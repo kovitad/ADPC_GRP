@@ -1,0 +1,12 @@
+# Local environment and secret material
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Raw correspondence may contain personal or infrastructure metadata
+*.eml
