@@ -1,16 +1,16 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 16 September 2026 (Increment 2 completed on `feat/increment-2-complete`; awaiting browser acceptance)
+**Updated:** 16 September 2026 (Increment 2 complete, Planner chat and map, Increment 1 built on the synthetic case; all awaiting browser acceptance)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Branches:** `main` (product baseline), `feat/increment-2-complete` (roles, AI usage limit, gateway, Langfuse; merge after browser test), and `experiment/planning-chat` (local AI chat prototype, not for merge)
+**Branches (stacked, merge in this order after acceptance):** `feat/increment-2-complete` → `feat/planner-chat-map` → `feat/increment-1-assessment`. `main` holds Phases A and B. `experiment/planning-chat` is superseded by `feat/planner-chat-map` and must not be merged.
 
 **Baseline:** `GRP-ARC-001` v2.2 plus product-owner scope change of 16 Sep: Increment 2 also delivers the Section 10 AI usage limit, AI gateway and Langfuse (spec places them in Increment 6).
 
 ## Current position
 
-Increment 0 is complete. **Increment 2 is complete in code** on `feat/increment-2-complete` (all four roles, Hub administration, security log, AI usage limit with automatic and manual reset, AI gateway, Langfuse). It still needs your browser acceptance test and the DEP-01 SIG app registration. **Increment 1 (golden assessment) has not started**: `api/assessments.py` and `worker/main.py` are stubs, and the golden and SIG fixture folders contain only READMEs. The spec's Alpha gate needs Increments 0 to 3, so Increment 1 is the critical path.
+Increment 0 is complete. **Increment 1 is built on the synthetic case** (see below). **Increment 2 is complete in code** on `feat/increment-2-complete` (all four roles, Hub administration, security log, AI usage limit with automatic and manual reset, AI gateway, Langfuse). It still needs your browser acceptance test and the DEP-01 SIG app registration. **Increment 1 (golden assessment) has not started**: `api/assessments.py` and `worker/main.py` are stubs, and the golden and SIG fixture folders contain only READMEs. The spec's Alpha gate needs Increments 0 to 3, so Increment 1 is the critical path.
 
 | Area | Current state on `main` |
 |---|---|
@@ -111,6 +111,41 @@ Not yet covered by tests: two different logins linking the same person at the sa
 - AI explains stored results only and stays off until Increment 6 is accepted.
 
 Any change to these rules needs an ADR and the approvals in Section 17.
+
+## Increment 1 status (branch `feat/increment-1-assessment`)
+
+Built and tested on the **synthetic** RP100 case (risk R-02). The signed Chiang Yuen case
+(DEP-04, DEP-06) is still missing; `tests/golden/chiang_yuen_rp100` stays empty on purpose.
+
+| Part | State |
+|---|---|
+| Tables | Migration `20260916_0004`: `boundary`, `dataset`, `dataset_version`, `feature`, `method`, `assessment`, `assessment_feature`. 15 of 16 spec tables exist (`assessment_export` is Increment 4). Geometry is GeoJSON with SHA-256, not PostGIS columns yet |
+| Storage | `core/storage.py` `LocalStorage`: generated keys, fingerprint on put, never overwrites different bytes, windowed raster open |
+| Method | `core/gis.py` `center-flood-overlay` 1.0.0, status **draft**. In boundary only; one-pixel windowed read; NoData and outside coverage are `unable_to_assess`, never not exposed |
+| Result rules | `core/result_rules.py` Section 8.4 checks before saving |
+| API | `POST /assessments` (Section 8.2 order, pinned inputs, Idempotency-Key, 202 + Location + Retry-After, 10/hour), `GET /assessments`, `/{id}`, `/{id}/result`, `/{id}/centers`, `POST /{id}/cancel`, `GET /catalog/boundaries|datasets|methods`. Other Hubs 404. API never imports GIS libraries |
+| Worker | `SKIP LOCKED` claim, 15-minute lease with expired-lease reclaim, membership and fingerprint recheck, locked result in one transaction, temporary-error retry up to 3, cancel wins over a running job. Disabling a member cancels their queued jobs |
+| Golden test | `tests/golden/test_synthetic_rp100.py` compares the API result to hand-designed `expected_summary.json` and `expected_centers.csv` exactly, plus stop-safely, idempotency, cancel and cross-Hub tests. CI installs the `gis` extra |
+| Screen | `/assessments.html`: choose area, scenario, centers (platform vs saved local), method; watch job; totals, map by status, center table with reason meaning, trust labels, sources, gaps, limits; recent jobs with cancel. Yellow SYNTHETIC banner |
+| Verified 16 Sep | 184 offline tests pass; on Docker Desktop PostgreSQL the worker claimed a queued job and saved 7 in scope, 3 exposed, 2 not exposed, 2 unable, 1 excluded — equal to the golden file. That check left one local job with support ref `GRP-E2E-CHK` |
+
+Synthetic design: 7 centers in a 0.15° × 0.1° box near lon 100.0–100.15, lat 15.0–15.1. The flood depth is 1.2 m and 0.6 m in the west and 0 m in the east. There is one NoData patch, the raster stops at lon 100.12, and one center sits outside the district. It is not a real place or scientific data.
+
+Remaining for Increment 1 acceptance:
+
+- [ ] DEP-04 and DEP-06: signed Chiang Yuen boundary, flood layer, centers, method approval and expected result. Then add `tests/golden/chiang_yuen_rp100` and a real seed
+- [ ] Method approval (`status: approved`); drafts run only where `ALLOW_DRAFT_METHODS=true` (Docker Desktop)
+- [ ] PostGIS geometry columns and a boundary loader for real admin data
+- [ ] Lease renewal for long jobs (current jobs finish in well under a minute)
+- [ ] PostgreSQL CI job for migrations and two workers claiming at once
+
+Browser test for Increment 1 (Docker Desktop):
+
+1. Sign in at `http://127.0.0.1:8000/admin`, open **Assessments**
+2. Keep Synthetic Test District, RP100, Synthetic evacuation centers, center-flood-overlay 1.0.0 (draft) → **Run assessment**
+3. Within a few seconds the state becomes `succeeded`: totals 7 / 3 / 2 / 2, map with orange, green and grey dots, and a table with reasons
+4. Check the yellow SYNTHETIC banner, "Scientifically approved: no", and the Sources, gaps and limits section
+5. Run again and cancel it quickly from Recent assessments (may already be finished)
 
 ## Known gaps after Increment 2
 

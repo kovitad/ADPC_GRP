@@ -32,7 +32,6 @@ from core.assessment_models import (
     Feature,
     Method,
 )
-from core.gis import CenterInput, MethodInputError, run_center_flood_overlay
 from core.models import AssessmentState
 from core.result_rules import count_results, validate_center_results
 from core.storage import LocalStorage
@@ -218,6 +217,9 @@ def _submitter_still_allowed(session: Session, assessment: Assessment) -> bool:
 
 def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) -> str:
     """Run one claimed job to a final state. Returns the resulting state."""
+
+    # GIS libraries load only in the worker; the API never imports them (AD-03).
+    from core.gis import CenterInput, MethodInputError, run_center_flood_overlay
 
     assessment = session.get(Assessment, assessment_id)
     if assessment is None or assessment.state != AssessmentState.RUNNING:

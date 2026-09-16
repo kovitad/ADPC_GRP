@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN groupadd --system --gid 10001 grp \
     && useradd --system --uid 10001 --gid grp --home-dir /nonexistent grp \
     && apt-get update \
-    && apt-get install --yes --no-install-recommends gosu \
+    && apt-get install --yes --no-install-recommends gosu libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
