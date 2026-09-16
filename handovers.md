@@ -18,9 +18,9 @@ The repository now provides a tested, architecture-aligned foundation for the AD
 | Worker | Runnable process and shutdown handling exist; PostgreSQL job claiming and GIS processing are not implemented |
 | Database | The first forward-only migration implements `hub`, `app_user`, `external_identity`, `hub_membership`, and `audit_event`; the remaining architecture tables are pending |
 | Deployment | Idempotent Ubuntu bootstrap, source/image release modes, GHCR publishing, hardened secret staging, Compose services, host Caddy configuration, and an operator runbook exist; the VM has not yet been bootstrapped from this repository |
-| Web | Responsive SERVIR sign-in, unavailable/failed/pending states, and a protected membership view exist; registration is intentionally absent |
+| Web | Registration for existing SIG accounts, SERVIR sign-in, unavailable/failed/pending states, and a protected membership/Admin view exist |
 | Access administration | A protected Platform Admin panel/API lists pending verified identities and assigns `planner`/`admin`; idempotent CLI commands provide bootstrap and recovery |
-| Tests and CI | Seventeen offline tests cover liveness, result invariants, route classification, OIDC verification, unknown-user denial, protected admin assignment, membership mapping, and UI guardrails |
+| Tests and CI | Nineteen offline tests cover liveness, result invariants, route classification, registration guardrails, OIDC verification, unknown-user denial, protected admin assignment, and membership mapping |
 
 ## Architecture guardrails
 
@@ -42,7 +42,7 @@ The current foundation has passed:
 
 ```text
 Ruff                       passed
-pytest                     17 passed
+pytest                     19 passed
 Python dependency check    passed
 Compose model validation   passed
 Deployment shell syntax    passed locally

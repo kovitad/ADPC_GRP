@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now has a standard OIDC adapter, signed sessions, pre-authorized Hub membership mapping, a pending-access audit queue, five access/audit tables, and a protected membership view. Live sign-in still requires a dedicated GRP application in the SERVIR identity system and its credentials. The assessment queue, GIS processing, downloads, AI, and live SIG evidence connection remain unimplemented.
+> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now has existing-SIG-account registration, a standard OIDC adapter, signed sessions, Hub membership mapping, a pending-access queue, five access/audit tables, and a protected Admin workspace. Live sign-in still requires a dedicated GRP application in the SERVIR identity system and its credentials. The assessment queue, GIS processing, downloads, AI, and live SIG evidence connection remain unimplemented.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -29,7 +29,7 @@ worker/           Background job and GIS-worker boundary
 core/             Shared models, validation, result rules, and storage protocol
 migrations/       Alembic environment and versioned database migrations
 grp/              Server-side access administration commands
-web/              Responsive sign-in and protected membership screens
+web/              Existing-SIG registration, sign-in, and protected workspace screens
 deploy/           Ubuntu Compose, Caddy, and deployment guidance
 tests/            Fast, contract, golden, live, and load test layers
 docs/adr/         Architecture decision records
@@ -60,7 +60,7 @@ Open `http://127.0.0.1:4173`. This static preview does not proxy API requests; a
 
 ## Sign-in and membership mapping
 
-GRP has no self-registration screen. SERVIR verifies identity; GRP grants access only when the verified email matches an active `app_user` with an active `hub_membership` (or a Platform Admin). An unknown verified identity creates an `identity_link_denied` audit event for administrator review, but no user, external identity, or membership record. After an administrator assigns a Hub role, the user retries sign-in and GRP links the external identity.
+GRP registration is only for people who already have a SIG/SERVIR account. It collects no local password or unverified identity data: the applicant must complete SERVIR authentication before a pending request appears. An unknown verified identity creates an `identity_link_denied` audit event for administrator review, but no user, external identity, or membership record. After an administrator assigns a Hub role, the user returns to sign in and GRP links the external identity.
 
 Architecture roles are `planner`, Hub `admin`, and Platform Admin. A SIG “Hub Expert” maps to the least-privilege GRP role, normally `planner`; it is not a separate GRP role. See [`docs/access-management.md`](docs/access-management.md) for the table map and provisioning commands.
 

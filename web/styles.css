@@ -457,6 +457,46 @@ a {
   text-align: center;
 }
 
+.registration-steps {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.registration-steps li {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--ink-700);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.registration-steps span {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--forest-900);
+  color: var(--lime-200);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.registration-limit {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  background: var(--sand-100);
+  color: var(--ink-700);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 .auth-footer {
   display: flex;
   flex-wrap: wrap;

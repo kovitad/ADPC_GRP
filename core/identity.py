@@ -70,7 +70,12 @@ def load_active_memberships(session: Session, user_id: UUID) -> tuple[Membership
     )
 
 
-def _audit_denial(session: Session, identity: VerifiedIdentity, reason: str) -> None:
+def _audit_denial(
+    session: Session,
+    identity: VerifiedIdentity,
+    reason: str,
+    request_intent: str,
+) -> None:
     notification = (
         "membership_assignment_required"
         if reason in {"membership_assignment_required", "no_active_membership"}
@@ -86,6 +91,7 @@ def _audit_denial(session: Session, identity: VerifiedIdentity, reason: str) -> 
                 "verified_email": identity.verified_email.lower(),
                 "provider_kind": identity.provider_kind,
                 "reason": reason,
+                "request_intent": request_intent,
                 "admin_notification": notification,
             },
             result=AuditResult.DENIED,
@@ -97,6 +103,8 @@ def link_verified_identity(
     session: Session,
     identity: VerifiedIdentity,
     now: datetime | None = None,
+    *,
+    request_intent: str = "sign_in",
 ) -> IdentityLinkResult:
     """Link a verified login only after an active GRP access mapping exists."""
 
@@ -112,20 +120,22 @@ def link_verified_identity(
     if external is not None:
         user = session.get(AppUser, external.user_id)
         if external.disabled_at is not None or user is None or user.status != UserStatus.ACTIVE:
-            _audit_denial(session, identity, "identity_or_user_disabled")
+            _audit_denial(session, identity, "identity_or_user_disabled", request_intent)
             return IdentityLinkResult(allowed=False, reason="access_not_authorized")
     else:
         user = session.scalar(select(AppUser).where(AppUser.email == normalized_email))
         if user is None:
-            _audit_denial(session, identity, "membership_assignment_required")
+            _audit_denial(
+                session, identity, "membership_assignment_required", request_intent
+            )
             return IdentityLinkResult(allowed=False, reason="membership_assignment_required")
         if user.status != UserStatus.ACTIVE:
-            _audit_denial(session, identity, "user_disabled")
+            _audit_denial(session, identity, "user_disabled", request_intent)
             return IdentityLinkResult(allowed=False, reason="access_not_authorized")
 
     memberships = load_active_memberships(session, user.id)
     if not memberships and not user.is_platform_admin:
-        _audit_denial(session, identity, "no_active_membership")
+        _audit_denial(session, identity, "no_active_membership", request_intent)
         return IdentityLinkResult(allowed=False, reason="membership_assignment_required")
 
     if external is None:
@@ -151,7 +161,7 @@ def link_verified_identity(
                 )
             )
             if external is None or external.user_id != user.id:
-                _audit_denial(session, identity, "identity_link_conflict")
+                _audit_denial(session, identity, "identity_link_conflict", request_intent)
                 return IdentityLinkResult(allowed=False, reason="access_not_authorized")
         session.add(
             AuditEvent(

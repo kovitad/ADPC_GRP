@@ -36,7 +36,7 @@ def test_unknown_verified_identity_creates_only_a_pending_audit_event() -> None:
     )
 
     with Session(engine) as session:
-        result = link_verified_identity(session, identity)
+        result = link_verified_identity(session, identity, request_intent="register")
         session.commit()
 
         assert not result.allowed
@@ -47,6 +47,7 @@ def test_unknown_verified_identity_creates_only_a_pending_audit_event() -> None:
         assert event is not None
         assert event.action == "identity_link_denied"
         assert event.new_value["verified_email"] == "expert@example.test"
+        assert event.new_value["request_intent"] == "register"
         assert list_access_requests(session) == ["expert@example.test"]
 
 

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Register | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/register.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to registration</a>
+    <div class="auth-layout">
+      <aside class="brand-panel" aria-label="Registration requirements">
+        <div class="brand-panel__map" aria-hidden="true"></div>
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+          <span>ADPC Hub</span>
+        </div>
+
+        <div class="brand-story">
+          <p class="eyebrow eyebrow--light">Existing SIG account required</p>
+          <h1>Verified identity. Hub-approved access.</h1>
+          <p class="brand-summary">
+            Registration confirms your existing SERVIR identity and asks a GRP administrator to
+            assign the correct Hub role.
+          </p>
+        </div>
+
+        <p class="environment-label"><span></span> ADPC staging environment</p>
+      </aside>
+
+      <main class="auth-main" id="main-content">
+        <section class="auth-card" aria-labelledby="registration-title">
+          <div class="mobile-brand" aria-label="ADPC Hub">
+            <span class="brand-mark brand-mark--dark" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </span>
+            <span>ADPC Hub</span>
+          </div>
+
+          <div class="context-row">
+            <span class="context-badge">Access request</span>
+            <span class="context-code">GRP / ADPC</span>
+          </div>
+
+          <div class="auth-heading">
+            <p class="eyebrow">Existing SIG members</p>
+            <h2 id="registration-title">Register for GRP access</h2>
+            <p>
+              Use the SERVIR account you already use for SIG. GRP will verify that identity and
+              notify a Platform Admin to assign your Hub and role.
+            </p>
+          </div>
+
+          <div class="auth-alert" id="registration-alert" role="alert" hidden>
+            <span class="auth-alert__icon" aria-hidden="true">!</span>
+            <div>
+              <strong data-registration-title>Registration could not be completed</strong>
+              <p data-registration-message>Please try again or contact the platform administrator.</p>
+            </div>
+          </div>
+
+          <ol class="registration-steps">
+            <li><span>1</span>Authenticate with your existing SIG/SERVIR account.</li>
+            <li><span>2</span>A Platform Admin reviews your verified email.</li>
+            <li><span>3</span>After approval, return to the sign-in page.</li>
+          </ol>
+
+          <a class="button button--primary" href="/api/v1/auth/login?intent=register">
+            Verify existing SIG account
+            <span class="button__arrow" aria-hidden="true">→</span>
+          </a>
+
+          <p class="registration-limit">
+            This does not create a SIG account or GRP password. If you cannot authenticate with
+            SERVIR, contact the SIG account administrator first.
+          </p>
+
+          <a class="button button--secondary" href="/">Return to sign in</a>
+        </section>
+
+        <footer class="auth-footer">
+          <span>© 2026 Asian Disaster Preparedness Center</span>
+          <span class="auth-footer__separator" aria-hidden="true">•</span>
+          <span>Authorized use only</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

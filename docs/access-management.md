@@ -2,12 +2,13 @@
 
 ## Sign-in flow
 
-GRP does not provide self-registration or store passwords. SERVIR authenticates a person through OIDC; GRP then authorizes the verified identity from its own records.
+GRP provides an access-request registration screen only for people with an existing SIG/SERVIR account. It never creates a SIG account or stores a password. SERVIR authenticates the person through OIDC; GRP then authorizes the verified identity from its own records.
 
-1. An unknown verified email is denied and recorded as `identity_link_denied`.
-2. A Platform Admin reviews the protected workspace queue and assigns a Hub plus `planner` or `admin` role.
-3. The person retries SERVIR sign-in. GRP links the issuer/subject identity and creates a signed session.
-4. Every protected request reloads the account and active memberships, so disabling access takes effect without waiting for session expiry.
+1. The applicant selects registration and authenticates with their existing SERVIR account.
+2. An unknown verified email is denied entry and recorded as `identity_link_denied`, which becomes the pending request.
+3. A Platform Admin reviews the protected workspace queue and assigns a Hub plus `planner` or `admin` role.
+4. The person returns to SERVIR sign-in. GRP links the issuer/subject identity and creates a signed session.
+5. Every protected request reloads the account and active memberships, so disabling access takes effect without waiting for session expiry.
 
 This first slice exposes the notification in the protected Platform Admin workspace, backed by the audit queue. It does not send email. Do not add a mailing integration without an approved sender, recipient policy, and operational owner.
 

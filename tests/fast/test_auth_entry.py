@@ -14,6 +14,15 @@ def test_login_entry_fails_closed_until_oidc_is_configured() -> None:
     assert response.headers["location"] == "/?auth=unavailable"
 
 
+def test_registration_entry_fails_closed_until_oidc_is_configured() -> None:
+    response = TestClient(app).get(
+        "/api/v1/auth/login?intent=register", follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/register.html?registration=unavailable"
+
+
 def test_sign_in_screen_uses_servir_without_local_password() -> None:
     page = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
@@ -22,8 +31,8 @@ def test_sign_in_screen_uses_servir_without_local_password() -> None:
     assert 'type="password"' not in page
     assert "does not create or store a" in page
     assert "separate password" in page
-    assert "Get access" not in page
-    assert "access.html" not in page
+    assert 'href="/register.html"' in page
+    assert "Register with an existing SIG account" in page
 
 
 def test_sign_in_screen_explains_admin_membership_assignment() -> None:
@@ -33,6 +42,18 @@ def test_sign_in_screen_explains_admin_membership_assignment() -> None:
     assert "First sign-in without a GRP membership is denied" in page
     assert "Administrator assignment required" in script
     assert "no active GRP membership was found" in script
+    assert "<form" not in page
+
+
+def test_registration_requires_an_existing_sig_account() -> None:
+    page = (WEB_ROOT / "register.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "register.js").read_text(encoding="utf-8")
+
+    assert "Existing SIG account required" in page
+    assert 'href="/api/v1/auth/login?intent=register"' in page
+    assert "does not create a SIG account or GRP password" in page
+    assert "Registration request received" in script
+    assert 'type="password"' not in page
     assert "<form" not in page
 
 
