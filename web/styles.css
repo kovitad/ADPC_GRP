@@ -1469,3 +1469,34 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
 .result-details { margin-top: 1rem; font-size: 0.8rem; color: #3b5651; }
 .result-details h3 { margin: 0.8rem 0 0.2rem; font-size: 0.8rem; }
 @media (max-width: 40rem) { .assessment-form { grid-template-columns: 1fr; } }
+
+/* Planning map workspace */
+.chat-mode { display: grid; gap: 0.35rem; margin: 0.75rem 0 0; font-size: 0.78rem; color: #3b5651; }
+.chat-mode label { display: flex; gap: 0.45rem; align-items: baseline; }
+.chat-mode small { color: #6d827e; }
+.map-toolbar__actions select { min-height: 2.2rem; border: 1px solid #cbd8d6; border-radius: 0.45rem; padding: 0 0.4rem; }
+.map-toolbar__actions .button { min-height: 2.2rem; padding: 0 0.8rem; border: 0; cursor: pointer; }
+.map-toolbar__actions .button:disabled { opacity: 0.5; cursor: not-allowed; }
+.layer-panel {
+  position: absolute;
+  z-index: 800;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  gap: 0.3rem;
+  width: min(15rem, 70%);
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  font-size: 0.72rem;
+  color: #243b37;
+}
+.layer-panel label { display: flex; gap: 0.35rem; align-items: center; }
+.layer-panel .is-disabled { color: #9aa7a4; }
+.layer-panel small { color: #7b8a87; line-height: 1.35; }
+.flood-legend, .center-legend { display: grid; gap: 0.15rem; padding-left: 1.2rem; color: #536c67; }
+.swatch { display: inline-block; width: 0.9rem; height: 0.6rem; border: 1px solid #cbd5e1; vertical-align: middle; }
+.dot--pending { background: #fff; border: 2px solid #374151; box-sizing: border-box; }
+.layer-panel__back { border: 1px solid #cbd8d6; border-radius: 0.4rem; background: #fff; cursor: pointer; }
+.map-stage { position: relative; }

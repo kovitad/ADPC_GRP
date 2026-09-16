@@ -13,6 +13,7 @@ from api import (
     auth,
     catalog,
     health,
+    maps,
     planning,
     platform,
     uploads,
@@ -32,7 +33,8 @@ app = FastAPI(
 register_error_handlers(app)
 
 for module in (
-    health, auth, access, admin, platform, planning, catalog, uploads, assessments, ai, audit, sig
+    health, auth, access, admin, platform, planning, maps, catalog,
+    uploads, assessments, ai, audit, sig,
 ):
     app.include_router(module.router, prefix="/api/v1")
 

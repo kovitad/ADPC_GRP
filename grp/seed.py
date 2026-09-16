@@ -22,6 +22,7 @@ from core.access_models import AuditEvent, AuditResult
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature, Method
 from core.db import session_scope
 from core.gis import METHOD_KEY, METHOD_VERSION, REASON_CODES
+from core.hazard_overlay import render_overlay
 from core.storage import LocalStorage
 from core.validation import canonical_sha256, centers_sha256
 
@@ -99,6 +100,19 @@ def write_flood_raster(path: Path) -> None:
         dataset.write(flood_depth_grid(), 1)
 
 
+def ensure_overlay(session: Session, storage: LocalStorage, version: DatasetVersion) -> None:
+    """Add the display-only flood overlay. It is a picture of the input, not an input, so
+    adding it to metadata does not change the pinned fingerprint."""
+
+    if version.meta.get("overlay_key") and storage.exists(str(version.meta["overlay_key"])):
+        return
+    overlay = render_overlay(
+        storage, str(version.storage_key), f"overlays/{version.sha256[:16]}/flood.png"
+    )
+    version.meta = {**version.meta, **overlay}
+    session.flush()
+
+
 def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
     existing = session.scalar(select(Boundary).where(Boundary.admin_code == ADMIN_CODE))
     if existing is not None:
@@ -115,6 +129,7 @@ def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
         method = session.scalar(
             select(Method).where(Method.key == METHOD_KEY, Method.version == METHOD_VERSION)
         )
+        ensure_overlay(session, storage, hazard)
         return SeedResult(False, str(existing.id), str(hazard.id), str(centers.id), str(method.id))
 
     boundary = Boundary(
@@ -173,6 +188,7 @@ def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
     )
     session.add_all([hazard_version, centers_version, method])
     session.flush()
+    ensure_overlay(session, storage, hazard_version)
     session.add_all(
         Feature(dataset_version_id=centers_version.id, name=name, lon=lon, lat=lat,
                 attributes={"type": "evacuation_center", "synthetic": True})

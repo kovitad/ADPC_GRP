@@ -21,8 +21,8 @@
         <span>SERVIR GRP</span>
       </a>
       <nav class="workspace-nav" aria-label="Workspace navigation">
-        <a class="workspace-nav__link" href="/assessments.html">Assessments</a>
         <a class="workspace-nav__link workspace-nav__link--active" href="/planning.html">Planning</a>
+        <a class="workspace-nav__link" href="/assessments.html">Assessments</a>
         <a class="workspace-nav__link" href="/workspace.html">My access</a>
       </nav>
       <div class="planning-user">
@@ -34,12 +34,11 @@
     <main class="planning-shell">
       <section class="assistant-pane" aria-labelledby="planning-title">
         <div class="assistant-heading">
-          <p class="eyebrow">Planning assistant · local test (ADR-0004)</p>
-          <h1 id="planning-title">Ask about flood planning</h1>
+          <p class="eyebrow">Planning workspace</p>
+          <h1 id="planning-title">Pick an area, run, ask</h1>
           <p>
-            Ask in your own words. The assistant can explain general ideas or check SIG flood
-            exposure evidence for a Thailand district. This is SIG generic evidence, not a GRP
-            assessment, and never a decision that a place is safe.
+            Choose a district on the map, run the flood screening, then ask the assistant about
+            the result. Answers never say a place is safe.
           </p>
         </div>
 
@@ -50,41 +49,35 @@
         </div>
         <p class="planning-banner" data-banner hidden></p>
 
+        <div class="chat-mode" role="radiogroup" aria-label="What the assistant uses">
+          <label>
+            <input type="radio" name="chat-mode" value="result" data-mode-result disabled />
+            <span>This result <small data-mode-result-label>(run an assessment first)</small></span>
+          </label>
+          <label>
+            <input type="radio" name="chat-mode" value="sig" data-mode-sig checked />
+            <span>General or SIG evidence <small>(any Thailand district)</small></span>
+          </label>
+        </div>
+
         <div class="assistant-conversation" aria-live="polite">
           <article class="assistant-message assistant-message--system">
             <span class="assistant-avatar" aria-hidden="true">AI</span>
             <div>
-              <p>
-                I can chat about flood planning or look up SIG flood exposure for a district. I
-                cannot change access, certify safety, or invent current data.
+              <p data-intro>
+                Click a district on the map to select it. After you run an assessment I can
+                explain which evacuation centers may be exposed and why.
               </p>
-              <strong>Try a suggestion or ask your own question.</strong>
             </div>
           </article>
-
-          <div class="planning-prompts" aria-label="Suggested questions">
-            <button type="button" data-suggestion="What is the difference between flood hazard, exposure and risk?">
-              Explain a concept
-              <span>General chat, no SIG data</span>
-            </button>
-            <button type="button" data-suggestion="Which schools and hospitals are exposed to flooding, and at what severity?">
-              Check exposure
-              <span>SIG evidence for the area below</span>
-            </button>
-          </div>
-
+          <div class="planning-prompts" aria-label="Suggested questions" data-prompts></div>
           <div class="chat-history" data-chat-history></div>
         </div>
 
         <form class="planning-question" data-question-form>
-          <label>
-            Area (Thailand district, used for SIG flood questions)
-            <input
-              name="place"
-              data-place
-              value="Mueang Nan District, Nan, Thailand"
-              maxlength="200"
-            />
+          <label data-place-row>
+            Area for SIG evidence (Thailand district)
+            <input name="place" data-place value="Mueang Nan District, Nan, Thailand" maxlength="200" />
           </label>
           <label>
             Your message
@@ -94,17 +87,14 @@
               rows="3"
               maxlength="1000"
               required
-              placeholder="Ask anything; the assistant will say what it can and cannot do…"
+              placeholder="Ask about the result or a planning question…"
             ></textarea>
           </label>
-          <label class="planning-publish">
+          <label class="planning-publish" data-publish-row>
             <input type="checkbox" data-publish-receipt />
-            Publish a public SIG receipt and show SIG's hazard map (creates a public record — use
-            public information only)
+            Publish a public SIG receipt and show SIG's hazard map (public record)
           </label>
-          <button class="button button--primary" type="submit" data-run-button>
-            Send message
-          </button>
+          <button class="button button--primary" type="submit" data-run-button>Send message</button>
           <p class="planning-status" data-planning-status aria-live="polite"></p>
           <p class="planning-status">Do not type private Hub data. Chat text is not saved.</p>
         </form>
@@ -113,16 +103,19 @@
       <section class="map-pane" aria-label="Map">
         <div class="map-toolbar">
           <div>
-            <span class="map-toolbar__label">Area</span>
-            <strong data-map-place>Thailand</strong>
+            <span class="map-toolbar__label">Selected area</span>
+            <strong data-area-name>Click a district on the map</strong>
           </div>
           <div class="map-toolbar__actions">
-            <button type="button" data-show-osm hidden>Back to OSM map</button>
-            <span class="map-state" data-map-state>No evidence yet</span>
+            <select data-scenario aria-label="Flood scenario"></select>
+            <button class="button button--primary" type="button" data-run-assessment disabled>
+              Run assessment
+            </button>
+            <span class="map-state" data-map-state>Loading layers…</span>
           </div>
         </div>
         <div class="map-stage">
-          <div id="risk-map" class="risk-map" aria-label="OpenStreetMap map"></div>
+          <div id="risk-map" class="risk-map" aria-label="OpenStreetMap map of Thailand"></div>
           <iframe
             class="sig-map"
             data-sig-map
@@ -131,12 +124,40 @@
             referrerpolicy="no-referrer"
             hidden
           ></iframe>
+          <div class="layer-panel" aria-label="Map layers">
+            <strong>Layers</strong>
+            <label><input type="checkbox" data-layer="districts" checked /> District outlines</label>
+            <label><input type="checkbox" data-layer="flood" checked /> <span data-flood-title>Flood depth</span></label>
+            <div class="flood-legend" data-flood-legend></div>
+            <label><input type="checkbox" data-layer="centers" checked /> Evacuation centers</label>
+            <div class="center-legend">
+              <span><i class="dot dot--exposed"></i> Potentially exposed</span>
+              <span><i class="dot dot--not"></i> Not exposed under this scenario</span>
+              <span><i class="dot dot--unable"></i> Unable to assess</span>
+              <span><i class="dot dot--pending"></i> Not assessed yet</span>
+            </div>
+            <label class="is-disabled" title="Arrives in Increment 6">
+              <input type="checkbox" data-layer="vulnerability" disabled /> Vulnerable people
+            </label>
+            <small data-vulnerability-note>Not available yet.</small>
+            <button type="button" class="layer-panel__back" data-show-osm hidden>Back to GRP map</button>
+          </div>
+        </div>
+        <div class="map-evidence" data-result-panel hidden>
+          <p class="synthetic-banner" data-synthetic hidden>
+            SYNTHETIC TEST DATA — invented inputs for software testing. Not a scientific result.
+          </p>
+          <p class="map-area" data-result-meta></p>
+          <div class="metric-grid" data-metrics></div>
+          <p class="map-area">
+            <a data-result-link href="/assessments.html">Open full result, sources and limits</a>
+          </p>
         </div>
         <div class="map-evidence" data-map-evidence hidden>
           <p class="map-area" data-area></p>
-          <div class="metric-grid" data-metrics></div>
+          <div class="metric-grid" data-sig-metrics></div>
           <details>
-            <summary>Sources, steps and declared gaps</summary>
+            <summary>SIG sources, steps and declared gaps</summary>
             <ol data-citations></ol>
             <ul data-trace></ul>
             <ul data-gaps></ul>

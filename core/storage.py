@@ -63,6 +63,9 @@ class LocalStorage:
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
 
+    def read_bytes(self, key: str) -> bytes:
+        return self._path(key).read_bytes()
+
     def sha256(self, key: str) -> str:
         return sha256_file(self._path(key))
 
