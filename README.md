@@ -53,17 +53,14 @@ Then open `http://127.0.0.1:8000/api/v1/healthz`. The public response intentiona
 
 The target is Ubuntu 24.04 at `staging-risk-servir.adpc.net`. Caddy runs on the host; the API is published only to `127.0.0.1:8000`; PostGIS has no host port.
 
-1. Install Docker Engine, the Compose plugin, and Caddy 2.
-2. Place the checkout under `/srv/grp/app`.
-3. Create `/srv/grp/data`, `/srv/grp/secrets`, and the secret files described in [`deploy/README.md`](deploy/README.md).
-4. Copy `.env.example` to `.env` and fill only environment-specific, non-secret values. Keep secret values in root-owned `0600` files.
-5. Validate and start the stack:
+The idempotent bootstrap installs the host dependencies, creates the filesystem layout and secrets, deploys the stack, and verifies health. It can either build from source on the VM or pull the prebuilt GHCR image:
 
 ```bash
-docker compose --env-file .env -f deploy/compose.yml config
-docker compose --env-file .env -f deploy/compose.yml up -d --build
-curl --fail http://127.0.0.1:8000/api/v1/healthz
+sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode source
+sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image
 ```
+
+Follow [`deploy/BOOTSTRAP.md`](deploy/BOOTSTRAP.md) for the first-run download commands, firewall safeguards, GHCR authentication, verification, and recovery steps. Use image mode for faster routine releases once the GitHub package is available.
 
 Do not expose ports `8000` or `5432` publicly. Do not enable AI until Increment 6 has passed its acceptance tests.
 

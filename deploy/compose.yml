@@ -21,6 +21,7 @@ services:
       - internal
 
   api:
+    image: ${GRP_IMAGE:-grp-api:local}
     build:
       context: ..
       dockerfile: deploy/Dockerfile
@@ -34,14 +35,24 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /srv/grp/data:/srv/grp/data
-      - /srv/grp/secrets:/srv/grp/secrets:ro
+      - /srv/grp/secrets:/run/source-secrets:ro
     read_only: true
     tmpfs:
-      - /tmp
+      - /run:rw,noexec,nosuid,nodev,size=1m
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
     networks:
       - internal
 
   worker:
+    image: ${GRP_IMAGE:-grp-api:local}
     build:
       context: ..
       dockerfile: deploy/Dockerfile
@@ -54,10 +65,19 @@ services:
         condition: service_healthy
     volumes:
       - /srv/grp/data:/srv/grp/data
-      - /srv/grp/secrets:/srv/grp/secrets:ro
+      - /srv/grp/secrets:/run/source-secrets:ro
     read_only: true
     tmpfs:
-      - /tmp
+      - /run:rw,noexec,nosuid,nodev,size=1m
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
     networks:
       - internal
 
