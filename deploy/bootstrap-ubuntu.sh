@@ -116,7 +116,7 @@ show_status() {
     else
         warn "checkout: missing"
     fi
-    for secret_name in postgres_password database_url session_secret servir_auth_client_secret; do
+    for secret_name in postgres_password database_url session_secret; do
         [ -s "$SECRETS_DIR/$secret_name" ] \
             && log "secret $secret_name: present" \
             || warn "secret $secret_name: missing"

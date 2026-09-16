@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now has existing-SIG-account registration, a standard OIDC adapter, signed sessions, Hub membership mapping, a pending-access queue, five access/audit tables, and a protected Admin workspace. Live sign-in still requires a dedicated GRP application in the SERVIR identity system and its credentials. The assessment queue, GIS processing, downloads, AI, and live SIG evidence connection remain unimplemented.
+> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now discovers the OAuth server from the SIG MCP resource, supports authorization-code/PKCE sign-in for existing SIG accounts, creates pending access requests, and enforces GRP-owned Hub membership. A localhost public client can be registered with the supplied command; staging still needs its own callback-specific client ID. Assessment, GIS, downloads, AI execution, and SIG evidence screens remain unimplemented.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -43,20 +43,30 @@ Python 3.12 is required.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-Copy-Item .env.example .env
 python -m pytest
-python -m uvicorn api.main:app --reload
+.\scripts\run-local.ps1 -RegisterSigClient
 ```
 
-Then open `http://127.0.0.1:8000/api/v1/healthz`. The public response intentionally contains no infrastructure detail.
+The first run creates ignored SQLite/session files and registers the exact localhost callback. Later runs use `.\scripts\run-local.ps1`. Open `http://127.0.0.1:8000/register.html`, choose **Continue with SIG**, and authenticate in SIG. A verified account without GRP membership returns to the pending screen.
 
-Preview the static sign-in screens separately:
+Bootstrap a different existing SIG user as Platform Admin, then create the ADPC Hub:
 
 ```powershell
-python -m http.server 4173 --directory web
+.\scripts\admin-local.ps1 bootstrap-platform-admin --email admin@example.org
+.\scripts\admin-local.ps1 ensure-hub --actor-email admin@example.org --code adpc --name "ADPC Hub"
 ```
 
-Open `http://127.0.0.1:4173`. This static preview does not proxy API requests; append `/?auth=pending` to review the membership-assignment state. In the deployed stack, login fails closed until the SERVIR issuer, client ID, redirect URI, and client-secret file are configured.
+Replace the sample with the administrator's verified SIG email. After that admin signs in, the protected workspace shows pending requests and can assign `planner` or `admin`. Authentication proves the SIG identity; only an active GRP membership grants application access. OAuth/MCP tokens remain server-side and are not persisted by this first slice.
+
+## LLM token preparation
+
+AI remains disabled, but both environment templates contain provider, model, base URL, output limit, and `AI_KEY_FILE_ADPC`. Store a local token through hidden input:
+
+```powershell
+python -m grp.configure set-ai-key
+```
+
+This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Enabling `AI_FEATURE_ENABLED` does not yet add LLM behavior.
 
 ## Sign-in and membership mapping
 

@@ -37,10 +37,9 @@ def _screen(state: str, intent: str = "sign_in") -> RedirectResponse:
 
 def _provider_configured(settings: Settings) -> bool:
     return bool(
-        settings.servir_auth_issuer
+        settings.sig_mcp_base_url
         and settings.servir_auth_client_id
         and settings.servir_auth_redirect_uri
-        and settings.servir_auth_client_secret_file.is_file()
         and settings.session_secret_file.is_file()
     )
 

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     servir_auth_client_id: str | None = None
     servir_auth_client_secret_file: Path = Path(".local/secrets/servir_auth_client_secret")
     servir_auth_redirect_uri: str | None = None
+    sig_mcp_base_url: str = "https://servirplatform.sig-gis.com/mcp"
     session_secret_file: Path = Path(".local/secrets/session_secret")
     session_idle_minutes: int = 60
     session_max_hours: int = 12
@@ -34,6 +35,11 @@ class Settings(BaseSettings):
     job_lease_minutes: int = 15
 
     ai_feature_enabled: bool = False
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    ai_base_url: str | None = None
+    ai_key_file_adpc: Path = Path(".local/secrets/ai_key_adpc")
+    ai_max_output_tokens: int = 800
     ai_timezone: str = "Asia/Bangkok"
     rate_limits: dict[str, int] = Field(
         default_factory=lambda: {

@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlencode, urlparse
 
@@ -28,8 +29,16 @@ class OidcMetadata:
     authorization_endpoint: str
     token_endpoint: str
     jwks_uri: str
+    userinfo_endpoint: str | None
+    registration_endpoint: str | None
     signing_algorithms: tuple[str, ...]
     token_auth_method: str
+
+
+@dataclass(frozen=True)
+class PublicClientRegistration:
+    client_id: str
+    issuer: str
 
 
 class HumanIdentityProvider(Protocol):
@@ -47,6 +56,94 @@ def generate_pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
+def _validate_endpoint(value: str, *, allow_insecure_localhost: bool = False) -> str:
+    parsed = urlparse(value)
+    if not parsed.hostname or parsed.username or parsed.password:
+        raise IdentityProviderError("Identity endpoint URL is invalid")
+    local_http = (
+        allow_insecure_localhost
+        and parsed.scheme == "http"
+        and parsed.hostname in {"127.0.0.1", "localhost"}
+    )
+    if parsed.scheme != "https" and not local_http:
+        raise IdentityProviderError("Identity endpoint must use HTTPS")
+    return value
+
+
+def _protected_resource_metadata_url(resource: str) -> str:
+    parsed = urlparse(resource)
+    suffix = parsed.path.rstrip("/")
+    return f"{parsed.scheme}://{parsed.netloc}/.well-known/oauth-protected-resource{suffix}"
+
+
+def _authorization_server_metadata_url(issuer: str) -> str:
+    parsed = urlparse(issuer)
+    suffix = parsed.path.rstrip("/")
+    return f"{parsed.scheme}://{parsed.netloc}/.well-known/oauth-authorization-server{suffix}"
+
+
+async def _discover_authorization_server(
+    client: httpx.AsyncClient,
+    resource: str,
+    configured_issuer: str | None = None,
+) -> str:
+    try:
+        response = await client.get(
+            _protected_resource_metadata_url(resource),
+            headers={"Accept": "application/json"},
+        )
+        response.raise_for_status()
+        document = response.json()
+        advertised_resource = str(document["resource"]).rstrip("/")
+        if not hmac.compare_digest(advertised_resource, resource):
+            raise IdentityProviderError("MCP resource metadata mismatch")
+        servers = tuple(str(value).rstrip("/") for value in document["authorization_servers"])
+        if not servers:
+            raise IdentityProviderError("MCP resource has no authorization server")
+        if configured_issuer:
+            issuer = configured_issuer.rstrip("/")
+            if not any(hmac.compare_digest(issuer, server) for server in servers):
+                raise IdentityProviderError(
+                    "Configured issuer is not authorized for the MCP resource"
+                )
+            return issuer
+        return servers[0]
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
+        raise IdentityProviderError("SIG MCP authorization metadata is unavailable") from error
+
+
+async def _openid_document(client: httpx.AsyncClient, issuer: str) -> dict[str, object]:
+    try:
+        response = await client.get(
+            f"{issuer}/.well-known/openid-configuration",
+            headers={"Accept": "application/json"},
+        )
+        response.raise_for_status()
+        document = response.json()
+        discovered_issuer = str(document["issuer"]).rstrip("/")
+        if not hmac.compare_digest(discovered_issuer, issuer):
+            raise IdentityProviderError("Identity issuer mismatch")
+        return document
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
+        raise IdentityProviderError("SERVIR sign-in metadata is unavailable") from error
+
+
+async def _oauth_document(client: httpx.AsyncClient, issuer: str) -> dict[str, object]:
+    try:
+        response = await client.get(
+            _authorization_server_metadata_url(issuer),
+            headers={"Accept": "application/json"},
+        )
+        response.raise_for_status()
+        document = response.json()
+        discovered_issuer = str(document["issuer"]).rstrip("/")
+        if not hmac.compare_digest(discovered_issuer, issuer):
+            raise IdentityProviderError("OAuth issuer mismatch")
+        return document
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
+        raise IdentityProviderError("SERVIR OAuth metadata is unavailable") from error
+
+
 class ServirSigIdentityProvider:
     def __init__(
         self,
@@ -54,44 +151,36 @@ class ServirSigIdentityProvider:
         *,
         client: httpx.AsyncClient | None = None,
     ) -> None:
-        if not settings.servir_auth_issuer:
-            raise IdentityProviderError("SERVIR issuer is not configured")
         if not settings.servir_auth_client_id:
             raise IdentityProviderError("SERVIR client ID is not configured")
         if not settings.servir_auth_redirect_uri:
             raise IdentityProviderError("SERVIR redirect URI is not configured")
         self.allow_insecure_localhost = settings.grp_env == "dev"
-        self.issuer = self._validate_endpoint(settings.servir_auth_issuer).rstrip("/")
+        self.resource = _validate_endpoint(settings.sig_mcp_base_url).rstrip("/")
+        self.configured_issuer = (
+            _validate_endpoint(settings.servir_auth_issuer).rstrip("/")
+            if settings.servir_auth_issuer
+            else None
+        )
         self.client_id = settings.servir_auth_client_id
-        self.client_secret = read_secret(settings.servir_auth_client_secret_file)
-        self.redirect_uri = self._validate_endpoint(settings.servir_auth_redirect_uri)
+        self.client_secret = (
+            read_secret(settings.servir_auth_client_secret_file)
+            if settings.servir_auth_client_secret_file.is_file()
+            else None
+        )
+        self.redirect_uri = _validate_endpoint(
+            settings.servir_auth_redirect_uri,
+            allow_insecure_localhost=self.allow_insecure_localhost,
+        )
         self.client = client or httpx.AsyncClient(timeout=10.0, follow_redirects=False)
         self._owns_client = client is None
 
-    def _validate_endpoint(self, value: str) -> str:
-        parsed = urlparse(value)
-        if not parsed.hostname or parsed.username or parsed.password:
-            raise IdentityProviderError("Identity endpoint URL is invalid")
-        local_http = (
-            self.allow_insecure_localhost
-            and parsed.scheme == "http"
-            and parsed.hostname in {"127.0.0.1", "localhost"}
-        )
-        if parsed.scheme != "https" and not local_http:
-            raise IdentityProviderError("Identity endpoint must use HTTPS")
-        return value
-
     async def _metadata(self) -> OidcMetadata:
+        issuer = await _discover_authorization_server(
+            self.client, self.resource, self.configured_issuer
+        )
+        document = await _openid_document(self.client, issuer)
         try:
-            response = await self.client.get(
-                f"{self.issuer}/.well-known/openid-configuration",
-                headers={"Accept": "application/json"},
-            )
-            response.raise_for_status()
-            document = response.json()
-            issuer = str(document["issuer"]).rstrip("/")
-            if not hmac.compare_digest(issuer, self.issuer):
-                raise IdentityProviderError("Identity issuer mismatch")
             algorithms = tuple(
                 algorithm
                 for algorithm in document.get("id_token_signing_alg_values_supported", [])
@@ -102,27 +191,35 @@ class ServirSigIdentityProvider:
             auth_methods = document.get(
                 "token_endpoint_auth_methods_supported", ["client_secret_basic"]
             )
+            preferred_methods = (
+                ("client_secret_basic", "client_secret_post")
+                if self.client_secret
+                else ("none",)
+            )
             token_auth_method = next(
-                (
-                    method
-                    for method in ("client_secret_basic", "client_secret_post")
-                    if method in auth_methods
-                ),
-                None,
+                (method for method in preferred_methods if method in auth_methods), None
             )
             if token_auth_method is None:
                 raise IdentityProviderError("No approved token endpoint authentication method")
+            userinfo_endpoint = document.get("userinfo_endpoint")
+            registration_endpoint = document.get("registration_endpoint")
             return OidcMetadata(
                 issuer=issuer,
-                authorization_endpoint=self._validate_endpoint(
-                    str(document["authorization_endpoint"])
+                authorization_endpoint=_validate_endpoint(str(document["authorization_endpoint"])),
+                token_endpoint=_validate_endpoint(str(document["token_endpoint"])),
+                jwks_uri=_validate_endpoint(str(document["jwks_uri"])),
+                userinfo_endpoint=(
+                    _validate_endpoint(str(userinfo_endpoint)) if userinfo_endpoint else None
                 ),
-                token_endpoint=self._validate_endpoint(str(document["token_endpoint"])),
-                jwks_uri=self._validate_endpoint(str(document["jwks_uri"])),
+                registration_endpoint=(
+                    _validate_endpoint(str(registration_endpoint))
+                    if registration_endpoint
+                    else None
+                ),
                 signing_algorithms=algorithms,
                 token_auth_method=token_auth_method,
             )
-        except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
+        except (KeyError, TypeError, ValueError) as error:
             raise IdentityProviderError("SERVIR sign-in metadata is unavailable") from error
 
     async def authorization_url(self, state: str, nonce: str, code_challenge: str) -> str:
@@ -133,6 +230,7 @@ class ServirSigIdentityProvider:
                 "redirect_uri": self.redirect_uri,
                 "response_type": "code",
                 "scope": "openid profile email",
+                "resource": self.resource,
                 "state": state,
                 "nonce": nonce,
                 "code_challenge": code_challenge,
@@ -151,13 +249,21 @@ class ServirSigIdentityProvider:
                 "code": code,
                 "redirect_uri": self.redirect_uri,
                 "code_verifier": code_verifier,
+                "resource": self.resource,
             }
-            token_auth: tuple[str, str] | None = (self.client_id, self.client_secret)
-            if metadata.token_auth_method == "client_secret_post":
+            token_auth: tuple[str, str] | None = None
+            if metadata.token_auth_method == "client_secret_basic":
+                if self.client_secret is None:
+                    raise IdentityProviderError("SERVIR client secret is unavailable")
+                token_auth = (self.client_id, self.client_secret)
+            elif metadata.token_auth_method == "client_secret_post":
+                if self.client_secret is None:
+                    raise IdentityProviderError("SERVIR client secret is unavailable")
                 token_data.update(
                     {"client_id": self.client_id, "client_secret": self.client_secret}
                 )
-                token_auth = None
+            else:
+                token_data["client_id"] = self.client_id
             token_response = await self.client.post(
                 metadata.token_endpoint,
                 data=token_data,
@@ -165,7 +271,9 @@ class ServirSigIdentityProvider:
                 headers={"Accept": "application/json"},
             )
             token_response.raise_for_status()
-            id_token = str(token_response.json()["id_token"])
+            token_document = token_response.json()
+            id_token = str(token_document["id_token"])
+            access_token = str(token_document["access_token"])
 
             jwks_response = await self.client.get(
                 metadata.jwks_uri, headers={"Accept": "application/json"}
@@ -186,21 +294,40 @@ class ServirSigIdentityProvider:
                 algorithms=[algorithm],
                 audience=self.client_id,
                 issuer=metadata.issuer,
-                options={"require": ["exp", "iat", "iss", "aud", "sub", "nonce", "email"]},
+                options={"require": ["exp", "iat", "iss", "aud", "sub", "nonce"]},
                 leeway=30,
             )
             if not hmac.compare_digest(str(claims["nonce"]), nonce):
                 raise IdentityProviderError("ID-token nonce mismatch")
-            if claims.get("email_verified") is not True:
+
+            identity_claims = claims
+            if not claims.get("email") or claims.get("email_verified") is not True:
+                if metadata.userinfo_endpoint is None:
+                    raise IdentityProviderError("SERVIR verified email is unavailable")
+                userinfo_response = await self.client.get(
+                    metadata.userinfo_endpoint,
+                    headers={
+                        "Accept": "application/json",
+                        "Authorization": f"Bearer {access_token}",
+                    },
+                )
+                userinfo_response.raise_for_status()
+                identity_claims = userinfo_response.json()
+                if not hmac.compare_digest(
+                    str(identity_claims.get("sub", "")), str(claims["sub"])
+                ):
+                    raise IdentityProviderError("SERVIR user-info subject mismatch")
+            if identity_claims.get("email_verified") is not True:
                 raise IdentityProviderError("SERVIR email is not verified")
-            email = str(claims["email"]).strip().lower()
+            email = str(identity_claims["email"]).strip().lower()
             if len(email) > 320 or email.count("@") != 1:
                 raise IdentityProviderError("SERVIR email claim is invalid")
+            display_name = identity_claims.get("name") or claims.get("name")
             return VerifiedIdentity(
                 issuer=str(claims["iss"]),
                 subject=str(claims["sub"]),
                 verified_email=email,
-                display_name=str(claims["name"]) if claims.get("name") else None,
+                display_name=str(display_name) if display_name else None,
             )
         except (httpx.HTTPError, jwt.PyJWTError, KeyError, TypeError, ValueError) as error:
             raise IdentityProviderError("SERVIR sign-in could not be verified") from error
@@ -208,3 +335,68 @@ class ServirSigIdentityProvider:
     async def close(self) -> None:
         if self._owns_client:
             await self.client.aclose()
+
+
+async def register_public_client(
+    *,
+    resource: str,
+    redirect_uri: str,
+    client_name: str,
+    issuer: str | None = None,
+    client: httpx.AsyncClient | None = None,
+) -> PublicClientRegistration:
+    """Register a PKCE public client through the SIG authorization server's DCR endpoint."""
+
+    validated_resource = _validate_endpoint(resource).rstrip("/")
+    validated_redirect = _validate_endpoint(redirect_uri, allow_insecure_localhost=True)
+    configured_issuer = _validate_endpoint(issuer).rstrip("/") if issuer else None
+    owns_client = client is None
+    http_client = client or httpx.AsyncClient(timeout=10.0, follow_redirects=False)
+    try:
+        discovered_issuer = await _discover_authorization_server(
+            http_client, validated_resource, configured_issuer
+        )
+        document = await _openid_document(http_client, discovered_issuer)
+        registration_endpoint = document.get("registration_endpoint")
+        if not registration_endpoint:
+            document = await _oauth_document(http_client, discovered_issuer)
+            registration_endpoint = document.get("registration_endpoint")
+        if not registration_endpoint:
+            raise IdentityProviderError("SERVIR dynamic client registration is unavailable")
+        response = await http_client.post(
+            _validate_endpoint(str(registration_endpoint)),
+            json={
+                "client_name": client_name,
+                "redirect_uris": [validated_redirect],
+                "token_endpoint_auth_method": "none",
+                "grant_types": ["authorization_code"],
+                "response_types": ["code"],
+            },
+            headers={"Accept": "application/json"},
+        )
+        response.raise_for_status()
+        registration = response.json()
+        if registration.get("token_endpoint_auth_method", "none") != "none":
+            raise IdentityProviderError("SERVIR did not register a public client")
+        client_id = str(registration["client_id"]).strip()
+        if not client_id:
+            raise IdentityProviderError("SERVIR registration returned no client ID")
+        return PublicClientRegistration(client_id=client_id, issuer=discovered_issuer)
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
+        raise IdentityProviderError("SERVIR client registration failed") from error
+    finally:
+        if owns_client:
+            await http_client.aclose()
+
+
+def write_client_id(path: Path, client_id: str) -> None:
+    """Persist the non-secret OAuth client identifier without overwriting another client."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        existing = path.read_text(encoding="utf-8").strip()
+        if existing and not hmac.compare_digest(existing, client_id):
+            raise IdentityProviderError(f"A different client ID already exists at {path}")
+        if existing:
+            return
+    path.write_text(f"{client_id}\n", encoding="utf-8")

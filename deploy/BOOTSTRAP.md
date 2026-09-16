@@ -31,7 +31,9 @@ Normal releases can pull the prebuilt GitHub Container Registry image and avoid 
 sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image
 ```
 
-The platform health endpoint works before identity-provider setup, but login remains unavailable. Register GRP as a dedicated SERVIR OIDC application, configure the issuer and client ID in `/srv/grp/app/.env`, and install the issued secret at `/srv/grp/secrets/servir_auth_client_secret` with root ownership and mode `0600`. Follow [`../docs/access-management.md`](../docs/access-management.md); a normal SIG user account is not an application credential.
+The platform health endpoint works before identity-provider setup, but login remains unavailable. Register a callback-specific SIG public PKCE client and put its non-secret ID in `SERVIR_AUTH_CLIENT_ID` in `/srv/grp/app/.env`. GRP discovers the issuer from `SIG_MCP_BASE_URL`; `SERVIR_AUTH_ISSUER` may pin the expected result. A public client has no client secret. Follow [`../docs/access-management.md`](../docs/access-management.md); a normal SIG user account is not an application credential.
+
+Prepare future LLM configuration without enabling it. Keep `AI_FEATURE_ENABLED=false`, set provider/model/base URL as non-secret values when approved, and place the token only in `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`.
 
 The `main` image is published by `.github/workflows/container.yml`. Make the package public in its GitHub package settings, or authenticate once if it remains private. Enter a token with `read:packages` without placing it in shell history:
 

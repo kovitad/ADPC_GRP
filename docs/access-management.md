@@ -5,22 +5,25 @@
 GRP provides an access-request registration screen only for people with an existing SIG/SERVIR account. It never creates a SIG account or stores a password. SERVIR authenticates the person through OIDC; GRP then authorizes the verified identity from its own records.
 
 1. The applicant selects registration and authenticates with their existing SERVIR account.
-2. An unknown verified email is denied entry and recorded as `identity_link_denied`, which becomes the pending request.
+2. An unknown verified email is denied entry and recorded as `identity_link_denied`, which becomes the pending request. The short-lived MCP access token is not stored.
 3. A Platform Admin reviews the protected workspace queue and assigns a Hub plus `planner` or `admin` role.
 4. The person returns to SERVIR sign-in. GRP links the issuer/subject identity and creates a signed session.
 5. Every protected request reloads the account and active memberships, so disabling access takes effect without waiting for session expiry.
 
 This first slice exposes the notification in the protected Platform Admin workspace, backed by the audit queue. It does not send email. Do not add a mailing integration without an approved sender, recipient policy, and operational owner.
 
-## SERVIR application configuration
+## SIG OAuth client configuration
 
-A SIG account is necessary but not sufficient. Register GRP as its own OIDC application with this exact staging callback:
+A SIG account is necessary but not sufficient. GRP discovers the authorization server from `SIG_MCP_BASE_URL` and requests the MCP resource audience. Register a callback-specific public PKCE client once:
 
-```text
-https://staging-risk-servir.adpc.net/api/v1/auth/callback
+```bash
+python -m grp.oauth register-client \
+  --redirect-uri https://staging-risk-servir.adpc.net/api/v1/auth/callback \
+  --client-name "ADPC GRP staging" \
+  --output-file .local/staging_servir_client_id
 ```
 
-Set `SERVIR_AUTH_ISSUER` and `SERVIR_AUTH_CLIENT_ID` in `/srv/grp/app/.env`. Write the issued client secret only to `/srv/grp/secrets/servir_auth_client_secret`, owned by root with mode `0600`, then redeploy. Never send that secret through Git or chat.
+Copy the resulting non-secret client ID into `SERVIR_AUTH_CLIENT_ID` in `/srv/grp/app/.env`. `SERVIR_AUTH_ISSUER` is an optional pin and otherwise comes from protected-resource discovery. A public client needs no client-secret file. If SIG provisions a confidential client instead, write its secret only to `/srv/grp/secrets/servir_auth_client_secret`, owned by root with mode `0600`. Never send secrets through Git or chat.
 
 ## Membership tables
 

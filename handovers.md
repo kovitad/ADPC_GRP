@@ -14,13 +14,13 @@ The repository now provides a tested, architecture-aligned foundation for the AD
 | Area | Current state |
 |---|---|
 | FastAPI | Application factory, configuration loading, public `/api/v1/healthz`, and internal `/api/v1/readyz` |
-| API modules | Standard OIDC authorization-code/PKCE flow, callback verification, signed sessions, and protected `/api/v1/me` exist; login fails closed until SERVIR configuration is supplied |
+| API modules | SIG MCP protected-resource discovery, OIDC authorization-code/PKCE, public or confidential clients, callback verification, signed sessions, and protected `/api/v1/me` exist |
 | Worker | Runnable process and shutdown handling exist; PostgreSQL job claiming and GIS processing are not implemented |
 | Database | The first forward-only migration implements `hub`, `app_user`, `external_identity`, `hub_membership`, and `audit_event`; the remaining architecture tables are pending |
 | Deployment | Idempotent Ubuntu bootstrap, source/image release modes, GHCR publishing, hardened secret staging, Compose services, host Caddy configuration, and an operator runbook exist; the VM has not yet been bootstrapped from this repository |
 | Web | Registration for existing SIG accounts, SERVIR sign-in, unavailable/failed/pending states, and a protected membership/Admin view exist |
 | Access administration | A protected Platform Admin panel/API lists pending verified identities and assigns `planner`/`admin`; idempotent CLI commands provide bootstrap and recovery |
-| Tests and CI | Nineteen offline tests cover liveness, result invariants, route classification, registration guardrails, OIDC verification, unknown-user denial, protected admin assignment, and membership mapping |
+| Tests and CI | Twenty-three offline tests cover liveness, result invariants, route classification, registration guardrails, OAuth discovery/registration, three token-auth modes, local setup, secret handling, unknown-user denial, protected admin assignment, and membership mapping |
 
 ## Architecture guardrails
 
@@ -42,7 +42,7 @@ The current foundation has passed:
 
 ```text
 Ruff                       passed
-pytest                     19 passed
+pytest                     23 passed
 Python dependency check    passed
 Compose model validation   passed
 Deployment shell syntax    passed locally
@@ -55,9 +55,9 @@ The access and existing-SIG registration implementation passed GitHub CI and the
 
 ## Configuration and security
 
-`.env.example` contains safe staging defaults and secret file paths only. The real `.env`, architecture sources, integration captures, and provisioning correspondence are intentionally ignored and are not in the public repository.
+`.env.example` and `.env.local.example` contain safe defaults and secret file paths only. The real `.env`, architecture sources, integration captures, and provisioning correspondence are intentionally ignored and are not in the public repository.
 
-On the server, secret values belong in root-owned files under `/srv/grp/secrets` with mode `0600`. Live login needs a SERVIR OIDC issuer, client ID, exact callback URI, and `servir_auth_client_secret`; a pre-existing SIG user account alone is insufficient. Do not put tokens, passwords, private keys, OAuth client secrets, or database credentials in Git, `.env`, container images, logs, screenshots, or issue comments.
+On the server, secret values belong in root-owned files under `/srv/grp/secrets` with mode `0600`. Live login needs a callback-specific client ID and exact callback URI; the issuer is discovered from the SIG MCP resource and can also be pinned. Public PKCE clients need no client secret. Do not put tokens, passwords, private keys, OAuth client secrets, or database credentials in Git, `.env`, container images, logs, screenshots, or issue comments. AI is still disabled; its future token path is prepared as `AI_KEY_FILE_ADPC`.
 
 Unknown verified identities are recorded in the audit table as pending access requests but do not create users, identity links, or memberships. The administrator notification appears in the protected Platform Admin workspace; the server-side `list-access-requests` command is the fallback. No email is sent. Provision roles with the audited workflow in [`docs/access-management.md`](docs/access-management.md).
 
@@ -69,7 +69,7 @@ For the first server run, download the reviewed bootstrap to `/srv/grp/bootstrap
 
 Proceed in this order:
 
-1. Register GRP as a dedicated application in SERVIR identity, set its exact staging callback, and install the client secret on the VM.
+1. Register a staging SIG public client for the exact HTTPS callback, put its client ID in `.env`, and complete a two-user live acceptance test (Platform Admin plus requester).
 2. Validate first Platform Admin and Hub membership provisioning using the documented CLI flow.
 3. Add PostgreSQL migration and cross-Hub isolation tests.
 4. Obtain the approved Chiang Yuen boundary, RP100 flood input, evacuation-center fixture, method, NoData rule, fingerprints, and signed expected result from the Scientific and Data Authority.
