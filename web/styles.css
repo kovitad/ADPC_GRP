@@ -287,6 +287,11 @@ a {
   text-transform: uppercase;
 }
 
+.context-badge--admin {
+  background: #fff0dc;
+  color: #815419;
+}
+
 .context-code {
   color: var(--ink-500);
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -455,6 +460,40 @@ a {
   font-size: 0.73rem;
   line-height: 1.55;
   text-align: center;
+}
+
+.support-copy--admin {
+  margin-top: 1rem;
+}
+
+.support-copy--admin a {
+  color: var(--forest-700);
+  font-weight: 800;
+}
+
+.admin-capabilities {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  color: var(--ink-700);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  list-style: none;
+}
+
+.admin-capabilities li {
+  position: relative;
+  padding-left: 1.4rem;
+}
+
+.admin-capabilities li::before {
+  position: absolute;
+  top: 0.12rem;
+  left: 0;
+  color: var(--forest-700);
+  content: "✓";
+  font-weight: 900;
 }
 
 .registration-steps {

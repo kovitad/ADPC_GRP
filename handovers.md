@@ -18,9 +18,9 @@ The repository now provides a tested, architecture-aligned foundation for the AD
 | Worker | Runnable process and shutdown handling exist; PostgreSQL job claiming and GIS processing are not implemented |
 | Database | The first forward-only migration implements `hub`, `app_user`, `external_identity`, `hub_membership`, and `audit_event`; the remaining architecture tables are pending |
 | Deployment | Idempotent Ubuntu bootstrap, source/image release modes, GHCR publishing, hardened secret staging, Compose services, host Caddy configuration, and an operator runbook exist; the VM has not yet been bootstrapped from this repository |
-| Web | Registration for existing SIG accounts, SERVIR sign-in, unavailable/failed/pending states, and a protected membership/Admin view exist |
+| Web | Existing-SIG registration, member sign-in, a dedicated `/admin` entry, authentication states, and a protected membership/approval view exist |
 | Access administration | A protected Platform Admin panel/API lists pending verified identities and assigns `planner`/`admin`; idempotent CLI commands provide bootstrap and recovery |
-| Tests and CI | Twenty-three offline tests cover liveness, result invariants, route classification, registration guardrails, OAuth discovery/registration, three token-auth modes, local setup, secret handling, unknown-user denial, protected admin assignment, and membership mapping |
+| Tests and CI | Twenty-six offline tests cover liveness, result invariants, route classification, registration/admin guardrails, OAuth discovery/registration, three token-auth modes, local setup, secret handling, unknown-user denial, protected admin assignment, and membership mapping |
 
 ## Architecture guardrails
 
@@ -42,7 +42,7 @@ The current foundation has passed:
 
 ```text
 Ruff                       passed
-pytest                     23 passed
+pytest                     26 passed
 Python dependency check    passed
 Compose model validation   passed
 Deployment shell syntax    passed locally

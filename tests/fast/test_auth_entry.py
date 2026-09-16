@@ -23,6 +23,22 @@ def test_registration_entry_fails_closed_until_oidc_is_configured() -> None:
     assert response.headers["location"] == "/register.html?registration=unavailable"
 
 
+def test_admin_entry_fails_closed_until_oidc_is_configured() -> None:
+    response = TestClient(app).get(
+        "/api/v1/auth/login?intent=admin", follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin-login.html?auth=unavailable"
+
+
+def test_admin_shortcut_opens_the_dedicated_login() -> None:
+    response = TestClient(app).get("/admin", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin-login.html"
+
+
 def test_sign_in_screen_uses_servir_without_local_password() -> None:
     page = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
@@ -55,6 +71,16 @@ def test_registration_requires_an_existing_sig_account() -> None:
     assert "Registration request received" in script
     assert 'type="password"' not in page
     assert "<form" not in page
+
+
+def test_admin_screen_uses_sig_and_explains_preprovisioning() -> None:
+    page = (WEB_ROOT / "admin-login.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "admin-login.js").read_text(encoding="utf-8")
+
+    assert 'href="/api/v1/auth/login?intent=admin"' in page
+    assert "does not grant administrator rights" in page
+    assert "Platform Admin authority required" in script
+    assert 'type="password"' not in page
 
 
 def test_workspace_renders_server_data_without_inner_html() -> None:

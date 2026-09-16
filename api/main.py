@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from api import access, admin, ai, assessments, audit, auth, catalog, health, uploads
@@ -18,6 +19,12 @@ app = FastAPI(
 
 for module in (health, auth, access, admin, catalog, uploads, assessments, ai, audit, sig):
     app.include_router(module.router, prefix="/api/v1")
+
+
+@app.get("/admin", include_in_schema=False)
+@app.get("/admin/", include_in_schema=False)
+def admin_login() -> RedirectResponse:
+    return RedirectResponse(url="/admin-login.html", status_code=303)
 
 if settings.grp_env == "dev":
     app.mount(

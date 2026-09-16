@@ -30,6 +30,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def _screen(state: str, intent: str = "sign_in") -> RedirectResponse:
     if intent == "register":
         location = f"/register.html?registration={state}"
+    elif intent == "admin":
+        location = f"/admin-login.html?auth={state}"
     else:
         location = f"/?auth={state}"
     return RedirectResponse(url=location, status_code=status.HTTP_303_SEE_OTHER)
@@ -51,7 +53,7 @@ def _provider_configured(settings: Settings) -> bool:
     openapi_extra={"x-grp-access": "public"},
 )
 async def begin_login(
-    intent: Literal["sign_in", "register"] = Query(default="sign_in"),
+    intent: Literal["sign_in", "register", "admin"] = Query(default="sign_in"),
 ) -> RedirectResponse:
     """Start an authorization-code flow against the configured SERVIR OIDC app."""
 
@@ -114,8 +116,8 @@ async def complete_login(
     intent = "sign_in"
     try:
         transaction = decode_auth_transaction(settings, transaction_cookie)
-        if transaction.get("intent") == "register":
-            intent = "register"
+        if transaction.get("intent") in {"register", "admin"}:
+            intent = transaction["intent"]
         if error or not code or not state:
             return _screen("failed", intent)
         if not hmac.compare_digest(transaction.get("state", ""), state):
@@ -137,6 +139,8 @@ async def complete_login(
 
     if not result.allowed:
         response = _screen("pending", intent)
+    elif intent == "admin" and not result.is_platform_admin:
+        response = _screen("not_admin", intent)
     else:
         response = RedirectResponse(url="/workspace.html", status_code=status.HTTP_303_SEE_OTHER)
         set_session_cookie(response, settings, result)

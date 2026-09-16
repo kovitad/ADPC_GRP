@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Platform Admin | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/admin-login.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to administrator sign in</a>
+    <div class="auth-layout">
+      <aside class="brand-panel" aria-label="Administrator access">
+        <div class="brand-panel__map" aria-hidden="true"></div>
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+          <span>ADPC Hub</span>
+        </div>
+
+        <div class="brand-story">
+          <p class="eyebrow eyebrow--light">Platform administration</p>
+          <h1>Approve access with accountable roles.</h1>
+          <p class="brand-summary">
+            Review identities verified by SIG, assign the correct Hub, and grant the minimum GRP
+            role required.
+          </p>
+        </div>
+
+        <p class="environment-label"><span></span> ADPC staging environment</p>
+      </aside>
+
+      <main class="auth-main" id="main-content">
+        <section class="auth-card" aria-labelledby="admin-sign-in-title">
+          <div class="mobile-brand" aria-label="ADPC Hub">
+            <span class="brand-mark brand-mark--dark" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </span>
+            <span>ADPC Hub</span>
+          </div>
+
+          <div class="context-row">
+            <span class="context-badge context-badge--admin">Restricted</span>
+            <span class="context-code">GRP / PLATFORM ADMIN</span>
+          </div>
+
+          <div class="auth-heading">
+            <p class="eyebrow">Administrator access</p>
+            <h2 id="admin-sign-in-title">Open the approval console</h2>
+            <p>
+              Authenticate with the SIG account that has already been provisioned as a GRP
+              Platform Admin. SIG proves identity; GRP verifies administrator authority.
+            </p>
+          </div>
+
+          <div class="auth-alert" id="admin-auth-alert" role="alert" hidden>
+            <span class="auth-alert__icon" aria-hidden="true">!</span>
+            <div>
+              <strong data-admin-alert-title>Administrator sign-in failed</strong>
+              <p data-admin-alert-message>Contact the platform owner for access.</p>
+            </div>
+          </div>
+
+          <ul class="admin-capabilities" aria-label="Administrator responsibilities">
+            <li>Review verified pending access requests</li>
+            <li>Assign the ADPC Hub and planner or admin role</li>
+            <li>Apply changes through the audited GRP workflow</li>
+          </ul>
+
+          <a class="button button--primary" href="/api/v1/auth/login?intent=admin">
+            Continue as Platform Admin
+            <span class="button__arrow" aria-hidden="true">→</span>
+          </a>
+
+          <p class="registration-limit">
+            This page does not grant administrator rights. The verified email must first be
+            bootstrapped in the GRP database by an authorized operator.
+          </p>
+
+          <a class="button button--secondary" href="/">Return to member sign in</a>
+        </section>
+
+        <footer class="auth-footer">
+          <span>© 2026 Asian Disaster Preparedness Center</span>
+          <span class="auth-footer__separator" aria-hidden="true">•</span>
+          <span>Restricted administration</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
