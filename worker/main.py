@@ -1,14 +1,21 @@
 import logging
 import signal
+import time
 from threading import Event
 
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
+from api.settings import get_settings
 from core.ai_allowance import release_stale_reservations
-from core.db import session_scope
+from core.assessment_jobs import claim_next_job, process_job
+from core.db import get_engine, session_scope
+from core.storage import LocalStorage
 
 logger = logging.getLogger("grp.worker")
 stop_event = Event()
+POLL_SECONDS = 3
+HOUSEKEEPING_SECONDS = 60
 
 
 def _request_stop(_signum: int, _frame: object) -> None:
@@ -16,15 +23,39 @@ def _request_stop(_signum: int, _frame: object) -> None:
 
 
 def run() -> None:
-    """Run the worker shell until the PostgreSQL job loop is implemented in Increment 1."""
+    """Claim and run assessment jobs; release stale AI reservations every minute."""
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     signal.signal(signal.SIGTERM, _request_stop)
     signal.signal(signal.SIGINT, _request_stop)
-    logger.warning("Worker started; assessment job claiming is not implemented yet (Increment 1)")
-    while not stop_event.wait(60):
-        release_reservations_once()
-        logger.info("Worker heartbeat")
+    settings = get_settings()
+    storage = LocalStorage(settings.storage_root)
+    logger.info("Worker started (lease %d min)", settings.job_lease_minutes)
+    last_housekeeping = 0.0
+    while not stop_event.is_set():
+        if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
+            release_reservations_once()
+            last_housekeeping = time.monotonic()
+            logger.info("Worker heartbeat")
+        if not run_one_job(storage, settings.job_lease_minutes):
+            stop_event.wait(POLL_SECONDS)
+
+
+def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:
+    """Claim and process at most one job. Returns True if a job was handled."""
+
+    try:
+        with Session(get_engine()) as session:
+            assessment_id = claim_next_job(session, lease_minutes=lease_minutes)
+            if assessment_id is None:
+                return False
+            logger.info("Claimed assessment %s", assessment_id)
+            state = process_job(session, storage, assessment_id)
+            logger.info("Assessment %s finished: %s", assessment_id, state)
+            return True
+    except SQLAlchemyError:
+        logger.exception("Job loop database error; will retry")
+        return False
 
 
 def release_reservations_once() -> int:

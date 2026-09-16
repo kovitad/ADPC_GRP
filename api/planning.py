@@ -20,6 +20,7 @@ from api.errors import GrpError, not_found
 from api.langfuse import send_ai_call
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
+from api.planning_access import planner_membership
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
@@ -70,19 +71,6 @@ class PlanningChat(BaseModel):
     hub_code: str | None = Field(default=None, max_length=64)
     publish_receipt: bool = False
     history: list[ChatTurn] = Field(default_factory=list, max_length=8)
-
-
-def _planner_membership(principal: CurrentPrincipal, hub_code: str | None) -> MembershipView:
-    """Planner or Hub Admin of the chosen Hub. Platform Admin alone is not enough (9.4)."""
-
-    members = [m for m in principal.memberships if m.role in {"planner", "admin"}]
-    if hub_code:
-        members = [m for m in members if m.hub_code == hub_code.strip().lower()]
-        if not members:
-            raise not_found()
-    if not members:
-        raise GrpError(403, "ACCESS_NOT_AUTHORIZED", "Access not authorized.")
-    return members[0]
 
 
 def _audit(
@@ -140,7 +128,7 @@ async def planning_chat(
     settings = get_settings()
     if not planning_chat_available(settings):
         raise not_found()
-    hub = _planner_membership(principal, payload.hub_code)
+    hub = planner_membership(principal, payload.hub_code)
     limiter.check(
         "ai_requests_per_person_per_hour",
         str(principal.user_id),

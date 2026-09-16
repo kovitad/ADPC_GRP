@@ -213,3 +213,4 @@ class AuditEvent(Base):
 
 # Register the AI usage tables on the shared metadata (imported last to avoid a cycle).
 from core import ai_models as _ai_models  # noqa: E402, F401
+from core import assessment_models as _assessment_models  # noqa: E402, F401

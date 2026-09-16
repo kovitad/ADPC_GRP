@@ -1,0 +1,23 @@
+# SYNTHETIC test case (risk R-02). Invented inputs for software testing only.
+# Not the Chiang Yuen golden case. Expected values were designed by hand from the seed
+# description in grp/seed.py, before the code was run, and must not be edited to pass a test.
+case: synthetic_rp100
+version: 1
+area:
+  name: Synthetic Test District
+  admin_code: SYN-TH-0001
+  polygon_lonlat: [[100.0, 15.0], [100.15, 15.0], [100.15, 15.1], [100.0, 15.1]]
+scenario:
+  hazard: flood
+  return_period_years: 100
+flood_layer:
+  crs: EPSG:4326
+  cell_degrees: 0.001
+  extent_lonlat: {west: 100.0, east: 100.12, south: 14.99, north: 15.11}
+  depth_rule: "1.2 m west of lon 100.02; 0.6 m from 100.02 to 100.05; 0 m east of 100.05"
+  nodata_patch: "lon 100.07-100.08, lat 15.05-15.06"
+method:
+  key: center-flood-overlay
+  version: 1.0.0
+  no_data_rule: "NoData or outside coverage is unable_to_assess, never not_exposed"
+question: "Which evacuation centers in the district may be exposed under the 100-year flood?"

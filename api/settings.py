@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     session_max_hours: int = 12
 
     worker_concurrency: int = 1
+    # Draft (not scientifically approved) methods may run only where this is true: local tests.
+    allow_draft_methods: bool = False
     job_lease_minutes: int = 15
 
     ai_feature_enabled: bool = False

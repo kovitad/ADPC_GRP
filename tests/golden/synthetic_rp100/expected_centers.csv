@@ -1,0 +1,8 @@
+name,status,reason_code,flood_depth_m
+Synthetic Clinic E,not_exposed_under_scenario,OUTSIDE_FLOOD_EXTENT,0.0
+Synthetic Gym F,unable_to_assess,NO_FLOOD_DATA,
+Synthetic Hall C,potentially_exposed,IN_FLOOD_EXTENT,0.6
+Synthetic School A,potentially_exposed,IN_FLOOD_EXTENT,1.2
+Synthetic School D,not_exposed_under_scenario,OUTSIDE_FLOOD_EXTENT,0.0
+Synthetic Shelter G,unable_to_assess,OUTSIDE_HAZARD_COVERAGE,
+Synthetic Temple B,potentially_exposed,IN_FLOOD_EXTENT,0.6

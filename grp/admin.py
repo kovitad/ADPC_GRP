@@ -407,6 +407,10 @@ def update_hub_member(
     membership.role = new_role
     membership.status = new_status
     membership.changed_by = actor.id
+    if new_status == MembershipStatus.DISABLED and old_value["status"] != new_status:
+        from core.assessment_jobs import cancel_queued_jobs_for_member
+
+        cancel_queued_jobs_for_member(session, user_id=membership.user_id, hub_id=hub.id)
     member_user = session.get(AppUser, membership.user_id)
     if member_user is not None:
         # The person gets a new session after any role or access change (Section 9.1).

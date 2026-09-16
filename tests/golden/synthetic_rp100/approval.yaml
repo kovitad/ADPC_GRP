@@ -1,0 +1,6 @@
+status: unsigned-synthetic
+approver: null
+approved_at: null
+note: >
+  Synthetic software test only. Replace with the signed Chiang Yuen RP100 case
+  (tests/golden/chiang_yuen_rp100) when the Scientific and Data Authority delivers DEP-04.

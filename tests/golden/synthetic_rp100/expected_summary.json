@@ -1,0 +1,7 @@
+{
+  "in_scope": 7,
+  "potentially_exposed": 3,
+  "not_exposed_under_scenario": 2,
+  "unable_to_assess": 2,
+  "excluded_outside_boundary": 1
+}
