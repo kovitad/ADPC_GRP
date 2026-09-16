@@ -1,0 +1,25 @@
+staging-risk-servir.adpc.net {
+    encode zstd gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        Content-Security-Policy "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+        -Server
+    }
+
+    handle /api/v1/readyz {
+        respond 404
+    }
+
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        root * /srv/grp/app/web
+        try_files {path} /index.html
+        file_server
+    }
+}

@@ -2,33 +2,34 @@
 
 ## Project Structure & Module Organization
 
-This repository is a compact architecture and integration-evidence workspace. Root-level Markdown files contain plans and procedures: `REFINED_MVP1_WORK_PLAN.md` defines delivery workstreams, while `SIG_MCP_CONNECTION_TEST.md` documents the MCP verification workflow. Files named `sig-mcp-*.json` are captured machine-readable evidence. The dated `.docx` file is a versioned architecture deliverable. Root-level `.eml` files preserve source correspondence and may contain sensitive headers. There is currently no application source tree, dependency manifest, asset directory, or automated test suite; do not describe referenced parent-workspace paths as if they exist in this checkout.
+The implementation follows the approved GRP boundaries. `api/` contains FastAPI modules for authentication, access, Admin, catalogs, uploads, assessments, AI, audit, health, and `integrations/sig`. `worker/` owns background GIS execution; web requests must never perform GIS work. `core/` holds shared domain models, validation, result invariants, database metadata, and the replaceable storage protocol. Alembic changes live in `migrations/`. Static frontend files are in `web/`; Ubuntu deployment assets are in `deploy/`. Tests are separated into `tests/fast`, `contract`, `golden`, `live`, and `load`. Record architecture changes in `docs/adr/`.
 
 ## Build, Test, and Development Commands
 
-No build step is required. Before submitting changes, run focused document checks from the repository root:
+Use Python 3.12. Common commands are:
 
-```powershell
-rg --files
-rg -n '^#{1,6} ' -g '*.md' .
-Get-Content -Raw .\sig-mcp-live-capture.json | ConvertFrom-Json | Out-Null
-python -m zipfile -t .\2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m ruff check .
+python -m uvicorn api.main:app --reload
+docker compose --env-file .env -f deploy/compose.yml config
 ```
 
-These commands inventory tracked artifacts, review heading structure, parse JSON, and verify that the Word package is not corrupt. Repeat the JSON check for every edited capture. Also open changed `.docx` files in Word or LibreOffice to inspect pagination, tables, and diagrams.
+`make install`, `make test`, `make lint`, and `make compose-config` provide the same workflows. Run `alembic upgrade head` separately during deployment; the application must not migrate automatically at startup.
 
 ## Coding Style & Naming Conventions
 
-Use UTF-8, ATX headings, sentence-case section titles, short paragraphs, and blank lines around lists and fenced blocks. Add a language tag to code fences. Keep JSON at two-space indentation and preserve captured field names and timestamps. Follow existing naming patterns: uppercase underscore-separated names for major Markdown deliverables, lowercase kebab-case for evidence captures, and `YYYY-MM-DD_<document-id>_<title>_vN.N.docx` for controlled documents. Prefer relative Markdown links.
+Use four-space Python indentation, type annotations, small modules, and Ruff-compatible formatting. Module and function names use `snake_case`; classes and enums use `PascalCase`; environment variables use `UPPER_SNAKE_CASE`. Keep API paths under `/api/v1`. Every documented operation must declare `x-grp-access` as `public`, `protected`, or `internal`. Use sentence-case Markdown headings and language-tagged code fences.
 
 ## Testing Guidelines
 
-Treat validation as evidence review: confirm JSON parses, internal links resolve, dates and receipt IDs agree across artifacts, and procedural commands remain reproducible. No coverage target applies. Never hand-edit captured results to make a run appear successful; document limitations alongside the evidence.
+Name tests `test_<behavior>.py` and test observable rules, including success, failure, and permission cases. Fast tests run offline on every push. Contract tests cover schemas, route classification, SIG fixtures, and cross-Hub denial. Golden expected values require scientific approval and must never be changed merely to pass CI. Live tests require staging credentials and must not issue public receipts automatically.
 
 ## Commit & Pull Request Guidelines
 
-This checkout contains no `.git` history, so an established commit convention cannot be inferred. Use concise, imperative, scoped subjects such as `docs: clarify MCP validation limits`. Pull requests should explain the purpose, list changed artifacts, report validation performed, and link the relevant decision or issue. Include screenshots only when a `.docx` layout change needs visual review.
+Use concise, imperative, scoped subjects such as `feat: add assessment queue contract` or `test: enforce route access labels`. Pull requests must explain the behavior, identify the architecture section or ADR, list validation performed, and call out migrations, security events, configuration, and API changes.
 
 ## Security & Configuration
 
-Do not commit OAuth tokens, provider keys, cookies, or unredacted session data. Review captures for credentials and personal data before committing; retain endpoint and protocol metadata only when it is intentionally part of the evidence record.
+Never commit `.env`, secret files, tokens, cookies, private keys, raw uploads, or provisioning correspondence. Keep secrets in `/srv/grp/secrets` with root ownership and mode `0600`; configuration references them through `_FILE` variables. Fail closed on unknown users, Hubs, areas, fingerprints, and upstream data.

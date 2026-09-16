@@ -1,0 +1,73 @@
+name: grp
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: grp
+      POSTGRES_USER: grp
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - grp_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grp -d grp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /srv/grp/data:/srv/grp/data
+      - /srv/grp/secrets:/srv/grp/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - internal
+
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["python", "-m", "worker.main"]
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /srv/grp/data:/srv/grp/data
+      - /srv/grp/secrets:/srv/grp/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - internal
+
+secrets:
+  postgres_password:
+    file: /srv/grp/secrets/postgres_password
+
+volumes:
+  grp_db:
+
+networks:
+  internal:
+    driver: bridge

@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adpc-grp"
+version = "0.1.0"
+description = "ADPC Hub implementation of the SERVIR Global Risk Platform"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "alembic>=1.14,<2",
+  "fastapi>=0.115,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.7,<3",
+  "sqlalchemy>=2.0,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8,<9",
+  "ruff>=0.9,<1",
+]
+gis = [
+  "rasterio>=1.4,<2",
+  "shapely>=2.0,<3",
+]
+
+[tool.setuptools.packages.find]
+include = ["api*", "core*", "worker*"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+  "contract: API and integration contract checks",
+  "golden: signed scientific golden-case checks",
+  "live: tests requiring approved staging services",
+  "load: performance and capacity checks",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

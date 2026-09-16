@@ -10,3 +10,24 @@ secrets/
 
 # Raw correspondence may contain personal or infrastructure metadata
 *.eml
+
+# Python and test artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local runtime state
+.local/
+*.log
+
+# Local architecture and integration evidence (not public source code)
+/2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx
+/REFINED_MVP1_WORK_PLAN.md
+/SIG_MCP_CONNECTION_TEST.md
+/sig-mcp-live-capture.json
+/sig-mcp-risk-validation.json
