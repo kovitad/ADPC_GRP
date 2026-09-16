@@ -13,7 +13,6 @@ from grp.admin import (
     ItemNotFound,
     LastAdminRequired,
     assign_member_as_actor,
-    list_access_requests,
     list_admin_hubs,
     list_hub_members,
     membership_access_message,
@@ -43,19 +42,6 @@ def authenticated_user(
 AuthenticatedUser = Annotated[CurrentPrincipal, Depends(authenticated_user)]
 
 
-def platform_admin(
-    request: Request,
-    session: DatabaseSession,
-) -> CurrentPrincipal:
-    principal = load_principal(request, session, get_settings())
-    if not principal.is_platform_admin:
-        raise access_not_authorized()
-    return principal
-
-
-PlatformAdmin = Annotated[CurrentPrincipal, Depends(platform_admin)]
-
-
 def _bad_request(error: ValueError) -> GrpError:
     """Map domain errors to Appendix D codes without revealing other Hubs."""
 
@@ -66,19 +52,6 @@ def _bad_request(error: ValueError) -> GrpError:
     if isinstance(error, HubAccessDenied):
         return access_not_authorized()
     return validation_failed(str(error))
-
-
-@router.get(
-    "/access-requests",
-    summary="List verified identities awaiting GRP membership",
-    openapi_extra={"x-grp-access": "protected"},
-)
-def pending_access_requests(
-    principal: PlatformAdmin,
-    session: DatabaseSession,
-) -> dict[str, list[dict[str, str]]]:
-    del principal
-    return {"requests": [{"email": email} for email in list_access_requests(session)]}
 
 
 @router.get(

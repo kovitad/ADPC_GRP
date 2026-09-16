@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from api.admin import authenticated_user, platform_admin
+from api.admin import authenticated_user
 from api.dependencies import database_session
 from api.main import app
 from api.sessions import CurrentPrincipal
@@ -55,24 +55,19 @@ def test_admin_access_queue_and_membership_assignment() -> None:
         session_id=str(uuid4()),
     )
     app.dependency_overrides[database_session] = test_session
-    app.dependency_overrides[platform_admin] = lambda: principal
     app.dependency_overrides[authenticated_user] = lambda: principal
     try:
         client = TestClient(app)
-        pending = client.get("/api/v1/admin/access-requests")
         assigned = client.post(
             "/api/v1/admin/hubs/adpc/members",
             json={"email": "expert@example.test", "role": "planner"},
         )
-        after = client.get("/api/v1/admin/access-requests")
     finally:
         app.dependency_overrides.clear()
 
-    assert pending.status_code == 200
-    assert pending.json() == {"requests": [{"email": "expert@example.test"}]}
     assert assigned.status_code == 200
     assert assigned.json()["changed"] is True
-    assert after.json() == {"requests": []}
+    assert "/api/v1/admin/access-requests" not in app.openapi()["paths"]
 
 
 def test_hub_admin_can_manage_own_hub_but_cannot_remove_last_admin() -> None:
@@ -228,7 +223,7 @@ def test_planner_cannot_manage_hub_or_read_another_hubs_members() -> None:
     assert add.status_code == 403
 
 
-def test_admin_access_queue_is_not_public() -> None:
+def test_admin_members_route_is_not_public() -> None:
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -240,7 +235,7 @@ def test_admin_access_queue_is_not_public() -> None:
 
     app.dependency_overrides[database_session] = test_session
     try:
-        response = TestClient(app).get("/api/v1/admin/access-requests")
+        response = TestClient(app).get("/api/v1/admin/hubs/adpc/members")
     finally:
         app.dependency_overrides.clear()
 

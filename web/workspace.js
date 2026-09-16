@@ -6,40 +6,14 @@
   const errorMessage = (payload, fallback) =>
     (payload && payload.error && payload.error.message) || fallback;
   const requestInput = document.querySelector("[data-request-email]");
-  const requestOptions = document.querySelector("[data-request-options]");
-  const requestCount = document.querySelector("[data-request-count]");
   const assignmentForm = document.querySelector("[data-assignment-form]");
   const assignmentStatus = document.querySelector("[data-assignment-status]");
   const assignButton = document.querySelector("[data-assign-button]");
   const adminMenu = document.querySelector("[data-admin-menu]");
-  const adminNavCount = document.querySelector("[data-admin-nav-count]");
   const hubSelect = document.querySelector("[data-hub-code]");
   const memberList = document.querySelector("[data-member-list]");
   const refreshMembers = document.querySelector("[data-refresh-members]");
   let currentIdentity = null;
-
-  const showPendingRequests = (requests) => {
-    requestOptions.replaceChildren();
-    requestCount.textContent = String(requests.length);
-    adminNavCount.textContent = String(requests.length);
-    requests.forEach((request) => {
-      const option = document.createElement("option");
-      option.value = request.email;
-      requestOptions.append(option);
-    });
-    if (!requestInput.value && requests.length > 0) requestInput.value = requests[0].email;
-  };
-
-  const loadPendingRequests = () =>
-    fetch("/api/v1/admin/access-requests", {
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error("Could not load pending requests");
-        return response.json();
-      })
-      .then((payload) => showPendingRequests(payload.requests));
 
   const memberControl = (value, options) => {
     const select = document.createElement("select");
@@ -151,14 +125,6 @@
     const adminPanel = document.querySelector("[data-admin-panel]");
     adminPanel.hidden = false;
     adminMenu.hidden = false;
-    if (identity.is_platform_admin) {
-      loadPendingRequests().catch(() => {
-        assignmentStatus.textContent = "Pending requests could not be loaded.";
-      });
-    } else {
-      requestCount.textContent = "Hub";
-      adminNavCount.textContent = "";
-    }
     loadAdminHubs().then(loadMembers).catch(() => {
       assignmentStatus.textContent = "Hub members could not be loaded.";
     });
@@ -223,7 +189,6 @@
         if (!response.ok) throw new Error(errorMessage(payload, "Membership could not be assigned"));
         assignmentStatus.textContent = payload.message;
         requestInput.value = "";
-        if (currentIdentity.is_platform_admin) await loadPendingRequests();
         await loadMembers();
       })
       .catch((error) => {

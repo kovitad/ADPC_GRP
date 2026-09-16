@@ -21,7 +21,6 @@
         <a class="workspace-nav__link workspace-nav__link--active" href="/workspace.html">My access</a>
         <a class="workspace-nav__link" data-admin-menu href="#admin-panel" hidden>
           Administration
-          <span class="workspace-nav__count" data-admin-nav-count>0</span>
         </a>
       </nav>
       <a class="workspace-signout" href="/api/v1/auth/logout">Sign out</a>
@@ -63,17 +62,16 @@
             <p class="eyebrow">Hub administration</p>
             <h2 id="admin-heading">Members and access</h2>
           </div>
-          <span class="request-count" data-request-count>0</span>
         </div>
         <p class="admin-card__intro">
-          Add an existing SERVIR account, assign the minimum Hub role, and turn access on or off.
-          Platform Admins can also review verified identities waiting for assignment.
+          Add a person by work email, assign the minimum Hub role, and turn access on or off. Then
+          copy the access message and send it. People without a SERVIR account are invited by SIG
+          first.
         </p>
         <form class="assignment-form" data-assignment-form>
           <label>
-            Verified email
-            <input data-request-email list="pending-access-emails" type="email" required />
-            <datalist id="pending-access-emails" data-request-options></datalist>
+            Work email
+            <input data-request-email type="email" autocomplete="off" required />
           </label>
           <label>
             Hub code

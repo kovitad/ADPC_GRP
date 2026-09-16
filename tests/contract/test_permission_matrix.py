@@ -30,7 +30,6 @@ ACTORS = ("anonymous", "planner", "hub_admin", "other_hub_admin", "platform_admi
 
 # route key -> expected status per actor, in ACTORS order.
 MATRIX = {
-    "list_access_requests": (401, 403, 403, 403, 200),
     "list_administered_hubs": (401, 200, 200, 200, 200),
     "list_members": (401, 403, 200, 404, 200),
     "add_member": (401, 403, 200, 404, 200),
@@ -112,8 +111,6 @@ def _client(world: dict, actor: str) -> tuple[TestClient, dict[str, str]]:
 
 def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, actor: str):
     member = world["planner_membership"]
-    if route == "list_access_requests":
-        return client.get("/api/v1/admin/access-requests")
     if route == "list_administered_hubs":
         return client.get("/api/v1/admin/hubs")
     if route == "list_members":
