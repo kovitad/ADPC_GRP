@@ -76,7 +76,8 @@ The local stack runs PostGIS, Alembic migrations, the API (with the web screens)
 .\scripts\docker-desktop.ps1 -AdminEmail you@adpc.net
 ```
 
-Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scriptsun-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
+Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scripts
+un-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
 
 ## Sign-in and membership mapping
 
