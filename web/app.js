@@ -1,33 +1,30 @@
 (() => {
   const parameters = new URLSearchParams(window.location.search);
   const alert = document.querySelector("#auth-alert");
+  const title = document.querySelector("[data-auth-alert-title]");
+  const message = document.querySelector("[data-auth-alert-message]");
+  const state = parameters.get("auth");
+  const states = {
+    unavailable: {
+      title: "Sign-in is temporarily unavailable",
+      message: "The SERVIR connection is not configured or cannot be reached. Please contact the platform administrator.",
+    },
+    failed: {
+      title: "Sign-in could not be completed",
+      message: "No GRP session was created. Return to SERVIR and try again, or contact the platform administrator.",
+    },
+    pending: {
+      title: "Administrator assignment required",
+      message: "Your SERVIR identity was verified, but no active GRP membership was found. An administrator can now assign your Hub and role; retry after they confirm access.",
+    },
+  };
 
-  if (alert && parameters.get("auth") === "unavailable") {
-    alert.hidden = false;
-    window.history.replaceState({}, "", window.location.pathname);
-  }
-
-  const copyButton = document.querySelector("[data-copy-template]");
-  const copyStatus = document.querySelector("[data-copy-status]");
-  const requestTemplate = document.querySelector("#access-request");
-
-  if (!copyButton || !copyStatus || !requestTemplate) {
+  if (!alert || !title || !message || !state || !states[state]) {
     return;
   }
 
-  if (!navigator.clipboard) {
-    copyButton.hidden = true;
-    copyStatus.textContent = "Select the message to copy it manually.";
-    return;
-  }
-
-  copyButton.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(requestTemplate.textContent.trim());
-      copyButton.textContent = "Copied";
-      copyStatus.textContent = "Access request copied to your clipboard.";
-    } catch {
-      copyStatus.textContent = "Could not copy automatically. Select the message and copy it manually.";
-    }
-  });
+  title.textContent = states[state].title;
+  message.textContent = states[state].message;
+  alert.hidden = false;
+  window.history.replaceState({}, "", window.location.pathname);
 })();

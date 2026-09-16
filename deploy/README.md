@@ -18,7 +18,7 @@ Start with the operational runbook in [`BOOTSTRAP.md`](BOOTSTRAP.md). The bootst
 /srv/grp/backup-staging/  temporary encrypted backup files
 ```
 
-The bootstrap creates `postgres_password`, `database_url`, and `session_secret` without overwriting existing values. Later increments require operator-supplied `servir_auth_client_secret`, `sig_service_token_hash`, `ai_key_adpc`, and `langfuse_secret_key` files.
+The bootstrap creates `postgres_password`, `database_url`, and `session_secret` without overwriting existing values. Live human sign-in now requires the operator-supplied `servir_auth_client_secret`; later increments require `sig_service_token_hash`, `ai_key_adpc`, and `langfuse_secret_key` files. See [`../docs/access-management.md`](../docs/access-management.md) for OIDC registration and first membership assignment.
 
 Compose mounts host secrets read-only. A root entrypoint copies them into a container-only tmpfs with ownership for UID `10001`, then starts GRP as that non-root user. Secret values must never appear in `.env`, Git, images, logs, shell history, or screenshots.
 

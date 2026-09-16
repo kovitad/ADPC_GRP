@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Workspace | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/workspace.js" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header class="workspace-header">
+      <a class="workspace-brand" href="/workspace.html" aria-label="GRP workspace">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span>SERVIR GRP</span>
+      </a>
+      <a class="workspace-signout" href="/api/v1/auth/logout">Sign out</a>
+    </header>
+
+    <main class="workspace-main" id="main-content">
+      <p class="eyebrow">Access confirmed</p>
+      <h1>Welcome to your GRP workspace</h1>
+      <p class="workspace-intro">
+        This initial workspace confirms the identity and membership mapping used by every protected
+        GRP feature.
+      </p>
+
+      <section class="identity-card" aria-labelledby="identity-heading">
+        <div class="identity-person">
+          <span class="identity-avatar" data-user-initial aria-hidden="true">…</span>
+          <div>
+            <h2 id="identity-heading" data-user-name>Loading membership…</h2>
+            <p data-user-email></p>
+          </div>
+        </div>
+        <span class="platform-admin-badge" data-platform-admin hidden>Platform Admin</span>
+
+        <div class="membership-section">
+          <h3>Hub memberships</h3>
+          <ul class="membership-list" data-memberships aria-live="polite"></ul>
+        </div>
+      </section>
+
+      <section class="admin-card" data-admin-panel hidden aria-labelledby="admin-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">Platform administration</p>
+            <h2 id="admin-heading">Pending access requests</h2>
+          </div>
+          <span class="request-count" data-request-count>0</span>
+        </div>
+        <p class="admin-card__intro">
+          These emails were verified by SERVIR but have no GRP mapping. Confirm the correct Hub
+          before assigning access.
+        </p>
+        <form class="assignment-form" data-assignment-form>
+          <label>
+            Verified email
+            <select data-request-email required></select>
+          </label>
+          <label>
+            Hub code
+            <input data-hub-code name="hub_code" value="adpc" required maxlength="64" />
+          </label>
+          <label>
+            GRP role
+            <select data-role name="role">
+              <option value="planner">Planner</option>
+              <option value="admin">Hub Admin</option>
+            </select>
+          </label>
+          <button class="button button--primary" data-assign-button type="submit">
+            Assign membership
+          </button>
+        </form>
+        <p class="assignment-status" data-assignment-status aria-live="polite"></p>
+      </section>
+
+      <p class="workspace-note" data-workspace-status>
+        Memberships are rechecked on every protected request. Ask an administrator if this mapping
+        is incorrect.
+      </p>
+    </main>
+  </body>
+</html>

@@ -51,11 +51,6 @@
             <span class="context-code">GRP / ADPC</span>
           </div>
 
-          <nav class="auth-nav" aria-label="Account access">
-            <a class="auth-nav__item is-active" href="/" aria-current="page">Sign in</a>
-            <a class="auth-nav__item" href="/access.html">Get access</a>
-          </nav>
-
           <div class="auth-heading">
             <p class="eyebrow">Welcome back</p>
             <h2 id="sign-in-title">Sign in to your Hub</h2>
@@ -68,8 +63,10 @@
           <div class="auth-alert" id="auth-alert" role="alert" hidden>
             <span class="auth-alert__icon" aria-hidden="true">!</span>
             <div>
-              <strong>Sign-in is temporarily unavailable</strong>
-              <p>Please try again later. If the problem continues, contact your Hub administrator.</p>
+              <strong data-auth-alert-title>Sign-in is temporarily unavailable</strong>
+              <p data-auth-alert-message>
+                Please try again later. If the problem continues, contact your Hub administrator.
+              </p>
             </div>
           </div>
 
@@ -91,15 +88,9 @@
             </p>
           </div>
 
-          <div class="card-divider"><span>New to GRP?</span></div>
-
-          <a class="button button--secondary" href="/access.html">
-            Learn how to get access
-          </a>
-
           <p class="support-copy">
-            Having trouble with an existing account? Contact your Hub administrator or the SERVIR
-            account team.
+            First sign-in without a GRP membership is denied and securely flagged for an
+            administrator. After your Hub and role are assigned, return here and try again.
           </p>
         </section>
 

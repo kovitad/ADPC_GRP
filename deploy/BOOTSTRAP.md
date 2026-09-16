@@ -31,6 +31,8 @@ Normal releases can pull the prebuilt GitHub Container Registry image and avoid 
 sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image
 ```
 
+The platform health endpoint works before identity-provider setup, but login remains unavailable. Register GRP as a dedicated SERVIR OIDC application, configure the issuer and client ID in `/srv/grp/app/.env`, and install the issued secret at `/srv/grp/secrets/servir_auth_client_secret` with root ownership and mode `0600`. Follow [`../docs/access-management.md`](../docs/access-management.md); a normal SIG user account is not an application credential.
+
 The `main` image is published by `.github/workflows/container.yml`. Make the package public in its GitHub package settings, or authenticate once if it remains private. Enter a token with `read:packages` without placing it in shell history:
 
 ```bash
@@ -65,6 +67,8 @@ sudo journalctl -u caddy --since "15 minutes ago" --no-pager
 ```
 
 Then verify `https://staging-risk-servir.adpc.net/api/v1/healthz` from an approved client. A healthy response is `{"status":"ok"}`.
+
+After OIDC configuration, open the staging root and complete SERVIR sign-in. Bootstrap the first Platform Admin and ADPC Hub before testing an ordinary Hub Expert account, using the commands in [`../docs/access-management.md`](../docs/access-management.md).
 
 ## Recovery and troubleshooting
 

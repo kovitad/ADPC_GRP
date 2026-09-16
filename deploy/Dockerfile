@@ -13,6 +13,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY api ./api
 COPY core ./core
+COPY grp ./grp
 COPY worker ./worker
 COPY migrations ./migrations
 COPY alembic.ini ./

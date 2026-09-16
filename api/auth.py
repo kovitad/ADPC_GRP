@@ -1,7 +1,43 @@
-from fastapi import APIRouter, status
+from __future__ import annotations
+
+import hmac
+import secrets
+
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 
+from api.dependencies import DatabaseSession
+from api.oidc import (
+    IdentityProviderError,
+    ServirSigIdentityProvider,
+    generate_pkce_pair,
+)
+from api.sessions import (
+    AUTH_TRANSACTION_COOKIE,
+    SESSION_COOKIE,
+    decode_auth_transaction,
+    encode_auth_transaction,
+    secure_cookie,
+    set_session_cookie,
+)
+from api.settings import Settings, get_settings
+from core.identity import link_verified_identity
+
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _screen(state: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/?auth={state}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+def _provider_configured(settings: Settings) -> bool:
+    return bool(
+        settings.servir_auth_issuer
+        and settings.servir_auth_client_id
+        and settings.servir_auth_redirect_uri
+        and settings.servir_auth_client_secret_file.is_file()
+        and settings.session_secret_file.is_file()
+    )
 
 
 @router.get(
@@ -10,11 +46,97 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     status_code=status.HTTP_303_SEE_OTHER,
     openapi_extra={"x-grp-access": "public"},
 )
-def begin_login() -> RedirectResponse:
-    """Return to the sign-in screen until the SERVIR OIDC adapter is configured."""
+async def begin_login() -> RedirectResponse:
+    """Start an authorization-code flow against the configured SERVIR OIDC app."""
 
-    return RedirectResponse(url="/?auth=unavailable", status_code=status.HTTP_303_SEE_OTHER)
+    settings = get_settings()
+    if not _provider_configured(settings):
+        return _screen("unavailable")
+    state = secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
+    verifier, challenge = generate_pkce_pair()
+    provider: ServirSigIdentityProvider | None = None
+    try:
+        provider = ServirSigIdentityProvider(settings)
+        location = await provider.authorization_url(state, nonce, challenge)
+        transaction = encode_auth_transaction(
+            settings,
+            {"state": state, "nonce": nonce, "code_verifier": verifier},
+        )
+    except (IdentityProviderError, OSError):
+        return _screen("unavailable")
+    finally:
+        if provider is not None:
+            await provider.close()
+    response = RedirectResponse(url=location, status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        AUTH_TRANSACTION_COOKIE,
+        transaction,
+        max_age=600,
+        httponly=True,
+        secure=secure_cookie(settings),
+        samesite="lax",
+        path="/api/v1/auth",
+    )
+    return response
 
 
-# Increment 2 continues with the SERVIR OIDC callback, logout, secure GRP
-# sessions, identity linking, and database-backed membership checks.
+@router.get(
+    "/callback",
+    summary="Complete SERVIR sign-in",
+    status_code=status.HTTP_303_SEE_OTHER,
+    openapi_extra={"x-grp-access": "public"},
+)
+async def complete_login(
+    request: Request,
+    session: DatabaseSession,
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    error: str | None = Query(default=None),
+) -> RedirectResponse:
+    """Verify the callback, link an approved member, and create a GRP session."""
+
+    if error or not code or not state:
+        return _screen("failed")
+    settings = get_settings()
+    transaction_cookie = request.cookies.get(AUTH_TRANSACTION_COOKIE)
+    if not transaction_cookie or not _provider_configured(settings):
+        return _screen("failed")
+    try:
+        transaction = decode_auth_transaction(settings, transaction_cookie)
+        if not hmac.compare_digest(transaction.get("state", ""), state):
+            return _screen("failed")
+        provider = ServirSigIdentityProvider(settings)
+        try:
+            identity = await provider.exchange_callback(
+                code,
+                transaction["nonce"],
+                transaction["code_verifier"],
+            )
+        finally:
+            await provider.close()
+        result = link_verified_identity(session, identity)
+        session.commit()
+    except (HTTPException, IdentityProviderError, KeyError, OSError):
+        session.rollback()
+        return _screen("failed")
+
+    if not result.allowed:
+        response = _screen("pending")
+    else:
+        response = RedirectResponse(url="/workspace.html", status_code=status.HTTP_303_SEE_OTHER)
+        set_session_cookie(response, settings, result)
+    response.delete_cookie(AUTH_TRANSACTION_COOKIE, path="/api/v1/auth")
+    return response
+
+
+@router.get(
+    "/logout",
+    summary="End the GRP session",
+    status_code=status.HTTP_303_SEE_OTHER,
+    openapi_extra={"x-grp-access": "public"},
+)
+def logout() -> RedirectResponse:
+    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response

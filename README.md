@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 foundation complete, with the sign-in and access-guidance UI delivered early. Health endpoints, module boundaries, configuration loading, deployment manifests, tests, and CI exist. Increment 1 has not started: database tables, migrations, the assessment queue, GIS processing, and the signed Chiang Yuen golden case remain to be implemented. The SERVIR OIDC adapter, sessions, membership enforcement, downloads, AI, and the live SIG evidence connection remain unimplemented.
+> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now has a standard OIDC adapter, signed sessions, pre-authorized Hub membership mapping, a pending-access audit queue, five access/audit tables, and a protected membership view. Live sign-in still requires a dedicated GRP application in the SERVIR identity system and its credentials. The assessment queue, GIS processing, downloads, AI, and live SIG evidence connection remain unimplemented.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -28,7 +28,8 @@ api/              FastAPI entry point and bounded API modules
 worker/           Background job and GIS-worker boundary
 core/             Shared models, validation, result rules, and storage protocol
 migrations/       Alembic environment and versioned database migrations
-web/              Responsive sign-in and Hub access-guidance screens
+grp/              Server-side access administration commands
+web/              Responsive sign-in and protected membership screens
 deploy/           Ubuntu Compose, Caddy, and deployment guidance
 tests/            Fast, contract, golden, live, and load test layers
 docs/adr/         Architecture decision records
@@ -55,7 +56,13 @@ Preview the static sign-in screens separately:
 python -m http.server 4173 --directory web
 ```
 
-Open `http://127.0.0.1:4173`. This static preview does not proxy API requests; append `/?auth=unavailable` to review the error state. In the deployed stack, the login entry returns to that state until the approved SERVIR OIDC adapter and GRP membership model are implemented.
+Open `http://127.0.0.1:4173`. This static preview does not proxy API requests; append `/?auth=pending` to review the membership-assignment state. In the deployed stack, login fails closed until the SERVIR issuer, client ID, redirect URI, and client-secret file are configured.
+
+## Sign-in and membership mapping
+
+GRP has no self-registration screen. SERVIR verifies identity; GRP grants access only when the verified email matches an active `app_user` with an active `hub_membership` (or a Platform Admin). An unknown verified identity creates an `identity_link_denied` audit event for administrator review, but no user, external identity, or membership record. After an administrator assigns a Hub role, the user retries sign-in and GRP links the external identity.
+
+Architecture roles are `planner`, Hub `admin`, and Platform Admin. A SIG “Hub Expert” maps to the least-privilege GRP role, normally `planner`; it is not a separate GRP role. See [`docs/access-management.md`](docs/access-management.md) for the table map and provisioning commands.
 
 ## Staging deployment
 
@@ -84,9 +91,9 @@ make compose-config  # validate the staging Compose model
 
 ## Delivery order
 
-Development follows the approved increments: server foundation; signed Chiang Yuen RP100 golden assessment; access and Admin; SIG sharing and evidence; review/downloads; additional data; vulnerability and AI; pilot hardening. No fallback geography, dataset, or provider is permitted.
+Development follows the approved increments: server foundation; signed Chiang Yuen RP100 golden assessment; access and Admin; SIG sharing and evidence; review/downloads; additional data; vulnerability and AI; pilot hardening. The access foundation was brought forward to support the requested SIG account test. No fallback geography, dataset, or provider is permitted.
 
-The next work is Increment 1: implement the architecture-defined database schema and first migration, then build the queued assessment workflow against a scientifically approved Chiang Yuen RP100 golden fixture. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
+The next assessment work is Increment 1: add its remaining architecture-defined tables and build the queued assessment workflow against a scientifically approved Chiang Yuen RP100 golden fixture. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
 
 ## Security
 

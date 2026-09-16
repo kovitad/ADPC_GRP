@@ -22,6 +22,11 @@ class Settings(BaseSettings):
 
     human_identity_provider: str = "servir_sig"
     auth_callback_path: str = "/api/v1/auth/callback"
+    servir_auth_issuer: str | None = None
+    servir_auth_client_id: str | None = None
+    servir_auth_client_secret_file: Path = Path(".local/secrets/servir_auth_client_secret")
+    servir_auth_redirect_uri: str | None = None
+    session_secret_file: Path = Path(".local/secrets/session_secret")
     session_idle_minutes: int = 60
     session_max_hours: int = 12
 

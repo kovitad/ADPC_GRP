@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.1.0"
 readonly DEFAULT_REPOSITORY="https://github.com/kovitad/ADPC_GRP.git"
 readonly DEFAULT_IMAGE="ghcr.io/kovitad/adpc_grp:main"
 readonly DEFAULT_DOMAIN="staging-risk-servir.adpc.net"
@@ -116,7 +116,7 @@ show_status() {
     else
         warn "checkout: missing"
     fi
-    for secret_name in postgres_password database_url session_secret; do
+    for secret_name in postgres_password database_url session_secret servir_auth_client_secret; do
         [ -s "$SECRETS_DIR/$secret_name" ] \
             && log "secret $secret_name: present" \
             || warn "secret $secret_name: missing"
