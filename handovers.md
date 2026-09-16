@@ -10,7 +10,7 @@
 
 ## Current position
 
-Increment 0 is complete. **Increment 1 is built on the synthetic case** (see below). **Increment 2 is complete in code** on `feat/increment-2-complete` (all four roles, Hub administration, security log, AI usage limit with automatic and manual reset, AI gateway, Langfuse). It still needs your browser acceptance test and the DEP-01 SIG app registration. **Increment 1 (golden assessment) has not started**: `api/assessments.py` and `worker/main.py` are stubs, and the golden and SIG fixture folders contain only READMEs. The spec's Alpha gate needs Increments 0 to 3, so Increment 1 is the critical path.
+Increment 0 is complete. **Increment 1 is built on the synthetic case** (see below). **Increment 2 is complete in code** on `feat/increment-2-complete` (all four roles, Hub administration, security log, AI usage limit with automatic and manual reset, AI gateway, Langfuse). It still needs your browser acceptance test and the DEP-01 SIG app registration. The Alpha gate still needs the signed Chiang Yuen golden case (DEP-04) and Increment 3 (SIG connection).
 
 | Area | Current state on `main` |
 |---|---|
