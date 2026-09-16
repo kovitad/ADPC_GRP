@@ -3,11 +3,13 @@ from __future__ import annotations
 import hmac
 import secrets
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 
 from api.dependencies import DatabaseSession
+from api.errors import GrpError
 from api.oidc import (
     IdentityProviderError,
     ServirSigIdentityProvider,
@@ -16,12 +18,16 @@ from api.oidc import (
 from api.sessions import (
     AUTH_TRANSACTION_COOKIE,
     SESSION_COOKIE,
+    clear_session_cookies,
     decode_auth_transaction,
+    decode_session_cookie,
     encode_auth_transaction,
+    revoke_user_sessions,
     secure_cookie,
     set_session_cookie,
 )
 from api.settings import Settings, get_settings
+from core.access_models import AppUser
 from core.identity import link_verified_identity
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -139,7 +145,9 @@ async def complete_login(
 
     if not result.allowed:
         response = _screen("pending", intent)
-    elif intent == "admin" and not result.is_platform_admin:
+    elif intent == "admin" and not (
+        result.is_platform_admin or any(item.role == "admin" for item in result.memberships)
+    ):
         response = _screen("not_admin", intent)
     else:
         location = "/workspace.html#admin-panel" if intent == "admin" else "/workspace.html"
@@ -155,7 +163,19 @@ async def complete_login(
     status_code=status.HTTP_303_SEE_OTHER,
     openapi_extra={"x-grp-access": "public"},
 )
-def logout() -> RedirectResponse:
+def logout(request: Request, session: DatabaseSession) -> RedirectResponse:
+    """End the GRP session on the server as well as in the browser (SIG sign-in is unchanged)."""
+
+    value = request.cookies.get(SESSION_COOKIE)
+    if value:
+        try:
+            user_id = UUID(decode_session_cookie(get_settings(), value)["user_id"])
+            user = session.get(AppUser, user_id)
+            if user is not None:
+                revoke_user_sessions(user)
+                session.commit()
+        except (GrpError, ValueError, OSError):
+            session.rollback()
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie(SESSION_COOKIE, path="/")
+    clear_session_cookies(response)
     return response

@@ -14,12 +14,12 @@
       message: "No GRP administrator session was created. Please try SIG sign-in again.",
     },
     pending: {
-      title: "Platform Admin provisioning required",
+      title: "GRP administrator provisioning required",
       message: "SIG verified this email, but it has not been provisioned for GRP access.",
     },
     not_admin: {
-      title: "Platform Admin authority required",
-      message: "This GRP account is active but is not a Platform Admin.",
+      title: "Administrator authority required",
+      message: "This GRP account is active but is not a Hub Admin or Platform Admin.",
     },
   };
 

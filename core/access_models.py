@@ -100,6 +100,7 @@ class AppUser(Base):
     display_name: Mapped[str | None] = mapped_column(String(200))
     is_platform_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sessions_valid_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
     )

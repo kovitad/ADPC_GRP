@@ -4,8 +4,9 @@ import argparse
 import re
 from dataclasses import dataclass
 from typing import Never
+from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.access_models import (
@@ -18,6 +19,7 @@ from core.access_models import (
     MembershipRole,
     MembershipStatus,
     UserStatus,
+    utc_now,
 )
 from core.db import session_scope
 
@@ -28,6 +30,18 @@ EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 class CommandResult:
     changed: bool
     message: str
+
+
+class LastAdminRequired(ValueError):
+    """Raised when a change would leave a Hub without an active Admin."""
+
+
+class HubAccessDenied(ValueError):
+    """Raised when a member of the Hub lacks the Admin role for the requested action."""
+
+
+class ItemNotFound(ValueError):
+    """Raised for unknown Hubs or members, and for Hubs the actor does not belong to."""
 
 
 def normalize_email(value: str) -> str:
@@ -42,6 +56,63 @@ def require_platform_admin(session: Session, email: str) -> AppUser:
     if actor is None or actor.status != UserStatus.ACTIVE or not actor.is_platform_admin:
         raise ValueError("The named actor is not an active Platform Admin")
     return actor
+
+
+def _active_actor(session: Session, actor_user_id: UUID) -> AppUser:
+    actor = session.get(AppUser, actor_user_id)
+    if actor is None or actor.status != UserStatus.ACTIVE:
+        raise ValueError("The named actor is not an active GRP user")
+    return actor
+
+
+def _active_hub(session: Session, hub_code: str) -> Hub:
+    hub = session.scalar(select(Hub).where(Hub.code == hub_code.strip().lower()))
+    if hub is None or hub.status != HubStatus.ACTIVE:
+        raise ItemNotFound("Active Hub does not exist")
+    return hub
+
+
+def require_hub_manager(session: Session, actor_user_id: UUID, hub: Hub) -> AppUser:
+    actor = _active_actor(session, actor_user_id)
+    if actor.is_platform_admin:
+        return actor
+    membership = session.scalar(
+        select(HubMembership).where(
+            HubMembership.hub_id == hub.id,
+            HubMembership.user_id == actor.id,
+            HubMembership.role == MembershipRole.ADMIN,
+            HubMembership.status == MembershipStatus.ACTIVE,
+        )
+    )
+    if membership is None:
+        belongs = session.scalar(
+            select(HubMembership.id).where(
+                HubMembership.hub_id == hub.id,
+                HubMembership.user_id == actor.id,
+                HubMembership.status == MembershipStatus.ACTIVE,
+            )
+        )
+        # Other-Hub requests look exactly like unknown Hubs (Section 13.1).
+        if belongs is None:
+            raise ItemNotFound("Active Hub does not exist")
+        raise HubAccessDenied("Hub Admin access required")
+    return actor
+
+
+def list_admin_hubs(session: Session, *, actor_user_id: UUID) -> list[dict[str, str]]:
+    actor = _active_actor(session, actor_user_id)
+    query = select(Hub).where(Hub.status == HubStatus.ACTIVE)
+    if not actor.is_platform_admin:
+        query = (
+            query.join(HubMembership, HubMembership.hub_id == Hub.id)
+            .where(
+                HubMembership.user_id == actor.id,
+                HubMembership.role == MembershipRole.ADMIN,
+                HubMembership.status == MembershipStatus.ACTIVE,
+            )
+        )
+    hubs = session.scalars(query.order_by(Hub.code)).all()
+    return [{"id": str(hub.id), "code": hub.code, "name": hub.name} for hub in hubs]
 
 
 def bootstrap_platform_admin(session: Session, email: str) -> CommandResult:
@@ -114,13 +185,29 @@ def assign_member(
     role: str,
 ) -> CommandResult:
     actor = require_platform_admin(session, actor_email)
+    return assign_member_as_actor(
+        session,
+        actor_user_id=actor.id,
+        email=email,
+        hub_code=hub_code,
+        role=role,
+    )
+
+
+def assign_member_as_actor(
+    session: Session,
+    *,
+    actor_user_id: UUID,
+    email: str,
+    hub_code: str,
+    role: str,
+) -> CommandResult:
     normalized_email = normalize_email(email)
     normalized_role = role.strip().lower()
     if normalized_role not in {MembershipRole.PLANNER, MembershipRole.ADMIN}:
         raise ValueError("Role must be planner or admin")
-    hub = session.scalar(select(Hub).where(Hub.code == hub_code.strip().lower()))
-    if hub is None or hub.status != HubStatus.ACTIVE:
-        raise ValueError("Active Hub does not exist")
+    hub = _active_hub(session, hub_code)
+    actor = require_hub_manager(session, actor_user_id, hub)
     user = session.scalar(select(AppUser).where(AppUser.email == normalized_email))
     if user is None:
         user = AppUser(email=normalized_email, status=UserStatus.ACTIVE)
@@ -162,6 +249,131 @@ def assign_member(
         )
     )
     return CommandResult(True, "Membership assigned")
+
+
+def list_hub_members(
+    session: Session, *, actor_user_id: UUID, hub_code: str
+) -> list[dict[str, object]]:
+    hub = _active_hub(session, hub_code)
+    require_hub_manager(session, actor_user_id, hub)
+    rows = session.execute(
+        select(HubMembership, AppUser)
+        .join(AppUser, AppUser.id == HubMembership.user_id)
+        .where(HubMembership.hub_id == hub.id)
+        .order_by(AppUser.email)
+    ).all()
+    return [
+        {
+            "id": str(membership.id),
+            "user_id": str(user.id),
+            "email": user.email,
+            "display_name": user.display_name,
+            "role": membership.role,
+            "status": membership.status,
+            "is_platform_admin": user.is_platform_admin,
+        }
+        for membership, user in rows
+    ]
+
+
+def update_hub_member(
+    session: Session,
+    *,
+    actor_user_id: UUID,
+    hub_code: str,
+    member_id: UUID,
+    role: str | None = None,
+    membership_status: str | None = None,
+) -> CommandResult:
+    hub = session.scalar(
+        select(Hub).where(Hub.code == hub_code.strip().lower()).with_for_update()
+    )
+    if hub is None or hub.status != HubStatus.ACTIVE:
+        raise ItemNotFound("Active Hub does not exist")
+    actor = require_hub_manager(session, actor_user_id, hub)
+    membership = session.scalar(
+        select(HubMembership).where(
+            HubMembership.id == member_id,
+            HubMembership.hub_id == hub.id,
+        )
+    )
+    if membership is None:
+        raise ItemNotFound("Hub membership does not exist")
+    new_role = role.strip().lower() if role is not None else membership.role
+    new_status = (
+        membership_status.strip().lower()
+        if membership_status is not None
+        else membership.status
+    )
+    if new_role not in {MembershipRole.PLANNER, MembershipRole.ADMIN}:
+        raise ValueError("Role must be planner or admin")
+    if new_status not in {MembershipStatus.ACTIVE, MembershipStatus.DISABLED}:
+        raise ValueError("Status must be active or disabled")
+    if membership.role == new_role and membership.status == new_status:
+        return CommandResult(False, "Membership already has those settings; no change")
+
+    removes_active_admin = (
+        membership.role == MembershipRole.ADMIN
+        and membership.status == MembershipStatus.ACTIVE
+        and (new_role != MembershipRole.ADMIN or new_status != MembershipStatus.ACTIVE)
+    )
+    if removes_active_admin:
+        other_admins = session.scalar(
+            select(func.count())
+            .select_from(HubMembership)
+            .where(
+                HubMembership.hub_id == hub.id,
+                HubMembership.id != membership.id,
+                HubMembership.role == MembershipRole.ADMIN,
+                HubMembership.status == MembershipStatus.ACTIVE,
+            )
+        )
+        if not other_admins:
+            raise LastAdminRequired("A Hub must keep at least one active Admin")
+
+    old_value = {"role": membership.role, "status": membership.status}
+    membership.role = new_role
+    membership.status = new_status
+    membership.changed_by = actor.id
+    member_user = session.get(AppUser, membership.user_id)
+    if member_user is not None:
+        # The person gets a new session after any role or access change (Section 9.1).
+        member_user.sessions_valid_after = utc_now()
+    action = "role_changed" if old_value["role"] != new_role else "access_status_changed"
+    session.add(
+        AuditEvent(
+            actor_user_id=actor.id,
+            actor_kind="person",
+            hub_id=hub.id,
+            action=action,
+            target_type="hub_membership",
+            target_id=str(membership.id),
+            old_value=old_value,
+            new_value={"role": new_role, "status": new_status},
+            result=AuditResult.SUCCESS,
+            support_ref="admin membership update",
+        )
+    )
+    return CommandResult(True, "Membership updated")
+
+
+def membership_access_message(
+    session: Session, *, actor_user_id: UUID, hub_code: str, member_id: UUID
+) -> str:
+    hub = _active_hub(session, hub_code)
+    require_hub_manager(session, actor_user_id, hub)
+    row = session.execute(
+        select(HubMembership, AppUser)
+        .join(AppUser, AppUser.id == HubMembership.user_id)
+        .where(HubMembership.id == member_id, HubMembership.hub_id == hub.id)
+    ).first()
+    if row is None:
+        raise ItemNotFound("Hub membership does not exist")
+    membership, _user = row
+    return (
+        f"You now have access to GRP ({hub.name}, {membership.role}). "
+        "Open the GRP address and sign in with your SERVIR account."
+    )
 
 
 def list_access_requests(session: Session) -> list[str]:

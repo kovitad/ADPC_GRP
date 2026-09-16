@@ -81,7 +81,7 @@ def test_admin_screen_uses_sig_and_explains_preprovisioning() -> None:
 
     assert 'href="/api/v1/auth/login?intent=admin"' in page
     assert "does not grant administrator rights" in page
-    assert "Platform Admin authority required" in script
+    assert "Administrator authority required" in script
     assert 'type="password"' not in page
 
 

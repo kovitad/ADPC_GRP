@@ -18,9 +18,7 @@
         <span>SERVIR GRP</span>
       </a>
       <nav class="workspace-nav" aria-label="Workspace navigation">
-        <a class="workspace-nav__link workspace-nav__link--active" href="/workspace.html">
-          Workspace
-        </a>
+        <a class="workspace-nav__link workspace-nav__link--active" href="/workspace.html">My access</a>
         <a class="workspace-nav__link" data-admin-menu href="#admin-panel" hidden>
           Administration
           <span class="workspace-nav__count" data-admin-nav-count>0</span>
@@ -62,23 +60,26 @@
       >
         <div class="admin-card__heading">
           <div>
-            <p class="eyebrow">Platform administration</p>
-            <h2 id="admin-heading">Pending access requests</h2>
+            <p class="eyebrow">Hub administration</p>
+            <h2 id="admin-heading">Members and access</h2>
           </div>
           <span class="request-count" data-request-count>0</span>
         </div>
         <p class="admin-card__intro">
-          These emails were verified by SERVIR but have no GRP mapping. Confirm the correct Hub
-          before assigning access.
+          Add an existing SERVIR account, assign the minimum Hub role, and turn access on or off.
+          Platform Admins can also review verified identities waiting for assignment.
         </p>
         <form class="assignment-form" data-assignment-form>
           <label>
             Verified email
-            <select data-request-email required></select>
+            <input data-request-email list="pending-access-emails" type="email" required />
+            <datalist id="pending-access-emails" data-request-options></datalist>
           </label>
           <label>
             Hub code
-            <input data-hub-code name="hub_code" value="adpc" required maxlength="64" />
+            <select data-hub-code name="hub_code" required>
+              <option value="adpc">ADPC Hub</option>
+            </select>
           </label>
           <label>
             GRP role
@@ -92,6 +93,22 @@
           </button>
         </form>
         <p class="assignment-status" data-assignment-status aria-live="polite"></p>
+        <div class="member-management">
+          <div class="member-management__heading">
+            <h3>Current Hub members</h3>
+            <button class="button button--secondary" type="button" data-refresh-members>
+              Refresh
+            </button>
+          </div>
+          <div class="member-table-wrap">
+            <table class="member-table">
+              <thead>
+                <tr><th>Person</th><th>Role</th><th>Access</th><th>Action</th></tr>
+              </thead>
+              <tbody data-member-list></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <p class="workspace-note" data-workspace-status>

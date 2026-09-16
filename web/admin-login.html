@@ -51,15 +51,15 @@
 
           <div class="context-row">
             <span class="context-badge context-badge--admin">Restricted</span>
-            <span class="context-code">GRP / PLATFORM ADMIN</span>
+            <span class="context-code">GRP / ADMINISTRATION</span>
           </div>
 
           <div class="auth-heading">
             <p class="eyebrow">Administrator access</p>
             <h2 id="admin-sign-in-title">Open the approval console</h2>
             <p>
-              Authenticate with the SIG account that has already been provisioned as a GRP
-              Platform Admin. SIG proves identity; GRP verifies administrator authority.
+              Authenticate with the SIG account assigned as a Hub Admin or Platform Admin.
+              SIG proves identity; GRP verifies administrator authority and Hub scope.
             </p>
           </div>
 
@@ -72,19 +72,19 @@
           </div>
 
           <ul class="admin-capabilities" aria-label="Administrator responsibilities">
-            <li>Review verified pending access requests</li>
+            <li>Platform Admins review verified pending access requests</li>
             <li>Assign the ADPC Hub and planner or admin role</li>
             <li>Apply changes through the audited GRP workflow</li>
           </ul>
 
           <a class="button button--primary" href="/api/v1/auth/login?intent=admin">
-            Continue as Platform Admin
+            Continue as Administrator
             <span class="button__arrow" aria-hidden="true">→</span>
           </a>
 
           <p class="registration-limit">
-            This page does not grant administrator rights. The verified email must first be
-            bootstrapped in the GRP database by an authorized operator.
+            This page does not grant administrator rights. Your verified account must first be
+            assigned by a GRP administrator or the authorized bootstrap command.
           </p>
 
           <a class="button button--secondary" href="/">Return to member sign in</a>
