@@ -2,7 +2,9 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 scaffold. Health endpoints, module boundaries, configuration loading, deployment manifests, and initial tests exist. Authentication, database tables, GIS assessment processing, downloads, AI, and the live SIG evidence connection are not implemented yet.
+> **Current status:** Increment 0 foundation complete. Health endpoints, module boundaries, configuration loading, deployment manifests, tests, and CI exist. Increment 1 has not started: database tables, migrations, the assessment queue, GIS processing, and the signed Chiang Yuen golden case remain to be implemented. Authentication, downloads, AI, and the live SIG evidence connection also remain unimplemented.
+
+For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
 ## Architecture
 
@@ -78,6 +80,8 @@ make compose-config  # validate the staging Compose model
 ## Delivery order
 
 Development follows the approved increments: server foundation; signed Chiang Yuen RP100 golden assessment; access and Admin; SIG sharing and evidence; review/downloads; additional data; vulnerability and AI; pilot hardening. No fallback geography, dataset, or provider is permitted.
+
+The next work is Increment 1: implement the architecture-defined database schema and first migration, then build the queued assessment workflow against a scientifically approved Chiang Yuen RP100 golden fixture. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
 
 ## Security
 
