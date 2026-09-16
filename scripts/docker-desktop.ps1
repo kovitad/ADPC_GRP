@@ -1,6 +1,8 @@
 param(
     # SERVIR account emails to make Platform Admin in the local database.
     [string[]]$AdminEmail = @(),
+    # SERVIR account emails to make Hub Admin of the adpc Hub (can then manage members).
+    [string[]]$HubAdminEmail = @(),
     [switch]$Down
 )
 
@@ -37,6 +39,46 @@ $Password = (Get-Content -LiteralPath (Join-Path $SecretRoot "postgres_password"
 Write-SecretOnce "database_url" { "postgresql+psycopg://grp:$Password@db:5432/grp" }
 Write-SecretOnce "session_secret" { New-SecretValue }
 
+# Copy selected keys from the ignored .env into secret files. Values are never printed.
+function Get-DotEnvValue([string]$Name) {
+    $envFile = Join-Path $RepositoryRoot ".env"
+    if (-not (Test-Path -LiteralPath $envFile)) { return $null }
+    foreach ($line in Get-Content -LiteralPath $envFile) {
+        if ($line -match "^\s*$([regex]::Escape($Name))\s*=\s*(.*)$") {
+            $value = $Matches[1].Trim().Trim('"').Trim("'")
+            if ($value) { return $value }
+        }
+    }
+    return $null
+}
+
+function Write-SecretFromEnv([string]$SecretName, [string[]]$EnvNames) {
+    foreach ($name in $EnvNames) {
+        $value = Get-DotEnvValue $name
+        if ($value) {
+            [System.IO.File]::WriteAllText((Join-Path $SecretRoot $SecretName), $value)
+            return $true
+        }
+    }
+    return $false
+}
+
+$LocalAiKey = Join-Path $RepositoryRoot ".local/secrets/ai_key_adpc"
+if (Test-Path -LiteralPath $LocalAiKey) {
+    Copy-Item -LiteralPath $LocalAiKey -Destination (Join-Path $SecretRoot "ai_key_adpc") -Force
+} elseif (-not (Write-SecretFromEnv "ai_key_adpc" @("OPENAI_API_KEY"))) {
+    Write-Warning "No AI provider key found; the AI test call will report AI unavailable."
+}
+if (-not (Write-SecretFromEnv "langfuse_secret_key" @("LANGFUSE_SECRET_KEY"))) {
+    Write-Warning "No LANGFUSE_SECRET_KEY in .env; Langfuse export stays off."
+}
+$env:LANGFUSE_HOST = Get-DotEnvValue "LANGFUSE_HOST"
+if (-not $env:LANGFUSE_HOST) { $env:LANGFUSE_HOST = Get-DotEnvValue "LANGFUSE_BASE_URL" }
+$env:LANGFUSE_PUBLIC_KEY = Get-DotEnvValue "LANGFUSE_PUBLIC_KEY"
+$model = Get-DotEnvValue "AI_MODEL"
+if (-not $model) { $model = Get-DotEnvValue "OPENAI_MODEL" }
+if ($model) { $env:AI_MODEL = $model }
+
 # Reuse the localhost SIG client registered by run-local.ps1 -RegisterSigClient (same callback).
 $ClientIdFile = Join-Path $RepositoryRoot ".local\servir_auth_client_id"
 if (Test-Path -LiteralPath $ClientIdFile) {
@@ -54,7 +96,12 @@ foreach ($email in $AdminEmail) {
     docker @Compose exec api python -m grp.admin ensure-hub --actor-email $email --code adpc --name "ADPC Hub"
 }
 
+foreach ($email in $HubAdminEmail) {
+    $actor = if ($AdminEmail.Count -gt 0) { $AdminEmail[0] } else { $email }
+    docker @Compose exec api python -m grp.admin assign-member --actor-email $actor --email $email --hub-code adpc --role admin
+}
+
 Write-Host ""
-Write-Host "GRP is starting at http://127.0.0.1:8000  (admin: http://127.0.0.1:8000/admin)"
+Write-Host "GRP is running at http://127.0.0.1:8000  (admin: /admin, platform: /platform.html)"
 Write-Host "Logs: docker compose -f deploy/compose.desktop.yml logs -f api worker"
 Write-Host "Stop: .\scripts\docker-desktop.ps1 -Down"

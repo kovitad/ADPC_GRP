@@ -209,3 +209,7 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
     )
+
+
+# Register the AI usage tables on the shared metadata (imported last to avoid a cycle).
+from core import ai_models as _ai_models  # noqa: E402, F401

@@ -121,11 +121,56 @@
         if (payload.hubs.length === 0) throw new Error("No administered Hub is available");
       });
 
+  const auditList = document.querySelector("[data-audit-list]");
+
+  const loadAudit = () =>
+    GRP.request(
+      `/api/v1/admin/audit-events?hub_code=${encodeURIComponent(hubSelect.value)}&limit=50`,
+    )
+      .then((payload) => {
+        auditList.replaceChildren();
+        payload.events.forEach((event) => {
+          const row = document.createElement("tr");
+          GRP.cell(row, GRP.formatTime(event.occurred_at));
+          GRP.cell(row, event.actor);
+          GRP.cell(row, event.action.replaceAll("_", " "));
+          GRP.cell(row, event.result);
+          auditList.append(row);
+        });
+        if (payload.events.length === 0) {
+          GRP.emptyRow(auditList, 4, "No security events for this Hub yet.");
+        }
+      })
+      .catch(() => auditList.replaceChildren());
+
+  const loadAllowance = () =>
+    GRP.request("/api/v1/me/ai-usage")
+      .then((usage) => {
+        const message = document.querySelector("[data-ai-message]");
+        const pill = document.querySelector("[data-ai-status]");
+        message.textContent = GRP.allowanceMessage(usage);
+        message.classList.toggle("is-low", GRP.isLow(usage));
+        pill.textContent = usage.status.replaceAll("_", " ");
+        pill.dataset.state = usage.status;
+        const share = usage.token_limit
+          ? Math.min(100, (usage.tokens_used / usage.token_limit) * 100)
+          : 0;
+        document.querySelector("[data-ai-meter]").style.width = `${share}%`;
+        document.querySelector("[data-ai-detail]").textContent = usage.token_limit
+          ? `${GRP.tokens(usage.tokens_used)} of ${GRP.tokens(usage.token_limit)} tokens used this month. The Platform Admin sets the limit; it resets on the 1st at 00:00 Bangkok time.`
+          : "No monthly token limit has been set yet.";
+      })
+      .catch(() => {
+        document.querySelector("[data-ai-message]").textContent =
+          "AI is not available right now. Maps, analysis and downloads still work.";
+      });
+
   const enableAdminPanel = (identity) => {
     const adminPanel = document.querySelector("[data-admin-panel]");
     adminPanel.hidden = false;
     adminMenu.hidden = false;
-    loadAdminHubs().then(loadMembers).catch(() => {
+    document.querySelector("[data-refresh-log]").addEventListener("click", () => loadAudit());
+    loadAdminHubs().then(() => Promise.all([loadMembers(), loadAudit()])).catch(() => {
       assignmentStatus.textContent = "Hub members could not be loaded.";
     });
     if (window.location.hash === "#admin-panel") {
@@ -163,6 +208,8 @@
       item.textContent = "Platform-wide administration access; no Hub membership assigned.";
       list.append(item);
     }
+    document.querySelector("[data-platform-menu]").hidden = !identity.is_platform_admin;
+    loadAllowance();
     const isHubAdmin = identity.memberships.some((membership) => membership.role === "admin");
     if (identity.is_platform_admin || isHubAdmin) enableAdminPanel(identity);
   };
@@ -199,8 +246,13 @@
       });
   });
 
-  hubSelect.addEventListener("change", () => loadMembers());
+  hubSelect.addEventListener("change", () => {
+    loadMembers();
+    loadAudit();
+  });
   refreshMembers.addEventListener("click", () => loadMembers());
+
+  GRP.bindSignOut();
 
   fetch("/api/v1/me", { credentials: "same-origin", headers: { Accept: "application/json" } })
     .then((response) => {

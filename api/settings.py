@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +41,19 @@ class Settings(BaseSettings):
     ai_key_file_adpc: Path = Path(".local/secrets/ai_key_adpc")
     ai_max_output_tokens: int = 800
     ai_timezone: str = "Asia/Bangkok"
+    ai_timeout_seconds: float = 60.0
+
+    # Langfuse (hosted) receives safe AI call metadata only; it never enforces the allowance.
+    langfuse_host: str | None = Field(
+        default=None, validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL")
+    )
+    langfuse_public_key: str | None = None
+    langfuse_secret_key_file: Path = Path(".local/secrets/langfuse_secret_key")
+    langfuse_environment: str | None = None
+
+    # SIG machine login, staging fallback (Section 9.6): hash of a long random token.
+    sig_service_token_hash_file: Path = Path(".local/secrets/sig_service_token_hash")
+    sig_allowed_ips: list[str] = Field(default_factory=list)
     rate_limits: dict[str, int] = Field(
         default_factory=lambda: {
             "api_requests_per_person_per_minute": 60,

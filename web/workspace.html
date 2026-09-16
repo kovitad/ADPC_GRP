@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Workspace | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/grp-common.js" defer></script>
     <script src="/workspace.js" defer></script>
   </head>
   <body class="workspace-body">
@@ -22,8 +23,9 @@
         <a class="workspace-nav__link" data-admin-menu href="#admin-panel" hidden>
           Administration
         </a>
+        <a class="workspace-nav__link" data-platform-menu href="/platform.html" hidden>Platform</a>
       </nav>
-      <a class="workspace-signout" href="/api/v1/auth/logout">Sign out</a>
+      <button class="workspace-signout" type="button" data-sign-out>Sign out</button>
     </header>
 
     <main class="workspace-main" id="main-content">
@@ -48,6 +50,19 @@
           <h3>Hub memberships</h3>
           <ul class="membership-list" data-memberships aria-live="polite"></ul>
         </div>
+      </section>
+
+      <section class="admin-card ai-allowance" aria-labelledby="ai-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">AI usage</p>
+            <h2 id="ai-heading">My AI allowance</h2>
+          </div>
+          <span class="status-pill" data-ai-status>…</span>
+        </div>
+        <p class="ai-allowance__message" data-ai-message aria-live="polite">Loading…</p>
+        <div class="usage-meter" aria-hidden="true"><span data-ai-meter></span></div>
+        <p class="admin-card__intro" data-ai-detail></p>
       </section>
 
       <section
@@ -104,6 +119,22 @@
                 <tr><th>Person</th><th>Role</th><th>Access</th><th>Action</th></tr>
               </thead>
               <tbody data-member-list></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="member-management">
+          <div class="member-management__heading">
+            <h3>Hub security log</h3>
+            <button class="button button--secondary" type="button" data-refresh-log>
+              Refresh
+            </button>
+          </div>
+          <div class="member-table-wrap">
+            <table class="member-table">
+              <thead>
+                <tr><th>When (Bangkok)</th><th>Who</th><th>Action</th><th>Result</th></tr>
+              </thead>
+              <tbody data-audit-list></tbody>
             </table>
           </div>
         </div>

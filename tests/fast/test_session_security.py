@@ -131,9 +131,13 @@ def test_sign_out_revokes_a_copied_session_cookie(secured_app) -> None:
     client = _signed_in_client(settings, engine, "planner@example.test", _now() - 5)
     copied = client.cookies[SESSION_COOKIE]
 
-    signed_out = client.get("/api/v1/auth/logout", follow_redirects=False)
+    forged = client.post("/api/v1/auth/logout")
+    signed_out = client.post(
+        "/api/v1/auth/logout", headers={"X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    )
     replay = TestClient(app)
     replay.cookies.set(SESSION_COOKIE, copied)
 
-    assert signed_out.status_code == 303
+    assert forged.status_code == 403
+    assert signed_out.status_code == 200
     assert replay.get("/api/v1/me").status_code == 401

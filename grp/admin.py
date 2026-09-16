@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
+import secrets
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Never
 from uuid import UUID
 
@@ -149,6 +152,17 @@ def bootstrap_platform_admin(session: Session, email: str) -> CommandResult:
 
 def ensure_hub(session: Session, *, actor_email: str, code: str, name: str) -> CommandResult:
     actor = require_platform_admin(session, actor_email)
+    return create_hub_as_actor(session, actor_user_id=actor.id, code=code, name=name)
+
+
+def create_hub_as_actor(
+    session: Session, *, actor_user_id: UUID, code: str, name: str
+) -> CommandResult:
+    """Create or confirm a Hub. Only a Platform Admin may do this (Section 9.4)."""
+
+    actor = _active_actor(session, actor_user_id)
+    if not actor.is_platform_admin:
+        raise HubAccessDenied("Platform Admin access required")
     normalized_code = code.strip().lower()
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,63}", normalized_code):
         raise ValueError("Hub code must contain 2-64 lowercase letters, digits, '_' or '-'")
@@ -176,6 +190,62 @@ def ensure_hub(session: Session, *, actor_email: str, code: str, name: str) -> C
         )
     )
     return CommandResult(True, "Hub provisioned")
+
+
+def list_all_hubs(session: Session) -> list[dict[str, object]]:
+    hubs = session.scalars(select(Hub).order_by(Hub.code)).all()
+    counts = dict(
+        session.execute(
+            select(HubMembership.hub_id, func.count())
+            .where(HubMembership.status == MembershipStatus.ACTIVE)
+            .group_by(HubMembership.hub_id)
+        ).all()
+    )
+    return [
+        {
+            "id": str(hub.id),
+            "code": hub.code,
+            "name": hub.name,
+            "status": hub.status,
+            "active_members": int(counts.get(hub.id, 0)),
+        }
+        for hub in hubs
+    ]
+
+
+def set_hub_status(
+    session: Session, *, actor_user_id: UUID, hub_code: str, hub_status: str
+) -> CommandResult:
+    """Close or reopen a Hub. Closed Hubs grant no access; memberships are kept for audit."""
+
+    actor = _active_actor(session, actor_user_id)
+    if not actor.is_platform_admin:
+        raise HubAccessDenied("Platform Admin access required")
+    if hub_status not in {HubStatus.ACTIVE, HubStatus.CLOSED}:
+        raise ValueError("Status must be active or closed")
+    hub = session.scalar(
+        select(Hub).where(Hub.code == hub_code.strip().lower()).with_for_update()
+    )
+    if hub is None:
+        raise ItemNotFound("Hub does not exist")
+    if hub.status == hub_status:
+        return CommandResult(False, "Hub already has that status; no change")
+    old = hub.status
+    hub.status = hub_status
+    session.add(
+        AuditEvent(
+            actor_user_id=actor.id,
+            actor_kind="person",
+            hub_id=hub.id,
+            action="hub_closed" if hub_status == HubStatus.CLOSED else "hub_reopened",
+            target_type="hub",
+            target_id=str(hub.id),
+            old_value={"status": old},
+            new_value={"status": hub_status},
+            result=AuditResult.SUCCESS,
+        )
+    )
+    return CommandResult(True, "Hub closed" if hub_status == HubStatus.CLOSED else "Hub reopened")
 
 
 def assign_member(
@@ -424,6 +494,27 @@ def list_access_requests(session: Session) -> list[str]:
     return pending
 
 
+def rotate_sig_service_token(session: Session, hash_file: Path) -> str:
+    """Issue a new SIG service token; store only its hash. Returns the token once."""
+
+    token = secrets.token_urlsafe(48)
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    hash_file.parent.mkdir(parents=True, exist_ok=True)
+    hash_file.write_text(f"{digest}\n", encoding="utf-8")
+    hash_file.chmod(0o600)
+    session.add(
+        AuditEvent(
+            actor_kind="system",
+            action="credential_rotated",
+            target_type="sig_service_login",
+            target_id=digest[:12],
+            result=AuditResult.SUCCESS,
+            support_ref="grp.admin rotate-sig-token",
+        )
+    )
+    return token
+
+
 def fail(message: str) -> Never:
     raise SystemExit(f"ERROR: {message}")
 
@@ -447,6 +538,9 @@ def build_parser() -> argparse.ArgumentParser:
     member.add_argument("--role", choices=["planner", "admin"], required=True)
 
     commands.add_parser("list-access-requests")
+
+    sig_token = commands.add_parser("rotate-sig-token")
+    sig_token.add_argument("--hash-file", type=Path, required=True)
     return parser
 
 
@@ -471,6 +565,11 @@ def main() -> None:
                     hub_code=arguments.hub_code,
                     role=arguments.role,
                 )
+            elif arguments.command == "rotate-sig-token":
+                token = rotate_sig_service_token(session, arguments.hash_file)
+                print("New SIG service token (shown once; give it to SIG via the secure channel):")
+                print(token)
+                return
             else:
                 requests = list_access_requests(session)
                 print("\n".join(requests) if requests else "No pending access requests")

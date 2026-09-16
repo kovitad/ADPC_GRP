@@ -16,7 +16,11 @@ from sqlalchemy.pool import StaticPool
 
 import api.access
 import api.admin
+import api.ai
 import api.auth
+import api.integrations.sig
+import api.permissions
+import api.platform
 from api.dependencies import database_session
 from api.main import app
 from api.rate_limits import limiter
@@ -35,6 +39,18 @@ MATRIX = {
     "add_member": (401, 403, 200, 404, 200),
     "change_member": (401, 403, 200, 404, 200),
     "access_message": (401, 403, 200, 404, 200),
+    "my_ai_usage": (401, 200, 200, 200, 200),
+    "hub_security_log": (401, 403, 200, 200, 200),
+    "read_ai_setting": (401, 403, 403, 403, 200),
+    "change_ai_setting": (401, 403, 403, 403, 200),
+    "people_ai_usage": (401, 403, 403, 403, 200),
+    "reset_ai_usage": (401, 403, 403, 403, 200),
+    "list_all_hubs": (401, 403, 403, 403, 200),
+    "create_hub": (401, 403, 403, 403, 200),
+    "change_hub_status": (401, 403, 403, 403, 200),
+    "platform_health": (401, 403, 403, 403, 200),
+    # Human sessions are never the SIG service, whoever they are.
+    "sig_evidence_with_session": (401, 401, 401, 401, 401),
 }
 
 
@@ -44,7 +60,10 @@ def world(tmp_path_factory) -> Iterator[dict]:
     secret.write_text("contract-session-secret-with-enough-length", encoding="utf-8")
     settings = Settings(_env_file=None, session_secret_file=secret)
     patch = pytest.MonkeyPatch()
-    for module in (api.access, api.admin, api.auth):
+    for module in (
+        api.access, api.admin, api.ai, api.auth, api.integrations.sig,
+        api.permissions, api.platform,
+    ):
         patch.setattr(module, "get_settings", lambda: settings)
 
     engine = create_engine(
@@ -128,7 +147,32 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             json={"role": "planner", "status": "active"},
             headers=headers,
         )
-    return client.get(f"/api/v1/admin/hubs/adpc/members/{member}/access-message")
+    if route == "access_message":
+        return client.get(f"/api/v1/admin/hubs/adpc/members/{member}/access-message")
+    user_id = world["users"]["planner"]
+    requests = {
+        "my_ai_usage": ("GET", "/api/v1/me/ai-usage", None),
+        "hub_security_log": ("GET", "/api/v1/admin/audit-events", None),
+        "read_ai_setting": ("GET", "/api/v1/platform/ai-usage/setting", None),
+        "change_ai_setting": (
+            "PUT",
+            "/api/v1/platform/ai-usage/setting",
+            {"token_limit_per_person": 200000, "ai_enabled": False},
+        ),
+        "people_ai_usage": ("GET", "/api/v1/platform/ai-usage/people", None),
+        "reset_ai_usage": ("POST", f"/api/v1/platform/ai-usage/people/{user_id}/reset", None),
+        "list_all_hubs": ("GET", "/api/v1/platform/hubs", None),
+        "create_hub": ("POST", "/api/v1/platform/hubs", {"code": "adpc", "name": "adpc Hub"}),
+        "change_hub_status": ("PATCH", "/api/v1/platform/hubs/adpc", {"status": "active"}),
+        "platform_health": ("GET", "/api/v1/platform/health", None),
+        "sig_evidence_with_session": (
+            "GET",
+            f"/api/v1/integrations/sig/assessments/{user_id}/evidence",
+            None,
+        ),
+    }
+    method, path, body = requests[route]
+    return client.request(method, path, json=body, headers=headers)
 
 
 @pytest.mark.contract

@@ -6,7 +6,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from api.dependencies import DatabaseSession
 from api.errors import GrpError
@@ -17,8 +17,10 @@ from api.oidc import (
 )
 from api.sessions import (
     AUTH_TRANSACTION_COOKIE,
+    CSRF_HEADER,
     SESSION_COOKIE,
     clear_session_cookies,
+    csrf_token,
     decode_auth_transaction,
     decode_session_cookie,
     encode_auth_transaction,
@@ -27,7 +29,7 @@ from api.sessions import (
     set_session_cookie,
 )
 from api.settings import Settings, get_settings
-from core.access_models import AppUser
+from core.access_models import AppUser, AuditEvent, AuditResult
 from core.identity import link_verified_identity
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -157,25 +159,45 @@ async def complete_login(
     return response
 
 
-@router.get(
+@router.post(
     "/logout",
     summary="End the GRP session",
-    status_code=status.HTTP_303_SEE_OTHER,
     openapi_extra={"x-grp-access": "public"},
 )
-def logout(request: Request, session: DatabaseSession) -> RedirectResponse:
-    """End the GRP session on the server as well as in the browser (SIG sign-in is unchanged)."""
+def logout(request: Request, session: DatabaseSession) -> JSONResponse:
+    """End the GRP session on the server and in the browser (SIG sign-in is unchanged).
 
+    POST with the CSRF header so another site cannot sign a person out.
+    """
+
+    settings = get_settings()
     value = request.cookies.get(SESSION_COOKIE)
     if value:
         try:
-            user_id = UUID(decode_session_cookie(get_settings(), value)["user_id"])
-            user = session.get(AppUser, user_id)
+            decoded = decode_session_cookie(settings, value)
+            supplied = request.headers.get(CSRF_HEADER, "")
+            if not hmac.compare_digest(supplied, csrf_token(settings, decoded["session_id"])):
+                raise GrpError(403, "ACCESS_NOT_AUTHORIZED", "Access not authorized.")
+            user = session.get(AppUser, UUID(decoded["user_id"]))
             if user is not None:
                 revoke_user_sessions(user)
+                session.add(
+                    AuditEvent(
+                        actor_user_id=user.id,
+                        actor_kind="person",
+                        action="sign_out",
+                        target_type="app_user",
+                        target_id=str(user.id),
+                        result=AuditResult.SUCCESS,
+                    )
+                )
                 session.commit()
-        except (GrpError, ValueError, OSError):
+        except GrpError as error:
             session.rollback()
-    response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+            if error.code == "ACCESS_NOT_AUTHORIZED":
+                raise
+        except (ValueError, OSError):
+            session.rollback()
+    response = JSONResponse({"signed_out": True, "location": "/"})
     clear_session_cookies(response)
     return response

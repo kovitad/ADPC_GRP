@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Platform administration | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/grp-common.js" defer></script>
+    <script src="/platform.js" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header class="workspace-header">
+      <a class="workspace-brand" href="/workspace.html" aria-label="GRP workspace">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span>SERVIR GRP</span>
+      </a>
+      <nav class="workspace-nav" aria-label="Workspace navigation">
+        <a class="workspace-nav__link" href="/workspace.html">My access</a>
+        <a class="workspace-nav__link" href="/workspace.html#admin-panel">Administration</a>
+        <a class="workspace-nav__link workspace-nav__link--active" href="/platform.html">Platform</a>
+      </nav>
+      <button class="workspace-signout" type="button" data-sign-out>Sign out</button>
+    </header>
+
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <p class="eyebrow">Platform Admin</p>
+      <h1>Platform administration</h1>
+      <p class="workspace-intro" data-platform-status>Checking Platform Admin access…</p>
+
+      <div data-platform-content hidden>
+        <section class="admin-card" aria-labelledby="health-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">Monitoring</p>
+              <h2 id="health-heading">System health</h2>
+            </div>
+            <button class="button button--secondary" type="button" data-refresh-health>
+              Refresh
+            </button>
+          </div>
+          <dl class="health-grid" data-health></dl>
+        </section>
+
+        <section class="admin-card" aria-labelledby="ai-setting-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">AI usage limit</p>
+              <h2 id="ai-setting-heading">One token limit for everyone</h2>
+            </div>
+            <span class="status-pill" data-setting-state>…</span>
+          </div>
+          <p class="admin-card__intro">
+            The limit applies to every person, counted per person across all Hubs. Usage resets
+            automatically at 00:00 Bangkok time on the 1st of each month. When the allowance is
+            used up, AI stops; maps, analysis and downloads keep working.
+          </p>
+          <form class="assignment-form" data-setting-form>
+            <label>
+              Tokens per person per month
+              <input
+                data-token-limit
+                type="number"
+                min="1000"
+                max="100000000"
+                step="1"
+                required
+              />
+            </label>
+            <label>
+              AI for the whole platform
+              <select data-ai-enabled>
+                <option value="false">Off</option>
+                <option value="true">On</option>
+              </select>
+            </label>
+            <button class="button button--primary" type="submit">Save AI setting</button>
+          </form>
+          <p class="assignment-status" data-setting-status aria-live="polite"></p>
+          <p class="admin-card__intro" data-setting-changed></p>
+        </section>
+
+        <section class="admin-card" aria-labelledby="ai-test-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">AI gateway</p>
+              <h2 id="ai-test-heading">Test AI call</h2>
+            </div>
+          </div>
+          <p class="admin-card__intro">
+            Sends one short message through the GRP AI gateway. The tokens count against your own
+            allowance and appear in the usage table and in Langfuse (if configured). No GRP data
+            is sent.
+          </p>
+          <form class="assignment-form" data-test-form>
+            <label class="assignment-form__wide">
+              Message
+              <input
+                data-test-message
+                maxlength="300"
+                value="Confirm that the GRP AI gateway is working."
+                required
+              />
+            </label>
+            <button class="button button--primary" type="submit">Send test call</button>
+          </form>
+          <p class="assignment-status" data-test-status aria-live="polite"></p>
+          <blockquote class="ai-reply" data-test-reply hidden></blockquote>
+        </section>
+
+        <section class="admin-card" aria-labelledby="people-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">This month</p>
+              <h2 id="people-heading">AI usage per person</h2>
+            </div>
+            <button class="button button--secondary" type="button" data-refresh-people>
+              Refresh
+            </button>
+          </div>
+          <p class="admin-card__intro">
+            <strong>Reset now</strong> sets one person's usage for this month back to zero. Past
+            call records are kept and the reset is written to the security log (ADR-0003).
+          </p>
+          <div class="member-table-wrap">
+            <table class="member-table">
+              <thead>
+                <tr>
+                  <th>Person</th><th>Used</th><th>Remaining</th><th>Status</th><th>Resets</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody data-people></tbody>
+            </table>
+          </div>
+          <p class="assignment-status" data-people-status aria-live="polite"></p>
+        </section>
+
+        <section class="admin-card" aria-labelledby="hubs-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">Hubs</p>
+              <h2 id="hubs-heading">Create or close a Hub</h2>
+            </div>
+          </div>
+          <p class="admin-card__intro">
+            Closing a Hub removes access for all its members on their next request. Memberships
+            and the security log are kept, and the Hub can be reopened.
+          </p>
+          <form class="assignment-form" data-hub-form>
+            <label>
+              Hub code
+              <input data-hub-code pattern="[a-z0-9][a-z0-9_\-]{1,63}" required />
+            </label>
+            <label class="assignment-form__wide">
+              Hub name
+              <input data-hub-name maxlength="200" required />
+            </label>
+            <button class="button button--primary" type="submit">Create Hub</button>
+          </form>
+          <p class="assignment-status" data-hub-status aria-live="polite"></p>
+          <div class="member-table-wrap">
+            <table class="member-table">
+              <thead>
+                <tr><th>Hub</th><th>Status</th><th>Active members</th><th>Action</th></tr>
+              </thead>
+              <tbody data-hubs></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="admin-card" aria-labelledby="log-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">All Hubs</p>
+              <h2 id="log-heading">Full security log</h2>
+            </div>
+            <button class="button button--secondary" type="button" data-refresh-log>
+              Refresh
+            </button>
+          </div>
+          <div class="member-table-wrap">
+            <table class="member-table">
+              <thead>
+                <tr><th>When (Bangkok)</th><th>Who</th><th>Action</th><th>Result</th></tr>
+              </thead>
+              <tbody data-log></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
