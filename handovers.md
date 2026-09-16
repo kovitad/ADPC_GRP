@@ -47,11 +47,11 @@ Python dependency check    passed
 Compose model validation   passed
 Deployment shell syntax    passed locally
 staged secret scan         passed
-GitHub Actions CI          passed at 0f4391a
-Container image workflow   passed at 0f4391a
+GitHub Actions CI          passed at 269a2e5
+Container image workflow   passed at 269a2e5
 ```
 
-The access implementation passed GitHub CI and the container workflow at feature commit `0f4391a`. The image was not built locally because Docker Desktop was not running. Before using image mode, confirm the GHCR package is visible for that commit, then execute the staging smoke checks in [`deploy/BOOTSTRAP.md`](deploy/BOOTSTRAP.md).
+The access and existing-SIG registration implementation passed GitHub CI and the container workflow at feature commit `269a2e5`. The image was not built locally because Docker Desktop was not running. Before using image mode, confirm the GHCR package is visible for that commit, then execute the staging smoke checks in [`deploy/BOOTSTRAP.md`](deploy/BOOTSTRAP.md).
 
 ## Configuration and security
 
