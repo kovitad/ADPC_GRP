@@ -1,81 +1,97 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 16 September 2026
+**Updated:** 16 September 2026 (Phase A review and stabilization)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Branch:** `main`
-**Current phase:** Increment 0 complete; first Increment 2 identity and membership slice implemented early
+**Branches:** `main` (product baseline) and `experiment/planning-chat` (local AI chat prototype, not for merge)
+
+**Baseline:** `GRP-ARC-001` v2.2. Local commits are not pushed yet.
 
 ## Current position
 
-The repository now provides a tested, architecture-aligned foundation for the ADPC Hub of the SERVIR Global Risk Platform. It is intentionally a scaffold, not a working flood-assessment product.
+Increment 0 is complete. Most of Increment 2 (sign-in, membership, Hub administration) is built early. **Increment 1 (golden assessment) has not started**: `api/assessments.py` and `worker/main.py` are stubs, and the golden and SIG fixture folders contain only READMEs. The spec's Alpha gate needs Increments 0 to 3, so Increment 1 is the critical path.
 
-| Area | Current state |
+| Area | Current state on `main` |
 |---|---|
-| FastAPI | Application factory, configuration loading, public `/api/v1/healthz`, and internal `/api/v1/readyz` |
-| API modules | SIG MCP protected-resource discovery, OIDC authorization-code/PKCE, public or confidential clients, callback verification, signed sessions, and protected `/api/v1/me` exist |
-| Worker | Runnable process and shutdown handling exist; PostgreSQL job claiming and GIS processing are not implemented |
-| Database | The first forward-only migration implements `hub`, `app_user`, `external_identity`, `hub_membership`, and `audit_event`; the remaining architecture tables are pending |
-| Deployment | Idempotent Ubuntu bootstrap, source/image release modes, GHCR publishing, hardened secret staging, Compose services, host Caddy configuration, and an operator runbook exist; the VM has not yet been bootstrapped from this repository |
-| Web | Reference-aligned SERVIR login design, existing-SIG registration, a dedicated `/admin` entry, authentication states, and a protected membership/approval view exist |
-| Access administration | A protected Platform Admin panel/API lists pending verified identities and assigns `planner`/`admin`; idempotent CLI commands provide bootstrap and recovery |
-| Tests and CI | Twenty-six offline tests cover liveness, result invariants, route classification, registration/admin guardrails, OAuth discovery/registration, three token-auth modes, local setup, secret handling, unknown-user denial, protected admin assignment, and membership mapping |
+| Sign-in | SERVIR OIDC/PKCE, ID-token checks (issuer, audience, signature, expiry, nonce, verified email). Uses an interim dynamically registered MCP client; see [ADR-0002](docs/adr/0002-interim-sig-mcp-client-login.md) |
+| Linking | Matches Section 9.2: only a pre-added email links; otherwise denied, logged, nothing created |
+| Sessions | Signed HttpOnly cookie, 60 min idle / 12 h max, membership reloaded every request. **New:** CSRF token on every state change; sign-out and any role/access change end the person's sessions on the server (`app_user.sessions_valid_after`) |
+| Hub administration | Platform Admin and Hub Admin member list, add, role change, enable/disable; last-Admin guard with row lock; audited changes; setup CLI (`bootstrap-platform-admin`, `ensure-hub`, `assign-member`) |
+| Errors | **New:** Appendix D format `{error: {code, message, support_ref}}` on sessions and admin routes; other-Hub and unknown items return 404 |
+| Database | Migrations `20260916_0001` (5 access tables) and `20260916_0002` (session revocation). 11 of 16 spec tables still missing |
+| Tests | 31 offline tests, Ruff clean. New `tests/fast/test_session_security.py` covers CSRF, role-change revocation, and sign-out replay |
+
+## Phase A work done on 16 September
+
+Commits (local, not pushed):
+
+| Commit | Branch | What |
+|---|---|---|
+| `ff084c7` | experiment | Snapshot of the uncommitted chat prototype, preserved as-is |
+| `3f3db5c` | main | Hub administration plus review fixes #6 to #8 (CSRF, session revocation, 404 and Appendix D errors) |
+| `3e0fe24` | experiment | Merge of main; public SIG receipts now opt-in only; Platform Admin without membership blocked from SIG evidence |
+| (this commit) | main | ADR-0002 and this handover |
+
+## Code review findings (16 September)
+
+Reviewed against `GRP-ARC-001` v2.2.
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | Sign-in requests a token addressed to SIG's MCP resource via self-registered client (Sections 9.1, 9.6) | Open, recorded as interim exception in ADR-0002; needs DEP-01 |
+| 2 | Chat issued a public SIG receipt on every flood question (Checklist I.2, Section 15.4) | Fixed on experiment branch: `publish_receipt` must be explicitly true |
+| 3 | Chat calls `assemble_pack` by free-text place with no area-match check (AD-03; the Ku Thong fallback-box failure) | Open, experiment only. Do not reuse this path in product code |
+| 4 | Platform Admin without Hub membership could run the SIG path (Section 9.4) | Fixed on experiment branch, with test |
+| 5 | Chat bypasses `AI_FEATURE_ENABLED`, allowance, usage records and per-Hub key (Section 7.5, AI-12/13) | Open, experiment only; ADR-0001 remains Proposed |
+| 6 | No CSRF protection (Section 13.1) | Fixed on main |
+| 7 | No new session after role change; sign-out left a copied cookie valid (Section 9.1) | Fixed on main |
+| 8 | 403/400 instead of 404 for other Hubs; errors not in Appendix D format | Fixed for sessions and admin routes; apply to every new route |
+| 9 | No rate limits (settings exist, not enforced) | Open, Phase B |
+| 10 | Pending-request list scans the whole audit log and lists any SERVIR account; spec has no self sign-up queue | Open, Phase B: decide keep (with ADR) or remove |
+| 11 | In-memory MCP token store is unbounded | Experiment only |
+| 12 | No permission-matrix, cross-Hub contract, or full Section 15.3 sign-in tests | Open, Phase B |
+
+Known limits of the Phase A fixes: sign-out is still a GET link and ends the person's sessions on all devices; migration `20260916_0002` was checked with SQLite tests only, not run on PostgreSQL.
+
+## Experiment branch rules
+
+`experiment/planning-chat` holds the local chat (`/planning.html`, `api/ai.py`, `api/mcp_client.py`, `api/openai_gateway.py`, `api/token_store.py`, ADR-0001). It passes 40 offline tests. It must not be merged into `main`: general chat, token storage and place-name pack calls conflict with the spec. Keep it `GRP_ENV=dev` only, never enable receipt publishing with private data, and keep the OpenAI key out of Git and logs. Revisit it in Increment 6, rebuilt to explain a stored GRP result.
 
 ## Architecture guardrails
 
-The implementation follows `GRP-ARC-001` version 2.2.
+- The GIS worker is the only calculator. Screens, SIG, downloads, and AI read the same locked result.
+- Every assessment is a background job with pinned boundary, dataset, method, and SHA-256 fingerprints.
+- Stop safely with typed errors. Never substitute a fallback area, dataset, route, or provider.
+- SERVIR sign-in proves identity; GRP membership decides Hub and role.
+- Nothing goes to SIG unless an Admin shares it. Receipts are issued by hand during acceptance only.
+- AI explains stored results only and stays off until Increment 6 is accepted.
 
-- The GIS worker is the only calculator. Screens, SIG, downloads, and AI read the same immutable result.
-- Every assessment is an asynchronous job with pinned boundary, dataset, method, and SHA-256 fingerprints.
-- Unsupported or mismatched inputs stop with typed errors. Never substitute a fallback area, dataset, route, or provider.
-- GRP owns users, Hub access, private data, methods, jobs, and results. SIG reads only Admin-approved evidence through a read-only endpoint.
-- SERVIR sign-in proves identity; GRP database membership determines Hub and role.
-- AI explains stored results only and remains disabled until Increment 6 is accepted.
-- A SIG receipt proves traceability, not scientific correctness or center safety.
+Any change to these rules needs an ADR and the approvals in Section 17.
 
-Any change to these rules requires an ADR and the approvals defined by the architecture baseline.
+## Refined plan
 
-## Validation completed
+**Phase B: finish Increment 2 security (about 1 week)**
+- Rate limits from Section 13.1
+- Permission matrix test for every row of Section 9.4; cross-Hub denial contract tests; remaining Section 15.3 sign-in tests
+- Decide the pending-request list (finding 10)
+- Cancel queued jobs on disable once jobs exist
 
-The current foundation has passed:
+**Phase C: Increment 1, golden assessment (main work, 2 to 3 weeks)**
+- Remaining tables and migrations, storage interface, Chiang Yuen seed, validation and result rules
+- `POST /assessments` with idempotency and 202; PostgreSQL `SKIP LOCKED` queue; worker with 15-minute lease; locked result
+- Golden test in CI (synthetic case until DEP-04 arrives); CI blocks merges on golden, migration, permission, contract and secret-scan failures
 
-```text
-Ruff                       passed
-pytest                     26 passed
-Python dependency check    passed
-Compose model validation   passed
-Deployment shell syntax    passed locally
-staged secret scan         passed
-GitHub Actions CI          passed at 269a2e5
-Container image workflow   passed at 269a2e5
-```
+**Phase D: Increment 3, SIG connection**
+- Sharing approval, evidence endpoint (rejects MCP-audience tokens), SIG machine login, contract tests, one receipt by hand
 
-The access and existing-SIG registration implementation passed GitHub CI and the container workflow at feature commit `269a2e5`. The image was not built locally because Docker Desktop was not running. Before using image mode, confirm the GHCR package is visible for that commit, then execute the staging smoke checks in [`deploy/BOOTSTRAP.md`](deploy/BOOTSTRAP.md).
+## Dependencies to chase this week
 
-## Configuration and security
-
-`.env.example` and `.env.local.example` contain safe defaults and secret file paths only. The real `.env`, architecture sources, integration captures, and provisioning correspondence are intentionally ignored and are not in the public repository.
-
-On the server, secret values belong in root-owned files under `/srv/grp/secrets` with mode `0600`. Live login needs a callback-specific client ID and exact callback URI; the issuer is discovered from the SIG MCP resource and can also be pinned. Public PKCE clients need no client secret. Do not put tokens, passwords, private keys, OAuth client secrets, or database credentials in Git, `.env`, container images, logs, screenshots, or issue comments. AI is still disabled; its future token path is prepared as `AI_KEY_FILE_ADPC`.
-
-Unknown verified identities are recorded in the audit table as pending access requests but do not create users, identity links, or memberships. The administrator notification appears in the protected Platform Admin workspace; the server-side `list-access-requests` command is the fallback. No email is sent. Provision roles with the audited workflow in [`docs/access-management.md`](docs/access-management.md).
-
-The staging target is Ubuntu 24.04 at `staging-risk-servir.adpc.net`, sized at 4 vCPU, 16 GB memory, and 250 GB disk. Caddy should expose HTTPS; FastAPI remains on `127.0.0.1:8000`, and PostGIS has no host port. SSH addresses and credentials must stay in the secure operations channel.
-
-For the first server run, download the reviewed bootstrap to `/srv/grp/bootstrap/bootstrap-ubuntu.sh` and run source mode. After the GHCR package is available, use image mode for faster releases. Firewall activation remains deliberately opt-in and requires an approved SSH source CIDR.
-
-## Next implementation slice
-
-Proceed in this order:
-
-1. Register a staging SIG public client for the exact HTTPS callback, put its client ID in `.env`, and complete a two-user live acceptance test (Platform Admin plus requester).
-2. Validate first Platform Admin and Hub membership provisioning using the documented CLI flow.
-3. Add PostgreSQL migration and cross-Hub isolation tests.
-4. Obtain the approved Chiang Yuen boundary, RP100 flood input, evacuation-center fixture, method, NoData rule, fingerprints, and signed expected result from the Scientific and Data Authority.
-5. Add the remaining tables, immutable storage, assessment validation, idempotent queueing, leases, typed failures, and signed golden-result proof.
-
-Do not invent or commit placeholder scientific values. The base SERVIR adapter is implemented for Increment 2, but provider registration and a live acceptance test remain outstanding. The SIG machine identity and evidence endpoint belong to Increment 3.
+| ID | Needed | Owner | Blocks |
+|---|---|---|---|
+| DEP-01 | GRP registered as its own app in SIG WorkOS (Sandbox, staging, production) | SIG platform owner | Removing ADR-0002 exception; Beta |
+| DEP-04, DEP-06 | Approved Chiang Yuen boundary, signed golden result, evacuation-center dataset | Scientific and Data Authority | Increment 1 acceptance |
+| DEP-08, DEP-09, DEP-13 | Risk pack `assessment_ref`, SIG machine login and how it is issued | SIG platform owner | Increment 3 |
 
 ## Resume commands
 
@@ -86,7 +102,8 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 python -m ruff check .
 python -m pytest
+alembic upgrade head
 docker compose --env-file .env -f deploy/compose.yml config
 ```
 
-Read [`README.md`](README.md), [`AGENTS.md`](AGENTS.md), and the secure copy of `GRP-ARC-001` version 2.2 before changing application behavior.
+Read [`README.md`](README.md), [`AGENTS.md`](AGENTS.md), [`docs/access-management.md`](docs/access-management.md), and the secure copy of `GRP-ARC-001` v2.2 before changing application behavior.

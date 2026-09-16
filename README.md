@@ -56,7 +56,7 @@ Bootstrap a different existing SIG user as Platform Admin, then create the ADPC 
 .\scripts\admin-local.ps1 ensure-hub --actor-email admin@example.org --code adpc --name "ADPC Hub"
 ```
 
-Replace the sample with the administrator's verified SIG email. The admin then opens `http://127.0.0.1:8000/admin`, authenticates through SIG, and reaches the protected approval panel. It shows pending requests and can assign `planner` or `admin`. Authentication proves the SIG identity; only an active GRP membership grants application access. OAuth/MCP tokens remain server-side and are not persisted by this first slice.
+Replace the sample with the administrator's verified SIG email. The admin then opens `http://127.0.0.1:8000/admin`, authenticates through SIG, and reaches the protected approval panel. Platform Admins see pending requests; Platform Admins and Hub Admins can add, change and disable members of Hubs they manage, and the last active Hub Admin is protected. State-changing requests need the `X-CSRF-Token` header (value from the `grp_csrf` cookie). Sign-out and any role or access change end that person's sessions on the server. Authentication proves the SIG identity; only an active GRP membership grants application access. The interim sign-in flow is recorded in `docs/adr/0002-interim-sig-mcp-client-login.md`; its access token is not kept.
 
 ## LLM token preparation
 
