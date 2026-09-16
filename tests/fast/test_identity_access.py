@@ -140,3 +140,95 @@ def test_preauthorized_user_without_hub_stays_in_pending_queue() -> None:
 
         assert not result.allowed
         assert list_access_requests(session) == ["unmapped@example.test"]
+
+
+def _linked_planner(session: Session) -> VerifiedIdentity:
+    bootstrap_platform_admin(session, "owner@example.test")
+    ensure_hub(session, actor_email="owner@example.test", code="adpc", name="ADPC Hub")
+    assign_member(
+        session,
+        actor_email="owner@example.test",
+        email="planner@example.test",
+        hub_code="adpc",
+        role="planner",
+    )
+    identity = VerifiedIdentity(
+        issuer="https://identity.example.test",
+        subject="planner-subject",
+        verified_email="planner@example.test",
+        display_name="Planner",
+    )
+    assert link_verified_identity(session, identity).allowed
+    session.commit()
+    return identity
+
+
+def test_same_login_reaches_same_person_after_email_change() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        identity = _linked_planner(session)
+        renamed = VerifiedIdentity(
+            issuer=identity.issuer,
+            subject=identity.subject,
+            verified_email="new-address@example.test",
+            display_name="Renamed",
+        )
+
+        result = link_verified_identity(session, renamed)
+
+        assert result.allowed
+        assert result.email == "planner@example.test"
+        assert session.scalar(select(func.count()).select_from(ExternalIdentity)) == 1
+
+
+def test_second_login_with_same_email_is_not_merged() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        identity = _linked_planner(session)
+        other_login = VerifiedIdentity(
+            issuer=identity.issuer,
+            subject="different-subject",
+            verified_email="planner@example.test",
+            display_name="Someone else",
+        )
+
+        result = link_verified_identity(session, other_login)
+        session.commit()
+
+        assert not result.allowed
+        assert session.scalar(select(func.count()).select_from(ExternalIdentity)) == 1
+        assert session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(AuditEvent.action == "identity_link_denied")
+        ) == 1
+
+
+def test_disabled_user_is_denied_at_sign_in() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        identity = _linked_planner(session)
+        user = session.scalar(select(AppUser).where(AppUser.email == "planner@example.test"))
+        user.status = "disabled"
+        session.commit()
+
+        assert not link_verified_identity(session, identity).allowed
+
+
+def test_verified_email_differing_from_admin_entry_is_denied() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        _linked_planner(session)
+        near_miss = VerifiedIdentity(
+            issuer="https://identity.example.test",
+            subject="near-miss-subject",
+            verified_email="planner@example.test.evil",
+            display_name=None,
+        )
+
+        assert not link_verified_identity(session, near_miss).allowed
+        assert session.scalar(select(func.count()).select_from(AppUser)) == 2

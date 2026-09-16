@@ -132,6 +132,14 @@ def link_verified_identity(
         if user.status != UserStatus.ACTIVE:
             _audit_denial(session, identity, "user_disabled", request_intent)
             return IdentityLinkResult(allowed=False, reason="access_not_authorized")
+        already_linked = session.scalar(
+            select(ExternalIdentity.id).where(ExternalIdentity.user_id == user.id).limit(1)
+        )
+        if already_linked is not None:
+            # The email is used only for the first link; a different login with the same email
+            # is never merged into an already linked person (Section 9.2).
+            _audit_denial(session, identity, "identity_link_conflict", request_intent)
+            return IdentityLinkResult(allowed=False, reason="access_not_authorized")
 
     memberships = load_active_memberships(session, user.id)
     if not memberships and not user.is_platform_admin:

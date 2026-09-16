@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 16 September 2026 (Phase A review and stabilization)
+**Updated:** 16 September 2026 (Phase A stabilization and Phase B security tests)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
 **Branches:** `main` (product baseline) and `experiment/planning-chat` (local AI chat prototype, not for merge)
 
-**Baseline:** `GRP-ARC-001` v2.2. Local commits are not pushed yet.
+**Baseline:** `GRP-ARC-001` v2.2. Phase A is pushed (`3e8f91f`); the Phase B commit is local until pushed.
 
 ## Current position
 
@@ -20,18 +20,20 @@ Increment 0 is complete. Most of Increment 2 (sign-in, membership, Hub administr
 | Hub administration | Platform Admin and Hub Admin member list, add, role change, enable/disable; last-Admin guard with row lock; audited changes; setup CLI (`bootstrap-platform-admin`, `ensure-hub`, `assign-member`) |
 | Errors | **New:** Appendix D format `{error: {code, message, support_ref}}` on sessions and admin routes; other-Hub and unknown items return 404 |
 | Database | Migrations `20260916_0001` (5 access tables) and `20260916_0002` (session revocation). 11 of 16 spec tables still missing |
-| Tests | 31 offline tests, Ruff clean. New `tests/fast/test_session_security.py` covers CSRF, role-change revocation, and sign-out replay |
+| Rate limits | **Phase B:** 60 API requests per person per minute, in process memory (`api/rate_limits.py`); returns 429 `RATE_LIMITED`. Must move to a shared store before a second API worker |
+| Tests | 77 offline tests, Ruff clean. Session security (CSRF, revocation, sign-out replay); **Phase B:** full permission matrix through real sessions (`tests/contract/test_permission_matrix.py`), ID-token rejection cases (`tests/fast/test_oidc_rejections.py`), identity-link rules |
 
 ## Phase A work done on 16 September
 
-Commits (local, not pushed):
+Commits (pushed with `3e8f91f`):
 
 | Commit | Branch | What |
 |---|---|---|
 | `ff084c7` | experiment | Snapshot of the uncommitted chat prototype, preserved as-is |
 | `3f3db5c` | main | Hub administration plus review fixes #6 to #8 (CSRF, session revocation, 404 and Appendix D errors) |
 | `3e0fe24` | experiment | Merge of main; public SIG receipts now opt-in only; Platform Admin without membership blocked from SIG evidence |
-| (this commit) | main | ADR-0002 and this handover |
+| `3e8f91f` | main | ADR-0002 and this handover |
+| `05d5de8` | main | Phase B: rate limit, identity merge fix, permission matrix and sign-in tests |
 
 ## Code review findings (16 September)
 
@@ -47,12 +49,14 @@ Reviewed against `GRP-ARC-001` v2.2.
 | 6 | No CSRF protection (Section 13.1) | Fixed on main |
 | 7 | No new session after role change; sign-out left a copied cookie valid (Section 9.1) | Fixed on main |
 | 8 | 403/400 instead of 404 for other Hubs; errors not in Appendix D format | Fixed for sessions and admin routes; apply to every new route |
-| 9 | No rate limits (settings exist, not enforced) | Open, Phase B |
-| 10 | Pending-request list scans the whole audit log and lists any SERVIR account; spec has no self sign-up queue | Open, Phase B: decide keep (with ADR) or remove |
+| 9 | No rate limits (settings exist, not enforced) | Fixed for the per-person API limit; assessment, SIG evidence and AI limits land with those routes |
+| 10 | Pending-request list scans the whole audit log and lists any SERVIR account; spec has no self sign-up queue | Scan bounded to the 500 latest denials. **Decision needed:** keep (write ADR) or remove |
 | 11 | In-memory MCP token store is unbounded | Experiment only |
-| 12 | No permission-matrix, cross-Hub contract, or full Section 15.3 sign-in tests | Open, Phase B |
+| 12 | No permission-matrix, cross-Hub contract, or full Section 15.3 sign-in tests | Fixed for existing routes: 30-case matrix, wrong audience/issuer/nonce/key/expiry, unverified email, userinfo subject mismatch, email change, disabled user |
+| 13 | A second SERVIR login with the same email was linked to an already linked person (Section 9.2: never merge by email) | Fixed in `core/identity.py`, with test |
+| 14 | Access message said "Open the GRP address" instead of the address (Section 9.5) | Fixed |
 
-Known limits of the Phase A fixes: sign-out is still a GET link and ends the person's sessions on all devices; migration `20260916_0002` was checked with SQLite tests only, not run on PostgreSQL.
+Not yet covered by tests: two different logins linking the same person at the same instant (needs PostgreSQL), the SERVIR outage message, and "no token or cookie in logs" (needs log capture). Known limits of the Phase A fixes: sign-out is still a GET link and ends the person's sessions on all devices; migration `20260916_0002` was checked with SQLite tests only, not run on PostgreSQL.
 
 ## Experiment branch rules
 
@@ -71,11 +75,8 @@ Any change to these rules needs an ADR and the approvals in Section 17.
 
 ## Refined plan
 
-**Phase B: finish Increment 2 security (about 1 week)**
-- Rate limits from Section 13.1
-- Permission matrix test for every row of Section 9.4; cross-Hub denial contract tests; remaining Section 15.3 sign-in tests
-- Decide the pending-request list (finding 10)
-- Cancel queued jobs on disable once jobs exist
+**Phase B: Increment 2 security (done 16 September, except below)**
+- Remaining: decide the pending-request list (finding 10); make sign-out a POST; PostgreSQL-backed tests for concurrent linking and migrations; cancel queued jobs on disable once jobs exist
 
 **Phase C: Increment 1, golden assessment (main work, 2 to 3 weeks)**
 - Remaining tables and migrations, storage interface, Chiang Yuen seed, validation and result rules

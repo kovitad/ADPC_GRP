@@ -23,6 +23,8 @@ from core.access_models import (
 )
 from core.db import session_scope
 
+# Only recent denials are shown so a flood of sign-in attempts cannot make the page unbounded.
+ACCESS_REQUEST_SCAN_LIMIT = 500
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -358,7 +360,12 @@ def update_hub_member(
 
 
 def membership_access_message(
-    session: Session, *, actor_user_id: UUID, hub_code: str, member_id: UUID
+    session: Session,
+    *,
+    actor_user_id: UUID,
+    hub_code: str,
+    member_id: UUID,
+    grp_address: str,
 ) -> str:
     hub = _active_hub(session, hub_code)
     require_hub_manager(session, actor_user_id, hub)
@@ -372,7 +379,7 @@ def membership_access_message(
     membership, _user = row
     return (
         f"You now have access to GRP ({hub.name}, {membership.role}). "
-        "Open the GRP address and sign in with your SERVIR account."
+        f"Open {grp_address} and sign in with your SERVIR account."
     )
 
 
@@ -381,6 +388,7 @@ def list_access_requests(session: Session) -> list[str]:
         select(AuditEvent)
         .where(AuditEvent.action == "identity_link_denied")
         .order_by(AuditEvent.occurred_at.desc())
+        .limit(ACCESS_REQUEST_SCAN_LIMIT)
     ).all()
     pending: list[str] = []
     seen: set[str] = set()

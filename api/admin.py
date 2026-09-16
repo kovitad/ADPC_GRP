@@ -189,6 +189,7 @@ def access_message(
             actor_user_id=principal.user_id,
             hub_code=hub_code,
             member_id=member_id,
+            grp_address=get_settings().grp_public_base_url,
         )
     except ValueError as error:
         raise _bad_request(error) from error

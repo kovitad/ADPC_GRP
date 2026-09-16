@@ -11,6 +11,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy.orm import Session
 
 from api.errors import GrpError, access_not_authorized, not_signed_in
+from api.rate_limits import limiter
 from api.settings import Settings
 from core.access_models import AppUser, UserStatus
 from core.db import read_secret
@@ -158,6 +159,12 @@ def load_principal(request: Request, session: Session, settings: Settings) -> Cu
         supplied = request.headers.get(CSRF_HEADER, "")
         if not supplied or not hmac.compare_digest(supplied, csrf_token(settings, session_id)):
             raise GrpError(403, "ACCESS_NOT_AUTHORIZED", "Access not authorized.")
+    limiter.check(
+        "api_requests_per_person_per_minute",
+        str(user_id),
+        settings.rate_limits["api_requests_per_person_per_minute"],
+        60,
+    )
     user = session.get(AppUser, user_id)
     if user is not None and _session_revoked(user, issued_at):
         raise not_signed_in()
