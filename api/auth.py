@@ -3,7 +3,7 @@ from __future__ import annotations
 import hmac
 import secrets
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -28,7 +28,8 @@ from api.sessions import (
     secure_cookie,
     set_session_cookie,
 )
-from api.settings import Settings, get_settings
+from api.settings import Settings, get_settings, planning_chat_available
+from api.token_store import session_token_store
 from core.access_models import AppUser, AuditEvent, AuditResult
 from core.identity import link_verified_identity
 
@@ -132,14 +133,14 @@ async def complete_login(
             return _screen("failed", intent)
         provider = ServirSigIdentityProvider(settings)
         try:
-            identity = await provider.exchange_callback(
+            authenticated = await provider.exchange_callback(
                 code,
                 transaction["nonce"],
                 transaction["code_verifier"],
             )
         finally:
             await provider.close()
-        result = link_verified_identity(session, identity, request_intent=intent)
+        result = link_verified_identity(session, authenticated.identity, request_intent=intent)
         session.commit()
     except (HTTPException, IdentityProviderError, KeyError, OSError):
         session.rollback()
@@ -154,7 +155,13 @@ async def complete_login(
     else:
         location = "/workspace.html#admin-panel" if intent == "admin" else "/workspace.html"
         response = RedirectResponse(url=location, status_code=status.HTTP_303_SEE_OTHER)
-        set_session_cookie(response, settings, result)
+        session_id = str(uuid4())
+        set_session_cookie(response, settings, result, session_id=session_id)
+        if planning_chat_available(settings):
+            # Interim exception (ADR-0002, ADR-0004): SIG MCP token kept in memory, dev only.
+            session_token_store.put(
+                session_id, authenticated.access_token, authenticated.expires_in
+            )
     response.delete_cookie(AUTH_TRANSACTION_COOKIE, path="/api/v1/auth")
     return response
 
@@ -178,6 +185,7 @@ def logout(request: Request, session: DatabaseSession) -> JSONResponse:
             supplied = request.headers.get(CSRF_HEADER, "")
             if not hmac.compare_digest(supplied, csrf_token(settings, decoded["session_id"])):
                 raise GrpError(403, "ACCESS_NOT_AUTHORIZED", "Access not authorized.")
+            session_token_store.delete(decoded["session_id"])
             user = session.get(AppUser, UUID(decoded["user_id"]))
             if user is not None:
                 revoke_user_sessions(user)

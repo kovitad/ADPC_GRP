@@ -4,7 +4,19 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from api import access, admin, ai, assessments, audit, auth, catalog, health, platform, uploads
+from api import (
+    access,
+    admin,
+    ai,
+    assessments,
+    audit,
+    auth,
+    catalog,
+    health,
+    planning,
+    platform,
+    uploads,
+)
 from api.errors import register_error_handlers
 from api.integrations import sig
 from api.settings import get_settings
@@ -20,7 +32,7 @@ app = FastAPI(
 register_error_handlers(app)
 
 for module in (
-    health, auth, access, admin, platform, catalog, uploads, assessments, ai, audit, sig
+    health, auth, access, admin, platform, planning, catalog, uploads, assessments, ai, audit, sig
 ):
     app.include_router(module.router, prefix="/api/v1")
 

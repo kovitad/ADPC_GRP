@@ -41,12 +41,19 @@ class PublicClientRegistration:
     issuer: str
 
 
+@dataclass(frozen=True)
+class AuthenticatedIdentity:
+    identity: VerifiedIdentity
+    access_token: str
+    expires_in: int
+
+
 class HumanIdentityProvider(Protocol):
     async def authorization_url(self, state: str, nonce: str, code_challenge: str) -> str: ...
 
     async def exchange_callback(
         self, code: str, nonce: str, code_verifier: str
-    ) -> VerifiedIdentity: ...
+    ) -> AuthenticatedIdentity: ...
 
 
 def generate_pkce_pair() -> tuple[str, str]:
@@ -241,7 +248,7 @@ class ServirSigIdentityProvider:
 
     async def exchange_callback(
         self, code: str, nonce: str, code_verifier: str
-    ) -> VerifiedIdentity:
+    ) -> AuthenticatedIdentity:
         metadata = await self._metadata()
         try:
             token_data = {
@@ -323,11 +330,15 @@ class ServirSigIdentityProvider:
             if len(email) > 320 or email.count("@") != 1:
                 raise IdentityProviderError("SERVIR email claim is invalid")
             display_name = identity_claims.get("name") or claims.get("name")
-            return VerifiedIdentity(
-                issuer=str(claims["iss"]),
-                subject=str(claims["sub"]),
-                verified_email=email,
-                display_name=str(display_name) if display_name else None,
+            return AuthenticatedIdentity(
+                identity=VerifiedIdentity(
+                    issuer=str(claims["iss"]),
+                    subject=str(claims["sub"]),
+                    verified_email=email,
+                    display_name=str(display_name) if display_name else None,
+                ),
+                access_token=access_token,
+                expires_in=int(token_document.get("expires_in", 3600)),
             )
         except (httpx.HTTPError, jwt.PyJWTError, KeyError, TypeError, ValueError) as error:
             raise IdentityProviderError("SERVIR sign-in could not be verified") from error

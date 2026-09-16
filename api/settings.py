@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     job_lease_minutes: int = 15
 
     ai_feature_enabled: bool = False
+    # Planner chat box and map using SIG generic evidence (ADR-0004). Docker Desktop only.
+    planning_chat_enabled: bool = False
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None
@@ -67,3 +69,9 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def planning_chat_available(settings: Settings) -> bool:
+    """ADR-0004: the interim planning chat runs only in local development."""
+
+    return settings.planning_chat_enabled and settings.grp_env == "dev"

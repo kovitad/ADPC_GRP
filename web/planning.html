@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Planning | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="/grp-common.js" defer></script>
+    <script src="/planning.js" defer></script>
+  </head>
+  <body class="planning-body">
+    <header class="workspace-header planning-header">
+      <a class="workspace-brand" href="/workspace.html" aria-label="GRP workspace">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span>SERVIR GRP</span>
+      </a>
+      <nav class="workspace-nav" aria-label="Workspace navigation">
+        <a class="workspace-nav__link workspace-nav__link--active" href="/planning.html">Planning</a>
+        <a class="workspace-nav__link" href="/workspace.html">My access</a>
+      </nav>
+      <div class="planning-user">
+        <span data-user-name>Loading…</span>
+        <button class="workspace-signout" type="button" data-sign-out>Sign out</button>
+      </div>
+    </header>
+
+    <main class="planning-shell">
+      <section class="assistant-pane" aria-labelledby="planning-title">
+        <div class="assistant-heading">
+          <p class="eyebrow">Planning assistant · local test (ADR-0004)</p>
+          <h1 id="planning-title">Ask about flood planning</h1>
+          <p>
+            Ask in your own words. The assistant can explain general ideas or check SIG flood
+            exposure evidence for a Thailand district. This is SIG generic evidence, not a GRP
+            assessment, and never a decision that a place is safe.
+          </p>
+        </div>
+
+        <div class="assistant-context">
+          <span aria-hidden="true">◇</span>
+          <strong data-hub-name>Hub</strong>
+          <span data-allowance>Checking AI allowance…</span>
+        </div>
+        <p class="planning-banner" data-banner hidden></p>
+
+        <div class="assistant-conversation" aria-live="polite">
+          <article class="assistant-message assistant-message--system">
+            <span class="assistant-avatar" aria-hidden="true">AI</span>
+            <div>
+              <p>
+                I can chat about flood planning or look up SIG flood exposure for a district. I
+                cannot change access, certify safety, or invent current data.
+              </p>
+              <strong>Try a suggestion or ask your own question.</strong>
+            </div>
+          </article>
+
+          <div class="planning-prompts" aria-label="Suggested questions">
+            <button type="button" data-suggestion="What is the difference between flood hazard, exposure and risk?">
+              Explain a concept
+              <span>General chat, no SIG data</span>
+            </button>
+            <button type="button" data-suggestion="Which schools and hospitals are exposed to flooding, and at what severity?">
+              Check exposure
+              <span>SIG evidence for the area below</span>
+            </button>
+          </div>
+
+          <div class="chat-history" data-chat-history></div>
+        </div>
+
+        <form class="planning-question" data-question-form>
+          <label>
+            Area (Thailand district, used for SIG flood questions)
+            <input
+              name="place"
+              data-place
+              value="Mueang Nan District, Nan, Thailand"
+              maxlength="200"
+            />
+          </label>
+          <label>
+            Your message
+            <textarea
+              name="question"
+              data-question
+              rows="3"
+              maxlength="1000"
+              required
+              placeholder="Ask anything; the assistant will say what it can and cannot do…"
+            ></textarea>
+          </label>
+          <label class="planning-publish">
+            <input type="checkbox" data-publish-receipt />
+            Publish a public SIG receipt and show SIG's hazard map (creates a public record — use
+            public information only)
+          </label>
+          <button class="button button--primary" type="submit" data-run-button>
+            Send message
+          </button>
+          <p class="planning-status" data-planning-status aria-live="polite"></p>
+          <p class="planning-status">Do not type private Hub data. Chat text is not saved.</p>
+        </form>
+      </section>
+
+      <section class="map-pane" aria-label="Map">
+        <div class="map-toolbar">
+          <div>
+            <span class="map-toolbar__label">Area</span>
+            <strong data-map-place>Thailand</strong>
+          </div>
+          <div class="map-toolbar__actions">
+            <button type="button" data-show-osm hidden>Back to OSM map</button>
+            <span class="map-state" data-map-state>No evidence yet</span>
+          </div>
+        </div>
+        <div class="map-stage">
+          <div id="risk-map" class="risk-map" aria-label="OpenStreetMap map"></div>
+          <iframe
+            class="sig-map"
+            data-sig-map
+            title="SIG receipt-bound hazard map"
+            sandbox="allow-scripts allow-same-origin"
+            referrerpolicy="no-referrer"
+            hidden
+          ></iframe>
+        </div>
+        <div class="map-evidence" data-map-evidence hidden>
+          <p class="map-area" data-area></p>
+          <div class="metric-grid" data-metrics></div>
+          <details>
+            <summary>Sources, steps and declared gaps</summary>
+            <ol data-citations></ol>
+            <ul data-trace></ul>
+            <ul data-gaps></ul>
+          </details>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

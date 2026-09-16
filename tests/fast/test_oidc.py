@@ -103,10 +103,12 @@ def test_oidc_authorization_and_verified_callback(tmp_path, auth_method: str) ->
             assert parameters["resource"] == [resource]
             assert parameters["code_challenge_method"] == ["S256"]
 
-            identity = await provider.exchange_callback("code-123", nonce, "verifier")
+            authenticated = await provider.exchange_callback("code-123", nonce, "verifier")
+            identity = authenticated.identity
             assert identity.subject == "sig-user-123"
             assert identity.verified_email == "expert@example.test"
             assert identity.display_name == "Example Expert"
+            assert authenticated.access_token == "mcp-access-token"
 
     asyncio.run(verify_flow())
 

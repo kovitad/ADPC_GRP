@@ -38,10 +38,12 @@ services:
       SERVIR_AUTH_CLIENT_SECRET_FILE: /run/grp-secrets/servir_auth_client_secret
       # Local demo only: AI build switch on so the Platform Admin can test the gateway.
       AI_FEATURE_ENABLED: "true"
+      # ADR-0004: planner chat box and map on SIG generic evidence, Docker Desktop only.
+      PLANNING_CHAT_ENABLED: "true"
       AI_PROVIDER: openai
       AI_MODEL: ${AI_MODEL:-gpt-5.2}
       AI_KEY_FILE_ADPC: /run/grp-secrets/ai_key_adpc
-      AI_MAX_OUTPUT_TOKENS: "300"
+      AI_MAX_OUTPUT_TOKENS: "900"
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY_FILE: /run/grp-secrets/langfuse_secret_key
