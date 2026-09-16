@@ -43,6 +43,8 @@ def test_sign_in_screen_uses_servir_without_local_password() -> None:
     page = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
     assert "Continue with SERVIR" in page
+    assert "/assets/servir-global-collaborative.png" in page
+    assert "/assets/thailand-flood-planning-cover.webp" in page
     assert 'href="/api/v1/auth/login"' in page
     assert 'type="password"' not in page
     assert "does not create or store a" in page

@@ -15,6 +15,9 @@
   --line: #dce4df;
   --danger-700: #984039;
   --danger-100: #fff0ed;
+  --auth-blue: #2380b0;
+  --auth-blue-dark: #1b678f;
+  --auth-navy: #0d2534;
   --shadow-lg: 0 32px 80px rgb(11 69 61 / 14%);
   --radius-lg: 1.25rem;
   --radius-md: 0.8rem;
@@ -67,25 +70,41 @@ a {
 .auth-layout {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(22rem, 0.92fr) minmax(32rem, 1.08fr);
+  grid-template-columns: minmax(27rem, 1.05fr) minmax(28.75rem, 0.95fr);
 }
 
 .brand-panel {
   position: relative;
-  display: flex;
+  isolation: isolate;
+  display: grid;
   min-height: 100vh;
-  flex-direction: column;
-  justify-content: space-between;
+  grid-template-rows: auto 1fr auto;
   overflow: hidden;
-  padding: clamp(2rem, 5vw, 4.5rem);
-  background:
-    radial-gradient(circle at 88% 12%, rgb(207 227 109 / 20%), transparent 23rem),
-    linear-gradient(145deg, var(--forest-900), var(--forest-950));
+  padding: clamp(2.25rem, 4vw, 3rem);
+  background: linear-gradient(145deg, var(--auth-navy), #124a67 55%, #1b678f);
   color: var(--white);
+}
+
+.brand-panel::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgb(9 30 44 / 96%) 0%,
+      rgb(9 35 51 / 82%) 28%,
+      rgb(10 42 59 / 28%) 65%,
+      rgb(8 28 39 / 72%) 100%
+    ),
+    linear-gradient(90deg, rgb(9 31 44 / 88%), transparent 72%);
+  content: "";
+  pointer-events: none;
 }
 
 .brand-panel::after {
   position: absolute;
+  z-index: 1;
   right: -8rem;
   bottom: -12rem;
   width: 32rem;
@@ -98,18 +117,44 @@ a {
   content: "";
 }
 
-.brand-panel__map {
+.brand-panel__cover {
   position: absolute;
+  z-index: 0;
   inset: 0;
-  opacity: 0.13;
-  background-image:
-    linear-gradient(30deg, transparent 48%, rgb(255 255 255 / 18%) 49%, transparent 51%),
-    linear-gradient(150deg, transparent 48%, rgb(255 255 255 / 12%) 49%, transparent 51%);
-  background-size: 5.5rem 5.5rem;
-  mask-image: linear-gradient(to bottom, black, transparent 86%);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  opacity: 0.94;
+  pointer-events: none;
+  user-select: none;
 }
 
-.brand-lockup,
+.brand-lockup {
+  position: relative;
+  z-index: 2;
+}
+
+.servir-logo {
+  display: block;
+  width: min(14.4rem, 52%);
+  height: auto;
+  filter: brightness(0) invert(1);
+}
+
+.brand-platform {
+  display: block;
+  width: max-content;
+  margin-top: 1.05rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgb(255 255 255 / 28%);
+  color: #d7edf7;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+}
+
 .mobile-brand {
   position: relative;
   z-index: 1;
@@ -146,9 +191,11 @@ a {
 
 .brand-story {
   position: relative;
-  z-index: 1;
-  max-width: 36rem;
-  margin-block: 5rem 3rem;
+  z-index: 2;
+  align-self: center;
+  max-width: 32.5rem;
+  margin-top: -5rem;
+  text-shadow: 0 2px 14px rgb(0 20 31 / 62%);
 }
 
 .eyebrow {
@@ -165,21 +212,21 @@ a {
 }
 
 .brand-story h1 {
-  max-width: 11ch;
+  max-width: 12ch;
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(2.8rem, 5.6vw, 5.8rem);
-  font-weight: 500;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
+  font-family: "Arial Narrow", "Segoe UI", sans-serif;
+  font-size: clamp(2.35rem, 3.8vw, 3.7rem);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
 }
 
 .brand-summary {
-  max-width: 34rem;
-  margin: 1.6rem 0 0;
-  color: rgb(255 255 255 / 72%);
-  font-size: 1.02rem;
-  line-height: 1.7;
+  max-width: 29rem;
+  margin: 1.15rem 0 0;
+  color: #e2eff4;
+  font-size: 0.83rem;
+  line-height: 1.65;
 }
 
 .feature-list {
@@ -213,24 +260,22 @@ a {
 
 .environment-label {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 0.55rem;
   margin: 0;
-  color: rgb(255 255 255 / 55%);
-  font-size: 0.73rem;
+  width: max-content;
+  max-width: 100%;
+  padding: 0.5rem 0.68rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 0.32rem;
+  background: rgb(6 28 40 / 40%);
+  color: #d8e8ee;
+  font-size: 0.52rem;
   font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.environment-label span {
-  width: 0.48rem;
-  height: 0.48rem;
-  border-radius: 50%;
-  background: var(--lime-300);
-  box-shadow: 0 0 0 0.24rem rgb(207 227 109 / 13%);
+  letter-spacing: 0.035em;
+  backdrop-filter: blur(5px);
 }
 
 .auth-main {
@@ -239,19 +284,18 @@ a {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: clamp(1.5rem, 5vw, 5rem);
-  background:
-    linear-gradient(rgb(255 255 255 / 68%), rgb(255 255 255 / 68%)),
-    repeating-linear-gradient(90deg, transparent 0 4.9rem, rgb(11 69 61 / 3%) 5rem);
+  padding: clamp(1.25rem, 2.5vw, 1.75rem);
+  background: radial-gradient(circle at 70% 15%, #fff 0, #f7fafb 34%, #edf3f5 100%);
 }
 
 .auth-card {
-  width: min(100%, 31rem);
-  padding: clamp(1.6rem, 4vw, 2.75rem);
-  border: 1px solid rgb(220 228 223 / 88%);
-  border-radius: var(--radius-lg);
-  background: rgb(255 255 255 / 94%);
-  box-shadow: var(--shadow-lg);
+  width: min(100%, 27.5rem);
+  padding: clamp(1.75rem, 3vw, 2.25rem);
+  border: 1px solid #d8e2e6;
+  border-top: 5px solid var(--auth-blue);
+  border-radius: 0.9rem;
+  background: var(--white);
+  box-shadow: 0 20px 60px rgb(30 66 80 / 15%);
 }
 
 .mobile-brand {
@@ -279,8 +323,8 @@ a {
 .context-badge {
   padding: 0.4rem 0.65rem;
   border-radius: 999px;
-  background: #edf5ee;
-  color: var(--forest-700);
+  background: #e8f4f8;
+  color: var(--auth-blue-dark);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -300,17 +344,17 @@ a {
 }
 
 .auth-heading {
-  margin: 2.2rem 0 1.7rem;
+  margin: 1.8rem 0 1.5rem;
 }
 
 .auth-heading h2 {
   margin: 0;
   color: var(--ink-900);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(2rem, 4vw, 2.65rem);
-  font-weight: 500;
-  letter-spacing: -0.035em;
-  line-height: 1.08;
+  font-family: "Arial Narrow", "Segoe UI", sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
 }
 
 .auth-heading > p:last-child {
@@ -318,6 +362,10 @@ a {
   color: var(--ink-700);
   font-size: 0.91rem;
   line-height: 1.65;
+}
+
+.auth-card .eyebrow {
+  color: var(--auth-blue);
 }
 
 .auth-alert {
@@ -381,18 +429,18 @@ a {
 }
 
 .button--primary {
-  background: var(--forest-900);
-  box-shadow: 0 0.7rem 1.5rem rgb(11 69 61 / 19%);
+  background: var(--auth-blue);
+  box-shadow: 0 0.7rem 1.5rem rgb(35 128 176 / 18%);
   color: var(--white);
 }
 
 .button--primary:hover {
-  background: var(--forest-800);
+  background: var(--auth-blue-dark);
 }
 
 .button--primary svg {
   width: 1.2rem;
-  fill: var(--lime-200);
+  fill: var(--white);
 }
 
 .button__arrow {
@@ -402,9 +450,9 @@ a {
 }
 
 .button--secondary {
-  border-color: var(--line);
-  background: var(--white);
-  color: var(--forest-800);
+  border-color: var(--auth-blue);
+  background: #f7fbfd;
+  color: var(--auth-blue-dark);
 }
 
 .button--secondary:hover {
@@ -467,7 +515,7 @@ a {
 }
 
 .support-copy--admin a {
-  color: var(--forest-700);
+  color: var(--auth-blue-dark);
   font-weight: 800;
 }
 
@@ -491,7 +539,7 @@ a {
   position: absolute;
   top: 0.12rem;
   left: 0;
-  color: var(--forest-700);
+  color: var(--auth-blue-dark);
   content: "✓";
   font-weight: 900;
 }
@@ -541,7 +589,7 @@ a {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.55rem;
-  margin-top: 1.5rem;
+  margin-top: 1rem;
   color: var(--ink-500);
   font-size: 0.68rem;
 }
@@ -822,28 +870,69 @@ a {
 
 @media (max-width: 64rem) {
   .auth-layout {
-    grid-template-columns: minmax(19rem, 0.78fr) minmax(29rem, 1.22fr);
+    grid-template-columns: minmax(23.75rem, 0.95fr) minmax(26.875rem, 1.05fr);
   }
 
   .brand-panel {
-    padding: 2.5rem;
+    padding: 2.25rem;
   }
 
   .brand-story h1 {
-    font-size: clamp(2.65rem, 5vw, 4rem);
+    font-size: clamp(2rem, 4vw, 3rem);
   }
 }
 
 @media (max-width: 50rem) {
   .auth-layout {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
   }
 
   .brand-panel {
+    order: 2;
+    display: grid;
+    min-height: 14.5rem;
+    padding: 1.7rem 1.75rem;
+    grid-template-rows: auto 1fr;
+  }
+
+  .brand-panel::before {
+    background: linear-gradient(135deg, rgb(9 30 44 / 88%), rgb(27 103 143 / 72%));
+  }
+
+  .brand-panel__cover {
+    display: none;
+  }
+
+  .servir-logo {
+    width: 10.9rem;
+  }
+
+  .brand-platform {
+    margin-top: 0.7rem;
+    padding-top: 0.55rem;
+    font-size: 0.5rem;
+  }
+
+  .brand-story {
+    align-self: end;
+    margin: 1.75rem 0 0;
+    text-shadow: none;
+  }
+
+  .brand-story h1 {
+    margin: 0;
+    font-size: 1.65rem;
+  }
+
+  .brand-summary,
+  .environment-label {
     display: none;
   }
 
   .auth-main {
+    order: 1;
     min-height: 100vh;
     justify-content: flex-start;
     padding: 2rem 1.1rem;
@@ -854,7 +943,7 @@ a {
   }
 
   .mobile-brand {
-    display: flex;
+    display: none;
   }
 
   .assignment-form {
