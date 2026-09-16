@@ -5,7 +5,7 @@
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
 **Branch:** `main`
-**Current phase:** Increment 0 application foundation complete; Increment 1 implementation not started
+**Current phase:** Increment 0 application foundation and sign-in/access UI complete; Increment 1 implementation not started
 
 ## Current position
 
@@ -14,12 +14,12 @@ The repository now provides a tested, architecture-aligned foundation for the AD
 | Area | Current state |
 |---|---|
 | FastAPI | Application factory, configuration loading, public `/api/v1/healthz`, and internal `/api/v1/readyz` |
-| API modules | Boundaries exist for auth, access, Admin, catalog, uploads, assessments, AI, audit, health, and SIG integration; business routes remain placeholders |
+| API modules | Boundaries exist for auth, access, Admin, catalog, uploads, assessments, AI, audit, health, and SIG integration; the public login entry fails closed until OIDC is configured and other business routes remain placeholders |
 | Worker | Runnable process and shutdown handling exist; PostgreSQL job claiming and GIS processing are not implemented |
 | Database | SQLAlchemy base and Alembic environment exist; the 16 architecture tables and first migration do not |
 | Deployment | Idempotent Ubuntu bootstrap, source/image release modes, GHCR publishing, hardened secret staging, Compose services, host Caddy configuration, and an operator runbook exist; the VM has not yet been bootstrapped from this repository |
-| Web | Static Increment 0 status page only; no Planner or Admin functionality |
-| Tests and CI | Four offline tests cover liveness, result-count invariants, and route access classification; GitHub CI runs Ruff and pytest |
+| Web | Responsive SERVIR sign-in, unavailable-provider state, and non-self-registration access guidance exist; no Planner or Admin workspace functionality |
+| Tests and CI | Seven offline tests cover liveness, result-count invariants, route access classification, login fail-closed behavior, and authentication-screen guardrails; GitHub CI runs Ruff and pytest |
 
 ## Architecture guardrails
 
@@ -41,7 +41,7 @@ The current foundation has passed:
 
 ```text
 Ruff                       passed
-pytest                     4 passed
+pytest                     7 passed
 Python dependency check    passed
 Compose model validation   passed
 Deployment shell syntax    passed locally

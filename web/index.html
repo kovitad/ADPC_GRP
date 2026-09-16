@@ -4,17 +4,111 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>SERVIR Global Risk Platform</title>
+    <meta name="theme-color" content="#0b453d" />
+    <title>Sign in | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
   </head>
   <body>
-    <main>
-      <p class="eyebrow">ADPC Hub</p>
-      <h1>SERVIR Global Risk Platform</h1>
-      <p>The staging foundation is running.</p>
-      <p class="notice">
-        Assessment, sign-in, sharing, and AI screens are not connected in this Increment 0 build.
-      </p>
-    </main>
+    <a class="skip-link" href="#main-content">Skip to sign in</a>
+    <div class="auth-layout">
+      <aside class="brand-panel" aria-label="Platform introduction">
+        <div class="brand-panel__map" aria-hidden="true"></div>
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+          <span>ADPC Hub</span>
+        </div>
+
+        <div class="brand-story">
+          <p class="eyebrow eyebrow--light">SERVIR Global Risk Platform</p>
+          <h1>Shared evidence for clearer risk decisions.</h1>
+          <p class="brand-summary">
+            Plan, assess, and share traceable risk evidence from one secure workspace.
+          </p>
+          <ul class="feature-list" aria-label="Platform benefits">
+            <li><span aria-hidden="true">01</span>One SERVIR account across connected tools</li>
+            <li><span aria-hidden="true">02</span>Hub-controlled roles and data access</li>
+            <li><span aria-hidden="true">03</span>Reproducible assessments with a clear audit trail</li>
+          </ul>
+        </div>
+
+        <p class="environment-label"><span></span> ADPC staging environment</p>
+      </aside>
+
+      <main class="auth-main" id="main-content">
+        <section class="auth-card" aria-labelledby="sign-in-title">
+          <div class="mobile-brand" aria-label="ADPC Hub">
+            <span class="brand-mark brand-mark--dark" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </span>
+            <span>ADPC Hub</span>
+          </div>
+
+          <div class="context-row">
+            <span class="context-badge">Secure workspace</span>
+            <span class="context-code">GRP / ADPC</span>
+          </div>
+
+          <nav class="auth-nav" aria-label="Account access">
+            <a class="auth-nav__item is-active" href="/" aria-current="page">Sign in</a>
+            <a class="auth-nav__item" href="/access.html">Get access</a>
+          </nav>
+
+          <div class="auth-heading">
+            <p class="eyebrow">Welcome back</p>
+            <h2 id="sign-in-title">Sign in to your Hub</h2>
+            <p>
+              Continue with the SERVIR account you use for SIG. GRP does not create or store a
+              separate password.
+            </p>
+          </div>
+
+          <div class="auth-alert" id="auth-alert" role="alert" hidden>
+            <span class="auth-alert__icon" aria-hidden="true">!</span>
+            <div>
+              <strong>Sign-in is temporarily unavailable</strong>
+              <p>Please try again later. If the problem continues, contact your Hub administrator.</p>
+            </div>
+          </div>
+
+          <a class="button button--primary" href="/api/v1/auth/login">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2 4.5 5v5.8c0 4.8 3.1 9.2 7.5 11.2 4.4-2 7.5-6.4 7.5-11.2V5L12 2Zm0 3.1 4.5 1.8v3.9c0 3.3-1.8 6.4-4.5 8-2.7-1.6-4.5-4.7-4.5-8V6.9L12 5.1Z" />
+            </svg>
+            Continue with SERVIR
+            <span class="button__arrow" aria-hidden="true">→</span>
+          </a>
+
+          <div class="provider-note">
+            <span class="provider-note__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V18a2 2 0 0 0 2 2h1v2h2v-2h1a2 2 0 0 0 2-2v-3.3A7 7 0 0 0 12 2Zm2.5 11.3-.5.3V18h-4v-4.4l-.5-.3A5 5 0 1 1 14.5 13.3Z" /></svg>
+            </span>
+            <p>
+              On the SERVIR sign-in page, use Google, Microsoft, or a secure code sent to your
+              work email.
+            </p>
+          </div>
+
+          <div class="card-divider"><span>New to GRP?</span></div>
+
+          <a class="button button--secondary" href="/access.html">
+            Learn how to get access
+          </a>
+
+          <p class="support-copy">
+            Having trouble with an existing account? Contact your Hub administrator or the SERVIR
+            account team.
+          </p>
+        </section>
+
+        <footer class="auth-footer">
+          <span>© 2026 Asian Disaster Preparedness Center</span>
+          <span class="auth-footer__separator" aria-hidden="true">•</span>
+          <span>Authorized use only</span>
+        </footer>
+      </main>
+    </div>
   </body>
 </html>

@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 foundation complete. Health endpoints, module boundaries, configuration loading, deployment manifests, tests, and CI exist. Increment 1 has not started: database tables, migrations, the assessment queue, GIS processing, and the signed Chiang Yuen golden case remain to be implemented. Authentication, downloads, AI, and the live SIG evidence connection also remain unimplemented.
+> **Current status:** Increment 0 foundation complete, with the sign-in and access-guidance UI delivered early. Health endpoints, module boundaries, configuration loading, deployment manifests, tests, and CI exist. Increment 1 has not started: database tables, migrations, the assessment queue, GIS processing, and the signed Chiang Yuen golden case remain to be implemented. The SERVIR OIDC adapter, sessions, membership enforcement, downloads, AI, and the live SIG evidence connection remain unimplemented.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -28,7 +28,7 @@ api/              FastAPI entry point and bounded API modules
 worker/           Background job and GIS-worker boundary
 core/             Shared models, validation, result rules, and storage protocol
 migrations/       Alembic environment and versioned database migrations
-web/              Static web-app foundation
+web/              Responsive sign-in and Hub access-guidance screens
 deploy/           Ubuntu Compose, Caddy, and deployment guidance
 tests/            Fast, contract, golden, live, and load test layers
 docs/adr/         Architecture decision records
@@ -48,6 +48,14 @@ python -m uvicorn api.main:app --reload
 ```
 
 Then open `http://127.0.0.1:8000/api/v1/healthz`. The public response intentionally contains no infrastructure detail.
+
+Preview the static sign-in screens separately:
+
+```powershell
+python -m http.server 4173 --directory web
+```
+
+Open `http://127.0.0.1:4173`. This static preview does not proxy API requests; append `/?auth=unavailable` to review the error state. In the deployed stack, the login entry returns to that state until the approved SERVIR OIDC adapter and GRP membership model are implemented.
 
 ## Staging deployment
 
