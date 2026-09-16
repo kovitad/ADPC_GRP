@@ -367,3 +367,8 @@ def test_status_reports_sig_connection(planning) -> None:
 
     assert connected["available"] and connected["can_plan"] and connected["sig_connected"]
     assert disconnected["sig_connected"] is False
+
+
+def test_router_is_told_to_return_english_place_names() -> None:
+    assert "romanized" in api.planning.ROUTER_INSTRUCTIONS
+    assert "Chiang Yuen District, Maha" in api.planning.ROUTER_INSTRUCTIONS
