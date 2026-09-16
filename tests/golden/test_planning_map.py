@@ -3,7 +3,7 @@
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -20,6 +20,7 @@ import api.ai_gateway  # noqa: E402
 import api.assessments  # noqa: E402
 import api.maps  # noqa: E402
 import api.permissions  # noqa: E402
+import api.planning  # noqa: E402
 from api.dependencies import database_session  # noqa: E402
 from api.main import app  # noqa: E402
 from api.rate_limits import limiter  # noqa: E402
@@ -42,8 +43,9 @@ def world(tmp_path, monkeypatch) -> Iterator[dict]:
     settings = Settings(
         _env_file=None, session_secret_file=secret, allow_draft_methods=True,
         storage_root=tmp_path / "data", ai_feature_enabled=True, ai_model="test-model",
+        grp_env="dev", planning_chat_enabled=True,
     )
-    for module in (api.access, api.assessments, api.maps, api.permissions):
+    for module in (api.access, api.assessments, api.maps, api.permissions, api.planning):
         monkeypatch.setattr(module, "get_settings", lambda: settings)
     storage = LocalStorage(settings.storage_root)
     engine = create_engine(
@@ -96,7 +98,8 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
     flood = layers["flood"][0]
     assert flood["return_period_years"] == 100 and flood["available"] is True
     south_west, north_east = flood["bounds"]
-    assert south_west == pytest.approx([14.99, 100.0]) and north_east == pytest.approx([15.11, 100.12])
+    assert south_west == pytest.approx([14.99, 100.0])
+    assert north_east == pytest.approx([15.11, 100.12])
     assert len(layers["flood_legend"]["classes"]) == 5
     assert layers["evacuation_centers"][0]["title"] == "Synthetic evacuation centers"
     assert layers["vulnerability"]["available"] is False
@@ -106,7 +109,7 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
 def test_overlay_picture_is_a_png_and_does_not_change_the_input_fingerprint(world) -> None:
     client = _client(world, "planner@example.test")
     with Session(world["engine"]) as session:
-        version = session.get(DatasetVersion, __import__("uuid").UUID(world["seed"].hazard_version_id))
+        version = session.get(DatasetVersion, UUID(world["seed"].hazard_version_id))
         pinned = version.sha256
         key = version.storage_key
 
@@ -184,3 +187,82 @@ def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:
     text = prompts[0]
     for forbidden in ("planner@example.test", "storage_key", "rasters/", "sha256", "support_ref"):
         assert forbidden not in text
+
+
+def _router_then(world: dict, *replies: str) -> list[str]:
+    queue = list(replies)
+    prompts: list[str] = []
+
+    async def provider(settings, *, instructions, prompt, hub_code):
+        prompts.append(prompt)
+        return queue.pop(0), "test-model", 30, 10
+
+    world["monkeypatch"].setattr(api.ai_gateway, "call_openai", provider)
+    return prompts
+
+
+def _chat(client: TestClient, message: str, **context):
+    return client.post("/api/v1/planning/chat", json={"message": message, **context})
+
+
+def test_chat_starts_assessment_then_explains_it_naturally(world) -> None:
+    client = _client(world, "planner@example.test")
+    prompts = _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "", "place": "Synthetic Test District",'
+        ' "return_period_years": null}',
+        '{"mode": "explain_result", "reply": "", "place": null, "return_period_years": null}',
+        "Three centers may be exposed under this scenario.",
+    )
+
+    started = _chat(client, "Run a flood assessment for the synthetic test district").json()
+    with Session(world["engine"]) as session:
+        process_job(session, world["storage"], claim_next_job(session, lease_minutes=15))
+    explained = _chat(
+        client, "Which centers are exposed?", assessment_id=started["assessment_id"]
+    ).json()
+
+    assert started["mode"] == "assessment_started"
+    assert started["boundary_id"] == world["seed"].boundary_id
+    assert explained["mode"] == "explain_result"
+    assert explained["label"] == "AI explanation. Numbers come from the assessment result."
+    context = json.loads(prompts[0])["context"]
+    assert "Synthetic Test District" in context["supported_areas"]
+    assert json.loads(prompts[1])["context"]["has_result"] is True
+
+
+def test_chat_uses_map_selection_when_no_place_is_named(world) -> None:
+    client = _client(world, "planner@example.test")
+    _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "", "place": null, "return_period_years": 100}',
+    )
+
+    body = _chat(client, "Run it here", boundary_id=world["seed"].boundary_id).json()
+
+    assert body["mode"] == "assessment_started"
+
+
+def test_chat_explains_unsupported_area_and_missing_result(world) -> None:
+    client = _client(world, "planner@example.test")
+    _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "", "place": "Chiang Yuen",'
+        ' "return_period_years": null}',
+        '{"mode": "run_assessment", "reply": "", "place": "Synthetic Test District",'
+        ' "return_period_years": 500}',
+        '{"mode": "explain_result", "reply": "", "place": null, "return_period_years": null}',
+    )
+
+    unsupported = _chat(client, "Assess Chiang Yuen").json()
+    no_scenario = _chat(client, "Assess the synthetic district for RP500").json()
+    no_result = _chat(client, "Explain the result").json()
+
+    assert unsupported["mode"] == "unsupported_area"
+    assert "Synthetic Test District" in unsupported["answer"]
+    assert no_scenario["mode"] == "unsupported_area" and "500-year" in no_scenario["answer"]
+    assert no_result["mode"] == "needs_result"
+    with Session(world["engine"]) as session:
+        from core.assessment_models import Assessment
+
+        assert session.scalars(select(Assessment)).all() == []

@@ -114,9 +114,22 @@ def submit_assessment(
     hub = planner_membership(principal, payload.hub_code)
     if not idempotency_key or len(idempotency_key.strip()) < 8:
         raise validation_failed("An Idempotency-Key header of at least 8 characters is required.")
-    key = idempotency_key.strip()
-    request_sha = canonical_sha256(payload.model_dump(mode="json"))
+    return _accepted(
+        create_assessment(session, settings, principal, hub, payload, idempotency_key.strip())
+    )
 
+
+def create_assessment(
+    session: Session,
+    settings,
+    principal: CurrentPrincipal,
+    hub,
+    payload: AssessmentSubmit,
+    key: str,
+) -> Assessment:
+    """Section 8.2 steps 3 to 7. Shared by the API route and the Planning chat."""
+
+    request_sha = canonical_sha256(payload.model_dump(mode="json"))
     existing = session.scalar(
         select(Assessment).where(
             Assessment.submitted_by == principal.user_id,
@@ -129,7 +142,7 @@ def submit_assessment(
             raise GrpError(
                 409, "IDEMPOTENCY_CONFLICT", "This request was already sent with different details."
             )
-        return _accepted(existing)
+        return existing
 
     limiter.check(
         "new_assessments_per_person_per_hour",
@@ -198,8 +211,9 @@ def submit_assessment(
             raise GrpError(
                 409, "IDEMPOTENCY_CONFLICT", "This request was already sent with different details."
             ) from None
-        return _accepted(winner)
-    return _accepted(assessment)
+        return winner
+    return assessment
+
 
 
 def _accepted(assessment: Assessment) -> JSONResponse:
@@ -405,15 +419,51 @@ async def explain_assessment(
 
     settings = get_settings()
     assessment = _load_visible(session, principal, assessment_id)
-    if assessment.state != AssessmentState.SUCCEEDED:
-        raise GrpError(409, "ASSESSMENT_NOT_READY", "The assessment is still running.")
     limiter.check(
         "ai_requests_per_person_per_hour",
         str(principal.user_id),
         settings.rate_limits["ai_requests_per_person_per_hour"],
         3600,
     )
-    result = assessment_result(assessment_id, principal, session)
+    answer = await explain_stored_result(
+        session,
+        settings,
+        principal,
+        assessment,
+        question=payload.question,
+        history=[turn.model_dump() for turn in payload.history],
+        export=lambda record: background.add_task(send_ai_call, settings, record),
+    )
+    view = usage_view(session, principal.user_id, feature_enabled=settings.ai_feature_enabled)
+    return {
+        "answer": answer.text,
+        "label": answer.label,
+        "assessment_id": str(assessment.id),
+        "usage": {
+            "tokens_used": view.tokens_used,
+            "tokens_remaining": view.tokens_remaining,
+            "token_limit": view.token_limit,
+            "reset_at": view.reset_at.isoformat(),
+            "status": view.status,
+        },
+    }
+
+
+async def explain_stored_result(
+    session: Session,
+    settings,
+    principal: CurrentPrincipal,
+    assessment: Assessment,
+    *,
+    question: str,
+    history: list[dict[str, str]],
+    export,
+):
+    """Explain one stored result. The model sees only result fields (Section 10.5)."""
+
+    if assessment.state != AssessmentState.SUCCEEDED:
+        raise GrpError(409, "ASSESSMENT_NOT_READY", "The assessment is still running.")
+    result = assessment_result(assessment.id, principal, session)
     centers = session.execute(
         select(AssessmentFeature, Feature)
         .join(Feature, Feature.id == AssessmentFeature.feature_id)
@@ -445,7 +495,7 @@ async def explain_assessment(
         "limits": result["limits"],
     }
     hub = next(m for m in principal.memberships if m.hub_id == assessment.hub_id)
-    answer = await run_ai_call(
+    return await run_ai_call(
         session,
         settings,
         user_id=principal.user_id,
@@ -453,26 +503,8 @@ async def explain_assessment(
         hub_code=hub.hub_code,
         instructions=EXPLAIN_INSTRUCTIONS,
         prompt=json.dumps(
-            {
-                "result": facts,
-                "question": payload.question,
-                "history": [turn.model_dump() for turn in payload.history],
-            },
-            ensure_ascii=False,
+            {"result": facts, "question": question, "history": history}, ensure_ascii=False
         ),
         prompt_version=EXPLAIN_VERSION,
-        export=lambda record: background.add_task(send_ai_call, settings, record),
+        export=export,
     )
-    view = usage_view(session, principal.user_id, feature_enabled=settings.ai_feature_enabled)
-    return {
-        "answer": answer.text,
-        "label": answer.label,
-        "assessment_id": str(assessment.id),
-        "usage": {
-            "tokens_used": view.tokens_used,
-            "tokens_remaining": view.tokens_remaining,
-            "token_limit": view.token_limit,
-            "reset_at": view.reset_at.isoformat(),
-            "status": view.status,
-        },
-    }
