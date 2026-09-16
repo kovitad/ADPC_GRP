@@ -91,6 +91,9 @@ $ErrorActionPreference = $NativeErrors
 docker @Compose up -d --build --wait
 if ($LASTEXITCODE -ne 0) { throw "docker compose up failed; see: docker compose -f deploy/compose.desktop.yml logs" }
 
+# Synthetic RP100 test case for Increment 1 (idempotent).
+docker @Compose exec api python -m grp.seed synthetic-rp100
+
 foreach ($email in $AdminEmail) {
     docker @Compose exec api python -m grp.admin bootstrap-platform-admin --email $email
     docker @Compose exec api python -m grp.admin ensure-hub --actor-email $email --code adpc --name "ADPC Hub"
@@ -102,6 +105,6 @@ foreach ($email in $HubAdminEmail) {
 }
 
 Write-Host ""
-Write-Host "GRP is running at http://127.0.0.1:8000  (admin: /admin, platform: /platform.html)"
+Write-Host "GRP is running at http://127.0.0.1:8000  (admin: /admin, assessments: /assessments.html, planning: /planning.html)"
 Write-Host "Logs: docker compose -f deploy/compose.desktop.yml logs -f api worker"
 Write-Host "Stop: .\scripts\docker-desktop.ps1 -Down"

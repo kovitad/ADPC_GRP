@@ -5,8 +5,9 @@ window.GRP = (() => {
     return match ? { "X-CSRF-Token": decodeURIComponent(match[1]) } : {};
   };
 
-  const request = async (path, { method = "GET", body } = {}) => {
+  const request = async (path, { method = "GET", body, idempotencyKey } = {}) => {
     const headers = { Accept: "application/json", ...csrfHeaders() };
+    if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const response = await fetch(path, {
       method,

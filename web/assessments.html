@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Flood assessment | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="/grp-common.js" defer></script>
+    <script src="/assessments.js" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header class="workspace-header">
+      <a class="workspace-brand" href="/workspace.html" aria-label="GRP workspace">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span>SERVIR GRP</span>
+      </a>
+      <nav class="workspace-nav" aria-label="Workspace navigation">
+        <a class="workspace-nav__link workspace-nav__link--active" href="/assessments.html">Assessments</a>
+        <a class="workspace-nav__link" href="/planning.html">Planning</a>
+        <a class="workspace-nav__link" href="/workspace.html">My access</a>
+      </nav>
+      <button class="workspace-signout" type="button" data-sign-out>Sign out</button>
+    </header>
+
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <p class="eyebrow">Evacuation-center flood screening</p>
+      <h1>Flood assessment</h1>
+      <p class="workspace-intro" data-page-status>Loading your Hub and the data you may use…</p>
+
+      <section class="admin-card" aria-labelledby="new-heading" data-new-card hidden>
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">New assessment</p>
+            <h2 id="new-heading">Choose area, scenario and data</h2>
+          </div>
+          <span class="status-pill" data-hub-pill>Hub</span>
+        </div>
+        <p class="admin-card__intro">
+          The assessment runs in the background on ADPC servers and saves one locked result.
+          Results are private to your Hub.
+        </p>
+        <form class="assignment-form assessment-form" data-submit-form>
+          <label>
+            Area
+            <select data-boundary required></select>
+          </label>
+          <label>
+            Flood scenario
+            <select data-hazard required></select>
+          </label>
+          <label>
+            Evacuation centers
+            <select data-centers required></select>
+          </label>
+          <label>
+            Method
+            <select data-method required></select>
+          </label>
+          <button class="button button--primary" type="submit" data-submit-button>
+            Run assessment
+          </button>
+        </form>
+        <p class="assignment-status" data-submit-status aria-live="polite"></p>
+      </section>
+
+      <section class="admin-card" aria-labelledby="result-heading" data-result-card hidden>
+        <p class="synthetic-banner" data-synthetic hidden>
+          SYNTHETIC TEST DATA — invented inputs for software testing. Not a scientific result.
+        </p>
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow" data-result-eyebrow>Result</p>
+            <h2 id="result-heading" data-result-title>Assessment</h2>
+          </div>
+          <span class="status-pill" data-state-pill>…</span>
+        </div>
+        <p class="admin-card__intro" data-result-meta></p>
+        <div class="metric-row" data-totals></div>
+        <div class="trust-row" data-trust></div>
+        <div class="result-map" id="result-map" aria-label="Map of the area and centers"></div>
+        <div class="map-key" aria-hidden="true">
+          <span><i class="dot dot--exposed"></i> Potentially exposed under this scenario</span>
+          <span><i class="dot dot--not"></i> Not exposed under this scenario</span>
+          <span><i class="dot dot--unable"></i> Unable to assess</span>
+        </div>
+        <div class="member-table-wrap">
+          <table class="member-table">
+            <thead>
+              <tr><th>Center</th><th>Status</th><th>Reason</th><th>Flood depth</th></tr>
+            </thead>
+            <tbody data-centers-table></tbody>
+          </table>
+        </div>
+        <details class="result-details">
+          <summary>Sources, declared gaps and limits</summary>
+          <h3>Sources</h3>
+          <ul data-sources></ul>
+          <h3>Declared gaps</h3>
+          <ul data-gaps></ul>
+          <h3>Limits</h3>
+          <ul data-limits></ul>
+        </details>
+      </section>
+
+      <section class="admin-card" aria-labelledby="recent-heading" data-recent-card hidden>
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">Your Hub</p>
+            <h2 id="recent-heading">Recent assessments</h2>
+          </div>
+          <button class="button button--secondary" type="button" data-refresh-recent>Refresh</button>
+        </div>
+        <div class="member-table-wrap">
+          <table class="member-table">
+            <thead>
+              <tr><th>Submitted (Bangkok)</th><th>Area</th><th>State</th><th>Support ref</th><th></th></tr>
+            </thead>
+            <tbody data-recent></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

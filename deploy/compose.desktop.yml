@@ -40,6 +40,8 @@ services:
       AI_FEATURE_ENABLED: "true"
       # ADR-0004: planner chat box and map on SIG generic evidence, Docker Desktop only.
       PLANNING_CHAT_ENABLED: "true"
+      # Draft methods run only here, for the SYNTHETIC test case (never on servers).
+      ALLOW_DRAFT_METHODS: "true"
       AI_PROVIDER: openai
       AI_MODEL: ${AI_MODEL:-gpt-5.2}
       AI_KEY_FILE_ADPC: /run/grp-secrets/ai_key_adpc

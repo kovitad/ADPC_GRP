@@ -1438,3 +1438,34 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
 .assistant-context .is-low { color: #9a5b00; }
 .map-area { margin: 0 0 0.5rem; color: #3b5651; font-size: 0.75rem; }
 .map-evidence ol, .map-evidence ul { padding-left: 1.1rem; }
+
+/* Flood assessment (Increment 1) */
+.synthetic-banner {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  background: #fde68a;
+  color: #713f12;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.assessment-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0.75rem;
+}
+.metric-row article { padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.75rem; }
+.metric-row span { display: block; color: #6d827e; font-size: 0.7rem; font-weight: 800; }
+.metric-row strong { font-size: 1.6rem; color: var(--forest-900); }
+.trust-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.9rem; }
+.result-map { height: 22rem; border-radius: 0.75rem; border: 1px solid var(--line); }
+.map-key { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.6rem 0; font-size: 0.72rem; color: #536c67; }
+.dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; vertical-align: middle; }
+.dot--exposed { background: #c2410c; }
+.dot--not { background: #0f766e; }
+.dot--unable { background: #6b7280; }
+.result-details { margin-top: 1rem; font-size: 0.8rem; color: #3b5651; }
+.result-details h3 { margin: 0.8rem 0 0.2rem; font-size: 0.8rem; }
+@media (max-width: 40rem) { .assessment-form { grid-template-columns: 1fr; } }
