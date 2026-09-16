@@ -9,3 +9,5 @@ __pycache__
 *.docx
 sig-mcp-*.json
 tests
+.local
+web/node_modules

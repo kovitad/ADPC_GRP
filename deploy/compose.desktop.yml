@@ -1,0 +1,83 @@
+# Local Docker Desktop stack for demos and PostgreSQL checks. Not for servers.
+# Start it with: .\scripts\docker-desktop.ps1
+name: grp-desktop
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: grp
+      POSTGRES_USER: grp
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - grp_desktop_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grp -d grp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: grp-api:desktop
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment: &grp-env
+      GRP_ENV: dev
+      GRP_PUBLIC_BASE_URL: http://127.0.0.1:8000
+      STORAGE_ROOT: /srv/grp/data
+      DATABASE_URL_FILE: /run/grp-secrets/database_url
+      SESSION_SECRET_FILE: /run/grp-secrets/session_secret
+      SIG_MCP_BASE_URL: https://servirplatform.sig-gis.com/mcp
+      SERVIR_AUTH_ISSUER: https://welcoming-splendor-62-staging.authkit.app
+      SERVIR_AUTH_CLIENT_ID: ${SERVIR_AUTH_CLIENT_ID:-}
+      SERVIR_AUTH_REDIRECT_URI: http://127.0.0.1:8000/api/v1/auth/callback
+      SERVIR_AUTH_CLIENT_SECRET_FILE: /run/grp-secrets/servir_auth_client_secret
+      AI_FEATURE_ENABLED: "false"
+    volumes: &grp-secrets
+      - ../.local/docker/secrets:/run/source-secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: grp-api:desktop
+    pull_policy: never
+    environment: *grp-env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../.local/docker/secrets:/run/source-secrets:ro
+      - ../web:/app/web:ro
+      - grp_desktop_data:/srv/grp/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    image: grp-api:desktop
+    pull_policy: never
+    command: ["python", "-m", "worker.main"]
+    environment: *grp-env
+    volumes:
+      - ../.local/docker/secrets:/run/source-secrets:ro
+      - grp_desktop_data:/srv/grp/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+secrets:
+  postgres_password:
+    file: ../.local/docker/secrets/postgres_password
+
+volumes:
+  grp_desktop_db:
+  grp_desktop_data:

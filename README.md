@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now discovers the OAuth server from the SIG MCP resource, supports authorization-code/PKCE sign-in for existing SIG accounts, creates pending access requests, and enforces GRP-owned Hub membership. A localhost public client can be registered with the supplied command; staging still needs its own callback-specific client ID. Assessment, GIS, downloads, AI execution, and SIG evidence screens remain unimplemented.
+> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now discovers the OAuth server from the SIG MCP resource, supports authorization-code/PKCE sign-in for existing SIG accounts, records denied sign-ins in the security log, and enforces GRP-owned Hub membership. A localhost public client can be registered with the supplied command; staging still needs its own callback-specific client ID. Assessment, GIS, downloads, AI execution, and SIG evidence screens remain unimplemented.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -56,7 +56,7 @@ Bootstrap a different existing SIG user as Platform Admin, then create the ADPC 
 .\scripts\admin-local.ps1 ensure-hub --actor-email admin@example.org --code adpc --name "ADPC Hub"
 ```
 
-Replace the sample with the administrator's verified SIG email. The admin then opens `http://127.0.0.1:8000/admin`, authenticates through SIG, and reaches the protected approval panel. Platform Admins see pending requests; Platform Admins and Hub Admins can add, change and disable members of Hubs they manage, and the last active Hub Admin is protected. State-changing requests need the `X-CSRF-Token` header (value from the `grp_csrf` cookie). Sign-out and any role or access change end that person's sessions on the server. Authentication proves the SIG identity; only an active GRP membership grants application access. The interim sign-in flow is recorded in `docs/adr/0002-interim-sig-mcp-client-login.md`; its access token is not kept.
+Replace the sample with the administrator's verified SIG email. The admin then opens `http://127.0.0.1:8000/admin`, authenticates through SIG, and reaches the protected approval panel. Platform Admins and Hub Admins add people by work email and can change and disable members of Hubs they manage, and the last active Hub Admin is protected. State-changing requests need the `X-CSRF-Token` header (value from the `grp_csrf` cookie). Sign-out and any role or access change end that person's sessions on the server. Authentication proves the SIG identity; only an active GRP membership grants application access. The interim sign-in flow is recorded in `docs/adr/0002-interim-sig-mcp-client-login.md`; its access token is not kept.
 
 ## LLM token preparation
 
@@ -67,6 +67,16 @@ python -m grp.configure set-ai-key
 ```
 
 This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Enabling `AI_FEATURE_ENABLED` does not yet add LLM behavior.
+
+## Run in Docker Desktop
+
+The local stack runs PostGIS, Alembic migrations, the API (with the web screens) and the worker shell:
+
+```powershell
+.\scripts\docker-desktop.ps1 -AdminEmail you@adpc.net
+```
+
+Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scriptsun-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
 
 ## Sign-in and membership mapping
 

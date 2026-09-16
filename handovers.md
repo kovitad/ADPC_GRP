@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 16 September 2026 (Phase A stabilization and Phase B security tests)
+**Updated:** 16 September 2026 (Phases A and B done; Docker Desktop stack added)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
 **Branches:** `main` (product baseline) and `experiment/planning-chat` (local AI chat prototype, not for merge)
 
-**Baseline:** `GRP-ARC-001` v2.2. Phase A is pushed (`3e8f91f`); the Phase B commit is local until pushed.
+**Baseline:** `GRP-ARC-001` v2.2. All `main` work below is pushed to GitHub.
 
 ## Current position
 
@@ -21,11 +21,12 @@ Increment 0 is complete. Most of Increment 2 (sign-in, membership, Hub administr
 | Errors | **New:** Appendix D format `{error: {code, message, support_ref}}` on sessions and admin routes; other-Hub and unknown items return 404 |
 | Database | Migrations `20260916_0001` (5 access tables) and `20260916_0002` (session revocation). 11 of 16 spec tables still missing |
 | Rate limits | **Phase B:** 60 API requests per person per minute, in process memory (`api/rate_limits.py`); returns 429 `RATE_LIMITED`. Must move to a shared store before a second API worker |
-| Tests | 77 offline tests, Ruff clean. Session security (CSRF, revocation, sign-out replay); **Phase B:** full permission matrix through real sessions (`tests/contract/test_permission_matrix.py`), ID-token rejection cases (`tests/fast/test_oidc_rejections.py`), identity-link rules |
+| Local run | **New:** `.\scripts\docker-desktop.ps1 -AdminEmail <email>` starts PostGIS, migrations, API with web screens, and worker shell in Docker Desktop at `http://127.0.0.1:8000`. Verified 16 Sep: both migrations apply on PostgreSQL 16/PostGIS 3.4, pages load, `/api/v1/me` returns Appendix D 401, sign-in redirects to SERVIR |
+| Tests | 72 offline tests, Ruff clean. Session security (CSRF, revocation, sign-out replay); **Phase B:** full permission matrix through real sessions (`tests/contract/test_permission_matrix.py`), ID-token rejection cases (`tests/fast/test_oidc_rejections.py`), identity-link rules |
 
-## Phase A work done on 16 September
+## Work done on 16 September
 
-Commits (pushed with `3e8f91f`):
+Commits:
 
 | Commit | Branch | What |
 |---|---|---|
@@ -33,7 +34,17 @@ Commits (pushed with `3e8f91f`):
 | `3f3db5c` | main | Hub administration plus review fixes #6 to #8 (CSRF, session revocation, 404 and Appendix D errors) |
 | `3e0fe24` | experiment | Merge of main; public SIG receipts now opt-in only; Platform Admin without membership blocked from SIG evidence |
 | `3e8f91f` | main | ADR-0002 and this handover |
-| `05d5de8` | main | Phase B: rate limit, identity merge fix, permission matrix and sign-in tests |
+| `7ebc57e` | main | Phase B: rate limit, identity merge fix, permission matrix and sign-in tests |
+| `2da45d9` | main | Remove self-service pending access list |
+| (next) | main | Docker Desktop stack, README and this handover |
+
+## What you can see today
+
+Start Docker Desktop, then run `.\scripts\docker-desktop.ps1 -AdminEmail <your SERVIR email>`.
+
+- `http://127.0.0.1:8000`: SERVIR sign-in screen
+- `http://127.0.0.1:8000/admin`: admin sign-in; after SERVIR login a Platform Admin or Hub Admin sees their memberships and the **Members and access** panel (add by email, change role, turn access on or off)
+- Not visible yet: any assessment, map, result, download, SIG sharing, or AI. Those are Increments 1, 3, 4, 5 and 6. The planning chat exists only on `experiment/planning-chat`
 
 ## Code review findings (16 September)
 
@@ -50,13 +61,13 @@ Reviewed against `GRP-ARC-001` v2.2.
 | 7 | No new session after role change; sign-out left a copied cookie valid (Section 9.1) | Fixed on main |
 | 8 | 403/400 instead of 404 for other Hubs; errors not in Appendix D format | Fixed for sessions and admin routes; apply to every new route |
 | 9 | No rate limits (settings exist, not enforced) | Fixed for the per-person API limit; assessment, SIG evidence and AI limits land with those routes |
-| 10 | Pending-request list scans the whole audit log and lists any SERVIR account; spec has no self sign-up queue | Scan bounded to the 500 latest denials. **Decision needed:** keep (write ADR) or remove |
+| 10 | Pending-request list scans the whole audit log and lists any SERVIR account; spec has no self sign-up queue | Fixed: route and UI removed (owner decision, 16 Sep). Admins add people by work email; server command `list-access-requests` stays as a support fallback |
 | 11 | In-memory MCP token store is unbounded | Experiment only |
 | 12 | No permission-matrix, cross-Hub contract, or full Section 15.3 sign-in tests | Fixed for existing routes: 30-case matrix, wrong audience/issuer/nonce/key/expiry, unverified email, userinfo subject mismatch, email change, disabled user |
 | 13 | A second SERVIR login with the same email was linked to an already linked person (Section 9.2: never merge by email) | Fixed in `core/identity.py`, with test |
 | 14 | Access message said "Open the GRP address" instead of the address (Section 9.5) | Fixed |
 
-Not yet covered by tests: two different logins linking the same person at the same instant (needs PostgreSQL), the SERVIR outage message, and "no token or cookie in logs" (needs log capture). Known limits of the Phase A fixes: sign-out is still a GET link and ends the person's sessions on all devices; migration `20260916_0002` was checked with SQLite tests only, not run on PostgreSQL.
+Not yet covered by tests: two different logins linking the same person at the same instant (needs PostgreSQL), the SERVIR outage message, and "no token or cookie in logs" (needs log capture). Known limits of the Phase A fixes: sign-out is still a GET link and ends the person's sessions on all devices; migrations upgrade cleanly on PostgreSQL in Docker Desktop, but downgrade is not tested.
 
 ## Experiment branch rules
 
@@ -76,7 +87,7 @@ Any change to these rules needs an ADR and the approvals in Section 17.
 ## Refined plan
 
 **Phase B: Increment 2 security (done 16 September, except below)**
-- Remaining: decide the pending-request list (finding 10); make sign-out a POST; PostgreSQL-backed tests for concurrent linking and migrations; cancel queued jobs on disable once jobs exist
+- Remaining: make sign-out a POST; PostgreSQL-backed test for concurrent linking; cancel queued jobs on disable once jobs exist
 
 **Phase C: Increment 1, golden assessment (main work, 2 to 3 weeks)**
 - Remaining tables and migrations, storage interface, Chiang Yuen seed, validation and result rules
