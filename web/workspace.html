@@ -17,6 +17,15 @@
         </span>
         <span>SERVIR GRP</span>
       </a>
+      <nav class="workspace-nav" aria-label="Workspace navigation">
+        <a class="workspace-nav__link workspace-nav__link--active" href="/workspace.html">
+          Workspace
+        </a>
+        <a class="workspace-nav__link" data-admin-menu href="#admin-panel" hidden>
+          Administration
+          <span class="workspace-nav__count" data-admin-nav-count>0</span>
+        </a>
+      </nav>
       <a class="workspace-signout" href="/api/v1/auth/logout">Sign out</a>
     </header>
 
@@ -44,7 +53,13 @@
         </div>
       </section>
 
-      <section class="admin-card" data-admin-panel hidden aria-labelledby="admin-heading">
+      <section
+        class="admin-card"
+        id="admin-panel"
+        data-admin-panel
+        hidden
+        aria-labelledby="admin-heading"
+      >
         <div class="admin-card__heading">
           <div>
             <p class="eyebrow">Platform administration</p>

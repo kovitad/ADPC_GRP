@@ -93,3 +93,6 @@ def test_workspace_renders_server_data_without_inner_html() -> None:
     assert "textContent" in script
     assert "innerHTML" not in script
     assert "Hub memberships" in page
+    assert "Administration" in page
+    assert "data-admin-menu" in page
+    assert 'adminMenu.hidden = false' in script

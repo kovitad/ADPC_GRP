@@ -4,10 +4,13 @@
   const assignmentForm = document.querySelector("[data-assignment-form]");
   const assignmentStatus = document.querySelector("[data-assignment-status]");
   const assignButton = document.querySelector("[data-assign-button]");
+  const adminMenu = document.querySelector("[data-admin-menu]");
+  const adminNavCount = document.querySelector("[data-admin-nav-count]");
 
   const showPendingRequests = (requests) => {
     requestSelect.replaceChildren();
     requestCount.textContent = String(requests.length);
+    adminNavCount.textContent = String(requests.length);
     requests.forEach((request) => {
       const option = document.createElement("option");
       option.value = request.email;
@@ -38,10 +41,15 @@
       .then((payload) => showPendingRequests(payload.requests));
 
   const enableAdminPanel = () => {
-    document.querySelector("[data-admin-panel]").hidden = false;
+    const adminPanel = document.querySelector("[data-admin-panel]");
+    adminPanel.hidden = false;
+    adminMenu.hidden = false;
     loadPendingRequests().catch(() => {
       assignmentStatus.textContent = "Pending requests could not be loaded.";
     });
+    if (window.location.hash === "#admin-panel") {
+      window.requestAnimationFrame(() => adminPanel.scrollIntoView({ behavior: "smooth" }));
+    }
   };
 
   const showIdentity = (identity) => {

@@ -142,7 +142,8 @@ async def complete_login(
     elif intent == "admin" and not result.is_platform_admin:
         response = _screen("not_admin", intent)
     else:
-        response = RedirectResponse(url="/workspace.html", status_code=status.HTTP_303_SEE_OTHER)
+        location = "/workspace.html#admin-panel" if intent == "admin" else "/workspace.html"
+        response = RedirectResponse(url=location, status_code=status.HTTP_303_SEE_OTHER)
         set_session_cookie(response, settings, result)
     response.delete_cookie(AUTH_TRANSACTION_COOKIE, path="/api/v1/auth")
     return response
