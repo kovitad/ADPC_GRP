@@ -42,9 +42,11 @@ EVIDENCE_LABEL = (
     "SIG generic flood evidence. Not a GRP assessment and not a decision that any place is safe."
 )
 CANNOT_REPLY = (
-    "I cannot do that here. I can explain general flood-planning ideas, or check SIG flood "
-    "exposure evidence for a Thailand district. Access changes use the GRP admin pages, and "
-    "no answer here certifies that a place is safe."
+    "I can't do that yet. Today I can run the flood screening for a supported area and show "
+    "where people could move (evacuation centers on the map), explain that result, or look up "
+    "SIG flood exposure for a Thailand district. Which vulnerable people need support, the "
+    "preparedness investment brief and the red/yellow/green risk map are coming next. I never "
+    "certify that a place is safe, and access changes use the GRP admin pages."
 )
 ROUTER_VERSION = "planning-router-v1"
 DRAFT_VERSION = "planning-draft-v1"
@@ -52,9 +54,11 @@ ROUTER_INSTRUCTIONS = (
     "You route chat messages for the GRP flood planning assistant. Return ONLY a JSON object "
     'with keys "mode", "reply", "place" and "return_period_years". Modes: '
     '"explain_result" when the user asks about the assessment result currently shown '
-    "(only if context.has_result is true); "
+    "(only if context.has_result is true), including 'where could people move?' once a result "
+    "is shown; "
     '"run_assessment" when the user wants to screen or assess evacuation centers for flooding '
-    "in an area (use context.supported_areas or context.selected_area); "
+    "in an area, or asks where people could move and no result is shown yet (use "
+    "context.supported_areas or context.selected_area); "
     '"sig_flood" when the user wants flood exposure of schools, hospitals, buildings or roads '
     "for a named Thailand district from SIG evidence; "
     '"chat" for greetings and general explanations that need no data; '

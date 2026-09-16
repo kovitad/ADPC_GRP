@@ -8,160 +8,136 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/planning.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js" defer></script>
     <script src="/planning.js" defer></script>
   </head>
-  <body class="planning-body">
-    <header class="workspace-header planning-header">
+  <body class="pw-body" data-view="chat">
+    <header class="pw-header">
       <a class="workspace-brand" href="/workspace.html" aria-label="GRP workspace">
         <span class="brand-mark" aria-hidden="true">
           <span></span><span></span><span></span><span></span>
         </span>
         <span>SERVIR GRP</span>
       </a>
-      <nav class="workspace-nav" aria-label="Workspace navigation">
-        <a class="workspace-nav__link workspace-nav__link--active" href="/planning.html">Planning</a>
-        <a class="workspace-nav__link" href="/assessments.html">Assessments</a>
-        <a class="workspace-nav__link" href="/workspace.html">My access</a>
+      <nav class="pw-nav" aria-label="Workspace navigation">
+        <a class="is-active" href="/planning.html">Planning</a>
+        <a href="/assessments.html">Assessments</a>
+        <a href="/workspace.html">My access</a>
       </nav>
-      <div class="planning-user">
-        <span data-user-name>Loading…</span>
-        <button class="workspace-signout" type="button" data-sign-out>Sign out</button>
+      <div class="pw-user">
+        <span class="pw-user__name" data-user-name>…</span>
+        <button class="pw-link-button" type="button" data-sign-out>Sign out</button>
       </div>
     </header>
 
-    <main class="planning-shell">
-      <section class="assistant-pane" aria-labelledby="planning-title">
-        <div class="assistant-heading">
-          <p class="eyebrow">Planning workspace</p>
-          <h1 id="planning-title">Pick an area, run, ask</h1>
-          <p>
-            Choose a district on the map, run the flood screening, then ask the assistant about
-            the result. Answers never say a place is safe.
-          </p>
+    <div class="pw-switch" role="tablist" aria-label="Show">
+      <button type="button" role="tab" data-show="chat" aria-selected="true">Chat</button>
+      <button type="button" role="tab" data-show="map" aria-selected="false">Map</button>
+    </div>
+
+    <main class="pw-shell">
+      <section class="pw-chat" aria-label="Planning assistant">
+        <div class="pw-chat__top">
+          <div>
+            <h1>Flood planning assistant</h1>
+            <p data-hub-name>Loading your Hub…</p>
+          </div>
+          <span class="pw-pill" data-allowance title="Your AI allowance this month">AI …</span>
+        </div>
+        <p class="pw-notice" data-banner hidden></p>
+
+        <div class="pw-thread" data-thread aria-live="polite">
+          <div class="pw-welcome" data-welcome>
+            <div class="pw-welcome__icon" aria-hidden="true">≈</div>
+            <h2>How can I help with flood planning?</h2>
+            <p>Ask in your own words. I'll run the screening, show it on the map, and explain it.</p>
+            <div class="pw-suggestions" data-suggestions></div>
+          </div>
         </div>
 
-        <div class="assistant-context">
-          <span aria-hidden="true">◇</span>
-          <strong data-hub-name>Hub</strong>
-          <span data-allowance>Checking AI allowance…</span>
-        </div>
-        <p class="planning-banner" data-banner hidden></p>
-
-        <div class="chat-mode" role="radiogroup" aria-label="What the assistant uses">
-          <label>
-            <input type="radio" name="chat-mode" value="result" data-mode-result disabled />
-            <span>This result <small data-mode-result-label>(run an assessment first)</small></span>
-          </label>
-          <label>
-            <input type="radio" name="chat-mode" value="sig" data-mode-sig checked />
-            <span>General or SIG evidence <small>(any Thailand district)</small></span>
-          </label>
-        </div>
-
-        <div class="assistant-conversation" aria-live="polite">
-          <article class="assistant-message assistant-message--system">
-            <span class="assistant-avatar" aria-hidden="true">AI</span>
-            <div>
-              <p data-intro>
-                Click a district on the map to select it. After you run an assessment I can
-                explain which evacuation centers may be exposed and why.
-              </p>
-            </div>
-          </article>
-          <div class="planning-prompts" aria-label="Suggested questions" data-prompts></div>
-          <div class="chat-history" data-chat-history></div>
-        </div>
-
-        <form class="planning-question" data-question-form>
-          <label data-place-row>
-            Area for SIG evidence (Thailand district)
-            <input name="place" data-place value="Mueang Nan District, Nan, Thailand" maxlength="200" />
-          </label>
-          <label>
-            Your message
+        <form class="pw-composer" data-composer>
+          <div class="pw-context" data-context></div>
+          <div class="pw-composer__box">
             <textarea
-              name="question"
-              data-question
-              rows="3"
+              data-input
+              rows="1"
               maxlength="1000"
-              required
-              placeholder="Ask about the result or a planning question…"
+              placeholder="Message the planning assistant…"
+              aria-label="Message"
             ></textarea>
-          </label>
-          <label class="planning-publish" data-publish-row>
-            <input type="checkbox" data-publish-receipt />
-            Publish a public SIG receipt and show SIG's hazard map (public record)
-          </label>
-          <button class="button button--primary" type="submit" data-run-button>Send message</button>
-          <p class="planning-status" data-planning-status aria-live="polite"></p>
-          <p class="planning-status">Do not type private Hub data. Chat text is not saved.</p>
+            <button class="pw-send" type="submit" data-send aria-label="Send message" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z" /></svg>
+            </button>
+          </div>
+          <p class="pw-composer__hint">
+            Enter to send · Shift + Enter for a new line · Don't share private Hub data
+          </p>
         </form>
       </section>
 
-      <section class="map-pane" aria-label="Map">
-        <div class="map-toolbar">
-          <div>
-            <span class="map-toolbar__label">Selected area</span>
-            <strong data-area-name>Click a district on the map</strong>
-          </div>
-          <div class="map-toolbar__actions">
-            <select data-scenario aria-label="Flood scenario"></select>
-            <button class="button button--primary" type="button" data-run-assessment disabled>
-              Run assessment
-            </button>
-            <span class="map-state" data-map-state>Loading layers…</span>
-          </div>
+      <section class="pw-map" aria-label="Map">
+        <div id="risk-map" class="pw-map__canvas" aria-label="OpenStreetMap map of Thailand"></div>
+
+        <div class="pw-search" data-search>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+          <input
+            type="search"
+            data-search-input
+            placeholder="Search a district or place in Thailand"
+            aria-label="Search a district or place"
+            autocomplete="off"
+          />
+          <div class="pw-search__results" data-search-results hidden></div>
         </div>
-        <div class="map-stage">
-          <div id="risk-map" class="risk-map" aria-label="OpenStreetMap map of Thailand"></div>
+
+        <button class="pw-fab" type="button" data-layers-toggle aria-expanded="false" aria-label="Map layers">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
+          Layers
+        </button>
+        <div class="pw-layers" data-layers hidden>
+          <label class="pw-toggle"><input type="checkbox" data-layer="districts" checked /><span>Supported areas</span></label>
+          <label class="pw-toggle"><input type="checkbox" data-layer="flood" checked /><span data-flood-title>Flood depth</span></label>
+          <div class="pw-legend" data-flood-legend></div>
+          <label class="pw-toggle"><input type="checkbox" data-layer="centers" checked /><span>Evacuation centers</span></label>
+          <div class="pw-legend">
+            <span><i class="pw-dot" style="--c:#c2410c"></i>Potentially exposed</span>
+            <span><i class="pw-dot" style="--c:#0f766e"></i>Not exposed under this scenario</span>
+            <span><i class="pw-dot" style="--c:#6b7280"></i>Unable to assess</span>
+            <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
+          </div>
+          <label class="pw-toggle is-disabled"><input type="checkbox" disabled /><span>Vulnerable people</span></label>
+          <p class="pw-muted" data-vulnerability-note>Not available yet.</p>
+        </div>
+
+        <div class="pw-place-chip" data-place-chip hidden></div>
+
+        <div class="pw-result" data-result hidden>
+          <div class="pw-result__head">
+            <div>
+              <span class="pw-badge" data-synthetic hidden>Synthetic test data</span>
+              <h2 data-result-title>Result</h2>
+              <p data-result-meta></p>
+            </div>
+            <button class="pw-icon-button" type="button" data-result-close aria-label="Hide result">×</button>
+          </div>
+          <div class="pw-progress" data-progress hidden><span></span></div>
+          <div class="pw-stats" data-stats></div>
+          <a class="pw-result__link" data-result-link href="/assessments.html">Sources, limits and full table →</a>
+        </div>
+
+        <div class="pw-sig" data-sig hidden>
+          <div class="pw-sig__bar">
+            <strong>SIG hazard map (public receipt)</strong>
+            <button class="pw-icon-button" type="button" data-sig-close aria-label="Close SIG map">×</button>
+          </div>
           <iframe
-            class="sig-map"
-            data-sig-map
+            data-sig-frame
             title="SIG receipt-bound hazard map"
             sandbox="allow-scripts allow-same-origin"
             referrerpolicy="no-referrer"
-            hidden
           ></iframe>
-          <div class="layer-panel" aria-label="Map layers">
-            <strong>Layers</strong>
-            <label><input type="checkbox" data-layer="districts" checked /> District outlines</label>
-            <label><input type="checkbox" data-layer="flood" checked /> <span data-flood-title>Flood depth</span></label>
-            <div class="flood-legend" data-flood-legend></div>
-            <label><input type="checkbox" data-layer="centers" checked /> Evacuation centers</label>
-            <div class="center-legend">
-              <span><i class="dot dot--exposed"></i> Potentially exposed</span>
-              <span><i class="dot dot--not"></i> Not exposed under this scenario</span>
-              <span><i class="dot dot--unable"></i> Unable to assess</span>
-              <span><i class="dot dot--pending"></i> Not assessed yet</span>
-            </div>
-            <label class="is-disabled" title="Arrives in Increment 6">
-              <input type="checkbox" data-layer="vulnerability" disabled /> Vulnerable people
-            </label>
-            <small data-vulnerability-note>Not available yet.</small>
-            <button type="button" class="layer-panel__back" data-show-osm hidden>Back to GRP map</button>
-          </div>
-        </div>
-        <div class="map-evidence" data-result-panel hidden>
-          <p class="synthetic-banner" data-synthetic hidden>
-            SYNTHETIC TEST DATA — invented inputs for software testing. Not a scientific result.
-          </p>
-          <p class="map-area" data-result-meta></p>
-          <div class="metric-grid" data-metrics></div>
-          <p class="map-area">
-            <a data-result-link href="/assessments.html">Open full result, sources and limits</a>
-          </p>
-        </div>
-        <div class="map-evidence" data-map-evidence hidden>
-          <p class="map-area" data-area></p>
-          <div class="metric-grid" data-sig-metrics></div>
-          <details>
-            <summary>SIG sources, steps and declared gaps</summary>
-            <ol data-citations></ol>
-            <ul data-trace></ul>
-            <ul data-gaps></ul>
-          </details>
         </div>
       </section>
     </main>
