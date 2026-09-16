@@ -112,6 +112,20 @@ Not yet covered by tests: two different logins linking the same person at the sa
 
 Any change to these rules needs an ADR and the approvals in Section 17.
 
+## Planning map workspace (branch `feat/planning-map-workspace`, on top of Increment 1)
+
+Owner decisions 16 Sep: OpenStreetMap (no Google), vulnerable people as a placeholder, build this before Increment 4.
+
+- `/planning.html`: chat on the left; OSM map on the right. Click a district to select it, choose the scenario, **Run assessment**
+- Layer panel: district outlines, flood depth (5 depth classes plus No data, legend), evacuation centers (white = not assessed yet, then orange / green / grey by result), **Vulnerable people** switched off with the note "Not available yet … Increment 6 (DEP-07)"
+- Chat switch: **This result** uses `POST /assessments/{id}/explain` (AI gets only stored result fields, Section 10.5; counts tokens, Langfuse). **General or SIG evidence** uses the ADR-0004 chat
+- New API: `GET /maps/layers`, `GET /maps/hazard/{id}/overlay.png`, `GET /maps/datasets/{id}/features`
+- The flood picture is drawn next to the data at seed time and served as a stored file. The API never reads rasters (AD-03), and the pinned fingerprint is unchanged
+- Tests: `tests/golden/test_planning_map.py` (layers, PNG, GeoJSON, access, explain prompt contains no emails, keys or file links). 189 tests pass
+- Verified in Docker 16 Sep: overlay stored with bounds `[[14.99, 100.0], [15.11, 100.12]]`, pages load; browser test pending
+
+Browser test: sign in → **Planning** → the synthetic district is preselected → **Run assessment** → dots turn coloured and totals show 7/3/2/2 → chat switches to **This result** → ask "Which centers could not be assessed, and why?"
+
 ## Increment 1 status (branch `feat/increment-1-assessment`)
 
 Built and tested on the **synthetic** RP100 case (risk R-02). The signed Chiang Yuen case
