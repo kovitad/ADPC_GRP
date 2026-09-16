@@ -1,16 +1,16 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 16 September 2026 (Phases A and B done; Docker Desktop stack added)
+**Updated:** 16 September 2026 (Increment 2 completed on `feat/increment-2-complete`; awaiting browser acceptance)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Branches:** `main` (product baseline) and `experiment/planning-chat` (local AI chat prototype, not for merge)
+**Branches:** `main` (product baseline), `feat/increment-2-complete` (roles, AI usage limit, gateway, Langfuse; merge after browser test), and `experiment/planning-chat` (local AI chat prototype, not for merge)
 
-**Baseline:** `GRP-ARC-001` v2.2. All `main` work below is pushed to GitHub.
+**Baseline:** `GRP-ARC-001` v2.2 plus product-owner scope change of 16 Sep: Increment 2 also delivers the Section 10 AI usage limit, AI gateway and Langfuse (spec places them in Increment 6).
 
 ## Current position
 
-Increment 0 is complete. Most of Increment 2 (sign-in, membership, Hub administration) is built early. **Increment 1 (golden assessment) has not started**: `api/assessments.py` and `worker/main.py` are stubs, and the golden and SIG fixture folders contain only READMEs. The spec's Alpha gate needs Increments 0 to 3, so Increment 1 is the critical path.
+Increment 0 is complete. **Increment 2 is complete in code** on `feat/increment-2-complete` (all four roles, Hub administration, security log, AI usage limit with automatic and manual reset, AI gateway, Langfuse). It still needs your browser acceptance test and the DEP-01 SIG app registration. **Increment 1 (golden assessment) has not started**: `api/assessments.py` and `worker/main.py` are stubs, and the golden and SIG fixture folders contain only READMEs. The spec's Alpha gate needs Increments 0 to 3, so Increment 1 is the critical path.
 
 | Area | Current state on `main` |
 |---|---|
@@ -19,10 +19,16 @@ Increment 0 is complete. Most of Increment 2 (sign-in, membership, Hub administr
 | Sessions | Signed HttpOnly cookie, 60 min idle / 12 h max, membership reloaded every request. **New:** CSRF token on every state change; sign-out and any role/access change end the person's sessions on the server (`app_user.sessions_valid_after`) |
 | Hub administration | Platform Admin and Hub Admin member list, add, role change, enable/disable; last-Admin guard with row lock; audited changes; setup CLI (`bootstrap-platform-admin`, `ensure-hub`, `assign-member`) |
 | Errors | **New:** Appendix D format `{error: {code, message, support_ref}}` on sessions and admin routes; other-Hub and unknown items return 404 |
-| Database | Migrations `20260916_0001` (5 access tables) and `20260916_0002` (session revocation). 11 of 16 spec tables still missing |
+| Roles (branch) | All four Section 9.3 roles: Planner, Hub Admin, Platform Admin, SIG service. Permission matrix test covers every route for every role (61 cases) |
+| Platform Admin (branch) | `/platform.html`: system health, AI usage setting, test AI call, per-person usage with **Reset now**, create/close/reopen Hubs, full security log |
+| AI usage limit (branch) | Section 10: one limit per person per month, row-locked reservation, automatic reset 00:00 Bangkok on the 1st, stale reservations released by worker each minute, Section 10.6 messages. Manual current-month reset by Platform Admin, logged ([ADR-0003](docs/adr/0003-manual-ai-allowance-reset.md)) |
+| AI gateway (branch) | `api/ai_gateway.py` is the only provider caller (OpenAI Responses, key file `AI_KEY_FILE_ADPC`, `store=false`). Only a Platform Admin test call uses it; no chat on `main` |
+| Langfuse (branch) | `api/langfuse.py` sends model, prompt version, token counts, outcome, Hub code and a hashed person reference to Langfuse Cloud. No prompts, answers or emails. Best effort; the database is the record |
+| SIG service login (branch) | Hashed bearer token (`python -m grp.admin rotate-sig-token --hash-file ...`), optional IP allowlist, 30 reads/min; evidence endpoint returns 404 until Increment 3 |
+| Database | Migrations `0001` (access), `0002` (session revocation), `0003` (AI usage: `ai_usage_setting`, `ai_allowance`, `llm_usage`; branch). 8 of 16 spec tables exist |
 | Rate limits | **Phase B:** 60 API requests per person per minute, in process memory (`api/rate_limits.py`); returns 429 `RATE_LIMITED`. Must move to a shared store before a second API worker |
 | Local run | **New:** `.\scripts\docker-desktop.ps1 -AdminEmail <email>` starts PostGIS, migrations, API with web screens, and worker shell in Docker Desktop at `http://127.0.0.1:8000`. Verified 16 Sep: both migrations apply on PostgreSQL 16/PostGIS 3.4, pages load, `/api/v1/me` returns Appendix D 401, sign-in redirects to SERVIR |
-| Tests | 72 offline tests, Ruff clean. Session security (CSRF, revocation, sign-out replay); **Phase B:** full permission matrix through real sessions (`tests/contract/test_permission_matrix.py`), ID-token rejection cases (`tests/fast/test_oidc_rejections.py`), identity-link rules |
+| Tests | 155 offline tests on the branch (72 on `main`), Ruff clean. Session security (CSRF, revocation, sign-out replay); **Phase B:** full permission matrix through real sessions (`tests/contract/test_permission_matrix.py`), ID-token rejection cases (`tests/fast/test_oidc_rejections.py`), identity-link rules |
 
 ## Work done on 16 September
 
@@ -36,15 +42,37 @@ Commits:
 | `3e8f91f` | main | ADR-0002 and this handover |
 | `7ebc57e` | main | Phase B: rate limit, identity merge fix, permission matrix and sign-in tests |
 | `2da45d9` | main | Remove self-service pending access list |
-| (next) | main | Docker Desktop stack, README and this handover |
+| `e9f3357` | main | Docker Desktop stack, README and this handover |
+| `0672b47` | feat/increment-2-complete | Complete Increment 2: roles, SIG service login, Hub close, security log views, AI usage limit, manual reset, AI gateway, Langfuse, platform page |
+| (this commit) | feat/increment-2-complete | Handover update |
 
 ## What you can see today
 
-Start Docker Desktop, then run `.\scripts\docker-desktop.ps1 -AdminEmail <your SERVIR email>`.
+Start Docker Desktop, check out `feat/increment-2-complete`, then run:
 
-- `http://127.0.0.1:8000`: SERVIR sign-in screen
-- `http://127.0.0.1:8000/admin`: admin sign-in; after SERVIR login a Platform Admin or Hub Admin sees their memberships and the **Members and access** panel (add by email, change role, turn access on or off)
-- Not visible yet: any assessment, map, result, download, SIG sharing, or AI. Those are Increments 1, 3, 4, 5 and 6. The planning chat exists only on `experiment/planning-chat`
+```powershell
+.\scripts\docker-desktop.ps1 -AdminEmail kovitad.janlakhon@adpc.net -HubAdminEmail kovitad.janlakhon@adpc.net
+```
+
+The script copies `OPENAI_API_KEY` and `LANGFUSE_SECRET_KEY` from the ignored `.env` into ignored secret files and turns the AI build switch on for this local stack only.
+
+| Page | What to check |
+|---|---|
+| `http://127.0.0.1:8000/admin` | Sign in with SERVIR |
+| `http://127.0.0.1:8000/workspace.html` | Memberships, **My AI allowance** card, **Members and access**, **Hub security log**, Sign out button |
+| `http://127.0.0.1:8000/platform.html` | System health; set token limit and AI on; **Send test call**; usage per person and **Reset now**; create, close and reopen a Hub; full security log |
+| Langfuse Cloud project | Trace `grp-ai-call` with model and token counts after a test call |
+
+Acceptance checklist for the browser test:
+
+- [ ] Sign in and sign out work; after sign-out `/workspace.html` sends you back to sign-in
+- [ ] AI card shows "AI features are turned off" before the limit is set
+- [ ] Setting limit and AI on changes the card to "AI allowance: … tokens left"
+- [ ] Test call returns a reply and token counts; usage table and Langfuse show it
+- [ ] Reset now returns usage to 0 and adds `ai allowance reset` to the security log
+- [ ] Closing a test Hub and reopening it are logged
+
+Not visible yet: assessments, maps, results, downloads, SIG sharing. Those are Increments 1, 3, 4 and 5.
 
 ## Code review findings (16 September)
 
@@ -83,6 +111,16 @@ Not yet covered by tests: two different logins linking the same person at the sa
 - AI explains stored results only and stays off until Increment 6 is accepted.
 
 Any change to these rules needs an ADR and the approvals in Section 17.
+
+## Known gaps after Increment 2
+
+- Browser acceptance not yet done; a live OpenAI call and a Langfuse trace have not been verified by the team
+- DEP-01: sign-in still uses the interim SIG MCP client (ADR-0002)
+- ADR-0003 needs the AI-11 wording change in the next spec version
+- The spec puts the AI gateway in Increment 6; only the Platform Admin test call exists. AI explain for results waits for Increment 1 results
+- Rate limits and the in-memory limiter are single-process only
+- Concurrent reservation proven with sequential tests on SQLite; add a PostgreSQL two-connection test
+- Hub Admin security log shows only events tagged with the Hub (member changes); sign-in events have no Hub
 
 ## Refined plan
 
