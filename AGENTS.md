@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+## Current state
+
+Read [`handovers.md`](handovers.md) first. It has the current branch (`feat/planning-chatbot-ux`), how to run the Docker Desktop stack, the architecture map, known gaps and the recommended next work. Record decisions in `docs/adr/` and update `handovers.md` at the end of each work session.
+
 ## Project Structure & Module Organization
 
 The implementation follows the approved GRP boundaries. `api/` contains FastAPI modules for authentication, access, Admin, catalogs, uploads, assessments, AI, audit, health, and `integrations/sig`. `worker/` owns background GIS execution; web requests must never perform GIS work. `core/` holds shared domain models, validation, result invariants, database metadata, and the replaceable storage protocol. Alembic changes live in `migrations/`. Static frontend files are in `web/`; Ubuntu deployment assets are in `deploy/`. Tests are separated into `tests/fast`, `contract`, `golden`, `live`, and `load`. Record architecture changes in `docs/adr/`.

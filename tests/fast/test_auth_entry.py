@@ -93,6 +93,17 @@ def test_workspace_renders_server_data_without_inner_html() -> None:
     assert "textContent" in script
     assert "innerHTML" not in script
     assert "Hub memberships" in page
-    assert "Administration" in page
-    assert "data-admin-menu" in page
+    # The menu comes from the shared top bar rendered by grp-common.js.
+    common = (WEB_ROOT / "grp-common.js").read_text(encoding="utf-8")
+    assert "data-grp-topbar" in page
+    assert '"Administration"' in common
+    assert "data-admin-menu" in common
+    assert "innerHTML" not in common
     assert 'adminMenu.hidden = false' in script
+
+
+def test_every_signed_in_page_uses_the_same_top_bar() -> None:
+    for name in ("workspace.html", "assessments.html", "platform.html", "planning.html"):
+        page = (WEB_ROOT / name).read_text(encoding="utf-8")
+        assert "<header data-grp-topbar></header>" in page, name
+        assert "workspace-nav" not in page and "pw-nav" not in page, name
