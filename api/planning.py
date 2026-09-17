@@ -444,7 +444,55 @@ async def planning_chat(
         "receipt": receipt,
         "map_url": map_url,
         "trace": trace,
+        "evidence": evidence_bundle(payload.message, place, pack, area_payload, trace, receipt),
         "usage": _usage(session, settings, principal),
+    }
+
+
+EVIDENCE_FIELDS = ("n", "kind", "title", "source", "validation", "retrieval", "method", "text")
+
+
+def evidence_bundle(
+    question: str,
+    place: str,
+    pack: dict[str, Any],
+    area: dict[str, Any],
+    trace: list[dict[str, str]],
+    receipt: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Everything the evidence panel shows and lets a Planner download. No secrets or
+    identities; only what SIG returned plus GRP's own step log."""
+
+    citations = [
+        {k: item.get(k) for k in EVIDENCE_FIELDS if item.get(k) is not None}
+        for item in pack.get("citations", [])
+        if isinstance(item, dict)
+    ]
+    execution = pack.get("exec") if isinstance(pack.get("exec"), dict) else {}
+    live = sum(1 for c in citations if "live" in str(c.get("retrieval", "")))
+    computed = sum(
+        1 for c in citations if str(c.get("retrieval", "")).startswith("computed")
+    )
+    return {
+        "question": question,
+        "place": place,
+        "pack_id": pack.get("pack_id"),
+        "focus": pack.get("focus"),
+        "area": area,
+        "summary": {
+            "sources": len(citations),
+            "pulled_live": live,
+            "computed": computed,
+            "declared_gaps": len(pack.get("gaps", []) or []),
+        },
+        "citations": citations,
+        "gaps": pack.get("gaps", []) or [],
+        "stats": pack.get("stats", {}),
+        "sig_trace": [str(line) for line in pack.get("trace", []) if isinstance(line, str)],
+        "grp_trace": trace,
+        "assembled_at": execution.get("assembled_at"),
+        "gather_ms": execution.get("gather_ms"),
+        "receipt": receipt,
     }
 
 

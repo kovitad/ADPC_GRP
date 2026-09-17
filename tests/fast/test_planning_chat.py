@@ -372,3 +372,25 @@ def test_status_reports_sig_connection(planning) -> None:
 def test_router_is_told_to_return_english_place_names() -> None:
     assert "romanized" in api.planning.ROUTER_INSTRUCTIONS
     assert "Chiang Yuen District, Maha" in api.planning.ROUTER_INSTRUCTIONS
+
+
+def test_evidence_bundle_counts_sources_and_keeps_traces() -> None:
+    pack = {
+        **PACK,
+        "citations": [
+            {"n": 1, "kind": "exposure", "retrieval": "computed-at-pack-time", "title": "a"},
+            {"n": 2, "kind": "feed", "retrieval": "pulled-live", "title": "b"},
+            {"n": 3, "kind": "gaps", "title": "c"},
+        ],
+        "exec": {"assembled_at": "2026-09-17T01:00:00Z", "gather_ms": 1200.5},
+    }
+    bundle = api.planning.evidence_bundle(
+        "Where could people move?", "Pua District, Nan, Thailand", pack,
+        {"verified": True}, [{"step": "assemble_pack", "detail": "pack-123"}], None,
+    )
+
+    assert bundle["summary"] == {"sources": 3, "pulled_live": 1, "computed": 1,
+                                 "declared_gaps": 1}
+    assert bundle["sig_trace"][0].startswith("aoi[")
+    assert bundle["grp_trace"][0]["step"] == "assemble_pack"
+    assert bundle["gather_ms"] == 1200.5

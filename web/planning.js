@@ -90,6 +90,27 @@
     return row;
   };
 
+  // SIG answers: a compact status card, the brief folded underneath, details on the right.
+  const addEvidenceMessage = (payload, question) => {
+    const row = addMessage("assistant", "", {
+      label: payload.label,
+      actions: [chipButton("Open map & evidence", () => renderEvidence(payload, question))],
+    });
+    const bubble = row.querySelector(".pw-bubble");
+    bubble.classList.add("pw-bubble--evidence");
+    bubble.prepend(statusCard(payload, question));
+    const brief = document.createElement("details");
+    brief.className = "pw-brief";
+    const summary = document.createElement("summary");
+    summary.textContent = "Read the brief";
+    const text = document.createElement("div");
+    text.className = "pw-brief__text";
+    text.textContent = payload.answer;
+    brief.append(summary, text);
+    bubble.querySelector(".pw-bubble__label").before(brief);
+    scrollDown();
+  };
+
   const addTyping = () => {
     hideWelcome();
     const row = document.createElement("div");
@@ -398,41 +419,266 @@
     $("[data-sig-frame]").removeAttribute("src");
   });
 
-  const sigActions = (payload, message) => {
-    const actions = [];
-    if (payload.receipt) {
-      const url = safeHttps(payload.receipt.public_url);
-      if (url) {
+  // Evidence panel: what SIG returned, what is missing, how it was produced, downloads.
+  const evidencePanel = $("[data-evidence]");
+  const sigAreaLayer = window.L.featureGroup().addTo(map);
+  let currentEvidence = null;
+
+  const openEvidence = () => {
+    evidencePanel.hidden = false;
+    document.body.classList.add("has-evidence");
+    if (window.matchMedia("(max-width: 860px)").matches) {
+      document.body.dataset.view = "map";
+    }
+    window.setTimeout(() => map.invalidateSize(), 0);
+  };
+
+  $("[data-ev-close]").addEventListener("click", () => {
+    evidencePanel.hidden = true;
+    document.body.classList.remove("has-evidence");
+  });
+
+  document.querySelectorAll("[data-ev-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("[data-ev-tab]").forEach((t) =>
+        t.setAttribute("aria-selected", String(t === tab)),
+      );
+      document.querySelectorAll("[data-ev-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.evPanel !== tab.dataset.evTab;
+      });
+    });
+  });
+
+  const downloadFile = (name, content, type) => {
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const slug = (text) =>
+    String(text || "evidence").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+
+  const traceText = (evidence) => {
+    const lines = [
+      `Question: ${evidence.question}`,
+      `Area: ${evidence.place}`,
+      `SIG pack: ${evidence.pack_id || "-"}`,
+      `Assembled at: ${evidence.assembled_at || "-"} (${evidence.gather_ms ?? "-"} ms)`,
+      `Receipt: ${evidence.receipt ? evidence.receipt.receipt_id : "none (not published)"}`,
+      "",
+      "SIG platform steps:",
+      ...evidence.sig_trace.map((line, i) => `  ${i + 1}. ${line}`),
+      "",
+      "GRP steps:",
+      ...evidence.grp_trace.map((step, i) => `  ${i + 1}. ${step.step}: ${step.detail}`),
+      "",
+      "Declared gaps:",
+      ...evidence.gaps.map((gap) => `  - ${gap}`),
+    ];
+    return lines.join("\n");
+  };
+
+  document.querySelector("[data-ev-download-toggle]").addEventListener("click", (event) => {
+    const menu = $("[data-ev-download]");
+    menu.hidden = !menu.hidden;
+    event.currentTarget.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+
+  document.querySelectorAll("[data-download]").forEach((button) => {
+    button.addEventListener("click", () => {
+      $("[data-ev-download]").hidden = true;
+      if (!currentEvidence) return;
+      const { evidence, answer } = currentEvidence;
+      const base = `grp-${slug(evidence.place)}-${(evidence.pack_id || "pack").slice(0, 8)}`;
+      if (button.dataset.download === "brief") {
+        const header = `# ${evidence.question}\n\nArea: ${evidence.place}\nSIG pack: ${evidence.pack_id}\n` +
+          `Status: ${evidence.receipt ? `receipt ${evidence.receipt.receipt_id}` : "unverified draft (no receipt)"}\n\n` +
+          "_SIG generic evidence. Not a GRP assessment and not a decision that any place is safe._\n\n";
+        downloadFile(`${base}-brief.md`, header + answer, "text/markdown");
+      } else if (button.dataset.download === "evidence") {
+        downloadFile(`${base}-evidence.json`, JSON.stringify({ ...evidence, brief: answer }, null, 2), "application/json");
+      } else {
+        downloadFile(`${base}-trace.txt`, traceText(evidence), "text/plain");
+      }
+    });
+  });
+
+  const outlineSigArea = async (evidence) => {
+    sigAreaLayer.clearLayers();
+    const name = (evidence.area && evidence.area.sig_place) || evidence.place;
+    if (!name) return;
+    try {
+      const query = /thailand/i.test(evidence.place) ? evidence.place : `${evidence.place}, Thailand`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=1&countrycodes=th&q=${encodeURIComponent(query)}`;
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      const [place] = await response.json();
+      if (!place || !place.geojson) return;
+      const shape = window.L.geoJSON(place.geojson, {
+        style: { color: "#1d4ed8", weight: 2.5, fillColor: "#60a5fa", fillOpacity: 0.08 },
+      }).bindTooltip(`${name} · outline from OpenStreetMap (orientation only)`, { sticky: true });
+      shape.addTo(sigAreaLayer);
+      map.flyToBounds(shape.getBounds(), { padding: [60, 60], duration: 0.7 });
+    } catch (_error) {
+      // Outline is only for orientation; the evidence still shows without it.
+    }
+  };
+
+  const evidenceCard = (citation) => {
+    const card = document.createElement("article");
+    card.className = "pw-card";
+    const title = document.createElement("h3");
+    title.textContent = `[${citation.n}] ${citation.title || citation.source || "Source"}`;
+    const source = document.createElement("p");
+    source.className = "pw-card__source";
+    source.textContent = citation.source || citation.kind || "";
+    const tags = document.createElement("div");
+    tags.className = "pw-card__tags";
+    const retrieval = String(citation.retrieval || "");
+    const tagText = retrieval.startsWith("computed") ? "computed" : retrieval.includes("live") ? "pulled live" : citation.kind === "gaps" ? "declared gap" : "archived";
+    const tag = document.createElement("span");
+    tag.className = `pw-tag pw-tag--${tagText.replace(" ", "-")}`;
+    tag.textContent = tagText;
+    const validation = document.createElement("span");
+    validation.textContent = citation.validation || "";
+    tags.append(tag, validation);
+    card.append(title, source, tags);
+    if (citation.text) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "Details";
+      const body = document.createElement("p");
+      body.textContent = citation.text;
+      details.append(summary, body);
+      card.append(details);
+    }
+    return card;
+  };
+
+  const renderEvidence = (payload, message) => {
+    const evidence = payload.evidence;
+    if (!evidence) return;
+    currentEvidence = { evidence, answer: payload.answer, message };
+    const counts = evidence.summary;
+    $("[data-ev-title]").textContent = (evidence.area && evidence.area.sig_place) || evidence.place;
+    $("[data-ev-counts]").textContent =
+      `${counts.sources} sources · ${counts.pulled_live} pulled live · ${counts.computed} computed · ${counts.declared_gaps} declared gap(s)`;
+    const area = $("[data-ev-area]");
+    area.textContent = evidence.area && evidence.area.sig_area
+      ? `SIG analysis area: ${evidence.area.sig_area}`
+      : "";
+
+    const numbers = $("[data-ev-numbers]");
+    numbers.replaceChildren();
+    Object.entries((evidence.stats && evidence.stats.counts) || {}).forEach(([name, value]) => {
+      const tile = document.createElement("div");
+      tile.className = "pw-number";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      strong.textContent = typeof value.exposed === "number"
+        ? `${value.exposed} / ${value.total}`
+        : `${value.exposed_km ?? 0} / ${value.total_km ?? 0} km`;
+      span.textContent = `${name.replaceAll("_", " ")} in flood area`;
+      tile.append(strong, span);
+      numbers.append(tile);
+    });
+
+    const cards = $("[data-ev-cards]");
+    cards.replaceChildren(...evidence.citations.map(evidenceCard));
+
+    const gaps = $("[data-ev-gaps]");
+    gaps.replaceChildren(...evidence.gaps.map((gap) => {
+      const item = document.createElement("li");
+      item.textContent = gap;
+      return item;
+    }));
+
+    const trace = $("[data-ev-trace]");
+    trace.replaceChildren(
+      ...evidence.sig_trace.map((line) => {
+        const item = document.createElement("li");
+        item.textContent = line;
+        return item;
+      }),
+      ...evidence.grp_trace.map((step) => {
+        const item = document.createElement("li");
+        item.className = "is-grp";
+        item.textContent = `GRP · ${step.step}: ${step.detail}`;
+        return item;
+      }),
+    );
+    $("[data-ev-exec]").textContent =
+      `Pack ${evidence.pack_id || "-"} assembled ${evidence.assembled_at ? GRP.formatTime(evidence.assembled_at) : "-"} (Bangkok) in ${evidence.gather_ms ?? "-"} ms.`;
+
+    const mapButton = $("[data-ev-map]");
+    const mapUrl = safeHttps(payload.map_url);
+    mapButton.disabled = false;
+    mapButton.classList.remove("is-warning");
+    delete mapButton.dataset.confirm;
+    if (evidence.receipt) {
+      mapButton.textContent = "Show SIG flood map";
+      mapButton.onclick = () => {
+        if (!mapUrl) return;
+        $("[data-sig-frame]").src = mapUrl;
+        sigPanel.hidden = false;
+      };
+      const receiptUrl = safeHttps(evidence.receipt.public_url);
+      $("[data-ev-foot]").textContent = "";
+      if (receiptUrl) {
         const link = document.createElement("a");
-        link.className = "pw-chip-button";
-        link.href = url;
+        link.href = receiptUrl;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.textContent = "Open public receipt";
-        actions.push(link);
-      }
-      const mapUrl = safeHttps(payload.map_url);
-      if (mapUrl) {
-        actions.push(chipButton("Show SIG hazard map", () => {
-          $("[data-sig-frame]").src = mapUrl;
-          sigPanel.hidden = false;
-          document.body.dataset.view = "map";
-        }));
+        link.textContent = `Public receipt ${evidence.receipt.receipt_id}`;
+        $("[data-ev-foot]").append("Passed SIG's source check · ", link);
       }
     } else {
-      actions.push(chipButton("Publish public SIG receipt", (button) => {
-        if (button.dataset.confirm !== "yes") {
-          button.dataset.confirm = "yes";
-          button.textContent = "Confirm: this creates a public record";
-          button.classList.add("is-warning");
+      mapButton.textContent = "Publish receipt & show SIG flood map";
+      mapButton.onclick = () => {
+        if (mapButton.dataset.confirm !== "yes") {
+          mapButton.dataset.confirm = "yes";
+          mapButton.textContent = "Confirm: this creates a public record";
+          mapButton.classList.add("is-warning");
           return;
         }
-        button.disabled = true;
+        mapButton.disabled = true;
         send(message, { publish: true, echo: false });
-      }));
+      };
+      $("[data-ev-foot]").textContent =
+        "Unverified draft: not yet checked by SIG's source check, no receipt. Evidence only — not a decision that any place is safe.";
     }
-    return actions;
+    outlineSigArea(evidence);
+    openEvidence();
+    if (evidence.receipt && mapUrl) {
+      $("[data-sig-frame]").src = mapUrl;
+      sigPanel.hidden = false;
+    }
   };
+
+  const statusCard = (payload, question) => {
+    const evidence = payload.evidence;
+    const counts = evidence.summary;
+    const card = document.createElement("div");
+    card.className = "pw-status";
+    const title = document.createElement("strong");
+    title.textContent = question;
+    const line = document.createElement("span");
+    line.textContent =
+      `${counts.sources} sources · ${counts.pulled_live} pulled live · ${counts.computed} computed · ${counts.declared_gaps} declared gap(s)`;
+    const badge = document.createElement("span");
+    badge.className = `pw-status__badge${evidence.receipt ? " is-ok" : ""}`;
+    badge.textContent = evidence.receipt ? `Receipt ${evidence.receipt.receipt_id}` : "Unverified draft";
+    card.append(title, line, badge);
+    return card;
+  };
+
+  const sigActions = (payload, message) => [
+    chipButton("Open map & evidence", () => renderEvidence(payload, message)),
+  ];
 
   // ---------- sending ----------
   const send = async (text, { publish = false, echo = true } = {}) => {
@@ -473,10 +719,17 @@
         watch(payload.assessment_id);
       } else if (payload.mode === "sig_evidence") {
         actions = sigActions(payload, message);
-      } else if (payload.mode === "gate_blocked" || payload.mode === "area_rejected") {
-        actions = [];
       }
-      addMessage("assistant", payload.answer, { label: payload.label, actions, error: payload.mode === "area_rejected" || payload.mode === "gate_blocked" });
+      if (payload.mode === "sig_evidence" && payload.evidence) {
+        addEvidenceMessage(payload, message);
+        renderEvidence(payload, message);
+      } else {
+        addMessage("assistant", payload.answer, {
+          label: payload.label,
+          actions,
+          error: payload.mode === "area_rejected" || payload.mode === "gate_blocked",
+        });
+      }
       state.history.push({ role: "user", text: message }, { role: "assistant", text: payload.answer.slice(0, 1200) });
     } catch (error) {
       typing.remove();

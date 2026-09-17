@@ -127,6 +127,50 @@
           <a class="pw-result__link" data-result-link href="/assessments.html">Sources, limits and full table →</a>
         </div>
 
+        <aside class="pw-evidence" data-evidence hidden aria-label="Evidence">
+          <div class="pw-evidence__head">
+            <div>
+              <span class="pw-eyebrow">SIG evidence</span>
+              <h2 data-ev-title>Evidence</h2>
+              <p class="pw-evidence__counts" data-ev-counts></p>
+            </div>
+            <button class="pw-icon-button" type="button" data-ev-close aria-label="Close evidence">×</button>
+          </div>
+          <div class="pw-area" data-ev-area></div>
+          <div class="pw-evidence__actions">
+            <button class="pw-chip-button" type="button" data-ev-map>Show SIG flood map</button>
+            <div class="pw-download">
+              <button class="pw-chip-button" type="button" data-ev-download-toggle aria-expanded="false">
+                Download ▾
+              </button>
+              <div class="pw-download__menu" data-ev-download hidden>
+                <button type="button" data-download="brief">Brief (.md)</button>
+                <button type="button" data-download="evidence">Evidence pack (.json)</button>
+                <button type="button" data-download="trace">Trace log (.txt)</button>
+              </div>
+            </div>
+          </div>
+          <div class="pw-tabs" role="tablist">
+            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="true">Evidence</button>
+            <button type="button" role="tab" data-ev-tab="missing" aria-selected="false">What is missing</button>
+            <button type="button" role="tab" data-ev-tab="trace" aria-selected="false">How it was produced</button>
+          </div>
+          <div class="pw-evidence__body">
+            <div data-ev-panel="evidence">
+              <div class="pw-numbers" data-ev-numbers></div>
+              <div class="pw-cards" data-ev-cards></div>
+            </div>
+            <div data-ev-panel="missing" hidden>
+              <ul class="pw-gaps" data-ev-gaps></ul>
+            </div>
+            <div data-ev-panel="trace" hidden>
+              <ol class="pw-trace" data-ev-trace></ol>
+              <p class="pw-muted-block" data-ev-exec></p>
+            </div>
+          </div>
+          <p class="pw-evidence__foot" data-ev-foot></p>
+        </aside>
+
         <div class="pw-sig" data-sig hidden>
           <div class="pw-sig__bar">
             <strong>SIG hazard map (public receipt)</strong>
