@@ -32,6 +32,13 @@ window.GRP = (() => {
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
+          Object.keys(sessionStorage)
+            .filter((key) => key.startsWith("grp."))
+            .forEach((key) => sessionStorage.removeItem(key));
+        } catch (_error) {
+          // Nothing stored or storage blocked.
+        }
+        try {
           await request("/api/v1/auth/logout", { method: "POST" });
         } finally {
           window.location.assign("/");

@@ -28,6 +28,35 @@
     history: [],
   };
 
+  // ---------- keep the conversation when moving between menu pages ----------
+  // Stored only in this browser tab (sessionStorage): gone when the tab closes or on sign-out.
+  const STORE_KEY = "grp.planning.v1";
+  const transcript = [];
+  let restoring = false;
+  let ownerEmail = null;
+  let openEvidencePayload = null;
+
+  const saveState = () => {
+    if (restoring || !ownerEmail) return;
+    try {
+      const kept = transcript.slice(-40);
+      const evidenceIndex = openEvidencePayload
+        ? kept.findIndex((entry) => entry.payload === openEvidencePayload)
+        : -1;
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({
+        owner: ownerEmail,
+        transcript: kept,
+        selectedId: state.selected ? state.selected.id : null,
+        assessmentId: state.assessmentId,
+        pendingAssessmentId: state.pendingAssessmentId || null,
+        history: state.history.slice(-8),
+        evidenceIndex,
+      }));
+    } catch (_error) {
+      // Storage full or blocked: the page still works, it just will not remember.
+    }
+  };
+
   // ---------- map ----------
   const map = window.L.map("risk-map", { zoomControl: true }).setView([13.4, 101.0], 6);
   window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -58,8 +87,12 @@
     if (welcome) welcome.remove();
   };
 
-  const addMessage = (role, text, { label, actions = [], error = false } = {}) => {
+  const addMessage = (role, text, { label, actions = [], error = false, record = true } = {}) => {
     hideWelcome();
+    if (record && !restoring) {
+      transcript.push({ kind: "message", role, text, label: label || null, error });
+      saveState();
+    }
     const row = document.createElement("div");
     row.className = `pw-msg pw-msg--${role}${error ? " pw-msg--error" : ""}`;
     if (role === "assistant") {
@@ -92,8 +125,13 @@
 
   // SIG answers: a compact status card, the brief folded underneath, details on the right.
   const addEvidenceMessage = (payload, question) => {
+    if (!restoring) {
+      transcript.push({ kind: "evidence", payload, question });
+      saveState();
+    }
     const row = addMessage("assistant", "", {
       label: payload.label,
+      record: false,
       actions: [chipButton("Open map & evidence", () => renderEvidence(payload, question))],
     });
     const bubble = row.querySelector(".pw-bubble");
@@ -368,6 +406,7 @@
     if (layer) map.flyToBounds(layer.getBounds(), { padding: [60, 60], duration: 0.6 });
     renderContext();
     renderWelcome();
+    saveState();
     if (announce && !state.busy) {
       addMessage("assistant", `${boundary.name} is selected. Ask me to run a flood assessment for it, or ask anything else.`, {
         actions: [chipButton("Run 100-year flood assessment", () => send(`Run a 100-year flood assessment for ${boundary.name}`))],
@@ -469,7 +508,7 @@
     $("[data-result-link]").hidden = true;
   };
 
-  const showResult = async (id) => {
+  const showResult = async (id, { quiet = false } = {}) => {
     const [result, centers] = await Promise.all([
       GRP.request(`/api/v1/assessments/${id}/result`),
       GRP.request(`/api/v1/assessments/${id}/centers?size=200`),
@@ -500,9 +539,12 @@
     });
     $("[data-result-link]").hidden = false;
     state.assessmentId = id;
+    state.pendingAssessmentId = null;
     renderContext();
     const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
     if (boundary) selectBoundary(boundary);
+    saveState();
+    if (quiet) return;
     addMessage(
       "assistant",
       `The ${result.scenario.return_period_years}-year flood screening for ${result.area} is on the map. ` +
@@ -528,6 +570,8 @@
       } else if (job.state === "queued" || job.state === "running") {
         state.pollTimer = window.setTimeout(() => watch(id), 2000);
       } else {
+        state.pendingAssessmentId = null;
+        saveState();
         $("[data-progress]").hidden = true;
         $("[data-result-meta]").textContent = `Assessment ${job.state}. Reference ${job.support_ref}.`;
         addMessage("assistant", `The assessment ${job.state}${job.error_code ? ` (${job.error_code})` : ""}. Reference ${job.support_ref}.`, { error: true });
@@ -559,6 +603,8 @@
   };
 
   $("[data-ev-close]").addEventListener("click", () => {
+    openEvidencePayload = null;
+    saveState();
     evidencePanel.hidden = true;
     document.body.classList.remove("has-evidence");
   });
@@ -700,6 +746,8 @@
     const evidence = payload.evidence;
     if (!evidence) return;
     currentEvidence = { evidence, answer: payload.answer, message };
+    openEvidencePayload = payload;
+    saveState();
     const counts = evidence.summary;
     $("[data-ev-title]").textContent = (evidence.area && evidence.area.sig_place) || evidence.place;
     $("[data-ev-counts]").textContent =
@@ -869,6 +917,8 @@
         state.assessmentId = null;
         await drawPendingCenters();
         showProgress(boundary ? boundary.name : "Assessment");
+        state.pendingAssessmentId = payload.assessment_id;
+        saveState();
         document.body.dataset.view = window.matchMedia("(max-width: 860px)").matches ? "map" : document.body.dataset.view;
         watch(payload.assessment_id);
       } else if (payload.mode === "sig_evidence") {
@@ -885,6 +935,7 @@
         });
       }
       state.history.push({ role: "user", text: message }, { role: "assistant", text: payload.answer.slice(0, 1200) });
+      saveState();
     } catch (error) {
       typing.remove();
       addMessage("assistant", error.message, { label: error.code, error: true });
@@ -1028,6 +1079,44 @@
     });
   });
 
+  const restoreState = async () => {
+    let saved = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(STORE_KEY) || "null");
+    } catch (_error) {
+      saved = null;
+    }
+    if (!saved) return;
+    if (saved.owner !== ownerEmail) {
+      sessionStorage.removeItem(STORE_KEY);
+      return;
+    }
+    restoring = true;
+    try {
+      (saved.transcript || []).forEach((entry) => {
+        transcript.push(entry);
+        if (entry.kind === "evidence") addEvidenceMessage(entry.payload, entry.question);
+        else addMessage(entry.role, entry.text, { label: entry.label, error: entry.error, record: false });
+      });
+      state.history = saved.history || [];
+      const boundary = state.boundaries.find((b) => b.id === saved.selectedId);
+      if (boundary) selectBoundary(boundary);
+      if (saved.assessmentId) {
+        await showResult(saved.assessmentId, { quiet: true }).catch(() => {});
+      }
+      if (saved.pendingAssessmentId) {
+        state.pendingAssessmentId = saved.pendingAssessmentId;
+        showProgress(boundary ? boundary.name : "Assessment");
+        watch(saved.pendingAssessmentId);
+      }
+      const evidence = transcript[saved.evidenceIndex];
+      if (evidence && evidence.kind === "evidence") renderEvidence(evidence.payload, evidence.question);
+    } finally {
+      restoring = false;
+      saveState();
+    }
+  };
+
   // ---------- start ----------
   GRP.bindSignOut();
 
@@ -1070,6 +1159,8 @@
       if (state.boundaries.length === 1) selectBoundary(state.boundaries[0]);
       else if (districtLayer.getLayers().length) map.fitBounds(districtLayer.getBounds(), { padding: [60, 60] });
       renderWelcome();
+      ownerEmail = identity.email;
+      await restoreState();
       updateSend();
       input.focus();
     })
