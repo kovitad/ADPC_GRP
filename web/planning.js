@@ -103,23 +103,148 @@
     brief.className = "pw-brief";
     const summary = document.createElement("summary");
     summary.textContent = "Read the brief";
-    const text = document.createElement("div");
-    text.className = "pw-brief__text";
-    text.textContent = payload.answer;
+    const text = renderBrief(payload.answer, (n) => {
+      renderEvidence(payload, question);
+      focusCitation(n);
+    });
     brief.append(summary, text);
     bubble.querySelector(".pw-bubble__label").before(brief);
     scrollDown();
   };
 
-  const addTyping = () => {
+  const STEP_LABELS = {
+    understand_question: "Understood the question",
+    assemble_pack: "Gathered SIG flood evidence",
+    draft: "Wrote the brief",
+    publish_answer: "SIG source check and receipt",
+    hazard_map: "Loaded SIG flood map",
+  };
+
+  const seconds = (ms) => `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} s`;
+  const clock = (ms) => {
+    const total = Math.floor(ms / 1000);
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  };
+
+  // Live progress while one request runs. The API answers in one go, so the steps advance
+  // on typical timings and are replaced by the real step durations when the answer arrives.
+  const addProgress = ({ publish = false } = {}) => {
     hideWelcome();
+    const steps = [
+      { label: "Understanding your question", after: 0 },
+      { label: "Finding the district and flood evidence on SIG (usually 20–90 s)", after: 4000 },
+      { label: "Checking SIG used the real district boundary", after: 30000 },
+      { label: "Writing the brief from the evidence", after: 45000 },
+    ];
+    if (publish) steps.push({ label: "SIG source check, receipt and flood map", after: 60000 });
     const row = document.createElement("div");
     row.className = "pw-msg pw-msg--assistant";
-    row.innerHTML =
-      '<span class="pw-avatar" aria-hidden="true">AI</span><div class="pw-bubble"><span class="pw-typing" aria-label="Thinking"><i></i><i></i><i></i></span></div>';
+    const avatar = document.createElement("span");
+    avatar.className = "pw-avatar";
+    avatar.textContent = "AI";
+    const bubble = document.createElement("div");
+    bubble.className = "pw-bubble pw-progress-card";
+    const head = document.createElement("div");
+    head.className = "pw-progress-card__head";
+    const title = document.createElement("strong");
+    title.textContent = "Working on it";
+    const timer = document.createElement("span");
+    timer.className = "pw-timer";
+    timer.textContent = "0:00";
+    head.append(title, timer);
+    const list = document.createElement("ol");
+    list.className = "pw-steps";
+    const items = steps.map((step) => {
+      const item = document.createElement("li");
+      item.textContent = step.label;
+      list.append(item);
+      return item;
+    });
+    const bar = document.createElement("div");
+    bar.className = "pw-progress";
+    bar.append(document.createElement("span"));
+    bubble.append(head, list, bar);
+    row.append(avatar, bubble);
     thread.append(row);
     scrollDown();
-    return row;
+    const started = performance.now();
+    const tick = () => {
+      const ms = performance.now() - started;
+      timer.textContent = clock(ms);
+      let current = 0;
+      steps.forEach((step, index) => {
+        if (ms >= step.after) current = index;
+      });
+      items.forEach((item, index) => {
+        item.className = index < current ? "is-done" : index === current ? "is-active" : "";
+      });
+    };
+    tick();
+    const handle = window.setInterval(tick, 500);
+    return {
+      remove: () => {
+        window.clearInterval(handle);
+        row.remove();
+      },
+      elapsed: () => performance.now() - started,
+    };
+  };
+
+  // Brief as headings and paragraphs; [n] citations open the matching evidence card.
+  const renderBrief = (text, onCite) => {
+    const box = document.createElement("div");
+    box.className = "pw-brief__text";
+    let list = null;
+    text.split(/\n+/).forEach((raw) => {
+      const line = raw.trim();
+      if (!line) return;
+      const heading = line.match(/^#{1,4}\s+(.*)$/);
+      const bullet = line.match(/^[-*]\s+(.*)$/);
+      let node;
+      if (heading) {
+        list = null;
+        node = document.createElement("h4");
+        appendInline(node, heading[1], onCite);
+      } else if (bullet) {
+        if (!list) {
+          list = document.createElement("ul");
+          box.append(list);
+        }
+        node = document.createElement("li");
+        appendInline(node, bullet[1], onCite);
+        list.append(node);
+        return;
+      } else {
+        list = null;
+        node = document.createElement("p");
+        appendInline(node, line, onCite);
+      }
+      box.append(node);
+    });
+    return box;
+  };
+
+  const appendInline = (parent, text, onCite) => {
+    text.split(/(\[\d+\](?:\[\d+\])*|\*\*[^*]+\*\*)/g).forEach((part) => {
+      if (!part) return;
+      if (/^\[\d+\]/.test(part)) {
+        part.match(/\d+/g).forEach((n) => {
+          const cite = document.createElement("button");
+          cite.type = "button";
+          cite.className = "pw-cite";
+          cite.textContent = n;
+          cite.title = `Open evidence [${n}]`;
+          cite.addEventListener("click", () => onCite(Number(n)));
+          parent.append(cite);
+        });
+      } else if (/^\*\*.*\*\*$/.test(part)) {
+        const strong = document.createElement("strong");
+        strong.textContent = part.slice(2, -2);
+        parent.append(strong);
+      } else {
+        parent.append(document.createTextNode(part));
+      }
+    });
   };
 
   const chipButton = (text, onClick, warning = false) => {
@@ -559,6 +684,18 @@
     return card;
   };
 
+  const focusCitation = (n) => {
+    document.querySelector('[data-ev-tab="evidence"]').click();
+    const card = $("[data-ev-cards]").children[n - 1];
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("is-focus");
+    void card.offsetWidth;
+    card.classList.add("is-focus");
+    const details = card.querySelector("details");
+    if (details) details.open = true;
+  };
+
   const renderEvidence = (payload, message) => {
     const evidence = payload.evidence;
     if (!evidence) return;
@@ -607,12 +744,13 @@
       ...evidence.grp_trace.map((step) => {
         const item = document.createElement("li");
         item.className = "is-grp";
-        item.textContent = `GRP · ${step.step}: ${step.detail}`;
+        const time = typeof step.duration_ms === "number" ? ` (${seconds(step.duration_ms)})` : "";
+        item.textContent = `GRP · ${STEP_LABELS[step.step] || step.step}: ${step.detail}${time}`;
         return item;
       }),
     );
     $("[data-ev-exec]").textContent =
-      `Pack ${evidence.pack_id || "-"} assembled ${evidence.assembled_at ? GRP.formatTime(evidence.assembled_at) : "-"} (Bangkok) in ${evidence.gather_ms ?? "-"} ms.`;
+      `Pack ${evidence.pack_id || "-"} assembled ${evidence.assembled_at ? GRP.formatTime(evidence.assembled_at) : "-"} (Bangkok); SIG gathering ${evidence.gather_ms ? seconds(evidence.gather_ms) : "-"}; whole answer ${evidence.total_ms ? seconds(evidence.total_ms) : "-"}.`;
 
     const mapButton = $("[data-ev-map]");
     const mapUrl = safeHttps(payload.map_url);
@@ -679,7 +817,16 @@
       note.textContent = payload.note;
       card.append(note);
     }
-    card.append(line, badge);
+    card.append(line);
+    const steps = (evidence.grp_trace || []).filter((step) => typeof step.duration_ms === "number");
+    if (evidence.total_ms || steps.length) {
+      const timing = document.createElement("span");
+      timing.className = "pw-status__timing";
+      const parts = steps.map((step) => `${STEP_LABELS[step.step] || step.step} ${seconds(step.duration_ms)}`);
+      timing.textContent = `Took ${seconds(evidence.total_ms || 0)} · ${parts.join(" · ")}`;
+      card.append(timing);
+    }
+    card.append(badge);
     return card;
   };
 
@@ -700,7 +847,7 @@
     autosize();
     state.busy = true;
     updateSend();
-    const typing = addTyping();
+    const typing = addProgress({ publish });
     try {
       const payload = await GRP.request("/api/v1/planning/chat", {
         method: "POST",

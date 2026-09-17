@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from time import perf_counter
 from typing import Any, Literal
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
@@ -196,6 +197,7 @@ async def planning_chat(
         if current is None or current.hub_id != hub.hub_id:
             current = None
 
+    request_started = perf_counter()
     routed = await run_ai_call(
         session,
         settings,
@@ -306,7 +308,14 @@ async def planning_chat(
             "Sign in with SERVIR again to connect to SIG evidence.",
         )
 
-    trace: list[dict[str, str]] = []
+    def elapsed_ms(since: float) -> int:
+        return round((perf_counter() - since) * 1000)
+
+    trace: list[dict[str, Any]] = [
+        {"step": "understand_question", "detail": ROUTER_VERSION,
+         "duration_ms": elapsed_ms(request_started)}
+    ]
+    step_started = perf_counter()
     try:
         async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
             pack_result = await mcp.call_tool(
@@ -316,7 +325,9 @@ async def planning_chat(
             pack = tool_payload(pack_result)
             if pack_result.is_error or pack.get("status") not in {None, "ok"}:
                 raise SigMcpError("SIG could not assemble evidence for that place")
-            trace.append({"step": "assemble_pack", "detail": str(pack.get("pack_id", ""))})
+            trace.append({"step": "assemble_pack", "detail": str(pack.get("pack_id", "")),
+                          "duration_ms": elapsed_ms(step_started)})
+            step_started = perf_counter()
 
             area = check_area(place, pack)
             area_payload = {
@@ -373,7 +384,9 @@ async def planning_chat(
                 prompt_version=DRAFT_VERSION,
                 export=export,
             )
-            trace.append({"step": "draft", "detail": f"{draft.model}"})
+            trace.append({"step": "draft", "detail": f"{draft.model}",
+                          "duration_ms": elapsed_ms(step_started)})
+            step_started = perf_counter()
 
             receipt: dict[str, Any] | None = None
             map_url = None
@@ -407,13 +420,16 @@ async def planning_chat(
                         "trace": trace,
                         "usage": _usage(session, settings, principal),
                     }
-                trace.append({"step": "publish_answer", "detail": str(published["receipt_id"])})
+                trace.append({"step": "publish_answer", "detail": str(published["receipt_id"]),
+                              "duration_ms": elapsed_ms(step_started)})
+                step_started = perf_counter()
                 embed = await mcp.call_tool(
                     "ui_embed",
                     {"component": "hazard_map", "receipt_id": str(published["receipt_id"])},
                 )
                 map_url = embed_url(embed, urlparse(settings.sig_mcp_base_url).hostname)
-                trace.append({"step": "hazard_map", "detail": "embedded" if map_url else "none"})
+                trace.append({"step": "hazard_map", "detail": "embedded" if map_url else "none",
+                              "duration_ms": elapsed_ms(step_started)})
                 receipt = {
                     "receipt_id": published["receipt_id"],
                     "public_url": published.get("public_resolver"),
@@ -457,7 +473,10 @@ async def planning_chat(
         "receipt": receipt,
         "map_url": map_url,
         "trace": trace,
-        "evidence": evidence_bundle(payload.message, place, pack, area_payload, trace, receipt),
+        "evidence": {
+            **evidence_bundle(payload.message, place, pack, area_payload, trace, receipt),
+            "total_ms": elapsed_ms(request_started),
+        },
         "usage": _usage(session, settings, principal),
     }
 
@@ -470,7 +489,7 @@ def evidence_bundle(
     place: str,
     pack: dict[str, Any],
     area: dict[str, Any],
-    trace: list[dict[str, str]],
+    trace: list[dict[str, Any]],
     receipt: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Everything the evidence panel shows and lets a Planner download. No secrets or

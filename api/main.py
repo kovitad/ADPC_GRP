@@ -45,6 +45,16 @@ def admin_login() -> RedirectResponse:
     return RedirectResponse(url="/admin-login.html", status_code=303)
 
 if settings.grp_env == "dev":
+
+    @app.middleware("http")
+    async def no_stale_web_files(request, call_next):
+        """Local development: always revalidate pages and scripts so edits show at once."""
+
+        response = await call_next(request)
+        if not request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     app.mount(
         "/",
         StaticFiles(directory=Path(__file__).resolve().parents[1] / "web", html=True),

@@ -653,3 +653,54 @@
   font-size: 0.76rem !important;
   line-height: 1.4;
 }
+
+/* Progress card while waiting */
+.pw-progress-card { width: 85%; white-space: normal; }
+.pw-progress-card__head { display: flex; justify-content: space-between; align-items: baseline; }
+.pw-progress-card__head strong { font-size: 0.86rem; }
+.pw-timer { font-variant-numeric: tabular-nums; color: var(--pw-muted); font-size: 0.8rem; font-weight: 700; }
+.pw-steps { display: grid; gap: 0.35rem; margin: 0.6rem 0 0.2rem; padding: 0; list-style: none; font-size: 0.8rem; color: #9aa9a6; }
+.pw-steps li { position: relative; padding-left: 1.4rem; }
+.pw-steps li::before {
+  content: "";
+  position: absolute;
+  top: 0.3rem;
+  left: 0.15rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid #c9d6d3;
+}
+.pw-steps li.is-active { color: var(--pw-ink); font-weight: 600; }
+.pw-steps li.is-active::before { border-color: var(--pw-forest); border-top-color: transparent; animation: pw-spin 0.9s linear infinite; }
+.pw-steps li.is-done { color: #52645f; }
+.pw-steps li.is-done::before { border-color: #16a34a; background: #16a34a; }
+.pw-progress-card .pw-progress { margin-top: 0.6rem; }
+@keyframes pw-spin { to { transform: rotate(360deg); } }
+
+/* Status timing, brief formatting, citations */
+.pw-status__timing { color: #52645f !important; font-size: 0.72rem !important; }
+.pw-brief__text { white-space: normal; }
+.pw-brief__text h4 { margin: 0.8rem 0 0.25rem; font-size: 0.84rem; color: var(--pw-forest); }
+.pw-brief__text p { margin: 0 0 0.5rem; line-height: 1.55; }
+.pw-brief__text ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+.pw-cite {
+  display: inline-grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin: 0 0.1rem;
+  padding: 0 0.25rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: #e0ecff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 800;
+  vertical-align: 1px;
+  cursor: pointer;
+}
+.pw-cite:hover { background: #c7dbff; }
+.pw-card.is-focus { animation: pw-flash 1.4s ease-out; }
+@keyframes pw-flash { 0% { box-shadow: 0 0 0 3px #60a5fa; } 100% { box-shadow: 0 0 0 0 transparent; } }
