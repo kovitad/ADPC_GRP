@@ -217,7 +217,7 @@
 
   GRP.bindSignOut();
 
-  GRP.request("/api/v1/me")
+  GRP.me()
     .then((identity) => {
       if (!identity.is_platform_admin) {
         statusText.textContent = "Platform Admin access is required for this page.";

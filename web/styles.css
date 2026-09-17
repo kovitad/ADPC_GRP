@@ -1500,3 +1500,96 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
 .dot--pending { background: #fff; border: 2px solid #374151; box-sizing: border-box; }
 .layer-panel__back { border: 1px solid #cbd8d6; border-radius: 0.4rem; background: #fff; cursor: pointer; }
 .map-stage { position: relative; }
+
+/* Shared top bar for all signed-in pages (rendered by grp-common.js) */
+.grp-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1200;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2rem;
+  height: 56px;
+  padding: 0 1.25rem;
+  background: #0b453d;
+  color: #fff;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.grp-topbar:empty { min-height: 56px; }
+.grp-topbar__brand {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.6rem;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+.grp-topbar__nav {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.grp-topbar__nav::-webkit-scrollbar { display: none; }
+.grp-topbar__nav a {
+  flex: none;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.grp-topbar__nav a[hidden] { display: none; }
+.grp-topbar__nav a:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.grp-topbar__nav a.is-active { color: #0b453d; background: #b8e063; }
+.grp-topbar__nav a:focus-visible,
+.grp-topbar__signout:focus-visible { outline: 2px solid #b8e063; outline-offset: 2px; }
+.grp-topbar__user { display: flex; flex: none; align-items: center; gap: 0.8rem; }
+.grp-topbar__name {
+  max-width: 16rem;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grp-topbar__signout {
+  padding: 0.32rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grp-topbar__signout:hover { background: rgba(255, 255, 255, 0.12); }
+@media (max-width: 860px) {
+  .grp-topbar { gap: 0.75rem; padding: 0 0.75rem; }
+  .grp-topbar__brand span:last-child, .grp-topbar__name { display: none; }
+}
+
+/* Calmer page headings next to the shared top bar */
+.workspace-body { min-height: 100vh; background: #f4f7f6; }
+.workspace-main { padding: clamp(1.75rem, 4vw, 2.75rem) 0 3rem; }
+.workspace-main > h1 {
+  max-width: none;
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.workspace-intro { margin-top: 0.5rem; }

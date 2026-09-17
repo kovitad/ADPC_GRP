@@ -1120,9 +1120,8 @@
   // ---------- start ----------
   GRP.bindSignOut();
 
-  GRP.request("/api/v1/me")
+  GRP.me()
     .then(async (identity) => {
-      $("[data-user-name]").textContent = identity.display_name || identity.email;
       const membership = identity.memberships.find((m) => m.role === "planner" || m.role === "admin");
       const banner = $("[data-banner]");
       if (!membership) {

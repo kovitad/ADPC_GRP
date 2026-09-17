@@ -271,7 +271,7 @@
 
   GRP.bindSignOut();
 
-  GRP.request("/api/v1/me")
+  GRP.me()
     .then(async (identity) => {
       const membership = identity.memberships.find((m) => m.role === "planner" || m.role === "admin");
       if (!membership) {

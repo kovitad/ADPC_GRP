@@ -19,41 +19,6 @@
   overflow: hidden;
 }
 
-/* Header */
-.pw-header {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  height: 56px;
-  padding: 0 1.25rem;
-  background: var(--pw-forest);
-  color: #fff;
-}
-.pw-header .workspace-brand { color: #fff; }
-.pw-nav { display: flex; gap: 0.25rem; }
-.pw-nav a {
-  padding: 0.4rem 0.8rem;
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-.pw-nav a:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
-.pw-nav a.is-active { color: var(--pw-forest); background: var(--pw-lime); }
-.pw-user { margin-left: auto; display: flex; align-items: center; gap: 0.9rem; font-size: 0.85rem; }
-.pw-user__name { color: rgba(255, 255, 255, 0.85); }
-.pw-link-button {
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
-  padding: 0.3rem 0.8rem;
-  background: transparent;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-.pw-link-button:hover { background: rgba(255, 255, 255, 0.1); }
-
 .pw-switch { display: none; }
 
 .pw-shell {
@@ -471,7 +436,6 @@
 @keyframes pw-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
 
 @media (max-width: 860px) {
-  .pw-nav, .pw-user__name { display: none; }
   .pw-switch {
     display: flex;
     gap: 0.25rem;

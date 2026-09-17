@@ -91,7 +91,92 @@ window.GRP = (() => {
     body.append(row);
   };
 
+  // One top bar for every signed-in page: same items, same order, always left-aligned.
+  const NAV_ITEMS = [
+    { key: "planning", label: "Planning", href: "/planning.html" },
+    { key: "assessments", label: "Assessments", href: "/assessments.html" },
+    { key: "access", label: "My access", href: "/workspace.html" },
+    { key: "admin", label: "Administration", href: "/workspace.html#admin-panel", attr: "data-admin-menu", hidden: true },
+    { key: "platform", label: "Platform", href: "/platform.html", attr: "data-platform-menu", hidden: true },
+  ];
+  const PAGE_KEYS = {
+    "/planning.html": "planning",
+    "/assessments.html": "assessments",
+    "/workspace.html": "access",
+    "/platform.html": "platform",
+  };
+
+  let mePromise = null;
+  const me = () => {
+    mePromise = mePromise || request("/api/v1/me");
+    return mePromise;
+  };
+
+  const renderTopbar = () => {
+    const slot = document.querySelector("[data-grp-topbar]");
+    if (!slot) return;
+    const current = PAGE_KEYS[window.location.pathname] || "";
+    slot.className = "grp-topbar";
+    slot.replaceChildren();
+
+    const brand = document.createElement("a");
+    brand.className = "grp-topbar__brand";
+    brand.href = "/planning.html";
+    brand.setAttribute("aria-label", "SERVIR GRP home");
+    const mark = document.createElement("span");
+    mark.className = "brand-mark";
+    mark.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 4; i += 1) mark.append(document.createElement("span"));
+    const name = document.createElement("span");
+    name.textContent = "SERVIR GRP";
+    brand.append(mark, name);
+
+    const nav = document.createElement("nav");
+    nav.className = "grp-topbar__nav";
+    nav.setAttribute("aria-label", "Main menu");
+    NAV_ITEMS.forEach((item) => {
+      const link = document.createElement("a");
+      link.href = item.href;
+      link.textContent = item.label;
+      link.dataset.nav = item.key;
+      if (item.attr) link.setAttribute(item.attr, "");
+      if (item.hidden) link.hidden = true;
+      if (item.key === current) {
+        link.classList.add("is-active");
+        link.setAttribute("aria-current", "page");
+      }
+      nav.append(link);
+    });
+
+    const user = document.createElement("div");
+    user.className = "grp-topbar__user";
+    const who = document.createElement("span");
+    who.className = "grp-topbar__name";
+    who.dataset.topbarName = "";
+    const signOut = document.createElement("button");
+    signOut.type = "button";
+    signOut.className = "grp-topbar__signout";
+    signOut.dataset.signOut = "";
+    signOut.textContent = "Sign out";
+    user.append(who, signOut);
+
+    slot.append(brand, nav, user);
+
+    me()
+      .then((identity) => {
+        who.textContent = identity.display_name || identity.email;
+        who.title = identity.email;
+        const isHubAdmin = identity.memberships.some((m) => m.role === "admin");
+        nav.querySelector('[data-nav="admin"]').hidden = !(isHubAdmin || identity.is_platform_admin);
+        nav.querySelector('[data-nav="platform"]').hidden = !identity.is_platform_admin;
+      })
+      .catch(() => {});
+  };
+
+  renderTopbar();
+
   return {
+    me,
     request,
     bindSignOut,
     formatDate,
