@@ -379,11 +379,11 @@
 
   // ---------- layers ----------
   const boundaryStyle = (selected) => ({
-    color: "#0b453d",
+    color: "#1b678f",
     weight: selected ? 3 : 2,
     dashArray: selected ? null : "4 4",
-    fillColor: "#b8e063",
-    fillOpacity: selected ? 0.14 : 0.04,
+    fillColor: "#8db33f",
+    fillOpacity: selected ? 0.16 : 0.05,
   });
 
   const drawDistricts = () => {

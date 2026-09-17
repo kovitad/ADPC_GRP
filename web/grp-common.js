@@ -122,14 +122,17 @@ window.GRP = (() => {
     const brand = document.createElement("a");
     brand.className = "grp-topbar__brand";
     brand.href = "/planning.html";
-    brand.setAttribute("aria-label", "SERVIR GRP home");
-    const mark = document.createElement("span");
-    mark.className = "brand-mark";
-    mark.setAttribute("aria-hidden", "true");
-    for (let i = 0; i < 4; i += 1) mark.append(document.createElement("span"));
+    brand.setAttribute("aria-label", "SERVIR Global Risk Platform home");
+    const logo = document.createElement("img");
+    logo.className = "grp-topbar__logo";
+    logo.src = "/assets/servir-global-collaborative.png";
+    logo.alt = "SERVIR Global Collaborative";
+    logo.width = 217;
+    logo.height = 30;
     const name = document.createElement("span");
-    name.textContent = "SERVIR GRP";
-    brand.append(mark, name);
+    name.className = "grp-topbar__product";
+    name.textContent = "Global Risk Platform";
+    brand.append(logo, name);
 
     const nav = document.createElement("nav");
     nav.className = "grp-topbar__nav";

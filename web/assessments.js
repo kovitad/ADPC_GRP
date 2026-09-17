@@ -185,7 +185,7 @@
     let bounds = null;
     if (boundary) {
       const outline = window.L.geoJSON(boundary.geometry, {
-        style: { color: "#0b453d", weight: 2, fillOpacity: 0.05 },
+        style: { color: "#1b678f", weight: 2, fillColor: "#8db33f", fillOpacity: 0.08 },
       }).addTo(layers);
       bounds = outline.getBounds();
     }

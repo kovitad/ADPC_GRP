@@ -1,11 +1,19 @@
 :root {
   color-scheme: light;
-  --forest-950: #072f2a;
-  --forest-900: #0b453d;
-  --forest-800: #11574c;
-  --forest-700: #176a5b;
-  --lime-300: #cfe36d;
-  --lime-200: #deec9b;
+  /* SERVIR Global Collaborative palette (from the logo) */
+  --servir-grey: #58595b;
+  --servir-blue: #2380b0;
+  --servir-blue-dark: #1b678f;
+  --servir-navy: #0d2534;
+  --servir-green: #8db33f;
+  --servir-green-soft: #e6f0d2;
+  /* Older names kept so existing rules follow the SERVIR palette */
+  --forest-950: var(--servir-navy);
+  --forest-900: var(--servir-blue-dark);
+  --forest-800: #1d70a0;
+  --forest-700: var(--servir-blue);
+  --lime-300: var(--servir-green);
+  --lime-200: var(--servir-green-soft);
   --sand-100: #f5f3eb;
   --sand-50: #fbfaf6;
   --white: #ffffff;
@@ -151,7 +159,7 @@ a {
   width: max-content;
   margin-top: 1.05rem;
   padding-top: 0.8rem;
-  border-top: 1px solid rgb(255 255 255 / 28%);
+  border-top: 2px solid var(--servir-green);
   color: #d7edf7;
   font-size: 0.63rem;
   font-weight: 800;
@@ -212,7 +220,7 @@ a {
 }
 
 .eyebrow--light {
-  color: var(--lime-200);
+  color: #b9d77a;
 }
 
 .brand-story h1 {
@@ -295,11 +303,21 @@ a {
 .auth-card {
   width: min(100%, 27.5rem);
   padding: clamp(1.75rem, 3vw, 2.25rem);
+  position: relative;
   border: 1px solid #d8e2e6;
-  border-top: 5px solid var(--auth-blue);
+  border-top: 0;
   border-radius: 0.9rem;
   background: var(--white);
+  overflow: hidden;
   box-shadow: 0 20px 60px rgb(30 66 80 / 15%);
+}
+
+.auth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(90deg, var(--servir-blue) 0%, var(--servir-blue) 55%, var(--servir-green) 100%);
 }
 
 .mobile-brand {
@@ -1509,32 +1527,39 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
   display: flex;
   flex: none;
   align-items: center;
-  gap: 2rem;
-  height: 56px;
+  gap: 1.75rem;
+  height: 60px;
   padding: 0 1.25rem;
-  background: #0b453d;
-  color: #fff;
+  background: #ffffff;
+  color: #3a3b3d;
+  border-bottom: 1px solid #e3e8e6;
+  box-shadow: 0 1px 3px rgba(16, 40, 36, 0.06);
   font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-.grp-topbar:empty { min-height: 56px; }
+.grp-topbar:empty { min-height: 60px; }
 .grp-topbar__brand {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 0.6rem;
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  gap: 0.85rem;
   text-decoration: none;
+}
+.grp-topbar__logo { display: block; width: auto; height: 30px; }
+.grp-topbar__product {
+  padding-left: 0.85rem;
+  border-left: 2px solid var(--servir-green);
+  color: var(--servir-grey);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 .grp-topbar__nav {
   display: flex;
   flex: 1;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.25rem;
+  gap: 0.2rem;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1542,44 +1567,48 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
 .grp-topbar__nav::-webkit-scrollbar { display: none; }
 .grp-topbar__nav a {
   flex: none;
-  padding: 0.42rem 0.85rem;
+  padding: 0.45rem 0.85rem;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 0.86rem;
+  color: #4b4d50;
+  font-size: 0.87rem;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s, color 0.15s;
 }
 .grp-topbar__nav a[hidden] { display: none; }
-.grp-topbar__nav a:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
-.grp-topbar__nav a.is-active { color: #0b453d; background: #b8e063; }
+.grp-topbar__nav a:hover { color: var(--servir-blue-dark); background: #eef5fa; }
+.grp-topbar__nav a.is-active { color: #ffffff; background: var(--servir-blue); }
 .grp-topbar__nav a:focus-visible,
-.grp-topbar__signout:focus-visible { outline: 2px solid #b8e063; outline-offset: 2px; }
+.grp-topbar__signout:focus-visible { outline: 2px solid var(--servir-green); outline-offset: 2px; }
 .grp-topbar__user { display: flex; flex: none; align-items: center; gap: 0.8rem; }
 .grp-topbar__name {
   max-width: 16rem;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.85);
+  color: #58595b;
   font-size: 0.84rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .grp-topbar__signout {
-  padding: 0.32rem 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  padding: 0.34rem 0.85rem;
+  border: 1px solid #cfd6d4;
   border-radius: 999px;
-  background: transparent;
-  color: #fff;
+  background: #ffffff;
+  color: #3a3b3d;
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
 }
-.grp-topbar__signout:hover { background: rgba(255, 255, 255, 0.12); }
+.grp-topbar__signout:hover { border-color: #8db33f; background: #f5f9ec; }
+@media (max-width: 1100px) {
+  .grp-topbar__product { display: none; }
+}
 @media (max-width: 860px) {
   .grp-topbar { gap: 0.75rem; padding: 0 0.75rem; }
-  .grp-topbar__brand span:last-child, .grp-topbar__name { display: none; }
+  .grp-topbar__logo { height: 22px; }
+  .grp-topbar__name { display: none; }
 }
 
 /* Calmer page headings next to the shared top bar */
@@ -1593,3 +1622,6 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
   letter-spacing: -0.02em;
 }
 .workspace-intro { margin-top: 0.5rem; }
+
+/* Full-colour SERVIR logo on light backgrounds (mobile sign-in header) */
+.mobile-brand .servir-logo--color { width: 11rem; filter: none; }
