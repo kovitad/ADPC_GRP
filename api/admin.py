@@ -24,11 +24,11 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 class MembershipAssignment(BaseModel):
     email: str = Field(min_length=3, max_length=320)
-    role: Literal["planner", "admin"] = "planner"
+    role: Literal["ndmo_planner", "hub_expert", "admin", "planner"] = "hub_expert"
 
 
 class MembershipUpdate(BaseModel):
-    role: Literal["planner", "admin"] | None = None
+    role: Literal["ndmo_planner", "hub_expert", "admin", "planner"] | None = None
     status: Literal["active", "disabled"] | None = None
 
 

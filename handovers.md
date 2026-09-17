@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 17 September 2026 (end of the Claude Code session; continue in Codex or any agent)
+**Updated:** 17 September 2026 (Codex area confirmation, location, explicit Hub roles and AI allowance fix; Claude Code Thai-place confirmation and rate-limit fixes)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Work branch:** `feat/planning-chatbot-ux`. It is pushed, contains all work, has a clean tree, **196 tests pass** and Ruff is clean.
+**Work branch:** `feat/planning-chatbot-ux`. All work below is committed and pushed. **207 tests pass**; Ruff and JavaScript syntax checks are clean.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -17,9 +17,9 @@
 | Area | State |
 |---|---|
 | Increment 0, servers ready | Done |
-| Increment 2, access and admin | **Complete in code**: four roles, Hub admin, security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
+| Increment 2, access and admin | **Complete in code**: NDMO Planner, Hub Expert / GIS Specialist, Hub Admin and Platform Admin; security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
 | Increment 1, golden assessment | **Built on a synthetic case**: job, worker, locked result, API, screen, golden test. Real acceptance needs DEP-04, DEP-06 and method approval |
-| Planner assistant and map (ADR-0004) | **Built, Docker Desktop only**: chat bot plus OSM map, SIG MCP evidence, evidence panel, downloads, progress, Thai input |
+| Planner assistant and map (ADR-0004) | **Built, Docker Desktop only**: chat bot plus OSM map, SIG MCP evidence, evidence panel, downloads, progress, Thai input; browser location accepts a confirmed district only |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
@@ -63,8 +63,9 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 ```
 
 **Important facts about the local stack:**
-- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev, and asset URLs carry `?v=20260917g`. **Bump that version when you change shared CSS or JS.**
-- **Python changes need an image rebuild.** In this session several API files were copied straight into the running container (`docker compose cp` + `restart api`) to save memory. **The image `grp-api:desktop` is therefore older than the code. Rebuild `api` and `worker` before trusting a fresh container.**
+- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; `grp-common.js`, `planning.js` and `planning.css` now carry `?v=20260917n`. **Bump asset versions when changing shared CSS or JS.**
+- **Python changes need an image rebuild.** The image `grp-api:desktop` was built by Codex on 17 September (04:03 UTC) with the area-confirmation, location and role changes. Two later API files, `api/errors.py` and `api/rate_limits.py` (Retry-After), were **copied into the running API container** because full rebuilds keep getting killed for low memory on this PC. **Rebuild `api` and `worker` when memory allows**; until then, recreating the container loses those two changes.
+- Local rate limit: `deploy/compose.desktop.yml` sets `RATE_LIMITS` with 300 API requests per person per minute, so quick menu switching does not hit 429. Servers keep the Section 13.1 value of 60.
 - After any API restart, **sign in again**. The SIG MCP token lives only in process memory (ADR-0002).
 - The script copies `OPENAI_API_KEY` and `LANGFUSE_SECRET_KEY` from the ignored `.env` into `.local/docker/secrets/` without printing them. `LANGFUSE_BASE_URL` and `LANGFUSE_PUBLIC_KEY` pass through as environment variables. The model comes from `OPENAI_MODEL` (currently `gpt-5.2`).
 - Desktop-only switches in `deploy/compose.desktop.yml`: `GRP_ENV=dev`, `AI_FEATURE_ENABLED=true`, `PLANNING_CHAT_ENABLED=true`, `ALLOW_DRAFT_METHODS=true`, `AI_MAX_OUTPUT_TOKENS=900`.
@@ -74,9 +75,10 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 1. `http://127.0.0.1:8000/admin`: sign in with SERVIR (`kovitad.janlakhon@adpc.net` is Platform Admin and Hub Admin of `adpc`)
 2. `/platform.html`: set a token limit (for example 50,000), AI **On**, Save; **Send test call**; **Reset now**; create, close and reopen a Hub; security log
 3. `/planning.html`:
-   - **Where could people move?** runs the synthetic assessment; the card shows 7 / 3 / 2 / 2 and dots are coloured
+   - The page opens on Thailand, with no assessment area selected. **Use my current district** / **Use my location** identifies a real Thailand district for SIG-only evidence. The synthetic fixture is hidden by default under Layers as **Demo** data; selecting it explicitly runs the 7 / 3 / 2 / 2 test assessment.
    - "Which centers could not be assessed, and why?" explains the stored result
-   - `where could people move if flood happen in บางบัวทอง นนทบุรี`: progress card with timer; status card with a note that this is not a GRP area; evidence panel opens (Evidence, What is missing, How it was produced, Download); Bang Bua Thong outlined
+   - `where could people move if flood happen in บางบัวทอง นนทบุรี`: confirm the AI-proposed district before any SIG request; then the progress card, status card with a note that this is not a GRP area, evidence panel and Bang Bua Thong outline appear
+   - **Use my location**: allow the browser prompt; the map accepts only a real Thailand district returned by OpenStreetMap (not a city-wide or approximate result), labels it as SIG-only and offers **Check SIG flood exposure**. Location coordinates are not stored and cannot start a GRP assessment.
    - **Publish receipt & show SIG flood map** (two-step confirm, creates a public record): SIG hazard map over the map
    - switch to Assessments and back: the conversation is kept
 4. `/assessments.html`, `/workspace.html`: same top bar, same order
@@ -98,7 +100,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py` | See 4.3 |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
-| Migrations | `migrations/versions/20260916_0001`…`0004` | Forward-only |
+| Migrations | `migrations/versions/20260916_0001`…`20260917_0005` | Forward-only |
 
 ### 4.2 Frontend (static, no build step)
 
@@ -120,6 +122,7 @@ Rules: no `innerHTML` with server or user text (tests check this). Build DOM wit
 2. **Router** AI call (`planning-router-v1`):
    - Context sent: selected area, whether a result is shown, supported area names.
    - The model returns `{mode, reply, place (English romanized), return_period_years}`.
+   - Its place is a proposal only. An explicit `place`, a matching user-selected boundary or a supported boundary named in the message is required for a GIS/SIG action. The automatically highlighted area is not sent as a selection. GRP matches full names (including province when present) and refuses ambiguous boundary matches. Otherwise the API returns `needs_area_confirmation` with no GIS/SIG call; the chat shows a confirmation button. The choice survives page navigation in this tab.
 3. By mode:
    - `explain_result`: `explain_stored_result()` (`result-explain-v1`) using only stored result fields.
    - `run_assessment`: matches supported areas or the map selection, then `create_assessment()` and returns `assessment_started`.
@@ -136,11 +139,14 @@ Rules: no `innerHTML` with server or user text (tests check this). Build DOM wit
    - status card (note, counts, timings, draft/receipt badge), with the brief rendered as headings and `[n]` citation buttons;
    - evidence panel with tabs and downloads (.md, .json, .txt);
    - SIG area outline from Nominatim (orientation only); SIG hazard map iframe after publish.
-   - State (transcript, selection, result, pending job, open evidence) is saved in `sessionStorage["grp.planning.v1"]`, scoped to the user email and capped at 40 entries.
+   - **Use my location** requests browser permission only after the user clicks it. Its coordinates go to Nominatim solely to identify a Thailand district, are held only in memory, and must be followed by an explicit SIG lookup click. Browser session storage uses `grp.planning.v2`, deliberately leaving prior synthetic-demo transcripts in the old v1 key.
+   - Natural-language requests for **current location** use the already confirmed browser district. A Thai place mention is geocoded with Nominatim and requires an on-screen confirmation before it becomes the SIG location. The canonical result-explanation prompt is routed to the stored-result flow even if the router model returns `cannot`.
+   - State (transcript, selection, result, pending job, open evidence) is saved in `sessionStorage["grp.planning.v2"]`, scoped to the user email and capped at 40 entries.
 
 ### 4.4 Tests
 
 - `tests/fast`: sessions, OIDC rejections, identity, AI limit and gateway, Langfuse, SIG service, platform admin, planning chat with fake SIG and model, UI static checks.
+- The AI allowance reserves the whole estimated request before a provider call. If it does not fit, `AI_LIMIT_REACHED` is returned; an already-running call can still exceed its estimate and its actual tokens are counted (AI-09).
 - `tests/contract/test_permission_matrix.py`: every route × role.
 - `tests/golden`:
   - `test_synthetic_rp100.py` compares against the hand-designed `synthetic_rp100/expected_*`;
@@ -159,7 +165,10 @@ Rules: no `innerHTML` with server or user text (tests check this). Build DOM wit
 | `e174dfd` | Planning conversation kept when switching menu pages (`sessionStorage`) |
 | `6832dbb` | One shared, left-aligned top bar for all signed-in pages |
 | `54c29d5` | SERVIR Global Collaborative logo; one palette across the app and sign-in pages |
-| (this commit) | Top bar tests updated; this handover; `AGENTS.md` pointer |
+| `19b3e2c` | Top bar tests updated; handover; `AGENTS.md` pointer |
+| Codex, committed here | **Area confirmation:** an AI-proposed place never starts GRP/SIG work without an explicit choice (full-name match, `needs_area_confirmation`); **Use my location** (browser permission, Nominatim district only, SIG-only, not stored); synthetic area hidden as a **Demo** layer; explicit Hub roles **NDMO Planner** and **Hub Expert / GIS Specialist** (ADR-0005, migration `20260917_0005`); the AI reservation must fit the remaining allowance; "explain the result" routing safeguard; session key `grp.planning.v2` |
+| Claude Code, committed here | **Thai place confirmation now answers:** **Use [district] and answer** confirms the district *and* re-sends the original question, so the evidence panel and map appear (before, it only picked the place and nothing ran) |
+| Claude Code, committed here | **Rate limit on menu switching:** 429 replies carry `Retry-After`; `GRP.request` waits and retries a GET once (max 10 s); assessment polling every 5 s instead of 2–3 s; My access reuses `GRP.me()`; local Docker limit 300/min |
 
 Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map workspace, natural routing, chat-bot redesign and Thai romanization (see `git log`).
 
@@ -172,6 +181,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0002 | Interim SERVIR sign-in via a self-registered SIG MCP client; MCP token kept in memory for local chat | Proposed; remove before Beta (DEP-01) |
 | ADR-0003 | Platform Admin manual reset of current-month AI usage | Accepted by owner; spec AI-11 text to update |
 | ADR-0004 | Interim Planner chat and map on SIG generic evidence, Docker Desktop only | Accepted for local testing; Technical Lead review pending |
+| ADR-0005 | Explicit NDMO Planner and Hub Expert / GIS Specialist roles | Accepted by product owner; local migration `20260917_0005` applied |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
@@ -190,9 +200,11 @@ Owner decisions (16–17 Sep):
 
 ## 7. Known gaps, risks and technical debt
 
-- **Docker image is stale** versus code (Section 3). Rebuild before relying on a new container.
+- **Docker image slightly behind Git:** `api/errors.py` and `api/rate_limits.py` exist only as copies in the running API container (see Section 3). Rebuild `api` and `worker` before trusting a recreated container.
+- **Rate limit is per process and per person:** a page load makes about 5–7 API calls. The 60/min spec value may be tight for real use; review it with the product owner before staging.
 - **Live end-to-end not formally confirmed:** OpenAI, Langfuse and SIG MCP work was observed by the owner in the browser but is not captured in tests; there is no recorded SIG fixture for the chat.
 - **Area check** relies on SIG trace wording `via admin boundary` (from the 14 Sep capture).
+- **Area confirmation** blocks model-only locations before SIG/GRP work. It requires a browser pass with a real SERVIR account after rebuilding the API image; the Python tests use fake SIG and model responses.
 - **Progress steps are estimated.** The API answers in one response; true streaming (SSE) is not built.
 - **SIG flood cells** appear only after publishing a receipt (the pack has no geometry). The outline before that comes from Nominatim, for orientation only.
 - **External browser calls:** `unpkg.com` (Leaflet) and `openstreetmap.org` (tiles, Nominatim). Acceptable for local use only; vendor Leaflet and use a contracted tile and geocoder before staging.
@@ -282,6 +294,6 @@ git fetch; git switch feat/planning-chatbot-ux
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 196 passed
+python -m pytest            # expect 207 passed
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

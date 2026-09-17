@@ -89,7 +89,7 @@ def test_workspace_renders_server_data_without_inner_html() -> None:
     page = (WEB_ROOT / "workspace.html").read_text(encoding="utf-8")
     script = (WEB_ROOT / "workspace.js").read_text(encoding="utf-8")
 
-    assert 'fetch("/api/v1/me"' in script
+    assert "GRP.me()" in script
     assert "textContent" in script
     assert "innerHTML" not in script
     assert "Hub memberships" in page
@@ -107,3 +107,12 @@ def test_every_signed_in_page_uses_the_same_top_bar() -> None:
         page = (WEB_ROOT / name).read_text(encoding="utf-8")
         assert "<header data-grp-topbar></header>" in page, name
         assert "workspace-nav" not in page and "pw-nav" not in page, name
+
+
+def test_planning_location_lookup_requires_an_administrative_district() -> None:
+    script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+
+    assert "const district = address.city_district || address.county;" in script
+    assert "CURRENT_LOCATION_NO_DISTRICT" in script
+    assert "zoom=14&addressdetails=1" in script
+    assert "polygon_geojson=1&addressdetails=1" in script

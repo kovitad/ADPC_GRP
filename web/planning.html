@@ -7,11 +7,11 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="/styles.css?v=20260917g" />
-    <link rel="stylesheet" href="/planning.css?v=20260917g" />
+    <link rel="stylesheet" href="/styles.css?v=20260917m" />
+    <link rel="stylesheet" href="/planning.css?v=20260917n" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="/grp-common.js?v=20260917g" defer></script>
-    <script src="/planning.js?v=20260917g" defer></script>
+    <script src="/grp-common.js?v=20260917n" defer></script>
+    <script src="/planning.js?v=20260917n" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -75,16 +75,24 @@
           />
           <div class="pw-search__results" data-search-results hidden></div>
         </div>
+        <button
+          class="pw-location"
+          type="button"
+          data-use-location
+          title="Use your browser location to find a Thailand district. Coordinates are sent to OpenStreetMap for district lookup."
+        >
+          Use my location
+        </button>
 
         <button class="pw-fab" type="button" data-layers-toggle aria-expanded="false" aria-label="Map layers">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
           Layers
         </button>
         <div class="pw-layers" data-layers hidden>
-          <label class="pw-toggle"><input type="checkbox" data-layer="districts" checked /><span>Supported areas</span></label>
-          <label class="pw-toggle"><input type="checkbox" data-layer="flood" checked /><span data-flood-title>Flood depth</span></label>
+          <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span>Demo assessment area</span></label>
+          <label class="pw-toggle"><input type="checkbox" data-layer="flood" /><span data-flood-title>Demo flood depth</span></label>
           <div class="pw-legend" data-flood-legend></div>
-          <label class="pw-toggle"><input type="checkbox" data-layer="centers" checked /><span>Evacuation centers</span></label>
+          <label class="pw-toggle"><input type="checkbox" data-layer="centers" /><span>Demo evacuation centers</span></label>
           <div class="pw-legend">
             <span><i class="pw-dot" style="--c:#c2410c"></i>Potentially exposed</span>
             <span><i class="pw-dot" style="--c:#0f766e"></i>Not exposed under this scenario</span>

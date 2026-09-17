@@ -1,17 +1,18 @@
-"""Planner or Hub Admin membership checks shared by planning, catalog and assessments."""
+"""Planning-role or Hub Admin checks shared by planning, catalog and assessments."""
 
 from api.errors import GrpError, not_found
 from api.sessions import CurrentPrincipal
+from core.access_models import PLANNING_MEMBER_ROLES
 from core.identity import MembershipView
 
 
 def planner_membership(principal: CurrentPrincipal, hub_code: str | None) -> MembershipView:
-    """Planner or Hub Admin of the chosen Hub. Platform Admin alone is not enough (9.4).
+    """NDMO Planner, Hub Expert / GIS Specialist, or Hub Admin of the selected Hub.
 
     `hub_code` only picks among the person's own memberships; it never grants access.
     """
 
-    members = [m for m in principal.memberships if m.role in {"planner", "admin"}]
+    members = [m for m in principal.memberships if m.role in PLANNING_MEMBER_ROLES]
     if hub_code:
         members = [m for m in members if m.hub_code == hub_code.strip().lower()]
         if not members:

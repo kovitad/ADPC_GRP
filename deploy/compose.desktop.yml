@@ -42,6 +42,8 @@ services:
       PLANNING_CHAT_ENABLED: "true"
       # Draft methods run only here, for the SYNTHETIC test case (never on servers).
       ALLOW_DRAFT_METHODS: "true"
+      # Local testing clicks through pages quickly; servers keep the Section 13.1 limit of 60.
+      RATE_LIMITS: '{"api_requests_per_person_per_minute":300,"new_assessments_per_person_per_hour":10,"sig_evidence_reads_per_minute":30,"ai_requests_per_person_per_hour":20}'
       AI_PROVIDER: openai
       AI_MODEL: ${AI_MODEL:-gpt-5.2}
       AI_KEY_FILE_ADPC: /run/grp-secrets/ai_key_adpc

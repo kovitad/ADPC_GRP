@@ -52,8 +52,31 @@ class HubStatus(StrEnum):
 
 
 class MembershipRole(StrEnum):
+    NDMO_PLANNER = "ndmo_planner"
+    HUB_EXPERT = "hub_expert"
+    # Retained only for pre-migration compatibility. The role migration converts it to
+    # hub_expert; new assignments must use one of the explicit roles below.
     PLANNER = "planner"
     ADMIN = "admin"
+
+
+PLANNING_MEMBER_ROLES = frozenset(
+    {
+        MembershipRole.NDMO_PLANNER,
+        MembershipRole.HUB_EXPERT,
+        MembershipRole.PLANNER,
+        MembershipRole.ADMIN,
+    }
+)
+ASSIGNABLE_MEMBERSHIP_ROLES = frozenset(
+    {
+        MembershipRole.NDMO_PLANNER,
+        MembershipRole.HUB_EXPERT,
+        MembershipRole.ADMIN,
+        # Backward-compatible API/CLI value; it is intentionally not offered by the UI.
+        MembershipRole.PLANNER,
+    }
+)
 
 
 class MembershipStatus(StrEnum):
@@ -153,7 +176,10 @@ class HubMembership(Base):
     __tablename__ = "hub_membership"
     __table_args__ = (
         UniqueConstraint("hub_id", "user_id", name="uq_hub_membership_hub_user"),
-        CheckConstraint("role IN ('planner', 'admin')", name="ck_hub_membership_role"),
+        CheckConstraint(
+            "role IN ('ndmo_planner', 'hub_expert', 'planner', 'admin')",
+            name="ck_hub_membership_role",
+        ),
         CheckConstraint("status IN ('active', 'disabled')", name="ck_hub_membership_status"),
     )
 

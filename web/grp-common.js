@@ -5,7 +5,9 @@ window.GRP = (() => {
     return match ? { "X-CSRF-Token": decodeURIComponent(match[1]) } : {};
   };
 
-  const request = async (path, { method = "GET", body, idempotencyKey } = {}) => {
+  const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const request = async (path, { method = "GET", body, idempotencyKey, retried = false } = {}) => {
     const headers = { Accept: "application/json", ...csrfHeaders() };
     if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
     if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -15,6 +17,12 @@ window.GRP = (() => {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    // Rate limited while loading a page: wait as told (at most 10 s) and read once more.
+    if (response.status === 429 && method === "GET" && !retried) {
+      const seconds = Math.min(10, Math.max(1, Number(response.headers.get("Retry-After")) || 3));
+      await wait(seconds * 1000);
+      return request(path, { method, body, idempotencyKey, retried: true });
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(

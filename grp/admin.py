@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.access_models import (
+    ASSIGNABLE_MEMBERSHIP_ROLES,
     AppUser,
     AuditEvent,
     AuditResult,
@@ -276,8 +277,8 @@ def assign_member_as_actor(
 ) -> CommandResult:
     normalized_email = normalize_email(email)
     normalized_role = role.strip().lower()
-    if normalized_role not in {MembershipRole.PLANNER, MembershipRole.ADMIN}:
-        raise ValueError("Role must be planner or admin")
+    if normalized_role not in ASSIGNABLE_MEMBERSHIP_ROLES:
+        raise ValueError("Role must be NDMO Planner, Hub Expert / GIS Specialist, or Hub Admin")
     hub = _active_hub(session, hub_code)
     actor = require_hub_manager(session, actor_user_id, hub)
     user = session.scalar(select(AppUser).where(AppUser.email == normalized_email))
@@ -377,8 +378,8 @@ def update_hub_member(
         if membership_status is not None
         else membership.status
     )
-    if new_role not in {MembershipRole.PLANNER, MembershipRole.ADMIN}:
-        raise ValueError("Role must be planner or admin")
+    if new_role not in ASSIGNABLE_MEMBERSHIP_ROLES:
+        raise ValueError("Role must be NDMO Planner, Hub Expert / GIS Specialist, or Hub Admin")
     if new_status not in {MembershipStatus.ACTIVE, MembershipStatus.DISABLED}:
         raise ValueError("Status must be active or disabled")
     if membership.role == new_role and membership.status == new_status:
@@ -539,7 +540,12 @@ def build_parser() -> argparse.ArgumentParser:
     member.add_argument("--actor-email", required=True)
     member.add_argument("--email", required=True)
     member.add_argument("--hub-code", required=True)
-    member.add_argument("--role", choices=["planner", "admin"], required=True)
+    member.add_argument(
+        "--role",
+        choices=["ndmo_planner", "hub_expert", "admin", "planner"],
+        required=True,
+        help="Use ndmo_planner, hub_expert, or admin; planner is a legacy compatibility value.",
+    )
 
     commands.add_parser("list-access-requests")
 

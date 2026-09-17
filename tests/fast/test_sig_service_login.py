@@ -103,3 +103,17 @@ def test_service_reads_are_rate_limited(sig_app) -> None:
 
     assert statuses[:30] == [404] * 30
     assert statuses[30] == 429
+
+
+def test_rate_limited_reply_says_when_to_retry(sig_app) -> None:
+    _, token, *_ = sig_app
+    client = TestClient(app)
+    headers = {"Authorization": f"Bearer {token}"}
+    for _ in range(30):
+        _evidence(client, headers)
+
+    limited = _evidence(client, headers)
+
+    assert limited.status_code == 429
+    assert 1 <= int(limited.headers["Retry-After"]) <= 61
+    assert limited.json()["error"]["code"] == "RATE_LIMITED"

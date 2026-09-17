@@ -243,10 +243,28 @@ def test_chat_uses_map_selection_when_no_place_is_named(world) -> None:
     assert body["mode"] == "assessment_started"
 
 
+def test_confirmed_assessment_area_overrides_a_different_model_place(world) -> None:
+    client = _client(world, "planner@example.test")
+    _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "", "place": "Chiang Yuen",'
+        ' "return_period_years": 100}',
+    )
+
+    body = _chat(
+        client, "Assess the selected area", place="Synthetic Test District"
+    ).json()
+
+    assert body["mode"] == "assessment_started"
+    assert body["boundary_id"] == world["seed"].boundary_id
+
+
 def test_chat_explains_unsupported_area_and_missing_result(world) -> None:
     client = _client(world, "planner@example.test")
     _router_then(
         world,
+        '{"mode": "run_assessment", "reply": "", "place": "Chiang Yuen",'
+        ' "return_period_years": null}',
         '{"mode": "run_assessment", "reply": "", "place": "Chiang Yuen",'
         ' "return_period_years": null}',
         '{"mode": "run_assessment", "reply": "", "place": "Synthetic Test District",'
@@ -254,15 +272,44 @@ def test_chat_explains_unsupported_area_and_missing_result(world) -> None:
         '{"mode": "explain_result", "reply": "", "place": null, "return_period_years": null}',
     )
 
-    # Not a GRP area: falls through to SIG evidence, which needs a SIG sign-in in this test.
-    unsupported = _chat(client, "Assess Chiang Yuen")
-    no_scenario = _chat(client, "Assess the synthetic district for RP500").json()
+    # Model-only place must be confirmed before SIG is contacted.
+    proposed = _chat(client, "Assess Chiang Yuen", boundary_id=world["seed"].boundary_id).json()
+    unsupported = _chat(client, "Assess Chiang Yuen", place=proposed["place"])
+    no_scenario = _chat(
+        client, "Assess the synthetic district for RP500", boundary_id=world["seed"].boundary_id
+    ).json()
     no_result = _chat(client, "Explain the result").json()
 
+    assert proposed["mode"] == "needs_area_confirmation"
     assert unsupported.status_code == 401
     assert unsupported.json()["error"]["code"] == "SIG_REAUTH_REQUIRED"
     assert no_scenario["mode"] == "unsupported_area" and "500-year" in no_scenario["answer"]
     assert no_result["mode"] == "needs_result"
+    with Session(world["engine"]) as session:
+        from core.assessment_models import Assessment
+
+        assert session.scalars(select(Assessment)).all() == []
+
+
+def test_confirmed_place_with_conflicting_province_does_not_start_grp_job(world) -> None:
+    client = _client(world, "planner@example.test")
+    _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "",'
+        ' "place": "Synthetic Test District, Bangkok", "return_period_years": 100}',
+        '{"mode": "run_assessment", "reply": "",'
+        ' "place": "Synthetic Test District, Bangkok", "return_period_years": 100}',
+    )
+
+    proposed = _chat(
+        client, "Assess Synthetic Test District in Bangkok", boundary_id=world["seed"].boundary_id
+    ).json()
+    confirmed = _chat(
+        client, "Assess Synthetic Test District in Bangkok", place=proposed["place"]
+    )
+
+    assert proposed["mode"] == "needs_area_confirmation"
+    assert confirmed.status_code == 401  # unsupported GRP area falls through to SIG
     with Session(world["engine"]) as session:
         from core.assessment_models import Assessment
 

@@ -229,7 +229,7 @@
       }
       showStatus(status);
       if (status.state === "queued" || status.state === "running") {
-        pollTimer = window.setTimeout(() => watch(id), 3000);
+        pollTimer = window.setTimeout(() => watch(id), 5000);
       } else {
         showRecent();
       }
@@ -273,10 +273,10 @@
 
   GRP.me()
     .then(async (identity) => {
-      const membership = identity.memberships.find((m) => m.role === "planner" || m.role === "admin");
+      const membership = identity.memberships.find((m) => ["ndmo_planner", "hub_expert", "planner", "admin"].includes(m.role));
       if (!membership) {
         $("[data-page-status]").textContent =
-          "You need a Planner or Hub Admin role in a Hub to run assessments. A Platform Admin role alone is not enough.";
+          "You need an NDMO Planner, Hub Expert / GIS Specialist, or Hub Admin role in a Hub to run assessments. A Platform Admin role alone is not enough.";
         return;
       }
       hubCode = membership.hub_code;

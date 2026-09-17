@@ -10,6 +10,13 @@
     not_exposed_under_scenario: "#0f766e",
     unable_to_assess: "#6b7280",
   };
+  const planningRoles = new Set(["ndmo_planner", "hub_expert", "planner", "admin"]);
+  const roleLabel = (role) => ({
+    ndmo_planner: "NDMO Planner",
+    hub_expert: "Hub Expert / GIS Specialist",
+    planner: "Legacy Planner",
+    admin: "Hub Admin",
+  }[role] || role);
 
   const thread = $("[data-thread]");
   const input = $("[data-input]");
@@ -20,6 +27,8 @@
     chatAvailable: false,
     boundaries: [],
     selected: null,
+    explicitSelection: false,
+    currentPlace: null,
     floodLayers: [],
     centersVersion: null,
     assessmentId: null,
@@ -30,7 +39,9 @@
 
   // ---------- keep the conversation when moving between menu pages ----------
   // Stored only in this browser tab (sessionStorage): gone when the tab closes or on sign-out.
-  const STORE_KEY = "grp.planning.v1";
+  // v2 deliberately starts a fresh local session: v1 restored the synthetic demo as the
+  // default map context, which is misleading for real-district SIG lookup.
+  const STORE_KEY = "grp.planning.v2";
   const transcript = [];
   let restoring = false;
   let ownerEmail = null;
@@ -47,6 +58,7 @@
         owner: ownerEmail,
         transcript: kept,
         selectedId: state.selected ? state.selected.id : null,
+        explicitSelection: state.explicitSelection,
         assessmentId: state.assessmentId,
         pendingAssessmentId: state.pendingAssessmentId || null,
         history: state.history.slice(-8),
@@ -87,10 +99,10 @@
     if (welcome) welcome.remove();
   };
 
-  const addMessage = (role, text, { label, actions = [], error = false, record = true } = {}) => {
+  const addMessage = (role, text, { label, actions = [], error = false, record = true, confirmation = null } = {}) => {
     hideWelcome();
     if (record && !restoring) {
-      transcript.push({ kind: "message", role, text, label: label || null, error });
+      transcript.push({ kind: "message", role, text, label: label || null, error, confirmation });
       saveState();
     }
     const row = document.createElement("div");
@@ -330,7 +342,7 @@
   const renderWelcome = () => {
     const welcome = $("[data-welcome]");
     if (!welcome) return;
-    const area = state.selected ? state.selected.name : state.boundaries[0]?.name || "a district";
+    const area = state.selected ? state.selected.name : null;
     welcome.querySelector("h2").textContent = "What decision are you preparing for?";
     const intro = welcome.querySelector("p");
     intro.textContent =
@@ -341,8 +353,11 @@
     const box = $("[data-suggestions]");
     box.replaceChildren();
     [
-      ["Where could people move?", `Run a 100-year flood assessment for ${area}`,
-        `Where could people move if a 100-year flood hits ${area}?`],
+      area
+        ? ["Where could people move?", `Run a 100-year flood assessment for ${area}`,
+          `Where could people move if a 100-year flood hits ${area}?`]
+        : ["Use my current district", "Find your Thailand district before asking SIG",
+          null],
       ["Explain what the map shows", "After a result appears",
         "Explain the result: which evacuation centers may be exposed and why?"],
       ["Check SIG flood exposure", "Schools, hospitals and roads for a Thailand district",
@@ -356,7 +371,10 @@
       strong.textContent = title;
       span.textContent = detail;
       button.append(strong, span);
-      button.addEventListener("click", () => send(prompt));
+      button.addEventListener("click", () => {
+        if (prompt) send(prompt);
+        else useCurrentLocation();
+      });
       box.append(button);
     });
     let coming = welcome.querySelector(".pw-coming");
@@ -397,8 +415,18 @@
     });
   };
 
-  const selectBoundary = (boundary, { announce = false } = {}) => {
+  const selectBoundary = (boundary, { announce = false, explicit = announce } = {}) => {
     state.selected = boundary;
+    state.explicitSelection = explicit;
+    if (explicit) {
+      const districtToggle = $('[data-layer="districts"]');
+      const floodToggle = $('[data-layer="flood"]');
+      const centersToggle = $('[data-layer="centers"]');
+      districtToggle.checked = floodToggle.checked = centersToggle.checked = true;
+      districtLayer.addTo(map);
+      centersLayer.addTo(map);
+      if (floodOverlay) floodOverlay.addTo(map);
+    }
     placeLayer.clearLayers();
     $("[data-place-chip]").hidden = true;
     districtLayer.eachLayer((layer) => layer.setStyle(boundaryStyle(layer.boundaryId === boundary.id)));
@@ -542,7 +570,7 @@
     state.pendingAssessmentId = null;
     renderContext();
     const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
-    if (boundary) selectBoundary(boundary);
+    if (boundary) selectBoundary(boundary, { explicit: true });
     saveState();
     if (quiet) return;
     addMessage(
@@ -568,7 +596,7 @@
       if (job.state === "succeeded") {
         await showResult(id);
       } else if (job.state === "queued" || job.state === "running") {
-        state.pollTimer = window.setTimeout(() => watch(id), 2000);
+        state.pollTimer = window.setTimeout(() => watch(id), 5000);
       } else {
         state.pendingAssessmentId = null;
         saveState();
@@ -832,7 +860,7 @@
           return;
         }
         mapButton.disabled = true;
-        send(message, { publish: true, echo: false });
+        send(message, { publish: true, echo: false, confirmedPlace: evidence.place });
       };
       $("[data-ev-foot]").textContent =
         "Unverified draft: not yet checked by SIG's source check, no receipt. Evidence only — not a decision that any place is safe.";
@@ -882,14 +910,82 @@
     chipButton("Open map & evidence", () => renderEvidence(payload, message)),
   ];
 
+  const confirmAreaAction = (confirmation) => {
+    const { place, message, publish } = confirmation;
+    return chipButton(publish ? `Confirm ${place} and publish` : `Confirm ${place}`, async (button) => {
+      button.disabled = true;
+      try {
+        const completed = await send(message, { publish, echo: false, confirmedPlace: place });
+        if (completed) {
+          confirmation.completed = true;
+          button.textContent = "Area confirmed";
+          saveState();
+        }
+      } finally {
+        if (!confirmation.completed) button.disabled = false;
+      }
+    });
+  };
+
   // ---------- sending ----------
-  const send = async (text, { publish = false, echo = true } = {}) => {
+  const asksAboutCurrentLocation = (message) => /\b(?:my )?current (?:location|district|area)\b/i.test(message);
+
+  const findThaiPlaceMention = async (message) => {
+    if (!/[\u0E00-\u0E7F]/.test(message)) return null;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&countrycodes=th&accept-language=en&q=${encodeURIComponent(message)}`;
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      const [place] = await response.json();
+      return response.ok && place ? place : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const send = async (text, { publish = false, echo = true, confirmedPlace = null } = {}) => {
     const message = (text ?? input.value).trim();
     if (!message || state.busy || !state.hubCode) return;
     if (!state.chatAvailable) {
       addMessage("assistant", "The chat assistant runs only in the local Docker Desktop test right now.", { error: true });
       return;
     }
+    if (!confirmedPlace && asksAboutCurrentLocation(message)) {
+      if (!state.currentPlace) {
+        if (echo) addMessage("user", message);
+        addMessage(
+          "assistant",
+          "I do not know your current district yet. Use the location button or search for a Thailand district first.",
+          { label: "Location needed.", actions: [chipButton("Use my location", useCurrentLocation)] },
+        );
+        return false;
+      }
+      confirmedPlace = state.currentPlace;
+    }
+    if (!confirmedPlace) {
+      const candidate = await findThaiPlaceMention(message);
+      const candidateName = candidate ? externalPlaceName(candidate) : "";
+      if (candidateName) {
+        if (echo) addMessage("user", message);
+        input.value = "";
+        autosize();
+        addMessage("assistant", `I found ${candidateName}. Confirm it as your map location before using SIG evidence.`, {
+          label: "Confirm your location.",
+          actions: [chipButton(`Use ${candidateName} and answer`, async (button) => {
+            // Confirming the district is the explicit area choice; then answer the
+            // original question for it so the evidence appears on the map at once.
+            button.disabled = true;
+            pickPlace(candidate);
+            const completed = await send(message, { echo: false, confirmedPlace: candidateName });
+            button.textContent = completed ? `${candidateName} confirmed` : `Use ${candidateName} and answer`;
+            if (!completed) button.disabled = false;
+          })],
+        });
+        return false;
+      }
+    }
+    const requestMessage = confirmedPlace && asksAboutCurrentLocation(message)
+      ? message.replace(/\b(?:my )?current (?:location|district|area)\b/i, confirmedPlace)
+      : message;
     if (echo) addMessage("user", message);
     input.value = "";
     autosize();
@@ -900,9 +996,10 @@
       const payload = await GRP.request("/api/v1/planning/chat", {
         method: "POST",
         body: {
-          message,
+          message: requestMessage,
+          place: confirmedPlace,
           hub_code: state.hubCode,
-          boundary_id: state.selected ? state.selected.id : null,
+          boundary_id: state.explicitSelection && state.selected ? state.selected.id : null,
           assessment_id: state.assessmentId,
           publish_receipt: publish,
           history: state.history.slice(-8),
@@ -913,7 +1010,7 @@
       let actions = [];
       if (payload.mode === "assessment_started") {
         const boundary = state.boundaries.find((b) => b.id === payload.boundary_id);
-        if (boundary) selectBoundary(boundary);
+        if (boundary) selectBoundary(boundary, { explicit: true });
         state.assessmentId = null;
         await drawPendingCenters();
         showProgress(boundary ? boundary.name : "Assessment");
@@ -923,6 +1020,14 @@
         watch(payload.assessment_id);
       } else if (payload.mode === "sig_evidence") {
         actions = sigActions(payload, message);
+      } else if (payload.mode === "needs_area_confirmation" && payload.place) {
+        const confirmation = { place: payload.place, message, publish };
+        addMessage("assistant", payload.answer, {
+          label: payload.label,
+          actions: [confirmAreaAction(confirmation)],
+          confirmation,
+        });
+        return;
       }
       if (payload.mode === "sig_evidence" && payload.evidence) {
         addEvidenceMessage(payload, message);
@@ -936,6 +1041,7 @@
       }
       state.history.push({ role: "user", text: message }, { role: "assistant", text: payload.answer.slice(0, 1200) });
       saveState();
+      return true;
     } catch (error) {
       typing.remove();
       addMessage("assistant", error.message, { label: error.code, error: true });
@@ -943,6 +1049,7 @@
         window.setTimeout(() => window.location.assign("/api/v1/auth/login"), 1500);
       }
       GRP.request("/api/v1/me/ai-usage").then(showAllowance).catch(() => {});
+      return false;
     } finally {
       state.busy = false;
       updateSend();
@@ -993,7 +1100,18 @@
     return button;
   };
 
-  const pickPlace = (place) => {
+  const externalPlaceName = (place) => {
+    const address = place.address || {};
+    // SIG needs an administrative district, not a city-wide or neighbourhood
+    // label. In Bangkok, `city_district` is the khet (for example Bang Sue);
+    // elsewhere in Thailand Nominatim normally uses `county` for the amphoe.
+    const district = address.city_district || address.county;
+    const province = address.state || address.province;
+    if (district) return [...new Set([district, province, "Thailand"].filter(Boolean))].join(", ");
+    return null;
+  };
+
+  const pickPlace = (place, { currentLocation = false } = {}) => {
     placeLayer.clearLayers();
     const lat = Number(place.lat);
     const lon = Number(place.lon);
@@ -1007,10 +1125,63 @@
       map.flyTo([lat, lon], 12, { duration: 0.6 });
     }
     window.L.circleMarker([lat, lon], { radius: 6, color: "#2563eb", fillColor: "#2563eb", fillOpacity: 1 }).addTo(placeLayer);
+    const name = externalPlaceName(place);
+    state.currentPlace = name || null;
     const chip = $("[data-place-chip]");
-    const name = place.display_name.split(",").slice(0, 2).join(",");
-    chip.textContent = `${name} is not a supported GRP assessment area yet. Ask the assistant for SIG flood evidence about it.`;
+    chip.replaceChildren();
+    if (!name) {
+      chip.textContent = "This map location is for orientation only. Choose a Thailand district before requesting SIG evidence.";
+      chip.hidden = false;
+      return;
+    }
+    chip.append(document.createTextNode(
+      `${currentLocation ? "Your current district" : name} is not a supported GRP assessment area yet. `
+    ));
+    chip.append(chipButton("Check SIG flood exposure", () => send(
+      `Check flood exposure for schools, hospitals and roads in ${name}.`,
+      { confirmedPlace: name },
+    )));
     chip.hidden = false;
+  };
+
+  const useCurrentLocation = async () => {
+    const button = $("[data-use-location]");
+    if (!navigator.geolocation) {
+      addMessage("assistant", "This browser does not provide location access. Search for a Thailand district instead.", { error: true });
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Finding location…";
+    try {
+      const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 },
+      ));
+      const { latitude, longitude } = position.coords;
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&addressdetails=1&accept-language=en&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`;
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      const place = await response.json();
+      if (!response.ok || !place || place.address?.country_code?.toLowerCase() !== "th") {
+        throw new Error("CURRENT_LOCATION_NOT_THAILAND");
+      }
+      if (!externalPlaceName(place)) {
+        throw new Error("CURRENT_LOCATION_NO_DISTRICT");
+      }
+      pickPlace({ ...place, lat: latitude, lon: longitude }, { currentLocation: true });
+    } catch (error) {
+      const message = error.code === 1
+        ? "Location permission was not granted. Search for a Thailand district instead."
+        : error.message === "CURRENT_LOCATION_NOT_THAILAND"
+        ? "GRP’s current SIG lookup is limited to Thailand districts."
+        : error.message === "CURRENT_LOCATION_NO_DISTRICT"
+        ? "I found your approximate location but not its administrative district. Search for a Thailand district before using SIG evidence."
+        : "I could not identify a district from your location. Search for a Thailand district instead.";
+      addMessage("assistant", message, { error: true });
+    } finally {
+      button.disabled = false;
+      button.textContent = "Use my location";
+    }
   };
 
   const runSearch = async (query) => {
@@ -1030,7 +1201,7 @@
     searchResults.hidden = false;
     if (query.length < 3) return;
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=5&countrycodes=th&q=${encodeURIComponent(query)}`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&addressdetails=1&limit=5&countrycodes=th&q=${encodeURIComponent(query)}`;
       const response = await fetch(url, { headers: { Accept: "application/json" } });
       const places = await response.json();
       if (token !== searchToken) return;
@@ -1066,6 +1237,7 @@
   searchInput.addEventListener("focus", () => {
     if (searchInput.value.trim()) searchResults.hidden = false;
   });
+  $("[data-use-location]").addEventListener("click", useCurrentLocation);
   document.addEventListener("click", (event) => {
     if (!$("[data-search]").contains(event.target)) searchResults.hidden = true;
   });
@@ -1096,11 +1268,17 @@
       (saved.transcript || []).forEach((entry) => {
         transcript.push(entry);
         if (entry.kind === "evidence") addEvidenceMessage(entry.payload, entry.question);
-        else addMessage(entry.role, entry.text, { label: entry.label, error: entry.error, record: false });
+        else addMessage(entry.role, entry.text, {
+          label: entry.label,
+          error: entry.error,
+          record: false,
+          actions: entry.confirmation && !entry.confirmation.completed
+            ? [confirmAreaAction(entry.confirmation)] : [],
+        });
       });
       state.history = saved.history || [];
       const boundary = state.boundaries.find((b) => b.id === saved.selectedId);
-      if (boundary) selectBoundary(boundary);
+      if (boundary) selectBoundary(boundary, { explicit: Boolean(saved.explicitSelection) });
       if (saved.assessmentId) {
         await showResult(saved.assessmentId, { quiet: true }).catch(() => {});
       }
@@ -1122,16 +1300,16 @@
 
   GRP.me()
     .then(async (identity) => {
-      const membership = identity.memberships.find((m) => m.role === "planner" || m.role === "admin");
+      const membership = identity.memberships.find((m) => planningRoles.has(m.role));
       const banner = $("[data-banner]");
       if (!membership) {
-        banner.textContent = "You need a Planner or Hub Admin role in a Hub to plan. A Platform Admin role alone is not enough.";
+        banner.textContent = "You need an NDMO Planner, Hub Expert / GIS Specialist, or Hub Admin role in a Hub to plan. A Platform Admin role alone is not enough.";
         banner.hidden = false;
         $("[data-hub-name]").textContent = "No Hub role";
         return;
       }
       state.hubCode = membership.hub_code;
-      $("[data-hub-name]").textContent = `${membership.hub_name} · ${membership.role === "admin" ? "Hub Admin" : "Planner"}`;
+      $("[data-hub-name]").textContent = `${membership.hub_name} · ${roleLabel(membership.role)}`;
       const query = `?hub_code=${encodeURIComponent(state.hubCode)}`;
       const [planning, areas, layers] = await Promise.all([
         GRP.request("/api/v1/planning/status").catch(() => ({ available: false })),
@@ -1155,8 +1333,10 @@
       drawLegend(layers.flood_legend);
       drawDistricts();
       await Promise.all([loadFloodOverlay(state.floodLayers[0]), drawPendingCenters()]);
-      if (state.boundaries.length === 1) selectBoundary(state.boundaries[0]);
-      else if (districtLayer.getLayers().length) map.fitBounds(districtLayer.getBounds(), { padding: [60, 60] });
+      // Synthetic fixtures remain available from Layers for demonstration, but never define
+      // the default map or analysis area for a real person.
+      districtLayer.remove();
+      centersLayer.remove();
       renderWelcome();
       ownerEmail = identity.email;
       await restoreState();

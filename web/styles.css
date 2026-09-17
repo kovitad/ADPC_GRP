@@ -1,5 +1,12 @@
 :root {
   color-scheme: light;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-strong: 650;
   /* SERVIR Global Collaborative palette (from the logo) */
   --servir-grey: #58595b;
   --servir-blue: #2380b0;
@@ -14,23 +21,23 @@
   --forest-700: var(--servir-blue);
   --lime-300: var(--servir-green);
   --lime-200: var(--servir-green-soft);
-  --sand-100: #f5f3eb;
-  --sand-50: #fbfaf6;
+  --sand-100: #f4f7f8;
+  --sand-50: #fafcfd;
   --white: #ffffff;
-  --ink-900: #182825;
-  --ink-700: #425752;
-  --ink-500: #667a75;
-  --line: #dce4df;
+  --ink-900: #1c2a33;
+  --ink-700: #4b606c;
+  --ink-500: #6c7e88;
+  --line: #dbe4e8;
   --danger-700: #984039;
   --danger-100: #fff0ed;
   --auth-blue: #2380b0;
   --auth-blue-dark: #1b678f;
   --auth-navy: #0d2534;
-  --shadow-lg: 0 32px 80px rgb(11 69 61 / 14%);
-  --radius-lg: 1.25rem;
-  --radius-md: 0.8rem;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --shadow-sm: 0 1px 2px rgb(18 48 64 / 6%);
+  --shadow-lg: 0 20px 52px rgb(18 48 64 / 12%);
+  --radius-lg: 1rem;
+  --radius-md: 0.625rem;
+  font-family: var(--font-sans);
   background: var(--sand-100);
   color: var(--ink-900);
 }
@@ -51,6 +58,9 @@ body {
   min-height: 100vh;
   margin: 0;
   background: var(--sand-100);
+  font-size: 0.9375rem;
+  font-weight: var(--weight-regular);
+  line-height: 1.5;
 }
 
 a {
@@ -60,6 +70,13 @@ a {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 .skip-link {
@@ -1625,3 +1642,118 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
 
 /* Full-colour SERVIR logo on light backgrounds (mobile sign-in header) */
 .mobile-brand .servir-logo--color { width: 11rem; filter: none; }
+
+/* Professional interface system: restrained type scale, controls and surfaces. */
+h1, h2, h3 { font-family: var(--font-display); font-weight: var(--weight-strong); }
+h4, h5, h6, strong { font-weight: var(--weight-semibold); }
+
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.095em;
+}
+
+.brand-platform,
+.context-badge,
+.card-divider {
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+}
+
+.brand-story h1 {
+  max-width: 14ch;
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 3.35vw, 3.25rem);
+  font-weight: var(--weight-strong);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.brand-summary { font-size: 0.86rem; line-height: 1.7; }
+
+.auth-main { background: radial-gradient(circle at 70% 15%, #ffffff 0, #f8fafb 34%, #eef3f5 100%); }
+.auth-card {
+  border-color: #dce5e9;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.auth-heading { margin: 1.5rem 0 1.25rem; }
+.auth-heading h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 2.5vw, 2rem);
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+.auth-heading > p:last-child { font-size: 0.89rem; line-height: 1.6; }
+
+.button {
+  min-height: 2.9rem;
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+.button--primary { box-shadow: 0 0.45rem 1.1rem rgb(35 128 176 / 14%); }
+.button__arrow { font-size: 1rem; }
+.provider-note { border: 1px solid #e4eceb; border-radius: var(--radius-md); }
+.provider-note p, .support-copy { font-size: 0.75rem; }
+.support-copy--admin a { font-weight: var(--weight-semibold); }
+
+.workspace-main > h1 {
+  font-size: clamp(1.6rem, 2.75vw, 2.15rem);
+  font-weight: var(--weight-strong);
+  letter-spacing: -0.025em;
+}
+.workspace-intro { font-size: 0.92rem; }
+.identity-card, .admin-card {
+  border-color: #dfe7ea;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.identity-person h2 { font-weight: var(--weight-strong); }
+.admin-card__heading h2 { font-size: 1.1rem; font-weight: var(--weight-strong); }
+.assignment-form label,
+.health-grid dt,
+.metric-row span,
+.member-table th { font-weight: var(--weight-semibold); }
+.assignment-form input,
+.assignment-form select,
+.member-table select {
+  border-color: #cbd8de;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 1px rgb(18 48 64 / 2%);
+}
+.assignment-form input:focus,
+.assignment-form select:focus,
+.member-table select:focus {
+  border-color: var(--servir-blue);
+  outline: 3px solid rgb(35 128 176 / 14%);
+  outline-offset: 0;
+}
+.member-table th {
+  color: var(--ink-500);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.member-table td { color: var(--ink-700); }
+.role-badge,
+.platform-admin-badge,
+.status-pill { font-weight: var(--weight-semibold); }
+
+.grp-topbar {
+  height: 58px;
+  border-bottom-color: #e2e8eb;
+  box-shadow: 0 1px 2px rgb(18 48 64 / 5%);
+  font-family: var(--font-sans);
+}
+.grp-topbar:empty { min-height: 58px; }
+.grp-topbar__product { font-weight: var(--weight-semibold); }
+.grp-topbar__nav a,
+.grp-topbar__signout { font-size: 0.82rem; font-weight: var(--weight-medium); }
+.grp-topbar__nav a.is-active { font-weight: var(--weight-semibold); }
+
+@media (max-width: 50rem) {
+  .brand-story h1 { font-size: 1.55rem; }
+}

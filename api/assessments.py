@@ -22,7 +22,7 @@ from api.planning_access import planner_membership
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import get_settings
-from core.access_models import AuditEvent, AuditResult
+from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_jobs import SubmitError, SubmitRequest, pin_inputs
 from core.assessment_models import Assessment, AssessmentFeature, Feature, Method
@@ -67,7 +67,7 @@ class AssessmentSubmit(BaseModel):
 def _load_visible(session: Session, principal: CurrentPrincipal, assessment_id: UUID):
     """Other Hubs' and unknown assessments are both 404 (Section 13.1)."""
 
-    hubs = {m.hub_id for m in principal.memberships if m.role in {"planner", "admin"}}
+    hubs = {m.hub_id for m in principal.memberships if m.role in PLANNING_MEMBER_ROLES}
     assessment = session.get(Assessment, assessment_id)
     if assessment is None or assessment.hub_id not in hubs:
         raise not_found()

@@ -82,7 +82,7 @@ Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The scr
 
 GRP registration is only for people who already have a SIG/SERVIR account. It collects no local password or unverified identity data: the applicant must complete SERVIR authentication before a pending request appears. An unknown verified identity creates an `identity_link_denied` audit event for administrator review, but no user, external identity, or membership record. After an administrator assigns a Hub role, the user returns to sign in and GRP links the external identity.
 
-Architecture roles are `planner`, Hub `admin`, and Platform Admin. A SIG “Hub Expert” maps to the least-privilege GRP role, normally `planner`; it is not a separate GRP role. See [`docs/access-management.md`](docs/access-management.md) for the table map and provisioning commands.
+Architecture roles are `ndmo_planner`, `hub_expert` (Hub Expert / GIS Specialist), Hub `admin`, and Platform Admin. The two planning roles have the same least-privilege planning access in this release; only Hub Admin manages Hub membership. See [`docs/access-management.md`](docs/access-management.md) for the table map and provisioning commands.
 
 ## Staging deployment
 

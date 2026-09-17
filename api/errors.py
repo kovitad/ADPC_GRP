@@ -18,11 +18,14 @@ def new_support_ref() -> str:
 class GrpError(Exception):
     """A typed, detail-free API error rendered in the Appendix D format."""
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    def __init__(
+        self, status_code: int, code: str, message: str, headers: dict[str, str] | None = None
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers or {}
 
 
 def not_signed_in() -> GrpError:
@@ -46,6 +49,7 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _render(_: Request, error: GrpError) -> JSONResponse:
         return JSONResponse(
             status_code=error.status_code,
+            headers=error.headers,
             content={
                 "error": {
                     "code": error.code,

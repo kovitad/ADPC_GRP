@@ -101,6 +101,26 @@ def test_two_requests_at_once_cannot_both_pass_when_only_one_fits(session) -> No
     assert blocked.value.code == "AI_LIMIT_REACHED"
 
 
+def test_estimated_call_must_fit_remaining_allowance_before_it_starts(session) -> None:
+    admin = _person(session, "owner@example.test", admin=True)
+    _enable(session, admin, limit=1_000)
+    person = _person(session)
+    month = reserve(session, person.id, request_id="first", estimate=900, feature_enabled=True)
+    settle(
+        session, person.id, month=month, request_id="first", hub_id=None, channel="web",
+        provider="openai", model="test-model", prompt_version="v1", input_tokens=900,
+        output_tokens=0, outcome="completed",
+    )
+
+    with pytest.raises(AiBlocked) as blocked:
+        reserve(session, person.id, request_id="too-large", estimate=101, feature_enabled=True)
+
+    assert blocked.value.code == "AI_LIMIT_REACHED"
+    assert reserve(
+        session, person.id, request_id="fits", estimate=100, feature_enabled=True
+    ) == month
+
+
 def test_settle_counts_real_tokens_and_remaining_never_below_zero(session) -> None:
     admin = _person(session, "owner@example.test", admin=True)
     _enable(session, admin, limit=1_000)
@@ -232,6 +252,37 @@ def test_gateway_limit_message_names_the_reset_date(session) -> None:
     assert error.value.code == "AI_LIMIT_REACHED" and error.value.status_code == 429
     assert "It resets on" in error.value.message
     assert "Maps, analysis and downloads still work." in error.value.message
+
+
+def test_gateway_does_not_call_provider_when_estimate_exceeds_balance(session) -> None:
+    admin = _person(session, "owner@example.test", admin=True)
+    _enable(session, admin, limit=1_000)
+    month = reserve(session, admin.id, request_id="r0", estimate=1, feature_enabled=True)
+    settle(
+        session, admin.id, month=month, request_id="r0", hub_id=None, channel="web",
+        provider="openai", model="m", prompt_version="v1", input_tokens=950,
+        output_tokens=0, outcome="completed",
+    )
+    session.commit()
+    called = False
+
+    async def provider(settings, *, instructions, prompt, hub_code):
+        nonlocal called
+        called = True
+        return "unexpected", "test-model", 1, 1
+
+    with pytest.raises(GrpError) as error:
+        asyncio.run(
+            run_ai_call(
+                session, _settings(), user_id=admin.id, hub_id=None, hub_code=None,
+                instructions="check", prompt="hello", prompt_version="v1",
+                provider_call=provider,
+            )
+        )
+
+    assert error.value.code == "AI_LIMIT_REACHED"
+    assert called is False
+    assert usage_view(session, admin.id, feature_enabled=True).tokens_used == 950
 
 
 def test_langfuse_batch_contains_no_private_text() -> None:

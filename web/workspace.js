@@ -14,13 +14,20 @@
   const memberList = document.querySelector("[data-member-list]");
   const refreshMembers = document.querySelector("[data-refresh-members]");
   let currentIdentity = null;
+  const roleLabel = (role) => ({
+    ndmo_planner: "NDMO Planner",
+    hub_expert: "Hub Expert / GIS Specialist",
+    planner: "Legacy Planner",
+    admin: "Hub Admin",
+  }[role] || role);
+  const memberRoles = ["ndmo_planner", "hub_expert", "admin", "planner"];
 
   const memberControl = (value, options) => {
     const select = document.createElement("select");
     options.forEach((optionValue) => {
       const option = document.createElement("option");
       option.value = optionValue;
-      option.textContent = optionValue === "admin" ? "Hub Admin" : optionValue;
+      option.textContent = roleLabel(optionValue);
       option.selected = optionValue === value;
       select.append(option);
     });
@@ -65,7 +72,7 @@
       email.textContent = member.email;
       personCell.append(name, email);
       const roleCell = document.createElement("td");
-      const role = memberControl(member.role, ["planner", "admin"]);
+      const role = memberControl(member.role, memberRoles);
       roleCell.append(role);
       const accessCell = document.createElement("td");
       const access = memberControl(member.status, ["active", "disabled"]);
@@ -198,7 +205,7 @@
       hub.append(name, code);
       const role = document.createElement("span");
       role.className = "role-badge";
-      role.textContent = membership.role;
+      role.textContent = roleLabel(membership.role);
       item.append(hub, role);
       list.append(item);
     });
@@ -254,19 +261,16 @@
 
   GRP.bindSignOut();
 
-  fetch("/api/v1/me", { credentials: "same-origin", headers: { Accept: "application/json" } })
-    .then((response) => {
-      if (response.status === 401 || response.status === 403) {
-        window.location.replace("/");
-        return null;
-      }
-      if (!response.ok) throw new Error("Could not load membership");
-      return response.json();
-    })
+  // Reuse the identity the shared top bar already loaded (one /me call per page).
+  GRP.me()
     .then((identity) => {
       if (identity) showIdentity(identity);
     })
-    .catch(() => {
+    .catch((error) => {
+      if (error.status === 401 || error.status === 403) {
+        window.location.replace("/");
+        return;
+      }
       document.querySelector("[data-workspace-status]").textContent =
         "Membership could not be loaded. Refresh the page or contact the platform administrator.";
     });

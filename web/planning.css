@@ -298,6 +298,25 @@
 .pw-search__item strong { font-size: 0.86rem; }
 .pw-search__item span { color: var(--pw-muted); font-size: 0.74rem; }
 .pw-search__empty { padding: 0.7rem 0.9rem; color: var(--pw-muted); font-size: 0.8rem; }
+.pw-location {
+  position: absolute;
+  z-index: 900;
+  top: 64px;
+  left: 68px;
+  min-height: 34px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #d9e5e1;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(16, 40, 36, 0.14);
+  color: var(--pw-forest);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pw-location:hover:not(:disabled) { background: #f1f7f5; }
+.pw-location:disabled { cursor: wait; opacity: 0.72; }
 
 .pw-fab {
   position: absolute;
@@ -347,7 +366,7 @@
 .pw-place-chip {
   position: absolute;
   z-index: 850;
-  top: 64px;
+  top: 106px;
   left: 14px;
   max-width: min(380px, calc(100% - 150px));
   padding: 0.45rem 0.75rem;
@@ -358,6 +377,7 @@
   font-size: 0.78rem;
   line-height: 1.4;
 }
+.pw-place-chip .pw-chip-button { margin: 0.35rem 0 0; }
 
 .pw-result {
   position: absolute;
@@ -668,3 +688,44 @@
 .pw-cite:hover { background: #c7dbff; }
 .pw-card.is-focus { animation: pw-flash 1.4s ease-out; }
 @keyframes pw-flash { 0% { box-shadow: 0 0 0 3px #60a5fa; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* Match the shared professional interface system without flattening map hierarchy. */
+.pw-body {
+  --pw-ink: #1c2a33;
+  --pw-muted: #687b84;
+  --pw-line: #dbe4e8;
+  --pw-canvas: #f4f7f8;
+  --pw-radius: 12px;
+  font-family: var(--font-sans, "Segoe UI", system-ui, sans-serif);
+  font-size: 0.9375rem;
+}
+.pw-chat__top h1,
+.pw-welcome h2,
+.pw-result h2,
+.pw-evidence h2 { font-weight: 650; }
+.pw-chat__top h1 { font-size: 0.96rem; }
+.pw-welcome h2 { font-size: 1.08rem; }
+.pw-welcome .pw-question,
+.pw-suggestion strong,
+.pw-fab,
+.pw-location,
+.pw-chip-button,
+.pw-tabs button,
+.pw-card summary,
+.pw-brief summary { font-weight: 600; }
+.pw-suggestion {
+  border-color: #dfe7ea;
+  border-radius: 10px;
+  background: #ffffff;
+}
+.pw-suggestion:hover { border-color: #a9c7d4; background: #f7fbfc; }
+.pw-bubble { font-size: 0.85rem; line-height: 1.58; }
+.pw-composer__box { border-color: #cedbe0; border-radius: 14px; box-shadow: 0 1px 2px rgb(18 48 64 / 5%); }
+.pw-composer__box:focus-within { border-color: var(--pw-forest-2); box-shadow: 0 0 0 3px rgb(35 128 176 / 12%); }
+.pw-composer textarea { font-size: 0.86rem; }
+.pw-search input,
+.pw-fab { box-shadow: 0 4px 14px rgb(18 48 64 / 14%); }
+.pw-pill,
+.pw-eyebrow,
+.pw-tag,
+.pw-cite { font-weight: 600; }

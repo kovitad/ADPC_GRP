@@ -26,7 +26,8 @@ class SlidingWindowLimiter:
             while hits and hits[0] <= now - window_seconds:
                 hits.popleft()
             if len(hits) >= limit:
-                raise rate_limited()
+                # Seconds until the oldest counted request leaves the window.
+                raise rate_limited(max(1, int(hits[0] + window_seconds - now) + 1))
             hits.append(now)
 
     def reset(self) -> None:
@@ -34,8 +35,13 @@ class SlidingWindowLimiter:
             self._hits.clear()
 
 
-def rate_limited() -> GrpError:
-    return GrpError(429, "RATE_LIMITED", "Too many requests. Please wait a moment.")
+def rate_limited(retry_after: int = 5) -> GrpError:
+    return GrpError(
+        429,
+        "RATE_LIMITED",
+        "Too many requests. Please wait a moment.",
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 limiter = SlidingWindowLimiter()

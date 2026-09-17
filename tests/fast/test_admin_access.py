@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 from api.admin import authenticated_user
 from api.dependencies import database_session
 from api.main import app
+from api.planning_access import planner_membership
 from api.sessions import CurrentPrincipal
 from core.access_models import AppUser, Base, Hub, HubMembership
 from core.identity import MembershipView, VerifiedIdentity, link_verified_identity
@@ -60,14 +62,38 @@ def test_admin_access_queue_and_membership_assignment() -> None:
         client = TestClient(app)
         assigned = client.post(
             "/api/v1/admin/hubs/adpc/members",
-            json={"email": "expert@example.test", "role": "planner"},
+            json={"email": "expert@example.test", "role": "hub_expert"},
+        )
+        ndmo = client.post(
+            "/api/v1/admin/hubs/adpc/members",
+            json={"email": "ndmo@example.test", "role": "ndmo_planner"},
         )
     finally:
         app.dependency_overrides.clear()
 
     assert assigned.status_code == 200
     assert assigned.json()["changed"] is True
+    assert ndmo.status_code == 200
+    assert ndmo.json()["changed"] is True
     assert "/api/v1/admin/access-requests" not in app.openapi()["paths"]
+
+
+@pytest.mark.parametrize("role", ["ndmo_planner", "hub_expert"])
+def test_new_planning_roles_can_access_their_own_hub(role: str) -> None:
+    hub_id = uuid4()
+    principal = CurrentPrincipal(
+        user_id=uuid4(),
+        email="member@example.test",
+        display_name=None,
+        is_platform_admin=False,
+        memberships=(MembershipView(hub_id, "adpc", "ADPC Hub", role),),
+        issued_at=0,
+        session_id=str(uuid4()),
+    )
+
+    membership = planner_membership(principal, "adpc")
+
+    assert membership.role == role
 
 
 def test_hub_admin_can_manage_own_hub_but_cannot_remove_last_admin() -> None:

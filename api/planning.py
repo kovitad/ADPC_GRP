@@ -31,7 +31,7 @@ from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
 from api.sig_evidence import check_area, embed_url, tool_payload
 from api.token_store import session_token_store
-from core.access_models import AuditEvent, AuditResult
+from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
 from core.identity import MembershipView
@@ -51,6 +51,11 @@ CANNOT_REPLY = (
 )
 ROUTER_VERSION = "planning-router-v1"
 DRAFT_VERSION = "planning-draft-v1"
+RESULT_EXPLANATION_PATTERN = re.compile(
+    r"\b(explain (?:the )?(?:result|map)|which (?:evacuation )?centers?.*"
+    r"(?:exposed|assess)|what (?:the )?map shows)\b",
+    re.IGNORECASE,
+)
 ROUTER_INSTRUCTIONS = (
     "You route chat messages for the GRP flood planning assistant. Return ONLY a JSON object "
     'with keys "mode", "reply", "place" and "return_period_years". Modes: '
@@ -151,17 +156,37 @@ def _normalize(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).replace(" district", "").strip()
 
 
+def _place_parts(value: str) -> tuple[str, ...]:
+    parts = (_normalize(part) for part in value.split(","))
+    return tuple(part for part in parts if part and part != "thailand")
+
+
 def _match_boundary(boundaries: list[Boundary], place: str | None) -> Boundary | None:
     if not place:
         return None
-    wanted = _normalize(place.split(",")[0])
+    wanted = _place_parts(place)
     if not wanted:
         return None
-    for boundary in boundaries:
-        name = _normalize(boundary.name)
-        if name == wanted or wanted in name or name in wanted:
-            return boundary
-    return None
+    matches = [boundary for boundary in boundaries if _place_parts(boundary.name) == wanted]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _same_area(first: str, second: str) -> bool:
+    """Compare the full known area, including province when present."""
+
+    return bool(_place_parts(first)) and _place_parts(first) == _place_parts(second)
+
+
+def _message_names_boundary(message: str, boundary: Boundary) -> bool:
+    """A model-suggested GRP area is usable only when the user named it explicitly."""
+
+    return f" {_normalize(boundary.name)} " in f" {_normalize(message)} "
+
+
+def _asks_to_explain_result(message: str) -> bool:
+    """Keep the visible result-explanation controls independent of router variation."""
+
+    return bool(RESULT_EXPLANATION_PATTERN.search(message))
 
 
 @router.post(
@@ -191,6 +216,8 @@ async def planning_chat(
 
     boundaries = session.scalars(select(Boundary).where(Boundary.is_supported)).all()
     selected = session.get(Boundary, payload.boundary_id) if payload.boundary_id else None
+    if selected is not None and not selected.is_supported:
+        selected = None
     current = None
     if payload.assessment_id:
         current = session.get(Assessment, payload.assessment_id)
@@ -223,6 +250,8 @@ async def planning_chat(
     )
     decision = _decision(routed.text)
     mode, reply = decision["mode"], decision["reply"]
+    if mode == "cannot" and _asks_to_explain_result(payload.message):
+        mode = "explain_result"
     base = {"hub_code": hub.hub_code}
 
     example_area = (selected or (boundaries[0] if boundaries else None))
@@ -255,6 +284,47 @@ async def planning_chat(
             "assessment_id": str(current.id),
             "usage": _usage(session, settings, principal),
         }
+
+    if mode in {"run_assessment", "sig_flood"}:
+        # The model's place is a suggestion, never the authority for a GIS job or SIG call.
+        # An explicit browser selection, a supported area named in the message, or a place
+        # confirmed by the person is required before acting on it.
+        confirmed_place = (payload.place or "").strip()
+        proposed_place = decision["place"]
+        if confirmed_place:
+            action_place = confirmed_place
+        elif proposed_place:
+            if selected is not None and _same_area(proposed_place, selected.name):
+                action_place = selected.name
+            else:
+                named_boundary = (
+                    _match_boundary(boundaries, proposed_place)
+                    if mode == "run_assessment"
+                    else None
+                )
+                if named_boundary is not None and _message_names_boundary(
+                    payload.message, named_boundary
+                ):
+                    action_place = named_boundary.name
+                else:
+                    return {
+                        **base,
+                        "mode": "needs_area_confirmation",
+                        "place": proposed_place,
+                        "answer": (
+                            f"Before I use flood data, confirm the area: {proposed_place}. "
+                            "No assessment or SIG request has run yet."
+                        ),
+                        "label": "Confirm the analysis area.",
+                        "usage": _usage(session, settings, principal),
+                    }
+        elif selected is not None and (
+            mode == "run_assessment" or "synthetic" not in selected.source.lower()
+        ):
+            action_place = selected.name
+        else:
+            action_place = None
+        decision["place"] = action_place
 
     fallback_note = None
     if mode == "run_assessment":
@@ -633,7 +703,7 @@ def planning_status(principal: SignedInMember, session: DatabaseSession) -> dict
     hubs = [
         {"hub_code": m.hub_code, "hub_name": m.hub_name, "role": m.role}
         for m in principal.memberships
-        if m.role in {"planner", "admin"}
+        if m.role in PLANNING_MEMBER_ROLES
     ]
     return {
         "available": planning_chat_available(settings),

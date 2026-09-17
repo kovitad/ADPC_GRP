@@ -6,7 +6,7 @@ GRP provides an access-request registration screen only for people with an exist
 
 1. The applicant selects registration and authenticates with their existing SERVIR account.
 2. An unknown verified email is denied entry and recorded as `identity_link_denied`, which becomes the pending request. The short-lived MCP access token is not stored.
-3. A Platform Admin reviews the protected workspace queue and assigns a Hub plus `planner` or `admin` role.
+3. A Platform Admin reviews the protected workspace queue and assigns a Hub plus `ndmo_planner`, `hub_expert`, or `admin` role.
 4. The person returns to SERVIR sign-in. GRP links the issuer/subject identity and creates a signed session.
 5. Every protected request reloads the account and active memberships, so disabling access takes effect without waiting for session expiry.
 
@@ -32,10 +32,16 @@ Copy the resulting non-secret client ID into `SERVIR_AUTH_CLIENT_ID` in `/srv/gr
 | `hub` | ADPC/SERVIR tenant boundary | Unique stable `code`; active or closed |
 | `app_user` | GRP authorization account | Lowercase unique verified email |
 | `external_identity` | SERVIR issuer/subject link | Unique `(issuer, subject)`; never stores tokens |
-| `hub_membership` | User-to-Hub role mapping | Unique `(hub_id, user_id)`; `planner` or `admin` |
+| `hub_membership` | User-to-Hub role mapping | Unique `(hub_id, user_id)`; NDMO Planner, Hub Expert / GIS Specialist, or Hub Admin |
 | `audit_event` | Denials and access changes | Append-only operational evidence |
 
-“Hub Expert” is a SIG designation, not a GRP role. Map it to `planner` unless the person must administer Hub membership.
+| GRP value | Administration label | Access |
+|---|---|---|
+| `ndmo_planner` | NDMO Planner | Planning, maps and assessments in the assigned Hub |
+| `hub_expert` | Hub Expert / GIS Specialist | Planning, maps and assessments in the assigned Hub |
+| `admin` | Hub Admin | Planning access plus Hub membership administration |
+
+Existing `planner` rows are migrated to `hub_expert`. The legacy value is not available in the UI.
 
 ## First staging assignment
 
@@ -58,7 +64,7 @@ sudo docker compose --env-file .env -f deploy/compose.yml run --rm --no-deps api
 read -r -p "Member email: " GRP_MEMBER_EMAIL
 sudo docker compose --env-file .env -f deploy/compose.yml run --rm --no-deps api \
   python -m grp.admin assign-member --actor-email "$GRP_ADMIN_EMAIL" \
-  --email "$GRP_MEMBER_EMAIL" --hub-code adpc --role planner
+  --email "$GRP_MEMBER_EMAIL" --hub-code adpc --role hub_expert
 unset GRP_ADMIN_EMAIL GRP_MEMBER_EMAIL
 ```
 

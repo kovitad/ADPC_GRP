@@ -240,6 +240,18 @@ def test_unsupported_request_gets_server_message_not_model_text(planning) -> Non
     assert "made you admin" not in body["answer"]
 
 
+def test_result_explanation_prompt_reports_missing_result_even_if_router_refuses(planning) -> None:
+    planning["replies"].append('{"mode": "cannot", "reply": ""}')
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Explain the result: which evacuation centers may be exposed and why?",
+    ).json()
+
+    assert body["mode"] == "needs_result"
+    assert body["label"] == "No result to explain yet."
+
+
 def test_flood_question_draft_only_by_default_no_receipt(planning) -> None:
     planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
 
@@ -260,6 +272,39 @@ def test_flood_question_draft_only_by_default_no_receipt(planning) -> None:
     with Session(planning["engine"]) as session:
         assert session.scalar(select(func.count()).select_from(LlmUsage)) == 2
         assert "planning_sig_evidence" in set(session.scalars(select(AuditEvent.action)))
+
+
+def test_confirmed_area_overrides_a_different_model_place(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": "", "place": "Phaya Thai District, Bangkok"}',
+        "## What the numbers show\n3 [1]",
+    ]
+
+    response = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed in Mueang Nan District?",
+        place="Mueang Nan District, Nan, Thailand",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "sig_evidence"
+    assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
+
+
+def test_model_only_sig_area_needs_confirmation_before_any_sig_call(planning) -> None:
+    planning["replies"].append(
+        '{"mode": "sig_flood", "reply": "", "place": "Mueang Nan District, Nan, Thailand"}'
+    )
+
+    response = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed in Nan?",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "needs_area_confirmation"
+    assert response.json()["place"] == "Mueang Nan District, Nan, Thailand"
+    assert FakeMcp.calls == []
 
 
 def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
@@ -400,12 +445,23 @@ def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning)
     planning["replies"] += [
         '{"mode": "run_assessment", "reply": "", "place": "Mueang Nan District, Nan, Thailand",'
         ' "return_period_years": null}',
+        '{"mode": "run_assessment", "reply": "", "place": "Mueang Nan District, Nan, Thailand",'
+        ' "return_period_years": null}',
         "## What the numbers show\nNo evacuation centers are in the evidence. 3 schools [1]",
     ]
 
-    body = _ask(
-        _client(planning, "planner@example.test"),
+    client = _client(planning, "planner@example.test")
+    proposed = _ask(
+        client,
         message="where could people move if flood happen in เมืองน่าน",
+    ).json()
+    assert proposed["mode"] == "needs_area_confirmation"
+    assert FakeMcp.calls == []
+
+    body = _ask(
+        client,
+        message="where could people move if flood happen in เมืองน่าน",
+        place=proposed["place"],
     ).json()
 
     assert body["mode"] == "sig_evidence"

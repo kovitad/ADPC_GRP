@@ -120,9 +120,12 @@ def reserve(
     month = period_month(now)
     row = _allowance(session, user_id, month, lock=True)
     limit = setting.token_limit_per_person
-    if row.tokens_used + row.tokens_reserved >= limit:
+    remaining = limit - row.tokens_used - row.tokens_reserved
+    # Do not start a call whose estimated maximum already exceeds the balance.
+    # Actual provider usage may still exceed the estimate and is fully counted (AI-09).
+    amount = max(1, estimate)
+    if amount > remaining:
         raise AiBlocked("AI_LIMIT_REACHED")
-    amount = max(1, min(estimate, limit - row.tokens_used - row.tokens_reserved))
     row.tokens_reserved += amount
     row.reservations = [
         *row.reservations,
