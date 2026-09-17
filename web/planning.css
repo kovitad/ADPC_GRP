@@ -645,3 +645,11 @@
   .pw-evidence { width: 100%; }
   .has-evidence .pw-fab, .has-evidence .pw-layers { right: 14px; }
 }
+.pw-status__note {
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a !important;
+  font-size: 0.76rem !important;
+  line-height: 1.4;
+}

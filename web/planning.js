@@ -672,7 +672,14 @@
     const badge = document.createElement("span");
     badge.className = `pw-status__badge${evidence.receipt ? " is-ok" : ""}`;
     badge.textContent = evidence.receipt ? `Receipt ${evidence.receipt.receipt_id}` : "Unverified draft";
-    card.append(title, line, badge);
+    card.append(title);
+    if (payload.note) {
+      const note = document.createElement("span");
+      note.className = "pw-status__note";
+      note.textContent = payload.note;
+      card.append(note);
+    }
+    card.append(line, badge);
     return card;
   };
 

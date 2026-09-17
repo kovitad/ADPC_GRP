@@ -74,7 +74,10 @@ DRAFT_INSTRUCTIONS = (
     "Write a short disaster-planning brief using ONLY the supplied evidence. Use every "
     "required section heading exactly. End every paragraph with numeric citations such as "
     "[1]. Never invent numbers, places, sources or recommendations. Say that hazard exposure "
-    "is not a declaration that a place is safe. Do not add a Sources section. Return Markdown."
+    "is not a declaration that a place is safe. If the question asks where people could move "
+    "or evacuate and the evidence has no evacuation centers or shelters, say that plainly in "
+    "the first section and describe only what the evidence does show. Do not add a Sources "
+    "section. Return Markdown."
 )
 
 
@@ -251,9 +254,18 @@ async def planning_chat(
             "usage": _usage(session, settings, principal),
         }
 
+    fallback_note = None
     if mode == "run_assessment":
-        return _start_assessment(session, settings, principal, hub, base, decision, selected,
-                                 boundaries)
+        started = _start_assessment(session, settings, principal, hub, base, decision, selected,
+                                    boundaries)
+        if started.get("reason") != "area_not_supported" or not decision["place"]:
+            return started
+        # No GRP assessment area here yet: answer with SIG flood evidence instead of stopping.
+        fallback_note = (
+            f"{decision['place'].split(',')[0]} is not a GRP assessment area yet, so this is SIG "
+            "flood evidence instead. It does not list evacuation centers."
+        )
+        mode = "sig_flood"
 
     if mode == "chat" and reply:
         return {
@@ -433,6 +445,7 @@ async def planning_chat(
         "answer": draft.text,
         "label": EVIDENCE_LABEL
         + ("" if receipt else " Unverified draft: not checked by the SIG gate, no receipt."),
+        "note": fallback_note,
         "area": area_payload,
         "stats": pack.get("stats", {}),
         "gaps": pack.get("gaps", []),
@@ -517,6 +530,7 @@ def _start_assessment(
         return {
             **base,
             "mode": "unsupported_area",
+            "reason": "area_not_supported",
             "answer": f"I can't run a GRP assessment for {asked} yet. Supported areas: {names}. "
             "I can still look up SIG flood evidence for a Thailand district if you ask.",
             "label": "Area not supported for GRP assessment.",

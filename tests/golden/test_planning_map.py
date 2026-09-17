@@ -254,12 +254,13 @@ def test_chat_explains_unsupported_area_and_missing_result(world) -> None:
         '{"mode": "explain_result", "reply": "", "place": null, "return_period_years": null}',
     )
 
-    unsupported = _chat(client, "Assess Chiang Yuen").json()
+    # Not a GRP area: falls through to SIG evidence, which needs a SIG sign-in in this test.
+    unsupported = _chat(client, "Assess Chiang Yuen")
     no_scenario = _chat(client, "Assess the synthetic district for RP500").json()
     no_result = _chat(client, "Explain the result").json()
 
-    assert unsupported["mode"] == "unsupported_area"
-    assert "Synthetic Test District" in unsupported["answer"]
+    assert unsupported.status_code == 401
+    assert unsupported.json()["error"]["code"] == "SIG_REAUTH_REQUIRED"
     assert no_scenario["mode"] == "unsupported_area" and "500-year" in no_scenario["answer"]
     assert no_result["mode"] == "needs_result"
     with Session(world["engine"]) as session:

@@ -394,3 +394,22 @@ def test_evidence_bundle_counts_sources_and_keeps_traces() -> None:
     assert bundle["sig_trace"][0].startswith("aoi[")
     assert bundle["grp_trace"][0]["step"] == "assemble_pack"
     assert bundle["gather_ms"] == 1200.5
+
+
+def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "run_assessment", "reply": "", "place": "Mueang Nan District, Nan, Thailand",'
+        ' "return_period_years": null}',
+        "## What the numbers show\nNo evacuation centers are in the evidence. 3 schools [1]",
+    ]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="where could people move if flood happen in เมืองน่าน",
+    ).json()
+
+    assert body["mode"] == "sig_evidence"
+    assert "not a GRP assessment area yet" in body["note"]
+    assert body["evidence"]["summary"]["sources"] == 1
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
+    assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
