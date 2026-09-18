@@ -97,6 +97,9 @@ Design notes to read before large changes:
 - [`docs/architecture-scaling-design.md`](docs/architecture-scaling-design.md) — why GRP is a modular monolith with background jobs, what keeps it ready to split into services later, and the measured triggers for doing so.
 - [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force, including the blocking no-data rule.
 - [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
+- [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md) — what `tools/prove_dataset.py` found when run on real districts: the datasets line up, but in Pua every shelter sits on a no-value pixel, shelter district names cannot be joined, and at least one shelter is in the wrong province. Read this before writing any loader.
+- [`docs/development-plan.md`](docs/development-plan.md) — how we work: definition of done, test layers, CI gates to add, observability, security and documentation habits, eight phases with finish lines, and the technical-debt register.
+- [`docs/backlog.md`](docs/backlog.md) — the ordered work items for the dev team (epics A to H, sized, with what blocks each), and a suggested first sprint that is blocked on nobody.
 - [`docs/flood-hazard-exposure-embed-design.md`](docs/flood-hazard-exposure-embed-design.md) — the SIG receipt-bound hazard map embed.
 
 
@@ -272,6 +275,8 @@ Owner decisions (16–17 Sep):
 
 Each item has a clear "done when". Keep the spec guardrails (Section 11).
 
+> For a **team** rather than one agent, work from [`docs/backlog.md`](docs/backlog.md): the same work split into sized epics with what blocks each, plus a first sprint that needs no answers from anyone. This list stays as the single-threaded order for whoever picks the session up next.
+
 0. **Browser acceptance of the publish flow** (small, do this first)
    - On Docker Desktop: ask a district question, open the evidence panel, then **Verify & create public receipt** and confirm.
    - Expect: the exact brief you read is gated, a receipt link and SIG's live hazard map appear, and the chat status card shows the receipt instead of "Unverified draft".
@@ -293,7 +298,9 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
    - One-page summary PDF and evacuation map PDF/PNG as export jobs (`assessment_export` table, `POST/GET /assessments/{id}/exports`).
    - *Done when* the synthetic case downloads match the locked result exactly (templates need DEP-12).
 5. **Real Thailand data** (medium; follow [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md))
-   - Inspect the downloaded files first and report size, resolution, CRS and value range; decide Option A (per-district flood picture, recommended) or Option B (tile service).
+   - The files are inspected and proved already: see [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) and [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md). Re-run the check any time with `python -m tools.prove_dataset --district "<name>"`.
+   - Decide Option A (per-district flood picture, recommended) or Option B (tile service).
+   - **Shelter membership must be decided by geometry, not by the district name field** — the proof shows the name join loses almost every point.
    - PostGIS geometry columns and a boundary loader (admin level, source, edition, fingerprint); load only approved districts.
    - Evacuation-center loader; flood raster converted to COG and registered with its provenance.
    - Vulnerability raster registered as an unapproved map layer only (DEP-07).
