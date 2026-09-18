@@ -105,6 +105,7 @@ window.GRP = (() => {
     { key: "assessments", label: "Assessments", href: "/assessments.html" },
     { key: "access", label: "My access", href: "/workspace.html" },
     { key: "admin", label: "Administration", href: "/workspace.html#admin-panel", attr: "data-admin-menu", hidden: true },
+    { key: "data", label: "Source data", href: "/data-inspector.html", attr: "data-data-menu", hidden: true },
     { key: "platform", label: "Platform", href: "/platform.html", attr: "data-platform-menu", hidden: true },
   ];
   const PAGE_KEYS = {
@@ -112,6 +113,7 @@ window.GRP = (() => {
     "/assessments.html": "assessments",
     "/workspace.html": "access",
     "/platform.html": "platform",
+    "/data-inspector.html": "data",
   };
 
   let mePromise = null;
@@ -179,6 +181,7 @@ window.GRP = (() => {
         who.title = identity.email;
         const isHubAdmin = identity.memberships.some((m) => m.role === "admin");
         nav.querySelector('[data-nav="admin"]').hidden = !(isHubAdmin || identity.is_platform_admin);
+        nav.querySelector('[data-nav="data"]').hidden = !(isHubAdmin || identity.is_platform_admin);
         nav.querySelector('[data-nav="platform"]').hidden = !identity.is_platform_admin;
       })
       .catch(() => {});

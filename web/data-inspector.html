@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Source data | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/styles.css?v=20260918a" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="/grp-common.js?v=20260918a" defer></script>
+    <script src="/data-inspector.js?v=20260918a" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header data-grp-topbar></header>
+
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <p class="eyebrow">Administration</p>
+      <h1>Source data</h1>
+      <p class="workspace-intro">
+        Look at the files in the read-only source folder before anyone builds a loader against
+        them: what arrived, what is wrong with it, and what is missing.
+      </p>
+
+      <p class="inspector-warning">
+        <strong>Unapproved data.</strong> Nothing on this page is a GRP result. These files are
+        not pinned, not versioned and not scientifically approved, so no number here may be shown
+        to a planner, put in a brief or sent to SIG.
+      </p>
+
+      <section class="admin-card" aria-labelledby="pick-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">Step 1</p>
+            <h2 id="pick-heading">Pick a folder</h2>
+          </div>
+          <span class="status-pill" data-root-pill>Folder</span>
+        </div>
+        <p class="admin-card__intro" data-pick-intro>
+          Reading the folder list…
+        </p>
+        <div class="inspector-folders" data-folders role="list"></div>
+      </section>
+
+      <section class="admin-card" aria-labelledby="progress-heading" data-progress-card hidden>
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">Step 2</p>
+            <h2 id="progress-heading">Reading the files</h2>
+          </div>
+          <span class="status-pill" data-progress-pill>Queued</span>
+        </div>
+        <p class="admin-card__intro" data-progress-text>
+          The worker is opening each layer. Large rasters are sampled, never read whole.
+        </p>
+        <div class="inspector-bar"><span data-progress-fill></span></div>
+      </section>
+
+      <section class="admin-card" aria-labelledby="findings-heading" data-report-card hidden>
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow" data-report-scope>Report</p>
+            <h2 id="findings-heading">What is wrong and what is missing</h2>
+          </div>
+          <span class="status-pill" data-cache-pill hidden>From cache</span>
+        </div>
+
+        <div class="inspector-tally" data-tally></div>
+        <div class="inspector-findings" data-findings></div>
+
+        <h3 class="inspector-subheading">Points against boundaries</h3>
+        <p class="inspector-note" data-cross-note>Not checked for this folder.</p>
+        <div class="inspector-map" data-map hidden></div>
+        <p class="inspector-legend" data-map-legend hidden>
+          <span class="dot dot--inside"></span> in the area it names
+          <span class="dot dot--mismatch"></span> in a different area
+          <span class="dot dot--outside"></span> outside every area
+        </p>
+
+        <h3 class="inspector-subheading">Layers</h3>
+        <div class="table-scroll">
+          <table class="data-table inspector-table">
+            <thead>
+              <tr>
+                <th scope="col">File</th>
+                <th scope="col">Kind</th>
+                <th scope="col">Coordinate system</th>
+                <th scope="col">Size</th>
+                <th scope="col">Values</th>
+              </tr>
+            </thead>
+            <tbody data-layers></tbody>
+          </table>
+        </div>
+
+        <h3 class="inspector-subheading">Columns</h3>
+        <p class="inspector-note">
+          Sample values, so a column whose heading was cut short can still be recognised.
+        </p>
+        <div data-columns></div>
+
+        <h3 class="inspector-subheading">Files read</h3>
+        <p class="inspector-note" data-fingerprint-note></p>
+        <div class="table-scroll">
+          <table class="data-table inspector-table">
+            <thead>
+              <tr>
+                <th scope="col">File</th>
+                <th scope="col">Size</th>
+                <th scope="col">Fingerprint</th>
+              </tr>
+            </thead>
+            <tbody data-files></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="inspector-error" data-error hidden></p>
+    </main>
+  </body>
+</html>

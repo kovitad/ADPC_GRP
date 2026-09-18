@@ -1,6 +1,7 @@
 import logging
 import signal
 import time
+from pathlib import Path
 from threading import Event
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,6 +11,7 @@ from api.settings import get_settings
 from core.ai_allowance import release_stale_reservations
 from core.assessment_jobs import claim_next_job, process_job
 from core.db import get_engine, session_scope
+from core.inspection_jobs import claim_next_inspection, process_inspection
 from core.storage import LocalStorage
 
 logger = logging.getLogger("grp.worker")
@@ -37,7 +39,11 @@ def run() -> None:
             release_reservations_once()
             last_housekeeping = time.monotonic()
             logger.info("Worker heartbeat")
-        if not run_one_job(storage, settings.job_lease_minutes):
+        worked = run_one_job(storage, settings.job_lease_minutes)
+        # Assessments are a planner waiting; inspections are an Admin looking. Planners win.
+        if not worked:
+            worked = run_one_inspection(settings.data_in_root, settings.job_lease_minutes)
+        if not worked:
             stop_event.wait(POLL_SECONDS)
 
 
@@ -55,6 +61,23 @@ def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:
             return True
     except SQLAlchemyError:
         logger.exception("Job loop database error; will retry")
+        return False
+
+
+def run_one_inspection(root: Path, lease_minutes: int) -> bool:
+    """Claim and run at most one data inspection (ADR-0006). Returns True if one was handled."""
+
+    try:
+        with Session(get_engine()) as session:
+            inspection_id = claim_next_inspection(session, lease_minutes=lease_minutes)
+            if inspection_id is None:
+                return False
+            logger.info("Claimed inspection %s", inspection_id)
+            state = process_inspection(session, root, inspection_id)
+            logger.info("Inspection %s finished: %s", inspection_id, state)
+            return True
+    except SQLAlchemyError:
+        logger.exception("Inspection loop database error; will retry")
         return False
 
 

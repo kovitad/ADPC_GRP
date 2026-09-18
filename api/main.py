@@ -12,6 +12,7 @@ from api import (
     audit,
     auth,
     catalog,
+    data_inspector,
     health,
     maps,
     planning,
@@ -34,7 +35,7 @@ register_error_handlers(app)
 
 for module in (
     health, auth, access, admin, platform, planning, maps, catalog,
-    uploads, assessments, ai, audit, sig,
+    uploads, assessments, ai, audit, sig, data_inspector,
 ):
     app.include_router(module.router, prefix="/api/v1")
 

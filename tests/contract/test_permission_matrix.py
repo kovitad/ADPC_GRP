@@ -18,6 +18,7 @@ import api.access
 import api.admin
 import api.ai
 import api.auth
+import api.data_inspector
 import api.integrations.sig
 import api.permissions
 import api.platform
@@ -51,6 +52,9 @@ MATRIX = {
     "platform_health": (401, 403, 403, 403, 200),
     # Human sessions are never the SIG service, whoever they are.
     "sig_evidence_with_session": (401, 401, 401, 401, 401),
+    # ADR-0006: the data inspector is for Admins. A Hub Expert or Planner is not one.
+    "source_folders": (401, 403, 200, 200, 200),
+    "ask_for_inspection": (401, 403, 200, 200, 200),
 }
 
 
@@ -58,11 +62,18 @@ MATRIX = {
 def world(tmp_path_factory) -> Iterator[dict]:
     secret = tmp_path_factory.mktemp("secrets") / "session_secret"
     secret.write_text("contract-session-secret-with-enough-length", encoding="utf-8")
-    settings = Settings(_env_file=None, session_secret_file=secret)
+    data_in = tmp_path_factory.mktemp("data-in")
+    (data_in / "notes.txt").write_text("a file, so the folder is not empty", encoding="utf-8")
+    settings = Settings(
+        _env_file=None,
+        session_secret_file=secret,
+        data_inspector_enabled=True,
+        data_in_root=data_in,
+    )
     patch = pytest.MonkeyPatch()
     for module in (
         api.access, api.admin, api.ai, api.auth, api.integrations.sig,
-        api.permissions, api.platform,
+        api.permissions, api.platform, api.data_inspector,
     ):
         patch.setattr(module, "get_settings", lambda: settings)
 
@@ -170,6 +181,8 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             f"/api/v1/integrations/sig/assessments/{user_id}/evidence",
             None,
         ),
+        "source_folders": ("GET", "/api/v1/data-inspector/folders", None),
+        "ask_for_inspection": ("POST", "/api/v1/data-inspector/inspections", {"folder": ""}),
     }
     method, path, body = requests[route]
     return client.request(method, path, json=body, headers=headers)

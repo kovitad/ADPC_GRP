@@ -3,7 +3,12 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from core import access_models, ai_models, assessment_models  # noqa: F401
+from core import (  # noqa: F401
+    access_models,
+    ai_models,
+    assessment_models,
+    inspection_models,
+)
 from core.db import Base, get_database_url
 
 config = context.config

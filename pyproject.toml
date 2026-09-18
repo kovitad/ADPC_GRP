@@ -38,6 +38,7 @@ include = ["api*", "core*", "grp*", "worker*"]
 addopts = "-ra"
 testpaths = ["tests"]
 markers = [
+  "fast: isolated rule checks that never touch the network",
   "contract: API and integration contract checks",
   "golden: signed scientific golden-case checks",
   "live: tests requiring approved staging services",
