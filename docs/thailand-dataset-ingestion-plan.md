@@ -48,10 +48,26 @@ Rough size expectation for a country-wide flood raster: a few hundred megabytes 
 ### 4.2 Evacuation centers
 - One `dataset_version`, then `feature` rows with name, longitude, latitude and safe attributes.
 - Fingerprint is order-independent, as now, so re-imports do not invalidate pinned jobs.
-- Required fields and the provider must come with DEP-06.
+- **Membership of a district is decided by geometry, never by the district name field.** The proof run showed the name join loses almost every point: many rows carry only `เมือง`, and Bang Bua Thong appears nowhere although Nonthaburi province has 68 shelters. Name fields are display-only.
+- **Check each point at ingest**: does it fall inside the district its own attributes name? Report the mismatches with the load; do not silently accept them. The proof found `อบต.ลาดตะเคียน`, a Prachinburi shelter, sitting inside Bang Bua Thong, so coordinate errors exist in the file.
+- The Thai column names are truncated by the shapefile format. What is known from the proof:
+
+  | Column | Holds | Confidence |
+  |---|---|---|
+  | `สถ_1` | Shelter name | Confirmed by reading values |
+  | `สถา` | Place or facility name | Likely; used as the fallback name |
+  | `อำเ` | District (abbreviated, unreliable) | Confirmed unusable for joining |
+  | `จัง` | Province | Likely |
+  | `ละต` / `ลอง` | Latitude / longitude in EPSG:4326 | Confirmed by sampling |
+  | `รอง` | Capacity or a supporting attribute | **Unknown — confirm before display** |
+
+- Required fields, the provider and the meaning of `สถา` and `รอง` must come with DEP-06. Nothing uncertain is shown to a planner.
 
 ### 4.3 Flood depth RP100
-- Convert to COG. If the file holds the 1 to 5 severity classes rather than depth in metres, keep it that way: it is far smaller and matches the legend the planner already sees.
+- **Settled:** the six tiles hold **depth in metres** at about 90 m resolution, not the 1 to 5 severity classes. The legend classes are derived at display time from the depth.
+- Convert to COG with overviews, keeping the original as the pinned source.
+- **The no-data rule must be decided before any result is produced** (DEP-05). The proof run found districts, Pua in Nan among them, where every shelter sits on a pixel holding no value. Whether that means "outside the modelled area, unknown" or "inside the modelled area, not flooded" changes the answer a planner reads from "29 unable to assess" to "29 not exposed". If a modelled-area mask exists, it is part of this dataset and must be loaded with it.
+- **Permanent water** needs a rule too: depths beyond a stated threshold are rivers and reservoirs, not flooding, and must be masked or flagged rather than reported as exposure.
 - The method reads windows, unchanged.
 - Record the return period on the version (`return_period_years = 100`), so the seven scenarios of Increment 5 slot in later.
 
@@ -70,14 +86,18 @@ Recommendation: **A now, B when planners ask to browse the whole country.** B is
 
 ## 6. Decisions needed
 
-1. **Option A or B** for drawing flood depth.
-2. **Does the flood raster hold depth in metres or the 1 to 5 classes?** If unknown, GRP reports size, resolution, CRS and value range first.
-3. **Licence and edition** for each dataset, for the provenance record.
-4. **Which districts are approved** as supported assessment areas at pilot start.
+1. **What does an absent flood value mean?** (DEP-05, **blocking**) Unknown, or not flooded inside a modelled area? Is there a modelled-area mask? Proven to change the answer for whole districts — see [`dataset-proof-results.md`](dataset-proof-results.md).
+2. **What depth counts as permanent water** rather than flooding, and is it masked or flagged?
+3. **Option A or B** for drawing flood depth. Recommendation: A now.
+4. **Licence and edition** for each dataset, for the provenance record.
+5. **Which districts are approved** as supported assessment areas at pilot start.
+6. **What `สถา` and `รอง` mean** in the shelter file, before either is shown to a planner.
+
+Answered already: the flood tiles hold depth in metres at about 90 m resolution (Section 4.3); shelter membership is decided by geometry (Section 4.2).
 
 ## 7. Order of work
 
-1. Inspect the downloaded files and report size, resolution, CRS and value range. No code changes.
+1. ~~Inspect the downloaded files and prove them on a real district. No code changes.~~ **Done** — [`thailand-dataset-inventory.md`](thailand-dataset-inventory.md) and [`dataset-proof-results.md`](dataset-proof-results.md).
 2. PostGIS geometry migration and the boundary loader; load approved districts.
 3. Evacuation-center loader; one real district assessed end to end against the synthetic-style checks.
 4. Flood COG conversion and Option A rendering; the map shows real flood colours for that district.

@@ -44,7 +44,23 @@ Deepest samples in Mueang Nonthaburi: 7.07 m, 7.03 m, 4.24 m, 3.79 m, 3.43 m.
 | 5 | Do the vulnerability rasters line up after reprojection? | Reproject a district-sized window to EPSG:4326 and sample the same shelters | Increment 6 |
 | 6 | Does the golden case reproduce? | Run the proof on Chiang Yuen when DEP-04 arrives and compare with the signed result | Increment 1 acceptance |
 
-## 6. Rules for this tool
+## 6. Running it again
+
+It needs two things that are not in Git:
+
+1. The delivered files unpacked under `.local/data-in/` (ignored by Git; they live on the product owner's PC and on the ADPC Drive).
+2. The GIS extras installed: `pip install -e ".[dev,gis]"` in the virtual environment, for `rasterio`, `pyogrio` and `shapely`.
+
+Then, from the repository root:
+
+```
+python -m tools.prove_dataset --district "Bang Bua Thong"
+python -m tools.prove_dataset --district "ปัว"
+```
+
+Either the Thai or the English district name works.
+
+## 7. Rules for this tool
 
 - It lives in `tools/`, outside the product, and writes nothing.
 - Its numbers must never be shown to a planner or put in a brief: the inputs are unapproved and unpinned.
