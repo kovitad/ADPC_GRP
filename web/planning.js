@@ -137,28 +137,49 @@
 
   // SIG answers: a compact status card, the brief folded underneath, details on the right.
   const addEvidenceMessage = (payload, question) => {
+    const packId = String((payload.evidence && payload.evidence.pack_id) || "");
+    if (payload.receipt && packId) {
+      const prior = Array.from(thread.children).find(
+        (node) => node.dataset.packId === packId && node.dataset.receipt === "no",
+      );
+      if (prior) prior.remove();
+    }
     if (!restoring) {
+      const priorIndex = payload.receipt && packId
+        ? transcript.findIndex((entry) => entry.kind === "evidence"
+          && entry.payload.evidence.pack_id === packId && !entry.payload.receipt)
+        : -1;
+      if (priorIndex >= 0) transcript.splice(priorIndex, 1);
       transcript.push({ kind: "evidence", payload, question });
       saveState();
     }
     const row = addMessage("assistant", "", {
       label: payload.label,
       record: false,
-      actions: [chipButton("Open map & evidence", () => renderEvidence(payload, question))],
+      actions: [chipButton(payload.map_url ? "Open map & evidence" : "Open evidence", () => renderEvidence(payload, question))],
     });
     const bubble = row.querySelector(".pw-bubble");
+    row.dataset.packId = packId;
+    row.dataset.receipt = payload.receipt ? "yes" : "no";
     bubble.classList.add("pw-bubble--evidence");
     bubble.prepend(statusCard(payload, question));
-    const brief = document.createElement("details");
-    brief.className = "pw-brief";
-    const summary = document.createElement("summary");
-    summary.textContent = "Read the brief";
-    const text = renderBrief(payload.answer, (n) => {
-      renderEvidence(payload, question);
-      focusCitation(n);
-    });
-    brief.append(summary, text);
-    bubble.querySelector(".pw-bubble__label").before(brief);
+    if (payload.answer && payload.answer.trim()) {
+      const brief = document.createElement("details");
+      brief.className = "pw-brief";
+      const summary = document.createElement("summary");
+      summary.textContent = "Read the brief";
+      const text = renderBrief(payload.answer, (n) => {
+        renderEvidence(payload, question);
+        focusCitation(n);
+      });
+      brief.append(summary, text);
+      bubble.querySelector(".pw-bubble__label").before(brief);
+    } else {
+      const warning = document.createElement("p");
+      warning.className = "pw-draft-warning";
+      warning.textContent = "The AI did not produce a complete brief. The evidence is still available, but nothing can be published yet.";
+      bubble.querySelector(".pw-bubble__label").before(warning);
+    }
     scrollDown();
   };
 
@@ -180,13 +201,18 @@
   // on typical timings and are replaced by the real step durations when the answer arrives.
   const addProgress = ({ publish = false } = {}) => {
     hideWelcome();
-    const steps = [
-      { label: "Understanding your question", after: 0 },
-      { label: "Finding the district and flood evidence on SIG (usually 20–90 s)", after: 4000 },
-      { label: "Checking SIG used the real district boundary", after: 30000 },
-      { label: "Writing the brief from the evidence", after: 45000 },
-    ];
-    if (publish) steps.push({ label: "SIG source check, receipt and flood map", after: 60000 });
+    const steps = publish
+      ? [
+          { label: "Checking the exact brief you reviewed", after: 0 },
+          { label: "Creating the public receipt if SIG accepts it", after: 5000 },
+          { label: "Loading SIG's receipt-bound hazard map", after: 12000 },
+        ]
+      : [
+          { label: "Understanding your question", after: 0 },
+          { label: "Finding the district and flood evidence on SIG (usually 20–90 s)", after: 4000 },
+          { label: "Checking SIG used the real district boundary", after: 30000 },
+          { label: "Writing the brief from the evidence", after: 45000 },
+        ];
     const row = document.createElement("div");
     row.className = "pw-msg pw-msg--assistant";
     const avatar = document.createElement("span");
@@ -247,7 +273,7 @@
     let list = null;
     text.split(/\n+/).forEach((raw) => {
       const line = raw.trim();
-      if (!line) return;
+      if (!line || /^#{1,6}\s*$/.test(line)) return;
       const heading = line.match(/^#{1,4}\s+(.*)$/);
       const bullet = line.match(/^[-*]\s+(.*)$/);
       let node;
@@ -271,6 +297,11 @@
       }
       box.append(node);
     });
+    if (!box.childNodes.length) {
+      const fallback = document.createElement("p");
+      fallback.textContent = "No formatted brief was returned. Review the evidence cards instead.";
+      box.append(fallback);
+    }
     return box;
   };
 
@@ -626,6 +657,13 @@
 
   // Evidence panel: what SIG returned, what is missing, how it was produced, downloads.
   const evidencePanel = $("[data-evidence]");
+  const publishConfirm = $("[data-publish-confirm]");
+  const publishConfirmButton = $("[data-publish-confirm-button]");
+  const hidePublishConfirm = () => {
+    publishConfirm.hidden = true;
+    publishConfirmButton.disabled = false;
+  };
+  $("[data-publish-cancel]").addEventListener("click", hidePublishConfirm);
   const sigAreaLayer = window.L.featureGroup().addTo(map);
   let currentEvidence = null;
 
@@ -838,6 +876,7 @@
 
     const mapButton = $("[data-ev-map]");
     const mapUrl = safeHttps(payload.map_url);
+    hidePublishConfirm();
     mapButton.disabled = false;
     mapButton.classList.remove("is-warning");
     delete mapButton.dataset.confirm;
@@ -861,19 +900,26 @@
         );
       }
     } else {
-      mapButton.textContent = "Publish receipt & show hazard map";
-      mapButton.onclick = () => {
-        if (mapButton.dataset.confirm !== "yes") {
-          mapButton.dataset.confirm = "yes";
-          mapButton.textContent = "Confirm: this creates a public record";
-          mapButton.classList.add("is-warning");
-          return;
-        }
-        mapButton.disabled = true;
-        send(message, { publish: true, echo: false, confirmedPlace: evidence.place });
-      };
-      $("[data-ev-foot]").textContent =
-        "Unverified draft: not yet checked by SIG's source check, no receipt. Evidence only — not a decision that any place is safe.";
+      if (payload.publish_token) {
+        mapButton.textContent = "Verify & create public receipt";
+        mapButton.onclick = () => { publishConfirm.hidden = false; };
+        publishConfirmButton.onclick = () => {
+          publishConfirmButton.disabled = true;
+          send(message, {
+            publish: true,
+            publishToken: payload.publish_token,
+            echo: false,
+            confirmedPlace: evidence.place,
+          });
+        };
+        $("[data-ev-foot]").textContent =
+          "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
+      } else {
+        mapButton.textContent = "Retry brief generation";
+        mapButton.onclick = () => send(message, { echo: false, confirmedPlace: evidence.place });
+        $("[data-ev-foot]").textContent =
+          "The evidence lookup succeeded, but the brief was incomplete and cannot be published. Retry to generate a new brief; no public record exists.";
+      }
     }
     outlineSigArea(evidence);
     openEvidence();
@@ -894,7 +940,9 @@
       `${counts.sources} sources · ${counts.pulled_live} pulled live · ${counts.computed} computed · ${counts.declared_gaps} declared gap(s)`;
     const badge = document.createElement("span");
     badge.className = `pw-status__badge${evidence.receipt ? " is-ok" : ""}`;
-    badge.textContent = evidence.receipt ? `Receipt ${evidence.receipt.receipt_id}` : "Unverified draft";
+    badge.textContent = evidence.receipt
+      ? `Receipt ${evidence.receipt.receipt_id}`
+      : payload.publish_token ? "Unverified draft" : "Brief incomplete · evidence only";
     card.append(title);
     if (payload.note) {
       const note = document.createElement("span");
@@ -903,6 +951,13 @@
       card.append(note);
     }
     card.append(line);
+    if (counts.pulled_live === 0) {
+      const sourceNote = document.createElement("span");
+      sourceNote.className = "pw-status__source-note";
+      sourceNote.textContent =
+        "No source was pulled live in this run; computed exposure is not a report of current flooding.";
+      card.append(sourceNote);
+    }
     const steps = (evidence.grp_trace || []).filter((step) => typeof step.duration_ms === "number");
     if (evidence.total_ms || steps.length) {
       const timing = document.createElement("span");
@@ -916,7 +971,7 @@
   };
 
   const sigActions = (payload, message) => [
-    chipButton("Open map & evidence", () => renderEvidence(payload, message)),
+    chipButton(payload.map_url ? "Open map & evidence" : "Open evidence", () => renderEvidence(payload, message)),
   ];
 
   const confirmAreaAction = (confirmation) => {
@@ -951,7 +1006,7 @@
     }
   };
 
-  const send = async (text, { publish = false, echo = true, confirmedPlace = null } = {}) => {
+  const send = async (text, { publish = false, publishToken = null, echo = true, confirmedPlace = null } = {}) => {
     const message = (text ?? input.value).trim();
     if (!message || state.busy || !state.hubCode) return;
     if (!state.chatAvailable) {
@@ -1011,6 +1066,7 @@
           boundary_id: state.explicitSelection && state.selected ? state.selected.id : null,
           assessment_id: state.assessmentId,
           publish_receipt: publish,
+          publish_token: publishToken,
           history: state.history.slice(-8),
         },
       });
@@ -1042,14 +1098,27 @@
         addEvidenceMessage(payload, message);
         renderEvidence(payload, message);
       } else {
+        if (payload.mode === "gate_blocked") {
+          hidePublishConfirm();
+          const mapButton = $("[data-ev-map]");
+          mapButton.textContent = "Retry brief generation";
+          mapButton.onclick = () => send(message, { echo: false, confirmedPlace: payload.area?.requested });
+          $("[data-ev-foot]").textContent =
+            "SIG refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
+        }
         addMessage("assistant", payload.answer, {
           label: payload.label,
           actions,
           error: payload.mode === "area_rejected" || payload.mode === "gate_blocked",
         });
       }
-      state.history.push({ role: "user", text: message }, { role: "assistant", text: payload.answer.slice(0, 1200) });
-      saveState();
+      if (!publish) {
+        state.history.push({ role: "user", text: message });
+        if (payload.answer?.trim()) {
+          state.history.push({ role: "assistant", text: payload.answer.slice(0, 1200) });
+        }
+        saveState();
+      }
       return true;
     } catch (error) {
       typing.remove();

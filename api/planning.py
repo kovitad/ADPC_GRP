@@ -26,6 +26,7 @@ from api.langfuse import send_ai_call
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
+from api.planning_publish import decode_publish_token, encode_publish_token
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
@@ -49,6 +50,8 @@ CANNOT_REPLY = (
     "preparedness investment brief and the red/yellow/green risk map are coming next. I never "
     "certify that a place is safe, and access changes use the GRP admin pages."
 )
+# Keep below the request field limit in PlanningChat.publish_token.
+PUBLISH_TOKEN_MAX_CHARS = 90_000
 ROUTER_VERSION = "planning-router-v1"
 DRAFT_VERSION = "planning-draft-v1"
 RESULT_EXPLANATION_PATTERN = re.compile(
@@ -97,6 +100,7 @@ class PlanningChat(BaseModel):
     place: str | None = Field(default=None, max_length=200)
     hub_code: str | None = Field(default=None, max_length=64)
     publish_receipt: bool = False
+    publish_token: str | None = Field(default=None, max_length=100_000)
     assessment_id: UUID | None = None
     boundary_id: UUID | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=8)
@@ -189,6 +193,216 @@ def _asks_to_explain_result(message: str) -> bool:
     return bool(RESULT_EXPLANATION_PATTERN.search(message))
 
 
+def _draft_issues(
+    text: str, required_sections: list[object], citations: list[object]
+) -> list[str]:
+    """Cheap local preflight for failures the SIG groundedness gate will reject."""
+
+    issues: list[str] = []
+    headings = [str(section).strip() for section in required_sections if str(section).strip()]
+    lines = [line.strip() for line in text.splitlines()]
+    for heading in headings:
+        if heading not in lines:
+            issues.append(f"Missing required heading: {heading.removeprefix('## ').strip()}")
+            continue
+        start = lines.index(heading) + 1
+        end = next(
+            (index for index in range(start, len(lines)) if lines[index].startswith("## ")),
+            len(lines),
+        )
+        if not any(line and not line.startswith("#") for line in lines[start:end]):
+            issues.append(f"No content under heading: {heading.removeprefix('## ').strip()}")
+    if any(line.lower() == "## sources" for line in lines):
+        issues.append("The brief must not add its own Sources section")
+    valid_citations = {
+        str(item["n"])
+        for item in citations
+        if isinstance(item, dict) and isinstance(item.get("n"), int)
+    }
+    cited = re.findall(r"\[(\d+)\]", text)
+    if not cited:
+        issues.append("The brief has no evidence citations")
+    elif any(number not in valid_citations for number in cited):
+        issues.append("The brief cites evidence that is not in this pack")
+    paragraphs = re.split(r"\n\s*\n", text)
+    for paragraph in paragraphs:
+        content = " ".join(
+            line.strip()
+            for line in paragraph.splitlines()
+            if line.strip() and not line.startswith("#")
+        )
+        if content and not re.search(r"\[\d+\]", content):
+            issues.append("A paragraph has no evidence citation")
+            break
+    return issues[:6]
+
+
+def _gate_failures(published: dict[str, Any]) -> list[str]:
+    values = published.get("failures")
+    failures = values if isinstance(values, list) else []
+    clean = [str(value).strip()[:300] for value in failures if str(value).strip()]
+    if not clean and isinstance(published.get("note"), str) and published["note"].strip():
+        clean.append(published["note"].strip()[:300])
+    return clean[:6]
+
+
+async def _publish_reviewed_draft(
+    payload: PlanningChat,
+    principal: CurrentPrincipal,
+    session: Session,
+    hub: MembershipView,
+    settings: Settings,
+) -> dict[str, Any]:
+    """Gate and embed the exact signed draft that the person reviewed."""
+
+    if not payload.publish_token:
+        raise GrpError(
+            422,
+            "VALIDATION_FAILED",
+            "Open the evidence panel and review a draft before creating a public receipt.",
+        )
+    limiter.check(
+        "sig_evidence_reads_per_minute",
+        f"{principal.user_id}:publish",
+        settings.rate_limits["sig_evidence_reads_per_minute"],
+        60,
+    )
+    claims = decode_publish_token(
+        settings,
+        payload.publish_token,
+        user_id=str(principal.user_id),
+        session_id=principal.session_id,
+        hub_id=str(hub.hub_id),
+    )
+    access_token = session_token_store.get(principal.session_id)
+    if not access_token:
+        raise GrpError(
+            401,
+            "SIG_REAUTH_REQUIRED",
+            "Sign in with SERVIR again to connect to SIG evidence.",
+        )
+
+    request_started = perf_counter()
+    evidence = dict(claims["evidence"])
+    trace = list(evidence.get("grp_trace", []))
+    try:
+        async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
+            step_started = perf_counter()
+            published_result = await mcp.call_tool(
+                "publish_answer",
+                {
+                    "pack_id": claims["pack_id"],
+                    "draft": claims["draft"],
+                    "question": claims["question"],
+                },
+            )
+            published = tool_payload(published_result)
+            failures = _gate_failures(published)
+            if (
+                published_result.is_error
+                or published.get("status") != "ok"
+                or not published.get("receipt_id")
+            ):
+                _audit(
+                    session,
+                    principal,
+                    hub,
+                    "sig_receipt_blocked",
+                    {"pack_id": claims["pack_id"], "result": "denied"},
+                )
+                detail = "\n".join(f"- {failure}" for failure in failures)
+                answer = (
+                    "No public record was created. SIG's source check rejected the exact draft "
+                    "you reviewed."
+                )
+                if detail:
+                    answer += f"\n\nWhy it was blocked:\n{detail}"
+                answer += "\n\nThe evidence is still available. Generate a new draft and try again."
+                return {
+                    "hub_code": hub.hub_code,
+                    "mode": "gate_blocked",
+                    "answer": answer,
+                    "label": "Not published — SIG source check blocked the draft.",
+                    "failures": failures,
+                    "area": claims["area"],
+                    "trace": trace,
+                    "usage": _usage(session, settings, principal),
+                }
+            trace.append(
+                {
+                    "step": "publish_answer",
+                    "detail": str(published["receipt_id"]),
+                    "duration_ms": round((perf_counter() - step_started) * 1000),
+                }
+            )
+            step_started = perf_counter()
+            embed = await mcp.call_tool(
+                "ui_embed",
+                {"component": "hazard_map", "receipt_id": str(published["receipt_id"])},
+            )
+            map_url = (
+                None
+                if embed.is_error
+                else embed_url(embed, urlparse(settings.sig_mcp_base_url).hostname)
+            )
+            trace.append(
+                {
+                    "step": "hazard_map",
+                    "detail": "embedded" if map_url else "none",
+                    "duration_ms": round((perf_counter() - step_started) * 1000),
+                }
+            )
+    except SigMcpError as error:
+        if "renewed" in str(error):
+            raise GrpError(
+                401, "SIG_REAUTH_REQUIRED", "Sign in with SERVIR again to connect to SIG evidence."
+            ) from error
+        raise GrpError(
+            503, "SIG_UNAVAILABLE", "SIG evidence is not available right now."
+        ) from error
+
+    receipt = {
+        "receipt_id": published["receipt_id"],
+        "public_url": published.get("public_resolver"),
+    }
+    evidence.update(
+        {
+            "receipt": receipt,
+            "grp_trace": trace,
+            "total_ms": int(evidence.get("total_ms") or 0)
+            + round((perf_counter() - request_started) * 1000),
+        }
+    )
+    _audit(
+        session,
+        principal,
+        hub,
+        "sig_receipt_published",
+        {
+            "pack_id": claims["pack_id"],
+            "place": claims["place"],
+            "receipt_id": receipt["receipt_id"],
+        },
+    )
+    return {
+        "hub_code": hub.hub_code,
+        "mode": "sig_evidence",
+        "answer": claims["draft"],
+        "label": EVIDENCE_LABEL,
+        "note": claims.get("note"),
+        "area": claims["area"],
+        "stats": evidence.get("stats", {}),
+        "gaps": evidence.get("gaps", []),
+        "citations": evidence.get("citations", []),
+        "receipt": receipt,
+        "map_url": map_url,
+        "map_kind": "flood_hazard_and_asset_exposure" if map_url else None,
+        "trace": trace,
+        "evidence": evidence,
+        "usage": _usage(session, settings, principal),
+    }
+
+
 @router.post(
     "/chat",
     summary="Planner chat with optional SIG flood evidence and map (ADR-0004)",
@@ -204,6 +418,8 @@ async def planning_chat(
     if not planning_chat_available(settings):
         raise not_found()
     hub = planner_membership(principal, payload.hub_code)
+    if payload.publish_receipt:
+        return await _publish_reviewed_draft(payload, principal, session, hub, settings)
     limiter.check(
         "ai_requests_per_person_per_hour",
         str(principal.user_id),
@@ -458,58 +674,6 @@ async def planning_chat(
                           "duration_ms": elapsed_ms(step_started)})
             step_started = perf_counter()
 
-            receipt: dict[str, Any] | None = None
-            map_url = None
-            if payload.publish_receipt:
-                published_result = await mcp.call_tool(
-                    "publish_answer",
-                    {"pack_id": str(pack["pack_id"]), "draft": draft.text,
-                     "question": payload.message},
-                )
-                published = tool_payload(published_result)
-                if (
-                    published_result.is_error
-                    or published.get("status") != "ok"
-                    or not published.get("receipt_id")
-                ):
-                    _audit(
-                        session,
-                        principal,
-                        hub,
-                        "sig_receipt_blocked",
-                        {"pack_id": pack.get("pack_id"), "result": "denied"},
-                    )
-                    return {
-                        **base,
-                        "mode": "gate_blocked",
-                        "answer": (
-                            "SIG's groundedness check refused the draft, so it is not shown and "
-                            "no receipt was issued. Ask again or rephrase the question."
-                        ),
-                        "label": "Blocked by the SIG evidence gate.",
-                        "failures": published.get("failures", []),
-                        "area": area_payload,
-                        "trace": trace,
-                        "usage": _usage(session, settings, principal),
-                    }
-                trace.append({"step": "publish_answer", "detail": str(published["receipt_id"]),
-                              "duration_ms": elapsed_ms(step_started)})
-                step_started = perf_counter()
-                embed = await mcp.call_tool(
-                    "ui_embed",
-                    {"component": "hazard_map", "receipt_id": str(published["receipt_id"])},
-                )
-                map_url = (
-                    None
-                    if embed.is_error
-                    else embed_url(embed, urlparse(settings.sig_mcp_base_url).hostname)
-                )
-                trace.append({"step": "hazard_map", "detail": "embedded" if map_url else "none",
-                              "duration_ms": elapsed_ms(step_started)})
-                receipt = {
-                    "receipt_id": published["receipt_id"],
-                    "public_url": published.get("public_resolver"),
-                }
     except SigMcpError as error:
         message = str(error)
         if "renewed" in message:
@@ -524,19 +688,52 @@ async def planning_chat(
         session,
         principal,
         hub,
-        "sig_receipt_published" if receipt else "planning_sig_evidence",
+        "planning_sig_evidence",
         {
             "pack_id": pack.get("pack_id"),
             "place": area.sig_place,
-            "receipt_id": receipt["receipt_id"] if receipt else None,
+            "receipt_id": None,
         },
     )
+    issues = _draft_issues(
+        draft.text, pack.get("required_sections", []), pack.get("citations", [])
+    )
+    answer = "" if issues else draft.text
+    evidence = {
+        **evidence_bundle(payload.message, place, pack, area_payload, trace, None),
+        "total_ms": elapsed_ms(request_started),
+    }
+    publish_token = None
+    if not issues:
+        publish_token = encode_publish_token(
+            settings,
+            user_id=str(principal.user_id),
+            session_id=principal.session_id,
+            hub_id=str(hub.hub_id),
+            claims={
+                "pack_id": str(pack["pack_id"]),
+                "question": payload.message,
+                "place": area.sig_place or place,
+                "draft": draft.text,
+                "area": area_payload,
+                "evidence": evidence,
+                "note": fallback_note,
+            },
+        )
+        if len(publish_token) > PUBLISH_TOKEN_MAX_CHARS:
+            # The browser must return the signed draft; an oversized pack cannot round-trip.
+            publish_token = None
+            issues = ["This evidence pack is too large to publish from this screen"]
     return {
         **base,
         "mode": "sig_evidence",
-        "answer": draft.text,
+        "answer": answer,
         "label": EVIDENCE_LABEL
-        + ("" if receipt else " Unverified draft: not checked by the SIG gate, no receipt."),
+        + (
+            " Draft formatting was incomplete; evidence remains available."
+            if issues
+            else " Unverified draft: not checked by the SIG gate, no receipt."
+        ),
         "note": fallback_note,
         "area": area_payload,
         "stats": pack.get("stats", {}),
@@ -546,14 +743,13 @@ async def planning_chat(
             for item in pack.get("citations", [])
             if isinstance(item, dict)
         ],
-        "receipt": receipt,
-        "map_url": map_url,
-        "map_kind": "flood_hazard_and_asset_exposure" if map_url else None,
+        "receipt": None,
+        "map_url": None,
+        "map_kind": None,
+        "publish_token": publish_token,
+        "draft_issues": issues,
         "trace": trace,
-        "evidence": {
-            **evidence_bundle(payload.message, place, pack, area_payload, trace, receipt),
-            "total_ms": elapsed_ms(request_started),
-        },
+        "evidence": evidence,
         "usage": _usage(session, settings, principal),
     }
 

@@ -525,6 +525,17 @@
 }
 .pw-area:empty { display: none; }
 .pw-evidence__actions { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.7rem 1.1rem 0.2rem; }
+.pw-publish {
+  margin: 0.65rem 1.1rem 0;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid #f0c36a;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #523a0b;
+}
+.pw-publish strong { display: block; font-size: 0.82rem; font-weight: 650; }
+.pw-publish p { margin: 0.3rem 0 0.6rem; font-size: 0.74rem; line-height: 1.45; }
+.pw-publish > div { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .pw-download { position: relative; }
 .pw-download__menu {
   position: absolute;
@@ -669,10 +680,12 @@
 
 /* Status timing, brief formatting, citations */
 .pw-status__timing { color: #52645f !important; font-size: 0.72rem !important; }
+.pw-status__source-note { color: #6a5933 !important; font-size: 0.72rem !important; line-height: 1.4; }
 .pw-brief__text { white-space: normal; }
 .pw-brief__text h4 { margin: 0.8rem 0 0.25rem; font-size: 0.84rem; color: var(--pw-forest); }
 .pw-brief__text p { margin: 0 0 0.5rem; line-height: 1.55; }
 .pw-brief__text ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+.pw-draft-warning { margin: 0.45rem 0; color: #7a4b0a; font-size: 0.78rem; line-height: 1.5; }
 .pw-cite {
   display: inline-grid;
   min-width: 1.15rem;

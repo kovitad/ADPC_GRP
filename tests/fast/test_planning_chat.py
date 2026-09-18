@@ -322,15 +322,29 @@ def test_model_only_sig_area_needs_confirmation_before_any_sig_call(planning) ->
 
 def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
     planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
-
-    body = _ask(
-        _client(planning, "planner@example.test"),
+    client = _client(planning, "planner@example.test")
+    draft = _ask(
+        client,
         message="Which schools are exposed?",
         place="Mueang Nan District, Nan, Thailand",
+    ).json()
+    assert draft["publish_token"]
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
+
+    body = _ask(
+        client,
+        message="Which schools are exposed?",
         publish_receipt=True,
+        publish_token=draft["publish_token"],
     ).json()
 
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack", "publish_answer", "ui_embed"]
+    assert FakeMcp.calls[1][1] == {
+        "pack_id": "pack-123",
+        "draft": draft["answer"],
+        "question": "Which schools are exposed?",
+    }
+    assert planning["replies"] == []  # publication did not call the model again
     assert body["receipt"]["receipt_id"] == "receipt-1"
     assert body["map_url"] == "https://sig.example/embed/hazard_map/r1"
     assert body["map_kind"] == "flood_hazard_and_asset_exposure"
@@ -339,14 +353,23 @@ def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
 
 
 def test_gate_blocked_draft_is_not_shown(planning) -> None:
-    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "SECRET DRAFT [9]"]
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\nSECRET DRAFT [1]",
+    ]
     FakeMcp.publish = {"status": "blocked", "failures": ["citation [9] not in pack"]}
     try:
-        body = _ask(
-            _client(planning, "planner@example.test"),
+        client = _client(planning, "planner@example.test")
+        draft = _ask(
+            client,
             message="Which schools are exposed?",
             place="Mueang Nan District, Nan, Thailand",
+        ).json()
+        body = _ask(
+            client,
+            message="Which schools are exposed?",
             publish_receipt=True,
+            publish_token=draft["publish_token"],
         ).json()
     finally:
         FakeMcp.publish = {"status": "ok", "receipt_id": "receipt-1",
@@ -354,21 +377,32 @@ def test_gate_blocked_draft_is_not_shown(planning) -> None:
 
     assert body["mode"] == "gate_blocked"
     assert "SECRET DRAFT" not in json.dumps(body)
+    assert "citation [9] not in pack" in body["answer"]
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack", "publish_answer"]
 
 
 def test_non_ok_publish_status_never_requests_an_embed(planning) -> None:
-    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "DRAFT [1]"]
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\nDRAFT [1]",
+    ]
     FakeMcp.publish = {
         "status": "declined",
         "receipt_id": "must-not-be-used",
         "note": "Publication is unavailable.",
     }
     try:
-        body = _ask(
-            _client(planning, "planner@example.test"),
+        client = _client(planning, "planner@example.test")
+        draft = _ask(
+            client,
             message="Which schools are exposed?",
             place="Mueang Nan District, Nan, Thailand",
+        ).json()
+        body = _ask(
+            client,
+            message="Which schools are exposed?",
             publish_receipt=True,
+            publish_token=draft["publish_token"],
         ).json()
     finally:
         FakeMcp.publish = {
@@ -379,6 +413,41 @@ def test_non_ok_publish_status_never_requests_an_embed(planning) -> None:
 
     assert body["mode"] == "gate_blocked"
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack", "publish_answer"]
+    assert "Publication is unavailable." in body["answer"]
+
+
+def test_incomplete_draft_cannot_be_published(planning) -> None:
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "####\n####"]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    assert body["mode"] == "sig_evidence"
+    assert body["answer"] == ""
+    assert body["publish_token"] is None
+    assert "Missing required heading" in body["draft_issues"][0]
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
+
+
+def test_publish_requires_a_valid_reviewed_draft_token(planning) -> None:
+    client = _client(planning, "planner@example.test")
+    missing = _ask(
+        client, message="Which schools are exposed?", publish_receipt=True
+    )
+    tampered = _ask(
+        client,
+        message="Which schools are exposed?",
+        publish_receipt=True,
+        publish_token="invalid-token",
+    )
+
+    assert missing.status_code == 422
+    assert tampered.status_code == 409
+    assert FakeMcp.calls == []
+    assert planning["replies"] == []
 
 
 def test_fallback_area_stops_before_drafting(planning) -> None:
@@ -390,7 +459,6 @@ def test_fallback_area_stops_before_drafting(planning) -> None:
         _client(planning, "planner@example.test"),
         message="Which schools are exposed?",
         place="Ku Thong, Thailand",
-        publish_receipt=True,
     ).json()
 
     assert body["mode"] == "area_rejected"
@@ -508,3 +576,22 @@ def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning)
     assert body["evidence"]["summary"]["sources"] == 1
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
     assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
+
+
+def test_publish_token_is_dropped_when_the_pack_is_too_large(planning, monkeypatch) -> None:
+    monkeypatch.setattr(api.planning, "PUBLISH_TOKEN_MAX_CHARS", 10)
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": "", "place": "Mueang Nan District, Nan, Thailand",'
+        ' "return_period_years": null}',
+        "## What the numbers show\n3 of 9 schools are in the flood area [1]",
+    ]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    assert body["mode"] == "sig_evidence"
+    assert body["publish_token"] is None
+    assert body["draft_issues"] == ["This evidence pack is too large to publish from this screen"]

@@ -126,3 +126,5 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert 'loading="lazy"' in page
     assert "Flood hazard and asset exposure" in page
     assert "not a vulnerability-weighted" in page
+    assert "Verify this exact brief and create a public receipt?" in page
+    assert "replayable public receipt" in page
