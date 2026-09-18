@@ -467,8 +467,10 @@ async def planning_chat(
                      "question": payload.message},
                 )
                 published = tool_payload(published_result)
-                if published_result.is_error or published.get("status") == "blocked" or not (
-                    published.get("receipt_id")
+                if (
+                    published_result.is_error
+                    or published.get("status") != "ok"
+                    or not published.get("receipt_id")
                 ):
                     _audit(
                         session,
@@ -497,7 +499,11 @@ async def planning_chat(
                     "ui_embed",
                     {"component": "hazard_map", "receipt_id": str(published["receipt_id"])},
                 )
-                map_url = embed_url(embed, urlparse(settings.sig_mcp_base_url).hostname)
+                map_url = (
+                    None
+                    if embed.is_error
+                    else embed_url(embed, urlparse(settings.sig_mcp_base_url).hostname)
+                )
                 trace.append({"step": "hazard_map", "detail": "embedded" if map_url else "none",
                               "duration_ms": elapsed_ms(step_started)})
                 receipt = {
@@ -542,6 +548,7 @@ async def planning_chat(
         ],
         "receipt": receipt,
         "map_url": map_url,
+        "map_kind": "flood_hazard_and_asset_exposure" if map_url else None,
         "trace": trace,
         "evidence": {
             **evidence_bundle(payload.message, place, pack, area_payload, trace, receipt),

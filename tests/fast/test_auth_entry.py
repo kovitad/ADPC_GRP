@@ -116,3 +116,13 @@ def test_planning_location_lookup_requires_an_administrative_district() -> None:
     assert "CURRENT_LOCATION_NO_DISTRICT" in script
     assert "zoom=14&addressdetails=1" in script
     assert "polygon_geojson=1&addressdetails=1" in script
+
+
+def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
+    page = (WEB_ROOT / "planning.html").read_text(encoding="utf-8")
+
+    assert 'sandbox="allow-scripts allow-same-origin"' in page
+    assert 'referrerpolicy="no-referrer"' in page
+    assert 'loading="lazy"' in page
+    assert "Flood hazard and asset exposure" in page
+    assert "not a vulnerability-weighted" in page

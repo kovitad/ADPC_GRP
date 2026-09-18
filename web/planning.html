@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260917m" />
-    <link rel="stylesheet" href="/planning.css?v=20260917n" />
+    <link rel="stylesheet" href="/planning.css?v=20260918a" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260917n" defer></script>
-    <script src="/planning.js?v=20260917n" defer></script>
+    <script src="/planning.js?v=20260918a" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -130,7 +130,7 @@
           </div>
           <div class="pw-area" data-ev-area></div>
           <div class="pw-evidence__actions">
-            <button class="pw-chip-button" type="button" data-ev-map>Show SIG flood map</button>
+            <button class="pw-chip-button" type="button" data-ev-map>Show hazard &amp; exposure map</button>
             <div class="pw-download">
               <button class="pw-chip-button" type="button" data-ev-download-toggle aria-expanded="false">
                 Download ▾
@@ -165,14 +165,24 @@
 
         <div class="pw-sig" data-sig hidden>
           <div class="pw-sig__bar">
-            <strong>SIG hazard map (public receipt)</strong>
+            <div>
+              <span class="pw-sig__eyebrow">SIG live component · public receipt</span>
+              <strong>Flood hazard and asset exposure</strong>
+              <span class="pw-sig__meta" data-sig-meta></span>
+            </div>
             <button class="pw-icon-button" type="button" data-sig-close aria-label="Close SIG map">×</button>
           </div>
+          <p class="pw-sig__help" id="sig-map-help">
+            Shows assets intersecting mapped flood-hazard classes. It is not a vulnerability-weighted
+            risk score and does not certify that a location is safe.
+          </p>
           <iframe
             data-sig-frame
-            title="SIG receipt-bound hazard map"
+            title="SIG receipt-bound flood hazard and asset exposure map"
+            aria-describedby="sig-map-help"
             sandbox="allow-scripts allow-same-origin"
             referrerpolicy="no-referrer"
+            loading="lazy"
           ></iframe>
         </div>
       </section>

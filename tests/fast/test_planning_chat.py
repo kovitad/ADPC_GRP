@@ -71,6 +71,7 @@ def test_embed_url_only_accepts_sig_host() -> None:
     result = McpToolResult(
         content=[
             {"type": "text", "text": '<iframe src="https://evil.example/embed"></iframe>'},
+            {"type": "text", "text": '<iframe src="https://sig.example/account">'},
             {"type": "text", "text": '<iframe src="https://sig.example/embed/hazard_map/r1">'},
         ],
         structured_content={},
@@ -78,6 +79,18 @@ def test_embed_url_only_accepts_sig_host() -> None:
     )
     assert embed_url(result, "sig.example") == "https://sig.example/embed/hazard_map/r1"
     assert embed_url(result, "other.example") is None
+
+
+def test_embed_url_rejects_non_hazard_component_on_sig_host() -> None:
+    result = McpToolResult(
+        content=[
+            {"type": "text", "text": '<iframe src="https://sig.example/embed/provenance_graph/r1">'},
+        ],
+        structured_content={},
+        is_error=False,
+    )
+
+    assert embed_url(result, "sig.example") is None
 
 
 def test_sig_mcp_client_initializes_then_calls_tool() -> None:
@@ -320,6 +333,7 @@ def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack", "publish_answer", "ui_embed"]
     assert body["receipt"]["receipt_id"] == "receipt-1"
     assert body["map_url"] == "https://sig.example/embed/hazard_map/r1"
+    assert body["map_kind"] == "flood_hazard_and_asset_exposure"
     with Session(planning["engine"]) as session:
         assert "sig_receipt_published" in set(session.scalars(select(AuditEvent.action)))
 
@@ -340,6 +354,31 @@ def test_gate_blocked_draft_is_not_shown(planning) -> None:
 
     assert body["mode"] == "gate_blocked"
     assert "SECRET DRAFT" not in json.dumps(body)
+
+
+def test_non_ok_publish_status_never_requests_an_embed(planning) -> None:
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "DRAFT [1]"]
+    FakeMcp.publish = {
+        "status": "declined",
+        "receipt_id": "must-not-be-used",
+        "note": "Publication is unavailable.",
+    }
+    try:
+        body = _ask(
+            _client(planning, "planner@example.test"),
+            message="Which schools are exposed?",
+            place="Mueang Nan District, Nan, Thailand",
+            publish_receipt=True,
+        ).json()
+    finally:
+        FakeMcp.publish = {
+            "status": "ok",
+            "receipt_id": "receipt-1",
+            "public_resolver": "https://sig.example/r/receipt-1",
+        }
+
+    assert body["mode"] == "gate_blocked"
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack", "publish_answer"]
 
 
 def test_fallback_area_stops_before_drafting(planning) -> None:

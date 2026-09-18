@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 from api.mcp_client import McpToolResult, SigMcpError
 
 AOI_PATTERN = re.compile(r"^aoi\[(?P<name>[^\]]+)\]\s*(?P<detail>.*)$")
+HAZARD_MAP_PATH = re.compile(r"^/embed/hazard_map/[^/]+/?$")
 
 
 @dataclass(frozen=True)
@@ -87,7 +88,11 @@ def check_area(requested_place: str, pack: dict[str, Any]) -> AreaCheck:
 
 
 def embed_url(result: McpToolResult, allowed_host: str | None) -> str | None:
-    """Return the first https URL on the SIG host from a ui_embed result."""
+    """Return the receipt-bound hazard-map URL from a SIG ``ui_embed`` result.
+
+    The MCP result can contain prose and arbitrary links.  Treat it as untrusted and
+    accept only the documented HTTPS component path on the configured SIG host.
+    """
 
     candidates: list[str] = []
 
@@ -105,6 +110,12 @@ def embed_url(result: McpToolResult, allowed_host: str | None) -> str | None:
     visit(result.content)
     for candidate in candidates:
         parsed = urlparse(candidate.replace("&amp;", "&"))
-        if parsed.scheme == "https" and parsed.hostname == allowed_host:
+        if (
+            parsed.scheme == "https"
+            and parsed.hostname == allowed_host
+            and parsed.username is None
+            and parsed.password is None
+            and HAZARD_MAP_PATH.fullmatch(parsed.path)
+        ):
             return parsed.geturl()
     return None

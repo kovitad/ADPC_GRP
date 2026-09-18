@@ -35,6 +35,9 @@ Add `POST /api/v1/planning/chat`, `GET /api/v1/planning/status` and `/planning.h
 - Not for Sandbox, staging or production. Moving it needs DEP-01, a security review, a spec update and a new decision.
 - The browser calls `nominatim.openstreetmap.org` and `unpkg.com` for the map. That is acceptable for a local test only.
 - The OSM outline is not the analysis area. The page says so.
+- The receipt-bound SIG component is described as **flood hazard and asset exposure**, not a
+  vulnerability-weighted risk map. Implementation and training guidance is in
+  `docs/flood-hazard-exposure-embed-design.md`.
 - When Increment 1 lands, the chat should explain stored GRP results instead of SIG generic packs.
 
 ## Action items

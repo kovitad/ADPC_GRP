@@ -611,9 +611,17 @@
 
   // ---------- SIG evidence ----------
   const sigPanel = $("[data-sig]");
+  const sigFrame = $("[data-sig-frame]");
+  const showSigMap = (mapUrl, evidence) => {
+    sigFrame.src = mapUrl;
+    const place = (evidence.area && evidence.area.sig_place) || evidence.place || "Confirmed area";
+    const receiptId = evidence.receipt && evidence.receipt.receipt_id;
+    $("[data-sig-meta]").textContent = `${place}${receiptId ? ` · receipt ${receiptId}` : ""}`;
+    sigPanel.hidden = false;
+  };
   $("[data-sig-close]").addEventListener("click", () => {
     sigPanel.hidden = true;
-    $("[data-sig-frame]").removeAttribute("src");
+    sigFrame.removeAttribute("src");
   });
 
   // Evidence panel: what SIG returned, what is missing, how it was produced, downloads.
@@ -795,7 +803,7 @@
       strong.textContent = typeof value.exposed === "number"
         ? `${value.exposed} / ${value.total}`
         : `${value.exposed_km ?? 0} / ${value.total_km ?? 0} km`;
-      span.textContent = `${name.replaceAll("_", " ")} in flood area`;
+      span.textContent = `${name.replaceAll("_", " ")} exposed to mapped flood hazard`;
       tile.append(strong, span);
       numbers.append(tile);
     });
@@ -834,12 +842,9 @@
     mapButton.classList.remove("is-warning");
     delete mapButton.dataset.confirm;
     if (evidence.receipt) {
-      mapButton.textContent = "Show SIG flood map";
-      mapButton.onclick = () => {
-        if (!mapUrl) return;
-        $("[data-sig-frame]").src = mapUrl;
-        sigPanel.hidden = false;
-      };
+      mapButton.textContent = mapUrl ? "Show hazard & exposure map" : "SIG embedded map unavailable";
+      mapButton.disabled = !mapUrl;
+      mapButton.onclick = () => mapUrl && showSigMap(mapUrl, evidence);
       const receiptUrl = safeHttps(evidence.receipt.public_url);
       $("[data-ev-foot]").textContent = "";
       if (receiptUrl) {
@@ -850,8 +855,13 @@
         link.textContent = `Public receipt ${evidence.receipt.receipt_id}`;
         $("[data-ev-foot]").append("Passed SIG's source check · ", link);
       }
+      if (!mapUrl) {
+        $("[data-ev-foot]").append(
+          `${receiptUrl ? " · " : ""}The answer is available, but SIG did not return a valid hazard-map embed.`,
+        );
+      }
     } else {
-      mapButton.textContent = "Publish receipt & show SIG flood map";
+      mapButton.textContent = "Publish receipt & show hazard map";
       mapButton.onclick = () => {
         if (mapButton.dataset.confirm !== "yes") {
           mapButton.dataset.confirm = "yes";
@@ -868,8 +878,7 @@
     outlineSigArea(evidence);
     openEvidence();
     if (evidence.receipt && mapUrl) {
-      $("[data-sig-frame]").src = mapUrl;
-      sigPanel.hidden = false;
+      showSigMap(mapUrl, evidence);
     }
   };
 

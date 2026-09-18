@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 18 September 2026 (stabilized, rebuilt from committed source and merged to `main`)
+**Updated:** 18 September 2026 (SIG receipt-bound flood-map embed hardening in progress)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. **207 tests pass**; Ruff and JavaScript syntax checks are clean.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work now continues on `codex/sig-embedded-flood-map`. **210 tests pass**; Ruff and JavaScript syntax checks are clean. The local API and worker were rebuilt from this branch and are healthy.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -20,6 +20,7 @@
 | Increment 2, access and admin | **Complete in code**: NDMO Planner, Hub Expert / GIS Specialist, Hub Admin and Platform Admin; security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
 | Increment 1, golden assessment | **Built on a synthetic case**: job, worker, locked result, API, screen, golden test. Real acceptance needs DEP-04, DEP-06 and method approval |
 | Planner assistant and map (ADR-0004) | **Built, Docker Desktop only**: chat bot plus OSM map, SIG MCP evidence, evidence panel, downloads, progress, Thai input; browser location accepts a confirmed district only |
+| SIG live hazard-map embed | **Implemented on `codex/sig-embedded-flood-map`**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path, sandboxed iframe and explicit hazard/exposure—not full risk—education |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
@@ -43,6 +44,7 @@ All feature branches are **stacked**: each contains the ones before it. `feat/pl
 | 3 | `feat/increment-1-assessment` | Assessment tables, storage, method, worker, API, synthetic seed and golden test, `/assessments.html` |
 | 4 | `feat/planning-map-workspace` | Map layers API, flood overlay picture, center points, explain API |
 | 5 | `feat/planning-chatbot-ux` | Natural chat routing, chat-bot UI, SIG evidence panel and downloads, progress and timings, Thai place names, state kept across pages, shared top bar, SERVIR logo and theme |
+| 6 | `codex/sig-embedded-flood-map` | Hardens the live SIG map embed and documents the scientific meaning, trust cues, security boundary and staging acceptance plan |
 
 **Merge status:** `feat/planning-chatbot-ux` has been fast-forward merged into `main` and pushed. The feature branch is retained temporarily for recovery. `experiment/planning-chat` is superseded; **never merge it**.
 
@@ -138,7 +140,7 @@ Rules: no `innerHTML` with server or user text (tests check this). Build DOM wit
    - progress card with timer (steps advance on typical timings);
    - status card (note, counts, timings, draft/receipt badge), with the brief rendered as headings and `[n]` citation buttons;
    - evidence panel with tabs and downloads (.md, .json, .txt);
-   - SIG area outline from Nominatim (orientation only); SIG hazard map iframe after publish.
+   - SIG area outline from Nominatim (orientation only); SIG live hazard-and-exposure component after publish. The API accepts only HTTPS URLs on the configured SIG host at `/embed/hazard_map/{id}`; the iframe is sandboxed and carries no token.
    - **Use my location** requests browser permission only after the user clicks it. Its coordinates go to Nominatim solely to identify a Thailand district, are held only in memory, and must be followed by an explicit SIG lookup click. Browser session storage uses `grp.planning.v2`, deliberately leaving prior synthetic-demo transcripts in the old v1 key.
    - Natural-language requests for **current location** use the already confirmed browser district. A Thai place mention is geocoded with Nominatim and requires an on-screen confirmation before it becomes the SIG location. The canonical result-explanation prompt is routed to the stored-result flow even if the router model returns `cannot`.
    - State (transcript, selection, result, pending job, open evidence) is saved in `sessionStorage["grp.planning.v2"]`, scoped to the user email and capped at 40 entries.
@@ -171,6 +173,23 @@ Rules: no `innerHTML` with server or user text (tests check this). Build DOM wit
 | Claude Code, committed here | **Rate limit on menu switching:** 429 replies carry `Retry-After`; `GRP.request` waits and retries a GET once (max 10 s); assessment polling every 5 s instead of 2–3 s; My access reuses `GRP.me()`; local Docker limit 300/min |
 
 Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map workspace, natural routing, chat-bot redesign and Thai romanization (see `git log`).
+
+### 18 Sep — training-deck review and SIG embed hardening
+
+- Reviewed the local `docs/Vulnerability Platform Training Presentation.pptx` as product/training
+  context. It is not treated as an approved GRP method and remains uncommitted pending a decision on
+  whether training material belongs in the source repository.
+- Added `docs/flood-hazard-exposure-embed-design.md`: terms, governed MCP sequence, four status
+  outcomes, trust cues, security controls, tests and staging gates.
+- Kept SIG as the renderer: after `publish_answer` returns `status="ok"` and a receipt, GRP calls
+  `ui_embed(component="hazard_map")`; GRP does not redraw or copy the hazard cells.
+- Tightened embed parsing to the configured SIG HTTPS host and `/embed/hazard_map/{id}` path.
+- Changed UI language from ambiguous “flood risk map” to **flood hazard and asset exposure**, with a
+  visible warning that vulnerability weighting and safety certification are not present.
+- Added an unavailable-map state so a valid cited answer and receipt remain usable when SIG returns no
+  valid embed; no illustrative fallback is substituted.
+- Full validation: 210 tests, Ruff and `node --check web/planning.js`; Docker Desktop API and worker
+  rebuilt and restarted successfully. Sign in again because the in-memory SIG token was cleared.
 
 ---
 
@@ -207,6 +226,11 @@ Owner decisions (16–17 Sep):
 - **Area confirmation** blocks model-only locations before SIG/GRP work. It requires a browser pass with a real SERVIR account after rebuilding the API image; the Python tests use fake SIG and model responses.
 - **Progress steps are estimated.** The API answers in one response; true streaming (SSE) is not built.
 - **SIG flood cells** appear only after publishing a receipt (the pack has no geometry). The outline before that comes from Nominatim, for orientation only.
+- **This is not yet a vulnerability-weighted risk map.** SIG Risk v0 declares hazard/exposure only;
+  full risk wording and red/yellow/green decision classes wait for DEP-07 and an approved method.
+- The embed URL shape is currently based on SIG's advertised `ui_embed` contract and the prototype
+  fixture. Capture a sanitized live response before staging and adjust the allow-list only through a
+  reviewed contract change.
 - **External browser calls:** `unpkg.com` (Leaflet) and `openstreetmap.org` (tiles, Nominatim). Acceptable for local use only; vendor Leaflet and use a contracted tile and geocoder before staging.
 - **Real data missing:** the only GRP assessment area is synthetic; the method is draft; geometry is GeoJSON, not PostGIS.
 - **Single-process memory** holds rate limits and the SIG token store; there is no lease renewal for long jobs.
@@ -238,10 +262,10 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
    - Build and publish a versioned container package from `main`, then deploy with `deploy/bootstrap-ubuntu.sh` rather than building application code on the VM.
    - Configure staging secrets under `/srv/grp/secrets`, run migrations once and execute the Section 3 browser checklist against the staging URL.
    - *Done when* staging runs the exact `main` revision, health is green and the owner accepts the browser checklist.
-2. **Record a SIG contract fixture for the chat** (small)
-   - Capture one real `assemble_pack` and `publish_answer` response (public area, no secrets) under `tests/fixtures/sig/`, reviewed as a diff.
-   - Replay it in a test of `sig_evidence` and `evidence_bundle`.
-   - *Done when* area check, counts and trace are tested against real SIG shapes.
+2. **Record a SIG contract fixture for the chat and live map** (small)
+   - Capture one real `assemble_pack`, `publish_answer` and `ui_embed(hazard_map)` response (public area, no secrets) under `tests/fixtures/sig/`, reviewed as a diff.
+   - Replay it in tests of `sig_evidence`, `evidence_bundle` and the embed host/path allow-list.
+   - *Done when* area check, counts, trace and map URL shape are tested against real SIG responses.
 3. **Real streaming progress** (medium)
    - Server-Sent Events for `/planning/chat` (router done, pack gathering, area checked, draft, publish), replacing estimated steps.
    - *Done when* the progress card shows true step states and durations live.
@@ -290,10 +314,10 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
 ## Resume commands
 
 ```powershell
-git fetch; git switch feat/planning-chatbot-ux
+git fetch; git switch codex/sig-embedded-flood-map
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 207 passed
+python -m pytest            # expect 210 passed
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

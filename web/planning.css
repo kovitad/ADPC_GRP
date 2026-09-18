@@ -444,7 +444,12 @@
   background: #fff;
   box-shadow: 0 14px 34px rgba(16, 40, 36, 0.24);
 }
-.pw-sig__bar { display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--pw-line); font-size: 0.85rem; }
+.pw-sig__bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 0.7rem 0.85rem 0.6rem; border-bottom: 1px solid var(--pw-line); }
+.pw-sig__bar > div { display: grid; gap: 0.08rem; }
+.pw-sig__eyebrow { color: #1d4ed8; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.pw-sig__bar strong { color: var(--pw-ink); font-size: 0.88rem; font-weight: 650; }
+.pw-sig__meta { color: var(--pw-muted); font-size: 0.7rem; }
+.pw-sig__help { margin: 0; padding: 0.45rem 0.85rem; border-bottom: 1px solid var(--pw-line); background: #f8fafc; color: #52645f; font-size: 0.7rem; line-height: 1.4; }
 .pw-sig iframe { flex: 1; border: 0; }
 
 .leaflet-popup-content { font-family: inherit; font-size: 0.8rem; line-height: 1.45; }
