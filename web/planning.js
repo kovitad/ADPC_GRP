@@ -441,7 +441,10 @@
       const layer = window.L.geoJSON(boundary.geometry, { style: boundaryStyle(false) });
       layer.boundaryId = boundary.id;
       layer.bindTooltip(`${boundary.name}${boundary.synthetic ? " · synthetic" : ""}`, { sticky: true });
-      layer.on("click", () => selectBoundary(boundary, { announce: true }));
+      layer.on("click", (event) => {
+        window.L.DomEvent.stop(event);
+        selectBoundary(boundary, { announce: true });
+      });
       districtLayer.addLayer(layer);
     });
   };
@@ -1018,8 +1021,17 @@
         if (echo) addMessage("user", message);
         addMessage(
           "assistant",
-          "I do not know your current district yet. Use the location button or search for a Thailand district first.",
-          { label: "Location needed.", actions: [chipButton("Use my location", useCurrentLocation)] },
+          "I do not know your district yet. Use my location, click your district on the map, or name it in your message (for example \"Bang Bua Thong, Nonthaburi\").",
+          {
+            label: "Location needed.",
+            actions: [
+              chipButton("Use my location", useCurrentLocation),
+              chipButton("Show me the map", () => {
+                document.body.dataset.view = "map";
+                window.setTimeout(() => map.invalidateSize(), 0);
+              }),
+            ],
+          },
         );
         return false;
       }
@@ -1183,7 +1195,8 @@
     // SIG needs an administrative district, not a city-wide or neighbourhood
     // label. In Bangkok, `city_district` is the khet (for example Bang Sue);
     // elsewhere in Thailand Nominatim normally uses `county` for the amphoe.
-    const district = address.city_district || address.county;
+    const district =
+      address.city_district || address.county || address.state_district || address.district;
     const province = address.state || address.province;
     if (district) return [...new Set([district, province, "Thailand"].filter(Boolean))].join(", ");
     return null;
@@ -1222,6 +1235,62 @@
     chip.hidden = false;
   };
 
+  // Nominatim returns the district field at different zooms depending on the address,
+  // so try the administrative levels from district outwards before giving up.
+  const reverseDistrict = async (lat, lon) => {
+    for (const zoom of [10, 12, 14, 8]) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=${zoom}&addressdetails=1&accept-language=en&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+        const response = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!response.ok) continue;
+        const place = await response.json();
+        if (!place || place.error) continue;
+        if (place.address?.country_code?.toLowerCase() !== "th") {
+          return { outsideThailand: true };
+        }
+        if (externalPlaceName(place)) return { place: { ...place, lat, lon } };
+      } catch (_error) {
+        // Try the next zoom level; the caller reports a single clear failure.
+      }
+    }
+    return {};
+  };
+
+  // Clicking bare map (not a supported area outline) offers that district for SIG evidence.
+  const useMapPoint = async (lat, lon) => {
+    const chip = $("[data-place-chip]");
+    chip.replaceChildren();
+    chip.textContent = "Finding the district for that point…";
+    chip.hidden = false;
+    const { place, outsideThailand } = await reverseDistrict(lat, lon);
+    if (place) {
+      pickPlace(place);
+      const name = externalPlaceName(place);
+      addMessage("assistant", `${name} is selected from the map for SIG flood evidence.`, {
+        label: "Map location selected.",
+        actions: [chipButton("Check SIG flood exposure", () => send(
+          `Check flood exposure for schools, hospitals and roads in ${name}.`,
+          { confirmedPlace: name },
+        ))],
+      });
+      return;
+    }
+    chip.textContent = outsideThailand
+      ? "GRP's SIG lookup covers Thailand districts only. Click inside Thailand or search for a district."
+      : "No administrative district was found for that point. Click nearer a town, or search for a district by name.";
+  };
+
+  let mapClickBusy = false;
+  map.on("click", async (event) => {
+    if (mapClickBusy) return;
+    mapClickBusy = true;
+    try {
+      await useMapPoint(event.latlng.lat, event.latlng.lng);
+    } finally {
+      mapClickBusy = false;
+    }
+  });
+
   const useCurrentLocation = async () => {
     const button = $("[data-use-location]");
     if (!navigator.geolocation) {
@@ -1237,23 +1306,25 @@
         { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 },
       ));
       const { latitude, longitude } = position.coords;
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&addressdetails=1&accept-language=en&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`;
-      const response = await fetch(url, { headers: { Accept: "application/json" } });
-      const place = await response.json();
-      if (!response.ok || !place || place.address?.country_code?.toLowerCase() !== "th") {
-        throw new Error("CURRENT_LOCATION_NOT_THAILAND");
-      }
-      if (!externalPlaceName(place)) {
-        throw new Error("CURRENT_LOCATION_NO_DISTRICT");
-      }
-      pickPlace({ ...place, lat: latitude, lon: longitude }, { currentLocation: true });
+      const { place, outsideThailand } = await reverseDistrict(latitude, longitude);
+      if (outsideThailand) throw new Error("CURRENT_LOCATION_NOT_THAILAND");
+      if (!place) throw new Error("CURRENT_LOCATION_NO_DISTRICT");
+      pickPlace(place, { currentLocation: true });
+      const name = externalPlaceName(place);
+      addMessage("assistant", `Your district is ${name}. It is not a GRP assessment area, so I can look up SIG flood evidence for it.`, {
+        label: "Current district confirmed.",
+        actions: [chipButton("Check SIG flood exposure", () => send(
+          `Check flood exposure for schools, hospitals and roads in ${name}.`,
+          { confirmedPlace: name },
+        ))],
+      });
     } catch (error) {
       const message = error.code === 1
         ? "Location permission was not granted. Search for a Thailand district instead."
         : error.message === "CURRENT_LOCATION_NOT_THAILAND"
         ? "GRP’s current SIG lookup is limited to Thailand districts."
         : error.message === "CURRENT_LOCATION_NO_DISTRICT"
-        ? "I found your approximate location but not its administrative district. Search for a Thailand district before using SIG evidence."
+        ? "I found your position but no administrative district there. Click your district on the map, or search for it by name."
         : "I could not identify a district from your location. Search for a Thailand district instead.";
       addMessage("assistant", message, { error: true });
     } finally {
