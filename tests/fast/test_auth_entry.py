@@ -112,8 +112,10 @@ def test_every_signed_in_page_uses_the_same_top_bar() -> None:
 def test_planning_location_lookup_requires_an_administrative_district() -> None:
     script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
 
-    # A district (amphoe or khet) is required; a city-wide or approximate place is refused.
-    assert "address.city_district || address.county" in script
+    # A district (amphoe, or khet in Bangkok) is required; a sub-district (tambon) is not.
+    # OpenStreetMap returns it in `county` outside Bangkok and `suburb` inside it.
+    assert "address.county," in script and "address.suburb," in script
+    assert "sub-?district" in script
     assert "CURRENT_LOCATION_NO_DISTRICT" in script
     assert "reverse?format=jsonv2&zoom=${zoom}&addressdetails=1" in script
     assert "for (const zoom of [10, 12, 14, 8])" in script

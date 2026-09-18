@@ -1195,9 +1195,22 @@
     // SIG needs an administrative district, not a city-wide or neighbourhood
     // label. In Bangkok, `city_district` is the khet (for example Bang Sue);
     // elsewhere in Thailand Nominatim normally uses `county` for the amphoe.
-    const district =
-      address.city_district || address.county || address.state_district || address.district;
-    const province = address.state || address.province;
+    // OpenStreetMap keeps the Thai district (amphoe, or khet in Bangkok) in different
+    // fields: `county` outside Bangkok, `suburb` inside it. `city_district` is often the
+    // sub-district (tambon), so accept a value only when it reads as a district.
+    const isDistrict = (value) =>
+      typeof value === "string"
+      && !/sub-?district/i.test(value)
+      && !/^ตำบล|^แขวง/.test(value)
+      && (/district$/i.test(value.trim()) || /^อำเภอ|^เขต/.test(value));
+    const district = [
+      address.county,
+      address.suburb,
+      address.city_district,
+      address.state_district,
+      address.district,
+    ].find(isDistrict);
+    const province = address.province || address.state || (district ? address.city : null);
     if (district) return [...new Set([district, province, "Thailand"].filter(Boolean))].join(", ");
     return null;
   };
