@@ -11,14 +11,16 @@ How to read this: **S** is about a day, **M** two to four days, **L** a week or 
 | # | Item | Size | Blocked by | Done when |
 |---|---|---|---|---|
 | A1 | ~~Prove the datasets on a real district~~ **done**, see [`dataset-proof-results.md`](dataset-proof-results.md) | S | — | — |
-| A2 | Extend `tools/prove_dataset.py` to all 928 districts: count shelters whose point falls outside the district their attributes name, and list districts with no flood values at all | S | — | A quality report exists that the Hub can act on |
+| A2 | ~~Nationwide quality report~~ **done** — the Admin **Source data** page (ADR-0006) runs it on demand: **1,139 of 10,303 shelters are in a different district from the one they name**, 255 of 928 districts hold no shelter, every flood tile is mostly no-value. What is left is to send these to DDPM and agree fixes | S | — | The Hub has taken the counts to the provider |
 | A3 | Boundary geometry moves to PostGIS, with a simplified copy for the map | M | — | Migration runs on PostgreSQL; the map loads outlines without full detail; golden tests still pass |
 | A4 | Boundary loader: `python -m grp.load boundaries --shapefile … --province …` with provenance (source, edition `2025-10`, licence, checksum) | M | Licence (DEP-04) | One province's districts are supported areas, each with admin code and fingerprint |
-| A5 | Shelter loader for `ddpm_shelters`: field mapping is in [`thailand-dataset-ingestion-plan.md`](thailand-dataset-ingestion-plan.md) §4.2, membership decided by geometry, mismatches reported not hidden | M | Meaning of `สถา` and `รอง` (DEP-06) | A district's shelters load with a stated count of rejected or suspicious points |
+| A5 | Shelter loader for `ddpm_shelters` (**the 1,139 mismatches must be reported at load time, never silently accepted**): field mapping is in [`thailand-dataset-ingestion-plan.md`](thailand-dataset-ingestion-plan.md) §4.2, membership decided by geometry, mismatches reported not hidden | M | Meaning of `สถา` and `รอง` (DEP-06) | A district's shelters load with a stated count of rejected or suspicious points |
 | A6 | Flood tiles to Cloud-Optimized GeoTIFF with overviews; registered as a dataset version with provenance | M | Licence (DEP-05) | Six tiles stored once, fingerprinted; the worker samples them unchanged |
 | A7 | **No-data rule**: method version stating what an absent value means, with the modelled-area mask if one exists | M | **DEP-05 decision** | A new method version is recorded; Pua-style districts report a defensible status |
 | A8 | Permanent-water handling: mask or flag depths over the agreed threshold | S | DEP-05 | Extreme depths are explained, not silently reported |
 | A9 | First real assessment end to end on one district, compared with the proof tool | M | A3 to A7 | Numbers match the independent check; result carries pinned versions |
+
+> **Before starting any of Epic A, open the Source data page and read the findings for the folder you are about to load.** It is faster than reading the file by hand and it names the decision each blocker waits on.
 
 ## Epic B — Make the map show real flood depth
 
@@ -93,7 +95,7 @@ How to read this: **S** is about a day, **M** two to four days, **L** a week or 
 ## Suggested first sprint (two weeks, one or two developers)
 
 1. **D1, D4** — CI on PostgreSQL with a secret scan. Everything else rests on this.
-2. **A2** — the nationwide data-quality report; it also tells the Hub what to fix.
+2. **A2 follow-up** — take the inspector's counts to DDPM; the report itself is built.
 3. **A3, A4** — PostGIS geometry and one province of real districts.
 4. **A5** — shelters for that province.
 5. **D2** — shared state, so a second API copy is possible.
