@@ -3,6 +3,12 @@
 **Status:** Proposed. Needs the product owner's choice in Section 6 and the Scientific and Data Authority's provenance for DEP-04 to DEP-07.
 **Date:** 18 September 2026.
 
+> **The files are now on this PC and have been inspected.** See
+> [`thailand-dataset-inventory.md`](thailand-dataset-inventory.md) for what they actually
+> contain, including the blocking question about how dry land is stored in the flood raster.
+> The size estimates below are settled: the six flood tiles total 113 MB, and the two
+> vulnerability rasters are about 600 MB each.
+
 ## 1. The four datasets
 
 | Dataset | Form | GRP use | Dependency |
