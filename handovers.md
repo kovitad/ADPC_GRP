@@ -92,6 +92,13 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 
 ## 4. Architecture map (what lives where)
 
+Design notes to read before large changes:
+
+- [`docs/architecture-scaling-design.md`](docs/architecture-scaling-design.md) — why GRP is a modular monolith with background jobs, what keeps it ready to split into services later, and the measured triggers for doing so.
+- [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
+- [`docs/flood-hazard-exposure-embed-design.md`](docs/flood-hazard-exposure-embed-design.md) — the SIG receipt-bound hazard map embed.
+
+
 ### 4.1 Backend (FastAPI, Python 3.12)
 
 | Area | Files | Notes |
@@ -284,11 +291,13 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
    - Job trace screen for Admin (`GET /admin/assessments/{id}/trace`).
    - One-page summary PDF and evacuation map PDF/PNG as export jobs (`assessment_export` table, `POST/GET /assessments/{id}/exports`).
    - *Done when* the synthetic case downloads match the locked result exactly (templates need DEP-12).
-5. **Real-data readiness** (medium)
-   - PostGIS geometry columns and a boundary loader (admin level, source, edition, fingerprint).
-   - A PostgreSQL CI job for migrations and two workers claiming at once.
-   - Lease renewal.
-   - *Done when* a real Thailand district can be loaded and assessed once DEP-04/05/06 arrive.
+5. **Real Thailand data** (medium; follow [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md))
+   - Inspect the downloaded files first and report size, resolution, CRS and value range; decide Option A (per-district flood picture, recommended) or Option B (tile service).
+   - PostGIS geometry columns and a boundary loader (admin level, source, edition, fingerprint); load only approved districts.
+   - Evacuation-center loader; flood raster converted to COG and registered with its provenance.
+   - Vulnerability raster registered as an unapproved map layer only (DEP-07).
+   - A PostgreSQL CI job for migrations and two workers claiming at once; lease renewal.
+   - *Done when* a real Thailand district is assessed end to end and the map shows real flood depth for it; full acceptance still needs the signed result (DEP-04).
 6. **Increment 3: SIG connection** (medium; waits on SIG)
    - Sharing approval (Admin), evidence endpoint with the public field set, SIG machine login (client credentials), `assessment_ref` call, receipt linking, retry every 15 minutes for 24 hours, contract tests.
    - *Done when* the pack numbers equal the golden result, private items return 404, and one receipt is issued by hand.
