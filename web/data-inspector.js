@@ -372,12 +372,13 @@
       row.append(print);
       filesBody.append(row);
     });
-    fingerprintNote.textContent = report.partly_fingerprinted
+    const key = report.fingerprint ? ` Folder fingerprint ${report.fingerprint.slice(0, 12)}…` : "";
+    fingerprintNote.textContent = (report.partly_fingerprinted
       ? "The stored report is reused only while these files are unchanged. Files too large to " +
         "hash whole are fingerprinted at their head and tail, marked below; a change in the " +
         "middle of one of those would not be noticed."
       : "The stored report is reused only while these files are unchanged. Every file here was " +
-        "hashed whole.";
+        "hashed whole.") + key;
   };
 
   const render = (payload) => {

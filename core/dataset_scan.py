@@ -75,12 +75,11 @@ class LayerReport:
 def _crs_text(crs: Any) -> tuple[str | None, int | None]:
     if not crs:
         return None, None
-    try:
-        return crs.to_string(), crs.to_epsg()
-    except AttributeError:
-        pass
-    except Exception:  # noqa: BLE001 - a malformed .prj is a finding, not a crash
-        return str(crs), None
+    if hasattr(crs, "to_string"):
+        try:
+            return crs.to_string(), crs.to_epsg()
+        except Exception:  # noqa: BLE001 - a malformed .prj is a finding, not a crash
+            return str(crs), None
     text = str(crs)
     upper = text.upper()
     if "EPSG:" in upper:
@@ -517,7 +516,7 @@ def cross_check_points(
         "areas": len(areas),
         "areas_without_points": len(areas) - len(matched_areas),
         "claimed_field": claimed_field,
-        "chosen_area_file": area_path.name,
+        "chosen_area_path": str(area_path),
         "compared_names": compare_names,
         "name_agreement": round(agreement, 3),
         "preview": preview,
@@ -615,12 +614,9 @@ def scan_folder(folder: Path, root: Path, files: list[Any]) -> dict[str, Any]:
         findings.extend(extra)
         if cross is not None:
             cross["point_layer"] = points.path
+            chosen = cross.pop("chosen_area_path", None)
             cross["area_layer"] = next(
-                (
-                    layer.path
-                    for layer in area_layers
-                    if paths[layer.path].name == cross.get("chosen_area_file")
-                ),
+                (layer.path for layer in area_layers if str(paths[layer.path]) == chosen),
                 area_layers[0].path,
             )
 

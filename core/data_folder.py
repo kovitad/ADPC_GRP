@@ -117,25 +117,53 @@ def folder_fingerprint(files: list[SourceFile]) -> str:
     return digest.hexdigest()
 
 
+DATA_SUFFIXES = (".shp", ".tif", ".tiff", ".geojson", ".gpkg")
+
+
 def list_folders(root: Path) -> list[dict[str, object]]:
-    """Folders a person may pick, with what each holds. The root is offered first."""
+    """Folders a person may pick, with what each holds. The root is offered first.
+
+    The tree is walked once and each file's size is counted into its own folder and every folder
+    above it. Walking each folder separately would re-read the whole tree per level, and this
+    runs in the API on every page load.
+    """
 
     base = root.resolve()
-    entries: list[dict[str, object]] = []
-    for path in [base, *sorted(p for p in base.rglob("*") if p.is_dir())]:
-        files = [p for p in path.rglob("*") if p.is_file()]
-        entries.append(
-            {
-                "path": "" if path == base else path.relative_to(base).as_posix(),
-                "name": "All source data" if path == base else path.name,
-                "depth": 0 if path == base else len(path.relative_to(base).parts),
-                "file_count": len(files),
-                "size_bytes": sum(p.stat().st_size for p in files),
-                "has_data_files": any(
-                    p.suffix.lower() in (".shp", ".tif", ".tiff", ".geojson") for p in files
-                ),
-            }
-        )
-        if len(entries) > MAX_FILES:
+    counts: dict[Path, int] = {}
+    sizes: dict[Path, int] = {}
+    data: dict[Path, bool] = {}
+    folders: set[Path] = {base}
+    seen = 0
+
+    for path in base.rglob("*"):
+        if path.is_dir():
+            folders.add(path)
+            continue
+        if not path.is_file():
+            continue
+        seen += 1
+        if seen > MAX_FILES:
             break
-    return entries
+        size = path.stat().st_size
+        is_data = path.suffix.lower() in DATA_SUFFIXES
+        folder = path.parent
+        folders.add(folder)
+        while True:
+            counts[folder] = counts.get(folder, 0) + 1
+            sizes[folder] = sizes.get(folder, 0) + size
+            data[folder] = data.get(folder, False) or is_data
+            if folder == base:
+                break
+            folder = folder.parent
+
+    return [
+        {
+            "path": "" if path == base else path.relative_to(base).as_posix(),
+            "name": "All source data" if path == base else path.name,
+            "depth": 0 if path == base else len(path.relative_to(base).parts),
+            "file_count": counts.get(path, 0),
+            "size_bytes": sizes.get(path, 0),
+            "has_data_files": data.get(path, False),
+        }
+        for path in sorted(folders, key=lambda item: (item != base, item.as_posix()))
+    ]
