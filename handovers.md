@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 17 September 2026 (Codex area confirmation, location, explicit Hub roles and AI allowance fix; Claude Code Thai-place confirmation and rate-limit fixes)
+**Updated:** 18 September 2026 (stabilized, rebuilt from committed source and merged to `main`)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Work branch:** `feat/planning-chatbot-ux`. All work below is committed and pushed. **207 tests pass**; Ruff and JavaScript syntax checks are clean.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. **207 tests pass**; Ruff and JavaScript syntax checks are clean.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -27,7 +27,7 @@
 | Increment 6, vulnerability and AI explain | AI explain exists early; vulnerability is a placeholder (DEP-07) |
 | Increment 7, pilot hardening | Not started |
 
-**Product-owner browser testing is in progress.** The owner has seen and steered the Planning page (chat, SIG evidence, menu, theme). No branch has been formally accepted or merged after Phase B.
+**Product-owner browser testing is in progress.** The owner has seen and steered the Planning page (chat, SIG evidence, menu and professional theme) and authorized the stabilization plan. The stacked feature branch was merged to `main` after the 18 September validation pass.
 
 ---
 
@@ -44,7 +44,7 @@ All feature branches are **stacked**: each contains the ones before it. `feat/pl
 | 4 | `feat/planning-map-workspace` | Map layers API, flood overlay picture, center points, explain API |
 | 5 | `feat/planning-chatbot-ux` | Natural chat routing, chat-bot UI, SIG evidence panel and downloads, progress and timings, Thai place names, state kept across pages, shared top bar, SERVIR logo and theme |
 
-**Merge advice:** after the owner accepts, merge `feat/planning-chatbot-ux` into `main` (it brings in 1 to 4), push, and delete the stale branches. `experiment/planning-chat` is superseded; **never merge it**.
+**Merge status:** `feat/planning-chatbot-ux` has been fast-forward merged into `main` and pushed. The feature branch is retained temporarily for recovery. `experiment/planning-chat` is superseded; **never merge it**.
 
 ---
 
@@ -64,7 +64,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 
 **Important facts about the local stack:**
 - `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; `grp-common.js`, `planning.js` and `planning.css` now carry `?v=20260917n`. **Bump asset versions when changing shared CSS or JS.**
-- **Python changes need an image rebuild.** The image `grp-api:desktop` was built by Codex on 17 September (04:03 UTC) with the area-confirmation, location and role changes. Two later API files, `api/errors.py` and `api/rate_limits.py` (Retry-After), were **copied into the running API container** because full rebuilds keep getting killed for low memory on this PC. **Rebuild `api` and `worker` when memory allows**; until then, recreating the container loses those two changes.
+- **Python changes need an image rebuild.** The local `grp-api:desktop` image was successfully rebuilt on 18 September from the committed source, including `api/errors.py` and `api/rate_limits.py`; the API and worker were recreated from that image. No copied-file workaround remains.
 - Local rate limit: `deploy/compose.desktop.yml` sets `RATE_LIMITS` with 300 API requests per person per minute, so quick menu switching does not hit 429. Servers keep the Section 13.1 value of 60.
 - After any API restart, **sign in again**. The SIG MCP token lives only in process memory (ADR-0002).
 - The script copies `OPENAI_API_KEY` and `LANGFUSE_SECRET_KEY` from the ignored `.env` into `.local/docker/secrets/` without printing them. `LANGFUSE_BASE_URL` and `LANGFUSE_PUBLIC_KEY` pass through as environment variables. The model comes from `OPENAI_MODEL` (currently `gpt-5.2`).
@@ -200,7 +200,7 @@ Owner decisions (16–17 Sep):
 
 ## 7. Known gaps, risks and technical debt
 
-- **Docker image slightly behind Git:** `api/errors.py` and `api/rate_limits.py` exist only as copies in the running API container (see Section 3). Rebuild `api` and `worker` before trusting a recreated container.
+- **Staging is not deployed yet:** the validated build is running locally. Use the release/bootstrap workflow and staging secrets on the Ubuntu VM; do not copy the local `.env` or token files.
 - **Rate limit is per process and per person:** a page load makes about 5–7 API calls. The 60/min spec value may be tight for real use; review it with the product owner before staging.
 - **Live end-to-end not formally confirmed:** OpenAI, Langfuse and SIG MCP work was observed by the owner in the browser but is not captured in tests; there is no recorded SIG fixture for the chat.
 - **Area check** relies on SIG trace wording `via admin boundary` (from the 14 Sep capture).
@@ -234,10 +234,10 @@ Owner decisions (16–17 Sep):
 
 Each item has a clear "done when". Keep the spec guardrails (Section 11).
 
-1. **Stabilise and merge** (small)
-   - Rebuild the Docker `api` and `worker` images; run the Section 3 checklist; fix findings.
-   - Merge `feat/planning-chatbot-ux` into `main`, push, delete stacked branches.
-   - *Done when* `main` has everything, CI is green, and the owner has accepted the checklist.
+1. **Prepare the staging release** (small)
+   - Build and publish a versioned container package from `main`, then deploy with `deploy/bootstrap-ubuntu.sh` rather than building application code on the VM.
+   - Configure staging secrets under `/srv/grp/secrets`, run migrations once and execute the Section 3 browser checklist against the staging URL.
+   - *Done when* staging runs the exact `main` revision, health is green and the owner accepts the browser checklist.
 2. **Record a SIG contract fixture for the chat** (small)
    - Capture one real `assemble_pack` and `publish_answer` response (public area, no secrets) under `tests/fixtures/sig/`, reviewed as a diff.
    - Replay it in a test of `sig_evidence` and `evidence_bundle`.
