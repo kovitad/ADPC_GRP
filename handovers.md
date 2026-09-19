@@ -317,7 +317,9 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   renew or finalize after another worker reclaims the job. Requests are idempotent and successful
   finalization can happen only once.
 - Full validation: 269 tests pass; Ruff and JavaScript syntax checks pass. A fresh PostGIS 16 database
-  migrated through all eight revisions and Alembic confirmed `20260919_0008` as head.
+  migrated through all eight revisions and Alembic confirmed `20260919_0008` as head. Docker Desktop
+  API and worker were rebuilt from the committed image, the persistent local database was upgraded to
+  `0008`, and `/api/v1/healthz` is green. Sign in again because the API restart cleared the SIG token.
 
 ---
 
