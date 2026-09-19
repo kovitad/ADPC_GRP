@@ -1,4 +1,4 @@
-"""Unapproved preview of one district's delivered data, with its warnings (backlog Epic P).
+"""Preview one district's delivered source data, with its warnings (backlog Epic P).
 
 The product owner asked to *see* the real Thailand files on a map before the blocking decisions
 are made. This builds that picture in the worker (AD-03): the district outline, its shelters,
@@ -35,7 +35,7 @@ MAX_PICTURE_PX = 2000
 # Hatching for no-value pixels inside the district, so "no data" never reads as "dry".
 HATCH_RGBA = (150, 60, 160, 150)
 
-LABEL = "Unapproved preview — not a GRP assessment"
+LABEL = "Delivered data preview — not a GRP assessment"
 
 
 class PreviewError(ValueError):
@@ -228,15 +228,7 @@ def _flood(
 def _warnings(counts: dict[str, int], flood: dict[str, Any]) -> list[dict[str, str]]:
     """Plain-words warnings for what is on the map: what, why it matters, what it waits on."""
 
-    notes = [
-        {
-            "grade": "blocker",
-            "title": "These files are not approved",
-            "why": "No licence, edition or checksum has been recorded for them, so nothing drawn "
-            "here can be quoted as a GRP result.",
-            "waits_on": "DEP-04 (boundaries, shelters) and DEP-05 (flood) licence and edition",
-        }
-    ]
+    notes: list[dict[str, str]] = []
     if counts["on_no_value_pixel"] or (flood.get("no_value_share") or 0) > 0:
         share = flood.get("no_value_share")
         notes.append(

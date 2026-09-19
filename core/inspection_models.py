@@ -1,9 +1,9 @@
 """Cached data-inspection reports (ADR-0006).
 
-An inspection reads unapproved source files and describes them. It is never an assessment and
-its numbers are never a result: nothing here may reach a planner, a brief or SIG. The cache is
-keyed by a fingerprint of every file in scope, so a report can only be shown while the files it
-describes are unchanged.
+An inspection reads delivered source files before ingestion and describes them. It is never an
+assessment and its numbers are never a result: nothing here may reach a planner, a brief or SIG.
+The cache is keyed by a fingerprint of every file in scope, so a report can only be shown while
+the files it describes are unchanged.
 """
 
 from __future__ import annotations

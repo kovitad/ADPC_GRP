@@ -4,7 +4,7 @@
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **264 tests pass**; Ruff and JavaScript syntax checks are clean.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **265 tests pass**; Ruff and JavaScript syntax checks are clean.
 
 **Handing over:** nothing is half-finished in the tree. The next person should start at Section 9, and first do the browser acceptance pass in Section 3 (nothing on this branch has been confirmed against live SIG and OpenAI yet).
 
@@ -88,7 +88,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
    - **Use my location**: allow the browser prompt; the map accepts only a real Thailand district returned by OpenStreetMap (not a city-wide or approximate result), labels it as SIG-only and offers **Check SIG flood exposure**. Location coordinates are not stored and cannot start a GRP assessment.
    - **Publish receipt & show SIG flood map** (two-step confirm, creates a public record): SIG hazard map over the map
    - switch to Assessments and back: the conversation is kept
-4. `/data-inspector.html` (**Source data** in the menu, Admins only): pick **All source data**. Expect nine blockers, ten problems and four known issues in about ten seconds, a map of shelters coloured by whether they sit in the district they name, and a second visit to the same folder returning instantly from the cache. While it runs, switch to another menu: the top bar shows **Running: Source data check …** and a notice appears bottom-right when it is ready. Coming back to Source data picks up the same job (it does not start again). A finished report is shown straight away; pick the folder again to re-check for changed files.
+4. `/data-inspector.html` (**Source data** in the menu, Admins only): pick **All source data**. Expect eight blockers, ten problems and five known issues in about ten seconds (ADR-0007 makes source/provenance registration known setup work, not a data-approval blocker), a map of shelters coloured by whether they sit in the district they name, and a second visit to the same folder returning instantly from the cache. While it runs, switch to another menu: the top bar shows **Running: Source data check …** and a notice appears bottom-right when it is ready. Coming back to Source data picks up the same job (it does not start again). A finished report is shown straight away; pick the folder again to re-check for changed files.
 5. `/data-preview.html` (**Preview one district** link on Source data, Admins only): press **Pua**. Expect the district outline, the flood picture hatched purple almost everywhere (99% no value), 29 purple shelters (on a no-value pixel), 1 orange shelter far away that names Pua, and a warnings panel led by two blockers. **Mueang Nan** asks you to pick between districts only if the name is shared; **Bang Bua Thong** shows one shelter on a flooded pixel. A made-up name says it is not in the boundary file.
 6. `/assessments.html`, `/workspace.html`: same top bar, same order
 7. Langfuse Cloud: traces `planning-router-v1`, `planning-draft-v1`, `result-explain-v1`, `platform-test-v1`
@@ -103,6 +103,7 @@ Design notes to read before large changes:
 - [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force, including the blocking no-data rule.
 - [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
 - [`docs/adr/0006-admin-data-inspector.md`](docs/adr/0006-admin-data-inspector.md) — the Admin **Source data** page: a read-only look at `.local/data-in`, run as a worker job, cached on a file fingerprint, findings graded blocker / problem / known. Dev only; nothing it reports is a GRP result.
+- [`docs/adr/0007-delivered-data-acceptance.md`](docs/adr/0007-delivered-data-acceptance.md) — the Data Science delivery is accepted source data; ingestion registers its provenance and checksums, while method decisions such as flood no-value remain separate blockers.
 - [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md) — what `tools/prove_dataset.py` found when run on real districts: the datasets line up, but in Pua every shelter sits on a no-value pixel, shelter district names cannot be joined, and at least one shelter is in the wrong province. Read this before writing any loader.
 - **District preview (backlog Epic P)** — `core/district_preview.py` (worker only) builds one district's outline, shelters and RP100 flood picture from `.local/data-in`, with warnings. It reuses the `dataset_inspection` job table: the `district` column (migration 0007) is part of the cache key, so a folder report and a preview are never confused. It never classifies a shelter as "not exposed": shelters are reported on a flood pixel / on a no-value pixel / outside tiles, because what no-value means is DEP-05. Admin-only, behind `DATA_INSPECTOR_ENABLED`, with no export and no SIG path. The picture is stored under `previews/<id>/flood.png` and served by `GET /api/v1/data-inspector/previews/{id}/flood.png`.
 - [`docs/development-plan.md`](docs/development-plan.md) — how we work: definition of done, test layers, CI gates to add, observability, security and documentation habits, eight phases with finish lines, and the technical-debt register.
@@ -220,12 +221,17 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Background assessment and inspection jobs are tracked in `localStorage`, survive navigation and
   other tabs, and report completion from the shared top bar.
 - Added the Admin-only `/data-preview.html`: one delivered district's outline, shelters and RP100
-  flood picture, with no-value hatching, warnings and preview counts. It is explicitly unapproved,
-  cannot start an assessment and has no SIG route.
+  flood picture, with no-value hatching, warnings and preview counts. It is not an assessment,
+  cannot start one and has no SIG route.
 - Added migration `20260919_0007` so folder inspections and district previews have distinct cache
   keys, and made the worker persist safe failure reports for malformed layers.
 - Preview-page polling now yields to the global background-job tracker after roughly three minutes,
   rather than polling forever in the foreground.
+- The product owner confirmed that the Data Science delivery is accepted source data (ADR-0007).
+  The UI no longer calls the files unapproved or treats acceptance as a blocker. Registration of
+  provenance/checksums is ingestion setup; DEP-05 no-value meaning still blocks classification.
+  A direct worker preview of Pua confirms the remaining findings are the no-value blocker, one
+  misplaced-shelter problem and the two unconfirmed shelter columns as a known issue.
 - CI now migrates an empty PostGIS database and runs the golden suite, and Gitleaks scans full Git
   history on pull requests and pushes to `main` (backlog D1 and D4). The CI sequence was reproduced
   locally against a fresh PostGIS 16 container (all seven migrations and 22 golden tests), and a
@@ -233,7 +239,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Automated browser acceptance reached the local OAuth sign-in, but the prior API session had expired.
   A person must complete SERVIR sign-in before the protected preview and live publish checks can run.
   No receipt was created. The public staging health URL reset the connection; staging remains undeployed.
-- Full validation: 264 tests, Ruff and JavaScript syntax checks pass.
+- Full validation: 265 tests, Ruff and JavaScript syntax checks pass.
 
 ---
 
@@ -246,10 +252,12 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0004 | Interim Planner chat and map on SIG generic evidence, Docker Desktop only | Accepted for local testing; Technical Lead review pending |
 | ADR-0005 | Explicit NDMO Planner and Hub Expert / GIS Specialist roles | Accepted by product owner; local migration `20260917_0005` applied |
 | ADR-0006 | Admin data inspector over a read-only source folder | Accepted for local Docker Desktop testing; browser acceptance pending |
+| ADR-0007 | Data Science delivery is accepted source data; provenance is registered during ingestion | Accepted by product owner; DEP-05 method decision still blocks real results |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
 - Increment 2 includes the AI limit, gateway and Langfuse;
+- the Data Science delivery in `.local/data-in` is accepted source data; do not call the files unapproved (ADR-0007);
 - OpenStreetMap only;
 - vulnerable people stays a placeholder;
 - the Planning map before Increment 4;
@@ -374,6 +382,6 @@ git fetch; git switch codex/sig-embedded-flood-map
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 264 passed
+python -m pytest            # expect 265 passed
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

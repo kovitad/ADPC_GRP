@@ -163,6 +163,21 @@ def test_an_unchanged_folder_reuses_the_stored_report(db: Session, source: Path)
 
 
 @pytest.mark.fast
+def test_an_old_report_format_is_not_reused(db: Session, source: Path) -> None:
+    first = _ask(db, source)
+    stored = db.get(DatasetInspection, first.inspection_id)
+    stored.state = AssessmentState.SUCCEEDED
+    stored.report = {"layers": [], "findings": [{"title": "obsolete wording"}]}
+    stored.fingerprint = folder_fingerprint(list_files(source, source))
+    db.commit()
+
+    again = _ask(db, source)
+
+    assert again.inspection_id != first.inspection_id
+    assert again.cached is False
+
+
+@pytest.mark.fast
 def test_a_changed_folder_is_read_again(db: Session, source: Path) -> None:
     first = _ask(db, source)
     stored = db.get(DatasetInspection, first.inspection_id)
@@ -296,21 +311,21 @@ def test_an_unexpected_projection_is_a_problem_not_a_known_one() -> None:
 
 
 @pytest.mark.fast
-def test_a_missing_licence_blocks_use_as_evidence() -> None:
+def test_missing_provenance_is_registration_work_not_a_data_blocker() -> None:
     layer = LayerReport(path="flood.tif", kind="raster", crs_epsg=4326, nodata=0.0)
 
     findings = find_problems([layer], ["flood.tif"])
 
-    assert _grades(findings, "No licence or provenance file") == ["blocker"]
+    assert _grades(findings, "Approval and provenance need registering") == ["known"]
 
 
 @pytest.mark.fast
-def test_a_licence_file_clears_that_finding() -> None:
+def test_a_provenance_file_clears_that_finding() -> None:
     layer = LayerReport(path="flood.tif", kind="raster", crs_epsg=4326, nodata=0.0)
 
-    findings = find_problems([layer], ["flood.tif", "LICENCE.txt"])
+    findings = find_problems([layer], ["flood.tif", "APPROVAL_AND_PROVENANCE.md"])
 
-    assert _grades(findings, "No licence or provenance file") == []
+    assert _grades(findings, "Approval and provenance need registering") == []
 
 
 @pytest.mark.fast
@@ -392,9 +407,11 @@ def test_the_worker_describes_a_real_raster_and_stores_it_once(db: Session, tmp_
     layer = report["layers"][0]
     assert layer["crs_epsg"] == 4326
     assert layer["value_max"] == pytest.approx(12.0)
-    # 12 m is deeper than flooding usually is, and there is no licence file beside it.
+    # 12 m is suspiciously deep; absent provenance is setup work rather than a rejection of the
+    # Data Science delivery (ADR-0007).
     assert any("holds values over 10" in f["title"] for f in report["findings"])
-    assert any(f["grade"] == "blocker" for f in report["findings"])
+    assert any(f["grade"] == "known" for f in report["findings"])
+    assert not any(f["grade"] == "blocker" for f in report["findings"])
     # Every file was small enough to hash whole, so the cache key is exact.
     assert report["partly_fingerprinted"] is False
     assert report["files"][0]["fully_fingerprinted"] is True

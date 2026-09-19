@@ -63,5 +63,5 @@ Either the Thai or the English district name works.
 ## 7. Rules for this tool
 
 - It lives in `tools/`, outside the product, and writes nothing.
-- Its numbers must never be shown to a planner or put in a brief: the inputs are unapproved and unpinned.
+- Its numbers must never be shown to a planner or put in a brief: the accepted source delivery is still unpinned and no approved assessment method has been applied.
 - When the real loaders exist, this tool stays useful as a quick independent check against them.

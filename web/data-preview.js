@@ -1,4 +1,4 @@
-/* Unapproved district preview (backlog Epic P).
+/* Delivered-source district preview (backlog Epic P).
  *
  * Draws one district's delivered files — outline, shelters, RP100 flood depth — with the gaps
  * that stop them being a result. It never says "not exposed": a shelter on a no-value pixel is

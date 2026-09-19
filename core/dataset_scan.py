@@ -1,4 +1,4 @@
-"""Describe unapproved source files and report what is wrong or missing (ADR-0006).
+"""Describe delivered source files and report what is wrong or missing (ADR-0006).
 
 Runs only in the worker (AD-03). It reads GIS files to describe them; it never produces a
 result, never writes to the source folder, and nothing it returns may be shown to a planner.
@@ -26,7 +26,16 @@ SHAPEFILE_SIDECARS = {
     ".dbf": "attribute table",
     ".prj": "coordinate system",
 }
-LICENCE_HINTS = ("licence", "license", "readme", "metadata", "terms", "citation")
+LICENCE_HINTS = (
+    "licence",
+    "license",
+    "readme",
+    "metadata",
+    "terms",
+    "citation",
+    "provenance",
+    "approval",
+)
 # Above this, a flood depth is more likely a river or reservoir than flooding (unconfirmed).
 DEEP_WATER_M = 10.0
 MAX_PREVIEW_POINTS = 500
@@ -353,14 +362,14 @@ def find_problems(layers: list[LayerReport], file_names: list[str]) -> list[Find
     if not any(_is_licence_file(name) for name in file_names):
         findings.append(
             Finding(
-                "blocker",
-                "No licence or provenance file",
-                "The spec requires a recorded source, edition, licence and retrieval date before "
-                "anything from a dataset is presented as evidence. Nothing in this folder states "
-                "them.",
+                "known",
+                "Approval and provenance need registering",
+                "The product owner confirms these files were delivered by the Data Science team. "
+                "GRP still needs to register that approval with the source, edition, licence, "
+                "retrieval date and checksums when the files are loaded.",
                 "the whole folder",
-                "Get the licence and edition in writing; record them at load time (DEP-04, "
-                "DEP-05).",
+                "Create the dataset-version records during ingestion; this is setup work, not a "
+                "defect in the delivered files (ADR-0007).",
             )
         )
     return findings

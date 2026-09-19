@@ -1,6 +1,6 @@
 # Bringing the real Thailand datasets into GRP
 
-**Status:** Proposed. Needs the product owner's choice in Section 6 and the Scientific and Data Authority's provenance for DEP-04 to DEP-07.
+**Status:** Proposed. The product owner accepts the Data Science delivery as source data under ADR-0007. Ingestion still needs the metadata registration and method decisions in Section 6, especially DEP-05.
 **Date:** 18 September 2026.
 
 > **The files are now on this PC and have been inspected.** See
@@ -31,7 +31,7 @@ Rough size expectation for a country-wide flood raster: a few hundred megabytes 
 ## 3. Ingestion pipeline (one command per dataset, idempotent)
 
 1. **Receive.** The file is downloaded by a person into `.local/data-in/` (ignored by Git). Nothing reaches out to Google Drive from the code.
-2. **Record provenance.** Source, edition or publication date, licence, retrieval date, and a SHA-256 of the original file. The spec requires this before anything is presented as evidence.
+2. **Register the accepted delivery.** Record the Data Science approval, source, edition or publication date, licence terms, retrieval date, and a SHA-256 of the original file. This is ingestion bookkeeping under ADR-0007, not a second approval request; it must be complete before anything is presented as evidence.
 3. **Convert.** Rasters become Cloud-Optimized GeoTIFF: internally tiled, compressed (DEFLATE with a predictor), with overviews. Keep the original as the pinned source; the COG is the working copy.
 4. **Store.** Written through the storage interface under a generated key; the fingerprint goes in `dataset_version.sha256`, metadata in `dataset_version.metadata`.
 5. **Register.** One `dataset` row per named source and one `dataset_version` per locked copy, with `is_current` moved only on replacement. Old versions stay, so old results keep their inputs.

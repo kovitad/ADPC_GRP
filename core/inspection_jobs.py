@@ -10,6 +10,7 @@ while those exact files are unchanged.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 from dataclasses import dataclass
@@ -39,6 +40,9 @@ PREVIEW_FOLDERS = (
     "floods/flood_depth_rp100",
 )
 MAX_ATTEMPTS = 2
+# Include report semantics in the cache key. Bump this whenever findings or preview wording change,
+# otherwise an unchanged source folder can keep serving an obsolete stored report.
+REPORT_FORMAT_VERSION = "2"
 
 
 @dataclass(frozen=True)
@@ -74,7 +78,7 @@ def request_inspection(
         relative = "" if target == root.resolve() else target.relative_to(root.resolve()).as_posix()
     if not files:
         raise DataFolderError("That folder holds no files.")
-    fingerprint = folder_fingerprint(files)
+    fingerprint = _report_fingerprint(files)
 
     cached = session.scalar(
         select(DatasetInspection)
@@ -105,6 +109,13 @@ def request_inspection(
     session.add(inspection)
     session.commit()
     return InspectionRequest(inspection.id, inspection.state, False)
+
+
+def _report_fingerprint(files: list) -> str:
+    source_fingerprint = folder_fingerprint(files)
+    return hashlib.sha256(
+        f"{REPORT_FORMAT_VERSION}\0{source_fingerprint}".encode()
+    ).hexdigest()
 
 
 def preview_files(root: Path) -> list:
@@ -165,7 +176,7 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID, storag
         else:
             target = resolve_folder(root, inspection.folder)
             files = list_files(target, root)
-        if folder_fingerprint(files) != inspection.fingerprint:
+        if _report_fingerprint(files) != inspection.fingerprint:
             # The files changed while the job waited; the report would describe something else.
             return _fail(session, inspection, "INPUT_FINGERPRINT_MISMATCH", "files changed")
         if inspection.district:

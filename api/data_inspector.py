@@ -1,6 +1,6 @@
 """Admin data inspector over the read-only source folder (ADR-0006).
 
-Describes unapproved files so an Admin can see what arrived, what is wrong with it and what is
+Describes delivered source files so an Admin can see what arrived, what is wrong with it and what is
 missing, before anyone writes a loader against it. Nothing here is an assessment: no result is
 produced, no version is pinned, and none of it may be shown to a planner or sent to SIG.
 
@@ -79,7 +79,7 @@ def source_folders(principal: AdminUser) -> dict[str, object]:
     return {
         "root_label": str(root),
         "folders": list_folders(root),
-        "notice": "Unapproved source data. Nothing here is a GRP result.",
+        "notice": "Delivered source data before ingestion. Nothing here is a GRP result.",
     }
 
 
@@ -150,7 +150,7 @@ def read_inspection(
 
 @router.post(
     "/previews",
-    summary="Queue an unapproved map preview of one district (or return the stored one)",
+    summary="Queue a delivered-data preview of one district (or return the stored one)",
     openapi_extra={"x-grp-access": "protected"},
 )
 def ask_for_preview(

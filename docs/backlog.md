@@ -24,7 +24,7 @@ How to read this: **S** is about a day, **M** two to four days, **L** a week or 
 
 ## Epic P — Preview the real data on the map now, with warnings (owner request, 19 Sep 2026)
 
-The owner wants to **see** the delivered data on the map before the blockers are settled, with every known gap stated beside it. This is a preview, never a result: it reads the unapproved files, is Admin-only like the Source data page, carries a fixed "Unapproved preview — not a GRP assessment" label, and cannot start an assessment or reach SIG.
+The owner wants to **see** the delivered data on the map before the method blockers are settled, with every known gap stated beside it. The Data Science delivery is accepted source data under ADR-0007. This is still a preview, never a result: it reads files before ingestion, is Admin-only like the Source data page, carries a fixed "Delivered data preview — not a GRP assessment" label, and cannot start an assessment or reach SIG.
 
 | # | Item | Size | Blocked by | Done when |
 |---|---|---|---|---|

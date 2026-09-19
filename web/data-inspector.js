@@ -1,7 +1,7 @@
 /* Admin data inspector (ADR-0006).
  *
  * Shows what is in the read-only source folder, what is wrong with it and what is missing.
- * Everything here describes unapproved files: it is never a GRP result.
+ * Everything here describes delivered source files before ingestion: it is never a GRP result.
  */
 (() => {
   "use strict";

@@ -64,8 +64,9 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
 
 - Not for Sandbox, staging or production. Moving it needs a security review (the folder becomes a
   server-side read surface), a spec update and a new decision.
-- The report describes **unapproved** data. Presenting any of it as evidence would breach AD-12
-  and Section 8.4; the warning banner and this ADR are the control.
+- The report describes delivered source data **before ingestion**. ADR-0007 records the owner's
+  acceptance of the Data Science delivery, but presenting preview numbers as an assessment or
+  evidence would still breach AD-12 and Section 8.4; the warning banner and this ADR are the control.
 - `hub_id` on `dataset_inspection` is nullable: the source folder belongs to the server, not to a
   Hub, so a Platform Admin who is a member of none may still inspect it. Consequently any Admin
   can read any inspection — acceptable while there is one shared read-only folder on one local
