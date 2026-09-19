@@ -627,6 +627,7 @@
     window.clearTimeout(state.pollTimer);
     try {
       const job = await GRP.request(`/api/v1/assessments/${id}`);
+      if (job.state !== "queued" && job.state !== "running") GRP.jobs.done(id);
       if (job.state === "succeeded") {
         await showResult(id);
       } else if (job.state === "queued" || job.state === "running") {
@@ -1093,6 +1094,13 @@
         showProgress(boundary ? boundary.name : "Assessment");
         state.pendingAssessmentId = payload.assessment_id;
         saveState();
+        GRP.jobs.track({
+          id: payload.assessment_id,
+          label: `Assessment for ${boundary ? boundary.name : "the chosen area"}`,
+          statusPath: `/api/v1/assessments/${payload.assessment_id}`,
+          href: "/planning.html",
+          ownerPath: "/planning.html",
+        });
         document.body.dataset.view = window.matchMedia("(max-width: 860px)").matches ? "map" : document.body.dataset.view;
         watch(payload.assessment_id);
       } else if (payload.mode === "sig_evidence") {

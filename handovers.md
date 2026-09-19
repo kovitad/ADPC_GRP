@@ -74,6 +74,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 - After any API restart, **sign in again**. The SIG MCP token lives only in process memory (ADR-0002).
 - The script copies `OPENAI_API_KEY` and `LANGFUSE_SECRET_KEY` from the ignored `.env` into `.local/docker/secrets/` without printing them. `LANGFUSE_BASE_URL` and `LANGFUSE_PUBLIC_KEY` pass through as environment variables. The model comes from `OPENAI_MODEL` (currently `gpt-5.2`).
 - Desktop-only switches in `deploy/compose.desktop.yml`: `GRP_ENV=dev`, `AI_FEATURE_ENABLED=true`, `PLANNING_CHAT_ENABLED=true`, `DATA_INSPECTOR_ENABLED=true`, `ALLOW_DRAFT_METHODS=true`, `AI_MAX_OUTPUT_TOKENS=900`.
+- **Background jobs in the browser** (`GRP.jobs` in `web/grp-common.js`): every page that starts a worker job (assessments on Planning and Assessments, Source data checks) calls `GRP.jobs.track({id, label, statusPath, href, ownerPath})`. The list lives in `sessionStorage` (`grp.jobs.v1`, cleared on sign-out); every signed-in page polls it every 5 s, shows a top-bar pill while anything runs and a notice (plus a browser notification if allowed and the tab is hidden) when it ends. The owning page shows the result itself, so no notice there, and calls `GRP.jobs.done(id)`. Any new long job must use this, never make the user wait on the page.
 - `.local/data-in` is bind-mounted **read-only** into the api and worker at `/srv/grp/data-in` (ADR-0006). Put the delivered files there; the app can never write to them. Adding or removing that mount needs `up -d` to recreate the containers, not a restart.
 
 ### Browser checklist
@@ -87,7 +88,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
    - **Use my location**: allow the browser prompt; the map accepts only a real Thailand district returned by OpenStreetMap (not a city-wide or approximate result), labels it as SIG-only and offers **Check SIG flood exposure**. Location coordinates are not stored and cannot start a GRP assessment.
    - **Publish receipt & show SIG flood map** (two-step confirm, creates a public record): SIG hazard map over the map
    - switch to Assessments and back: the conversation is kept
-4. `/data-inspector.html` (**Source data** in the menu, Admins only): pick **All source data**. Expect nine blockers, ten problems and four known issues in about ten seconds, a map of shelters coloured by whether they sit in the district they name, and a second visit to the same folder returning instantly from the cache. Change one file and it re-reads.
+4. `/data-inspector.html` (**Source data** in the menu, Admins only): pick **All source data**. Expect nine blockers, ten problems and four known issues in about ten seconds, a map of shelters coloured by whether they sit in the district they name, and a second visit to the same folder returning instantly from the cache. While it runs, switch to another menu: the top bar shows **Running: Source data check …** and a notice appears bottom-right when it is ready. Coming back to Source data picks up the same job (it does not start again). A finished report is shown straight away; pick the folder again to re-check for changed files.
 5. `/assessments.html`, `/workspace.html`: same top bar, same order
 6. Langfuse Cloud: traces `planning-router-v1`, `planning-draft-v1`, `result-explain-v1`, `platform-test-v1`
 

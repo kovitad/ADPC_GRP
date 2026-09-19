@@ -2006,3 +2006,56 @@ h4, h5, h6, strong { font-weight: var(--weight-semibold); }
   .inspector-map { height: 18rem; }
   .inspector-tally__item { min-width: 5.5rem; flex: 1; }
 }
+
+/* Background jobs: top bar reminder and finish notices (grp-common.js). */
+.grp-topbar__jobs {
+  max-width: 18rem;
+  overflow: hidden;
+  padding: 0.3rem 0.75rem 0.3rem 1.55rem;
+  border-radius: 999px;
+  background: var(--servir-green-soft) no-repeat 0.6rem 50% / 0.55rem 0.55rem
+    radial-gradient(circle, var(--servir-green) 60%, transparent 62%);
+  color: var(--servir-navy);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grp-topbar__jobs[hidden] { display: none; }
+.grp-toasts {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(24rem, calc(100vw - 2rem));
+}
+.grp-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 4px solid var(--servir-green);
+  border-radius: 8px;
+  background: var(--white);
+  box-shadow: 0 6px 20px rgba(13, 37, 52, 0.18);
+  color: var(--ink-900);
+  font-size: 0.88rem;
+}
+.grp-toast.is-failed { border-left-color: var(--danger-700); }
+.grp-toast p { flex: 1; margin: 0; }
+.grp-toast a { color: var(--servir-blue-dark); font-weight: 600; }
+.grp-toast button {
+  border: 0;
+  background: none;
+  color: var(--ink-500);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+@media (max-width: 860px) {
+  .grp-topbar__jobs { max-width: 9rem; }
+}

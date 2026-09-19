@@ -222,6 +222,7 @@
     window.clearTimeout(pollTimer);
     try {
       const status = await GRP.request(`/api/v1/assessments/${id}`);
+      if (status.state !== "queued" && status.state !== "running") GRP.jobs.done(id);
       if (status.state === "succeeded") {
         await showResult(id);
         showRecent();
@@ -258,7 +259,15 @@
           method: { key, version },
         },
       });
-      status.textContent = `Job accepted (${accepted.support_ref}). It runs in the background.`;
+      status.textContent =
+        `Job accepted (${accepted.support_ref}). It runs in the background; you can leave this page and will be told when it finishes.`;
+      GRP.jobs.track({
+        id: accepted.assessment_id,
+        label: `Assessment ${accepted.support_ref}`,
+        statusPath: `/api/v1/assessments/${accepted.assessment_id}`,
+        href: "/assessments.html",
+        ownerPath: "/assessments.html",
+      });
       watch(accepted.assessment_id);
       showRecent();
     } catch (error) {
@@ -285,6 +294,9 @@
         "Pick an area, scenario and data, then run. The result shows which centers may be exposed and why.";
       await loadCatalog();
       await showRecent();
+      // A job started here before switching pages: keep following it.
+      const pending = GRP.jobs.list().find((job) => job.ownerPath === "/assessments.html");
+      if (pending) watch(pending.id);
     })
     .catch((error) => {
       if (error.status === 401 || error.status === 403) {

@@ -133,7 +133,12 @@
       if (started.from_cache) {
         setProgress("Cached", "These files have not changed, so the stored report is reused.", 1);
       } else {
-        setProgress("Queued", "The worker will open each layer. Large rasters are sampled.", 0.3);
+        track(started.inspection_id, folder);
+        setProgress(
+          "Queued",
+          "The worker will open each layer. You can leave this page; you will be told when it is ready.",
+          0.3
+        );
       }
       poll(started.inspection_id);
     } catch (error) {
@@ -141,6 +146,15 @@
       showError(error.message || "The folder could not be read.");
     }
   };
+
+  const track = (inspectionId, folder) =>
+    GRP.jobs.track({
+      id: inspectionId,
+      label: `Source data check (${folder || "all source data"})`,
+      statusPath: `/api/v1/data-inspector/inspections/${inspectionId}`,
+      href: "/data-inspector.html",
+      ownerPath: "/data-inspector.html",
+    });
 
   const poll = async (inspectionId) => {
     let payload;
@@ -151,6 +165,7 @@
       showError(error.message || "The report could not be read.");
       return;
     }
+    if (payload.state !== "queued" && payload.state !== "running") GRP.jobs.done(inspectionId);
     if (payload.state === "succeeded") {
       setProgress("Done", "Every layer in this folder was read.", 1);
       window.setTimeout(() => {
@@ -169,7 +184,10 @@
     pollCount += 1;
     if (pollCount > POLL_LIMIT) {
       progressCard.hidden = true;
-      showError("The inspection is taking longer than expected. Check that the worker is running.");
+      showError(
+        "The inspection is taking longer than expected. It keeps running in the background and " +
+          "you will be told when it finishes; if it never does, check that the worker is running."
+      );
       return;
     }
     const share = Math.min(0.3 + pollCount * 0.03, 0.92);
@@ -397,11 +415,31 @@
 
   /* ---------- start ---------- */
 
+  // Coming back to the page: read the job already asked for rather than asking again, which
+  // would re-fingerprint every file. Only a job that is gone is asked for afresh.
+  const resume = async (saved) => {
+    clearError();
+    setProgress("Checking", "Picking up the check you started…", 0.3);
+    try {
+      await GRP.request(`/api/v1/data-inspector/inspections/${saved.inspection_id}`);
+    } catch (error) {
+      if (error.status === 404) {
+        inspect(saved.folder);
+        return;
+      }
+      progressCard.hidden = true;
+      showError(error.message || "The report could not be read.");
+      return;
+    }
+    poll(saved.inspection_id);
+  };
+
   GRP.request("/api/v1/data-inspector/folders")
     .then((payload) => {
       renderFolders(payload);
       const saved = readState();
-      if (saved.folder !== undefined) inspect(saved.folder);
+      if (saved.inspection_id) resume(saved);
+      else if (saved.folder !== undefined) inspect(saved.folder);
     })
     .catch((error) => {
       pickIntro.textContent = "";
