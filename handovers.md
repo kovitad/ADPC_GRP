@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 19 September 2026 (data-library/SIG workflow and Hub-override design added before implementation)
+**Updated:** 19 September 2026 (senior technical review added gates to the proposed data-library design)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -102,7 +102,8 @@ Design notes to read before large changes:
 - [`docs/architecture-scaling-design.md`](docs/architecture-scaling-design.md) — why GRP is a modular monolith with background jobs, what keeps it ready to split into services later, and the measured triggers for doing so.
 - [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force, including the blocking no-data rule.
 - [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
-- [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) — proposed SIG-first screening, GRP detailed assessment, versioned platform baseline, Hub-level category overrides, import/upload lifecycle, technical stack, scaling triggers and review challenges. Approve ADR-0008 before implementing it.
+- [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) — proposed SIG screening, GRP detailed assessment, versioned platform baseline, Hub-level category overrides, import/upload lifecycle, technical stack and scaling triggers.
+- [`docs/data-library-solution-review.md`](docs/data-library-solution-review.md) — senior review verdict: the direction is sound but ADR-0008 is not implementation-ready until the P0 privacy, boundary-versioning, lease-renewal, readiness-state and multi-tile hazard gaps are closed.
 - [`docs/adr/0006-admin-data-inspector.md`](docs/adr/0006-admin-data-inspector.md) — the Admin **Source data** page: a read-only look at `.local/data-in`, run as a worker job, cached on a file fingerprint, findings graded blocker / problem / known. Dev only; nothing it reports is a GRP result.
 - [`docs/adr/0007-delivered-data-acceptance.md`](docs/adr/0007-delivered-data-acceptance.md) — the Data Science delivery is accepted source data; ingestion registers its provenance and checksums, while method decisions such as flood no-value remain separate blockers.
 - [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md) — what `tools/prove_dataset.py` found when run on real districts: the datasets line up, but in Pua every shelter sits on a no-value pixel, shelter district names cannot be joined, and at least one shelter is in the wrong province. Read this before writing any loader.
@@ -233,9 +234,10 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   provenance/checksums is ingestion setup; DEP-05 no-value meaning still blocks classification.
   A direct worker preview of Pua confirms the remaining findings are the no-value blocker, one
   misplaced-shelter problem and the two unconfirmed shelter columns as a known issue.
-- Designed the next data-library increment before coding it: SIG screening first, GRP assessment
-  second, immutable platform baselines, and category-by-category Hub overrides accepted by a Hub
-  Admin rather than hidden per-user defaults. See the design note and proposed ADR-0008.
+- Designed the next data-library increment before coding it: SIG screening, GRP assessment,
+  immutable platform baselines, and category-by-category Hub overrides accepted by a Hub Admin
+  rather than hidden per-user defaults. The senior technical review is conditional: close its P0
+  findings before approving ADR-0008 or writing the migration.
 - CI now migrates an empty PostGIS database and runs the golden suite, and Gitleaks scans full Git
   history on pull requests and pushes to `main` (backlog D1 and D4). The CI sequence was reproduced
   locally against a fresh PostGIS 16 container (all seven migrations and 22 golden tests), and a

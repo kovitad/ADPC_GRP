@@ -1,8 +1,10 @@
 # Data library, SIG screening and GRP assessment design
 
-**Status:** Proposed for product, Technical Lead, Data Science and SIG review.
+**Status:** Proposed; senior technical review found P0 changes required before implementation approval.
 **Date:** 19 September 2026.
 **Decision record:** [`adr/0008-baseline-and-hub-data-overrides.md`](adr/0008-baseline-and-hub-data-overrides.md).
+
+**Technical review:** [`data-library-solution-review.md`](data-library-solution-review.md).
 
 ## 1. Purpose
 

@@ -2,7 +2,7 @@
 
 **Updated:** 18 September 2026. Ordered so the top item is always the next sensible one to pick up.
 
-How to read this: **S** is about a day, **M** two to four days, **L** a week or more, for one developer who has read `handovers.md`. "Blocked by" names another team; do not start those without the answer. Every item must meet the definition of done in [`development-plan.md`](development-plan.md). The cross-cutting baseline/import/Hub-override design is in [`data-library-sig-assessment-design.md`](data-library-sig-assessment-design.md) and ADR-0008; approve that decision before implementing A3–A9 or F2.
+How to read this: **S** is about a day, **M** two to four days, **L** a week or more, for one developer who has read `handovers.md`. "Blocked by" names another team; do not start those without the answer. Every item must meet the definition of done in [`development-plan.md`](development-plan.md). The cross-cutting baseline/import/Hub-override design is in [`data-library-sig-assessment-design.md`](data-library-sig-assessment-design.md) and ADR-0008. Close the P0 gates in [`data-library-solution-review.md`](data-library-solution-review.md), then approve the decision before implementing A3–A9 or F2.
 
 ---
 

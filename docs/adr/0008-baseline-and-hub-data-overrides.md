@@ -1,6 +1,6 @@
 # ADR-0008: Versioned platform baseline with Hub-level data overrides
 
-**Status:** Proposed for product owner, Technical Lead, Data Science and security review.
+**Status:** Proposed; senior technical review found P0 changes required before approval.
 
 **Date:** 2026-09-19
 
@@ -12,7 +12,7 @@ ADR-0007 accepts the Data Science delivery as the initial source data. The produ
 
 Allowing every person to silently replace a source would make two planners receive different answers and would make old results impossible to replay. Overwriting a baseline version would have the same problem. Sending raw data to SIG would unnecessarily widen the trust boundary.
 
-The detailed design is [`../data-library-sig-assessment-design.md`](../data-library-sig-assessment-design.md).
+The detailed design is [`../data-library-sig-assessment-design.md`](../data-library-sig-assessment-design.md). The senior review and required gates are in [`../data-library-solution-review.md`](../data-library-solution-review.md).
 
 ## Decision
 
@@ -49,6 +49,7 @@ The detailed design is [`../data-library-sig-assessment-design.md`](../data-libr
 
 ## Action items
 
+- [ ] Close the P0 findings in the senior technical review.
 - [ ] Product and Technical Lead approve the baseline/Hub override rule.
 - [ ] Data Science confirms category metadata and DEP-05 flood NoData semantics.
 - [ ] Security approves upload limits, quarantine and malware-scanning expectations.
