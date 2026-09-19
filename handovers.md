@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 19 September 2026 (senior technical review added gates to the proposed data-library design)
+**Updated:** 19 September 2026 (reviewed data-library/SIG architecture diagrams retained in this handover)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -96,6 +96,70 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 ---
 
 ## 4. Architecture map (what lives where)
+
+### 4.0 Proposed data-library and SIG flow
+
+This is the retained design direction, not implemented behavior. ADR-0008 remains proposed until the
+P0 gates in the senior review are closed. SIG screening is optional; a SIG outage must never block a
+valid GRP assessment. Hub data overrides are visible Hub-level choices accepted by a Hub Admin, not
+hidden per-user defaults.
+
+```mermaid
+flowchart TD
+    USER[Planner confirms a district] --> CHOICE{What is needed?}
+    CHOICE -->|Quick hazard context| SIGSCREEN[SIG screening\nHazard, exposure, sources and gaps]
+    CHOICE -->|Detailed shelter assessment| RESOLVE[Resolve GRP input versions]
+    SIGSCREEN --> DECIDE{Detailed assessment needed?}
+    DECIDE -->|Yes| RESOLVE
+    DECIDE -->|No| SCREENONLY[Keep as labelled screening evidence]
+
+    BASE[Immutable platform baseline] --> RESOLVE
+    CANDIDATE[User contributes Hub candidate data] --> VALIDATE[Quarantine and worker validation]
+    VALIDATE --> ACCEPT{Hub Admin accepts?}
+    ACCEPT -->|Yes| OVERRIDE[Immutable Hub override version]
+    ACCEPT -->|No| REJECT[Needs correction or remains inactive]
+    OVERRIDE --> RESOLVE
+
+    RESOLVE --> COMPAT{Versions and method compatible?}
+    COMPAT -->|No| STOP[Stop with typed explanation\nNo silent fallback]
+    COMPAT -->|Yes| PIN[Show and pin boundary, data, method IDs and checksums]
+    PIN --> JOB[Queued GRP GIS worker]
+    JOB --> RESULT[Immutable private GRP result]
+    RESULT --> SHARE{Eligible and Admin-approved for SIG?}
+    SHARE -->|No or any Hub-local input| PRIVATE[Remain private in GRP]
+    SHARE -->|Platform inputs and approved public fields| EVIDENCE[Restricted GRP evidence endpoint]
+    EVIDENCE --> SIGMCP[SIG Risk pack, citations and gate]
+    SIGMCP --> RECEIPT[Public receipt and receipt-bound map]
+```
+
+```mermaid
+flowchart LR
+    subgraph GRP[ADPC GRP trust boundary]
+      API[FastAPI]
+      DB[(PostgreSQL and PostGIS)]
+      QUEUE[(Leased job queues)]
+      WORKERS[Assessment, import and export workers]
+      STORE[(Managed file storage\nCOGs and originals)]
+      API --> DB
+      API --> QUEUE
+      QUEUE --> WORKERS
+      WORKERS --> DB
+      WORKERS --> STORE
+    end
+
+    subgraph SIG[SIG trust boundary]
+      MCP[SIG MCP Risk pack]
+      GATE[Groundedness gate]
+      UI[Receipt and map component]
+      MCP --> GATE --> UI
+    end
+
+    DB -->|Explicitly shared result fields only\nNo raw files| MCP
+```
+
+Scale path: keep the modular monolith for the pilot; add lease renewal and separate job classes first,
+then shared state and S3-compatible storage before multiple API/worker hosts, and a tile service only
+when national raster browsing is measured as necessary.
 
 Design notes to read before large changes:
 
@@ -237,7 +301,8 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Designed the next data-library increment before coding it: SIG screening, GRP assessment,
   immutable platform baselines, and category-by-category Hub overrides accepted by a Hub Admin
   rather than hidden per-user defaults. The senior technical review is conditional: close its P0
-  findings before approving ADR-0008 or writing the migration.
+  findings before approving ADR-0008 or writing the migration. The reviewed product flow and trust-
+  boundary diagrams are retained in Section 4.0 of this handover.
 - CI now migrates an empty PostGIS database and runs the golden suite, and Gitleaks scans full Git
   history on pull requests and pushes to `main` (backlog D1 and D4). The CI sequence was reproduced
   locally against a fresh PostGIS 16 container (all seven migrations and 22 golden tests), and a
