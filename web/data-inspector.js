@@ -39,7 +39,7 @@
 
   const readState = () => {
     try {
-      return JSON.parse(sessionStorage.getItem(STATE_KEY) || "{}");
+      return JSON.parse(localStorage.getItem(STATE_KEY) || "{}");
     } catch (_) {
       return {};
     }
@@ -47,7 +47,7 @@
 
   const writeState = (value) => {
     try {
-      sessionStorage.setItem(STATE_KEY, JSON.stringify(value));
+      localStorage.setItem(STATE_KEY, JSON.stringify(value));
     } catch (_) {
       /* a private window is fine; the page just does not remember the folder */
     }

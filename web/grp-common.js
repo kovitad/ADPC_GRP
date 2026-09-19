@@ -40,9 +40,11 @@ window.GRP = (() => {
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-          Object.keys(sessionStorage)
-            .filter((key) => key.startsWith("grp."))
-            .forEach((key) => sessionStorage.removeItem(key));
+          [sessionStorage, localStorage].forEach((store) =>
+            Object.keys(store)
+              .filter((key) => key.startsWith("grp."))
+              .forEach((key) => store.removeItem(key)),
+          );
         } catch (_error) {
           // Nothing stored or storage blocked.
         }
@@ -192,7 +194,7 @@ window.GRP = (() => {
   };
 
   // Background jobs the person started (assessments, source data checks). The server keeps
-  // running them whatever page is open; this remembers them for the tab so any page can say
+  // running them whatever page or tab is open; this remembers them across tabs so any page can say
   // "still running" and announce when one finishes. The page that owns a job shows the result
   // itself, so it is not announced there.
   const JOBS_KEY = "grp.jobs.v1";
@@ -201,7 +203,7 @@ window.GRP = (() => {
 
   const readJobs = () => {
     try {
-      return JSON.parse(sessionStorage.getItem(JOBS_KEY) || "[]");
+      return JSON.parse(localStorage.getItem(JOBS_KEY) || "[]");
     } catch (_error) {
       return [];
     }
@@ -209,7 +211,7 @@ window.GRP = (() => {
 
   const writeJobs = (jobs) => {
     try {
-      sessionStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
+      localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
     } catch (_error) {
       // Storage blocked: the job still runs, there is just no reminder on other pages.
     }
