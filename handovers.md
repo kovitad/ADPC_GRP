@@ -227,7 +227,12 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Preview-page polling now yields to the global background-job tracker after roughly three minutes,
   rather than polling forever in the foreground.
 - CI now migrates an empty PostGIS database and runs the golden suite, and Gitleaks scans full Git
-  history on pull requests and pushes to `main` (backlog D1 and D4).
+  history on pull requests and pushes to `main` (backlog D1 and D4). The CI sequence was reproduced
+  locally against a fresh PostGIS 16 container (all seven migrations and 22 golden tests), and a
+  full-history Gitleaks scan found no leaks.
+- Automated browser acceptance reached the local OAuth sign-in, but the prior API session had expired.
+  A person must complete SERVIR sign-in before the protected preview and live publish checks can run.
+  No receipt was created. The public staging health URL reset the connection; staging remains undeployed.
 - Full validation: 264 tests, Ruff and JavaScript syntax checks pass.
 
 ---
