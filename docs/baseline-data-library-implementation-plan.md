@@ -218,9 +218,9 @@ Add an Admin-only **Data library** page:
 
 ## 10. Execution order
 
-1. Migration and domain state model.
-2. Generic import queue, lease renewal and two-worker test.
-3. Managed staging, manifests, checksums and atomic promotion.
+1. ~~Migration and domain state model.~~ **Built in migration `20260919_0008`.**
+2. **Started:** generic import queue, idempotent request, lease renewal and fenced one-time finalization are built and fast-tested. Add the PostgreSQL two-worker claim/promotion test when connecting the processor.
+3. **Next:** managed staging, manifests, checksums and atomic promotion.
 4. Boundary collection loader.
 5. Shelter loader and spatial mismatch report.
 6. RP100 six-tile logical manifest and bounded COG conversion.

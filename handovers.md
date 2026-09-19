@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 19 September 2026 (bounded local baseline implementation plan and post-baseline sequence approved)
+**Updated:** 19 September 2026 (data-library schema and fenced import-job foundation implemented)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **265 tests pass**; Ruff and JavaScript syntax checks are clean.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **269 tests pass**; Ruff and JavaScript syntax checks are clean.
 
 **Handing over:** nothing is half-finished in the tree. The next person should start at Section 9, and first do the browser acceptance pass in Section 3 (nothing on this branch has been confirmed against live SIG and OpenAI yet).
 
@@ -190,7 +190,7 @@ Design notes to read before large changes:
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py` | See 4.3 |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
-| Migrations | `migrations/versions/20260916_0001`…`20260919_0007` | Forward-only; `0006` adds inspections and `0007` separates district-preview cache entries |
+| Migrations | `migrations/versions/20260916_0001`…`20260919_0008` | Forward-only; `0008` adds data-library readiness, import jobs, file manifests, boundary collection links and Hub selections |
 
 ### 4.2 Frontend (static, no build step)
 
@@ -311,7 +311,13 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Automated browser acceptance reached the local OAuth sign-in, but the prior API session had expired.
   A person must complete SERVIR sign-in before the protected preview and live publish checks can run.
   No receipt was created. The public staging health URL reset the connection; staging remains undeployed.
-- Full validation: 265 tests, Ruff and JavaScript syntax checks pass.
+- Began the accepted local baseline implementation. Migration `0008` adds explicit readiness states,
+  data import jobs, immutable file manifests, boundary collection-version links and unique Hub data
+  selections. Import jobs now use attempt numbers as fencing tokens: an expired stale worker cannot
+  renew or finalize after another worker reclaims the job. Requests are idempotent and successful
+  finalization can happen only once.
+- Full validation: 269 tests pass; Ruff and JavaScript syntax checks pass. A fresh PostGIS 16 database
+  migrated through all eight revisions and Alembic confirmed `20260919_0008` as head.
 
 ---
 
@@ -390,9 +396,9 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
 
 Execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data-library-implementation-plan.md) in order:
 
-1. Migration and readiness/domain states.
-2. Import queue with lease renewal, idempotent finalization and two-worker tests.
-3. Managed staging, checksums and atomic promotion.
+1. ~~Migration and readiness/domain states.~~ **Built:** migration `0008` passes from an empty PostGIS database.
+2. **In progress:** import queue has idempotent requests, lease renewal and fenced finalization; add the PostgreSQL two-worker claim/promotion test with the processor.
+3. **Next:** managed staging, checksums and atomic promotion.
 4. Versioned district-boundary collection and PostGIS loader.
 5. DDPM shelter loader with geometric membership and mismatch reporting.
 6. One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.
@@ -485,6 +491,6 @@ git fetch; git switch codex/sig-embedded-flood-map
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 265 passed
+python -m pytest            # expect 269 passed
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

@@ -60,6 +60,9 @@ class Boundary(Base):
     source: Mapped[str] = mapped_column(String(200), nullable=False)
     edition: Mapped[str] = mapped_column(String(100), nullable=False)
     geometry_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    collection_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     is_supported: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = _created()
 
@@ -91,6 +94,12 @@ class DatasetVersion(Base):
             "return_period_years IS NULL OR return_period_years IN (10, 20, 50, 75, 100, 200, 500)",
             name="ck_dataset_version_return_period",
         ),
+        CheckConstraint(
+            "readiness IN ('received', 'validating', 'needs_correction', "
+            "'technically_valid', 'waiting_for_method', 'ready_for_acceptance', "
+            "'assessment_ready', 'retired')",
+            name="ck_dataset_version_readiness",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
@@ -104,7 +113,12 @@ class DatasetVersion(Base):
         "metadata", JSON_VALUE, default=dict, nullable=False
     )
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    readiness: Mapped[str] = mapped_column(
+        String(32), default="assessment_ready", server_default="assessment_ready", nullable=False
+    )
+    importer_version: Mapped[str | None] = mapped_column(String(64))
     accepted_by: Mapped[UUID | None] = mapped_column(ForeignKey("app_user.id", ondelete="RESTRICT"))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
 
 
