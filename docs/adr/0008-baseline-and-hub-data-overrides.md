@@ -1,6 +1,6 @@
 # ADR-0008: Versioned platform baseline with Hub-level data overrides
 
-**Status:** Proposed; senior technical review found P0 changes required before approval.
+**Status:** Accepted by the product owner for bounded local baseline implementation on 2026-09-19 after senior technical review. The named Technical Lead must confirm before server rollout; browser upload and scientific activation remain conditional on the security and Data Science gates below.
 
 **Date:** 2026-09-19
 
@@ -23,9 +23,13 @@ The detailed design is [`../data-library-sig-assessment-design.md`](../data-libr
 5. Every assessment shows and pins the exact boundary, dataset and method version IDs and checksums before the job runs.
 6. Never silently fall back from an invalid or incompatible Hub override to the platform baseline.
 7. Keep technical validation, source acceptance, method approval and assessment readiness as separate statuses.
-8. Use SIG first for general screening. Use GRP for deterministic, reproducible assessments. Share only an Admin-approved public result field set with SIG; never raw files.
-9. Use PostgreSQL/PostGIS for metadata and spatial vectors, the existing storage protocol for original files and rasters, and PostgreSQL-leased worker jobs for validation and ingestion. Do not add a vector-embedding database.
-10. Implement existing-source import before browser upload so the 2.1 GB delivery is not transferred twice.
+8. Offer SIG for general screening, but never make it a prerequisite for a valid GRP assessment. Use GRP for deterministic, reproducible assessments. Share only an Admin-approved public result field set with SIG; never raw files.
+9. Keep assessments using any Hub-local input private and ineligible for SIG. Changing that deny-by-default rule requires a separate privacy ADR.
+10. Represent boundaries as versioned collections: each boundary feature belongs to an immutable collection version, and an assessment pins both.
+11. Represent the six RP100 tiles as one logical hazard version with an ordered, checksummed manifest and deterministic tile-edge rules.
+12. Require lease renewal, idempotent finalization and atomic promotion before processing large imports.
+13. Use PostgreSQL/PostGIS for metadata and spatial vectors, the existing storage protocol for original files and rasters, and PostgreSQL-leased worker jobs for validation and ingestion. Do not add a vector-embedding database.
+14. Implement existing-source import before browser upload so the 2.1 GB delivery is not transferred twice. Exclude vulnerability rasters from the local baseline slice and process them separately on the deployment VM.
 
 ## Options considered
 
@@ -49,8 +53,9 @@ The detailed design is [`../data-library-sig-assessment-design.md`](../data-libr
 
 ## Action items
 
-- [ ] Close the P0 findings in the senior technical review.
-- [ ] Product and Technical Lead approve the baseline/Hub override rule.
+- [x] Close the P0 design decisions in the senior technical review for the local baseline scope.
+- [x] Product owner approves the baseline/Hub override rule for local implementation.
+- [ ] Named Technical Lead confirms the design before server rollout.
 - [ ] Data Science confirms category metadata and DEP-05 flood NoData semantics.
 - [ ] Security approves upload limits, quarantine and malware-scanning expectations.
 - [ ] Add schema migration and contract tests.

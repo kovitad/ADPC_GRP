@@ -4,7 +4,7 @@
 
 **Reviewed:** [`data-library-sig-assessment-design.md`](data-library-sig-assessment-design.md), ADR-0008, current models, worker and backlog
 
-**Verdict:** **Conditionally sound, changes required before implementation approval**
+**Verdict:** **Approved for the bounded local baseline implementation; mandatory engineering gates remain before browser upload or server rollout**
 
 ## Executive assessment
 
@@ -19,7 +19,7 @@ The central architecture is correct:
 - assessments pin exact versions and never silently fall back;
 - an embedding/vector database is not introduced.
 
-This is an appropriate modular-monolith design for the pilot and has a credible scale path. It is **not yet implementation-ready**, because several policy and model gaps could otherwise cause privacy breaches, unreproducible results or duplicate processing.
+This is an appropriate modular-monolith design for the pilot and has a credible scale path. ADR-0008 now closes the P0 policy/model choices for the bounded local baseline scope. The lease, idempotency, atomic-promotion and concurrency controls remain implementation prerequisites, not optional follow-up work. Browser upload and server rollout still require the security and operational gates below.
 
 ## Findings requiring decisions
 
@@ -200,8 +200,8 @@ Provider columns can change independently of file edition. Store an importer/map
 
 ## Recommended implementation order after review
 
-1. Amend ADR-0008 with the uploaded-data deny-by-default rule and optional—not mandatory—SIG screening.
-2. Decide boundary collection versioning and hazard tile-manifest shape in a schema spike.
+1. Apply ADR-0008's uploaded-data deny-by-default rule and optional—not mandatory—SIG screening in tests and UI.
+2. Implement the selected boundary collection versioning and hazard tile-manifest shape through the schema plan.
 3. Add lease renewal and two-worker concurrency tests before import jobs.
 4. Build baseline import for boundaries and shelters using staging and atomic promotion.
 5. Add method-compatibility records and flood manifest registration; do not enable flood assessment until DEP-05.
@@ -222,4 +222,4 @@ Provider columns can change independently of file edition. Store an importer/map
 | National continuous raster browsing | Add a tile service and cache; do not serve whole rasters through FastAPI |
 | Large regional or multi-country platform | Reassess database partitioning, object-store lifecycle, worker autoscaling and operational ownership from measured load |
 
-The design should proceed, but ADR-0008 should not be marked accepted until the P0 items have explicit answers.
+The bounded local baseline implementation may proceed under ADR-0008 and the baseline implementation plan. It must stop before browser upload, scientific flood activation or server rollout unless the corresponding gates have passed.

@@ -1,10 +1,12 @@
 # Data library, SIG screening and GRP assessment design
 
-**Status:** Proposed; senior technical review found P0 changes required before implementation approval.
+**Status:** Approved for the bounded local baseline implementation in ADR-0008; browser upload, scientific activation and server rollout remain gated.
 **Date:** 19 September 2026.
 **Decision record:** [`adr/0008-baseline-and-hub-data-overrides.md`](adr/0008-baseline-and-hub-data-overrides.md).
 
 **Technical review:** [`data-library-solution-review.md`](data-library-solution-review.md).
+
+**Implementation plan:** [`baseline-data-library-implementation-plan.md`](baseline-data-library-implementation-plan.md).
 
 ## 1. Purpose
 
@@ -291,7 +293,7 @@ Measured triggers for additional infrastructure:
 
 ## 12. Implementation sequence
 
-1. Approve ADR-0008 and the Hub-level override rule.
+1. Implement the accepted bounded local scope under ADR-0008 and the baseline implementation plan.
 2. Extend the schema for import jobs, file manifests, version status and Hub-current selection.
 3. Build existing-source import for district boundaries and shelters.
 4. Add worker validation, PostGIS loading, checksums and audit events.

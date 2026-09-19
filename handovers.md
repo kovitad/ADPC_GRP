@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 19 September 2026 (reviewed data-library/SIG architecture diagrams retained in this handover)
+**Updated:** 19 September 2026 (bounded local baseline implementation plan and post-baseline sequence approved)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -99,9 +99,9 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 
 ### 4.0 Proposed data-library and SIG flow
 
-This is the retained design direction, not implemented behavior. ADR-0008 remains proposed until the
-P0 gates in the senior review are closed. SIG screening is optional; a SIG outage must never block a
-valid GRP assessment. Hub data overrides are visible Hub-level choices accepted by a Hub Admin, not
+This is the retained design direction, not implemented behavior. ADR-0008 is accepted for the bounded
+local baseline scope; browser upload, scientific activation and server rollout remain gated. SIG
+screening is optional; a SIG outage must never block a valid GRP assessment. Hub data overrides are visible Hub-level choices accepted by a Hub Admin, not
 hidden per-user defaults.
 
 ```mermaid
@@ -167,7 +167,8 @@ Design notes to read before large changes:
 - [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force, including the blocking no-data rule.
 - [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
 - [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) — proposed SIG screening, GRP detailed assessment, versioned platform baseline, Hub-level category overrides, import/upload lifecycle, technical stack and scaling triggers.
-- [`docs/data-library-solution-review.md`](docs/data-library-solution-review.md) — senior review verdict: the direction is sound but ADR-0008 is not implementation-ready until the P0 privacy, boundary-versioning, lease-renewal, readiness-state and multi-tile hazard gaps are closed.
+- [`docs/data-library-solution-review.md`](docs/data-library-solution-review.md) — senior review, mandatory safeguards and scale gates. Its P0 policy/model choices are closed in ADR-0008 for local baseline work; browser upload and server rollout remain gated.
+- [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data-library-implementation-plan.md) — exact local execution order: schema, lease/idempotency controls, managed staging, boundaries, shelters, six-tile RP100 manifest, Data library UI and the plan after baseline completion.
 - [`docs/adr/0006-admin-data-inspector.md`](docs/adr/0006-admin-data-inspector.md) — the Admin **Source data** page: a read-only look at `.local/data-in`, run as a worker job, cached on a file fingerprint, findings graded blocker / problem / known. Dev only; nothing it reports is a GRP result.
 - [`docs/adr/0007-delivered-data-acceptance.md`](docs/adr/0007-delivered-data-acceptance.md) — the Data Science delivery is accepted source data; ingestion registers its provenance and checksums, while method decisions such as flood no-value remain separate blockers.
 - [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md) — what `tools/prove_dataset.py` found when run on real districts: the datasets line up, but in Pua every shelter sits on a no-value pixel, shelter district names cannot be joined, and at least one shelter is in the wrong province. Read this before writing any loader.
@@ -300,9 +301,9 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   misplaced-shelter problem and the two unconfirmed shelter columns as a known issue.
 - Designed the next data-library increment before coding it: SIG screening, GRP assessment,
   immutable platform baselines, and category-by-category Hub overrides accepted by a Hub Admin
-  rather than hidden per-user defaults. The senior technical review is conditional: close its P0
-  findings before approving ADR-0008 or writing the migration. The reviewed product flow and trust-
-  boundary diagrams are retained in Section 4.0 of this handover.
+  rather than hidden per-user defaults. ADR-0008 now accepts the bounded local baseline scope;
+  its implementation safeguards are mandatory. Browser upload, flood activation and server rollout
+  remain gated. The reviewed diagrams are retained in Section 4.0 of this handover.
 - CI now migrates an empty PostGIS database and runs the golden suite, and Gitleaks scans full Git
   history on pull requests and pushes to `main` (backlog D1 and D4). The CI sequence was reproduced
   locally against a fresh PostGIS 16 container (all seven migrations and 22 golden tests), and a
@@ -324,7 +325,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0005 | Explicit NDMO Planner and Hub Expert / GIS Specialist roles | Accepted by product owner; local migration `20260917_0005` applied |
 | ADR-0006 | Admin data inspector over a read-only source folder | Accepted for local Docker Desktop testing; browser acceptance pending |
 | ADR-0007 | Data Science delivery is accepted source data; provenance is registered during ingestion | Accepted by product owner; DEP-05 method decision still blocks real results |
-| ADR-0008 | Immutable platform baseline plus Hub-level, category-by-category accepted overrides | **Proposed**; product, Technical Lead, Data Science and security review required before implementation |
+| ADR-0008 | Immutable platform baseline plus Hub-level, category-by-category accepted overrides | Accepted for bounded local baseline implementation; browser upload, scientific activation and server rollout remain gated |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
@@ -385,6 +386,25 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
 
 > For a **team** rather than one agent, work from [`docs/backlog.md`](docs/backlog.md): the same work split into sized epics with what blocks each, plus a first sprint that needs no answers from anyone. This list stays as the single-threaded order for whoever picks the session up next.
 
+### Current implementation track: local baseline data library
+
+Execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data-library-implementation-plan.md) in order:
+
+1. Migration and readiness/domain states.
+2. Import queue with lease renewal, idempotent finalization and two-worker tests.
+3. Managed staging, checksums and atomic promotion.
+4. Versioned district-boundary collection and PostGIS loader.
+5. DDPM shelter loader with geometric membership and mismatch reporting.
+6. One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.
+7. Data library API/UI, permission matrix, audit events and shared completion notices.
+8. Docker Desktop browser acceptance and measured memory, duration and disk use.
+
+Do not import the vulnerability rasters in this slice. Do not enable a real flood assessment until
+DEP-05 is resolved. Do not add browser upload or deploy this feature to a server before its security
+gates pass.
+
+### Existing product acceptance and release queue
+
 0. **Browser acceptance of the publish flow** (small, do this first)
    - On Docker Desktop: ask a district question, open the evidence panel, then **Verify & create public receipt** and confirm.
    - Expect: the exact brief you read is gated, a receipt link and SIG's live hazard map appear, and the chat status card shows the receipt instead of "Unverified draft".
@@ -405,14 +425,14 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
    - Job trace screen for Admin (`GET /admin/assessments/{id}/trace`).
    - One-page summary PDF and evacuation map PDF/PNG as export jobs (`assessment_export` table, `POST/GET /assessments/{id}/exports`).
    - *Done when* the synthetic case downloads match the locked result exactly (templates need DEP-12).
-5. **Real Thailand data and data library** (medium to large; first approve [`docs/adr/0008-baseline-and-hub-data-overrides.md`](docs/adr/0008-baseline-and-hub-data-overrides.md), then follow [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) and [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md))
+5. **Real Thailand data and data library** (medium to large; ADR-0008 is accepted for the bounded local scope; execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data-library-implementation-plan.md), then follow [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) and [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md))
    - The files are inspected and proved already: see [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) and [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md). Re-run the check any time with `python -m tools.prove_dataset --district "<name>"`.
    - Decide Option A (per-district flood picture, recommended) or Option B (tile service).
    - **Shelter membership must be decided by geometry, not by the district name field** — the proof shows the name join loses almost every point.
    - PostGIS geometry columns and a boundary loader (admin level, source, edition, fingerprint); load only approved districts.
    - Evacuation-center loader; flood raster converted to COG and registered with its provenance.
-   - Vulnerability raster registered as an unapproved map layer only (DEP-07).
-   - A PostgreSQL CI job for migrations and two workers claiming at once; lease renewal.
+   - Vulnerability raster deferred to a separate deployment-VM command and kept out of assessments until DEP-07.
+   - Two workers claiming at once; lease renewal and idempotent import promotion.
    - *Done when* a real Thailand district is assessed end to end and the map shows real flood depth for it; full acceptance still needs the signed result (DEP-04).
 6. **Increment 3: SIG connection** (medium; waits on SIG)
    - Sharing approval (Admin), evidence endpoint with the public field set, SIG machine login (client credentials), `assessment_ref` call, receipt linking, retry every 15 minutes for 24 hours, contract tests.
@@ -426,6 +446,17 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
    - Replace in-memory limits and token store.
    - Split `planning.js`/`planning.py`.
    - Update spec text for the ADRs.
+
+### After the local baseline is finished
+
+1. Get DEP-05's NoData, modelled-area and permanent-water decisions.
+2. Approve a compatible method version and run one real district against the proof tool and signed golden case.
+3. Prove one Hub shelter override without changing any old result.
+4. Add quarantined browser upload using the same import pipeline after security review.
+5. Build the deployment-VM vulnerability conversion command; activate it only after DEP-07.
+6. Build result exports, then the protected SIG `assessment_ref` evidence path for platform-input results only.
+7. Move to S3-compatible storage/direct multipart upload only when a second host or measured size requires it.
+8. Complete load, restore, security and alert rehearsals before pilot deployment.
 
 ---
 
