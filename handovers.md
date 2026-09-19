@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 18 September 2026 (dataset proved, dev plan and backlog written, Admin data inspector built)
+**Updated:** 19 September 2026 (district preview built, background jobs persist across tabs, documentation reconciled)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`, which is **committed and pushed with a clean working tree**. **249 tests pass**; Ruff and JavaScript syntax checks are clean.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **264 tests pass**; Ruff and JavaScript syntax checks are clean.
 
 **Handing over:** nothing is half-finished in the tree. The next person should start at Section 9, and first do the browser acceptance pass in Section 3 (nothing on this branch has been confirmed against live SIG and OpenAI yet).
 
@@ -37,7 +37,7 @@
 
 ## 2. Branches
 
-All feature branches are **stacked**: each contains the ones before it. `feat/planning-chatbot-ux` includes everything.
+The original feature branches are **stacked** through `feat/planning-chatbot-ux`. Current work continues from that baseline on `codex/sig-embedded-flood-map`.
 
 | # | Branch | Adds |
 |---|---|---|
@@ -122,7 +122,7 @@ Design notes to read before large changes:
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py` | See 4.3 |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
-| Migrations | `migrations/versions/20260916_0001`…`20260917_0005` | Forward-only |
+| Migrations | `migrations/versions/20260916_0001`…`20260919_0007` | Forward-only; `0006` adds inspections and `0007` separates district-preview cache entries |
 
 ### 4.2 Frontend (static, no build step)
 
@@ -212,8 +212,23 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   visible warning that vulnerability weighting and safety certification are not present.
 - Added an unavailable-map state so a valid cited answer and receipt remain usable when SIG returns no
   valid embed; no illustrative fallback is substituted.
-- Full validation: 210 tests, Ruff and `node --check web/planning.js`; Docker Desktop API and worker
+- Full validation at that point: 210 tests, Ruff and `node --check web/planning.js`; Docker Desktop API and worker
   rebuilt and restarted successfully. Sign in again because the in-memory SIG token was cleared.
+
+### 19 Sep — background-job continuity and district preview
+
+- Background assessment and inspection jobs are tracked in `localStorage`, survive navigation and
+  other tabs, and report completion from the shared top bar.
+- Added the Admin-only `/data-preview.html`: one delivered district's outline, shelters and RP100
+  flood picture, with no-value hatching, warnings and preview counts. It is explicitly unapproved,
+  cannot start an assessment and has no SIG route.
+- Added migration `20260919_0007` so folder inspections and district previews have distinct cache
+  keys, and made the worker persist safe failure reports for malformed layers.
+- Preview-page polling now yields to the global background-job tracker after roughly three minutes,
+  rather than polling forever in the foreground.
+- CI now migrates an empty PostGIS database and runs the golden suite, and Gitleaks scans full Git
+  history on pull requests and pushes to `main` (backlog D1 and D4).
+- Full validation: 264 tests, Ruff and JavaScript syntax checks pass.
 
 ---
 
@@ -225,6 +240,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0003 | Platform Admin manual reset of current-month AI usage | Accepted by owner; spec AI-11 text to update |
 | ADR-0004 | Interim Planner chat and map on SIG generic evidence, Docker Desktop only | Accepted for local testing; Technical Lead review pending |
 | ADR-0005 | Explicit NDMO Planner and Hub Expert / GIS Specialist roles | Accepted by product owner; local migration `20260917_0005` applied |
+| ADR-0006 | Admin data inspector over a read-only source folder | Accepted for local Docker Desktop testing; browser acceptance pending |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
@@ -353,6 +369,6 @@ git fetch; git switch codex/sig-embedded-flood-map
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 213 passed
+python -m pytest            # expect 264 passed
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

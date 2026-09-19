@@ -44,9 +44,9 @@ A change that weakens one of these is not an improvement, however elegant.
 
 Rules: never edit a golden expected value to make a test pass; never let tests reach the network; record external fixtures deliberately and review them as a diff.
 
-### 2.3 CI gates to add (in this order)
-1. **PostgreSQL job** running migrations from empty plus the golden tests (SQLite today hides PostGIS and locking differences).
-2. **Secret scan** on every push.
+### 2.3 CI gates
+1. **PostgreSQL job** running migrations from empty plus the golden tests — added 19 September 2026.
+2. **Secret scan** on every CI run (pull requests and pushes to `main`) — added 19 September 2026.
 3. **Two-worker concurrency test**: two workers, one queue, no double-processing.
 4. **Front-end syntax and asset-version check**, so a shared file change cannot ship without a cache bump.
 5. **Container build and image scan** on merge to `main`.
@@ -85,7 +85,7 @@ Each phase has a purpose, the work, and a clear finish line. Dependencies on oth
 *Purpose: make what exists provable and repeatable.*
 - Browser acceptance of the publish flow, the district confirmation and the location fixes.
 - Rebuild the Docker images so no change lives only inside a running container.
-- Add the PostgreSQL CI job and the secret scan.
+- Keep the PostgreSQL migration/golden CI job and full-history secret scan green.
 - Move the rate limiter and SIG token store out of process memory (PostgreSQL first; Redis only if measured).
 - Record one real SIG exchange as a fixture and replay it in tests.
 - **Done when** `main` deploys cleanly from a built image, CI proves migrations and golden results on PostgreSQL, and no test depends on the network.
@@ -139,7 +139,7 @@ Each phase has a purpose, the work, and a clear finish line. Dependencies on oth
 | Item | Why it matters | Pay it in |
 |---|---|---|
 | Rate limits and SIG token in process memory | Blocks a second API copy | Phase 1 |
-| SQLite-only CI | Hides PostGIS and `SKIP LOCKED` behaviour | Phase 1 |
+| ~~SQLite-only CI~~ | PostgreSQL migration/golden job added 19 September; two-worker locking coverage remains | Phase 1 |
 | `api/planning.py` and `web/planning.js` are large | Slows every change and review | Phase 2, split by concern |
 | Boundaries stored as GeoJSON | Real geometry needs PostGIS indexes | Phase 2 |
 | Estimated progress steps in the chat | Times shown are guesses | Phase 3, server-sent events |

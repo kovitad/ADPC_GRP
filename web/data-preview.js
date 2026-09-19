@@ -132,6 +132,14 @@
       showError(reason || `The preview stopped: ${payload.error_code}. Quote ${payload.support_ref}.`);
       return;
     }
+    if (count > 120) {
+      progressCard.hidden = true;
+      showError(
+        "The preview is taking longer than expected. It keeps running in the background and " +
+          "you will be told when it finishes; if it never does, check that the worker is running."
+      );
+      return;
+    }
     setProgress(
       payload.state === "running" ? "Drawing" : "Queued",
       payload.state === "running"

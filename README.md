@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now discovers the OAuth server from the SIG MCP resource, supports authorization-code/PKCE sign-in for existing SIG accounts, records denied sign-ins in the security log, and enforces GRP-owned Hub membership. A localhost public client can be registered with the supplied command; staging still needs its own callback-specific client ID. Assessment, GIS, downloads, AI execution, and SIG evidence screens remain unimplemented.
+> **Current status:** The local Docker Desktop build includes access and Admin controls, a synthetic queued assessment with a locked result, the metered AI gateway, the Planner chat/map, receipt-bound SIG hazard-and-exposure embeds, and Admin-only inspection and district preview of the delivered Thailand files. These additions remain on `codex/sig-embedded-flood-map`; real Thailand assessment inputs are not approved or loaded, and staging has not been deployed. See [`handovers.md`](handovers.md) for the exact revision, validation record, limitations and next work.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -60,13 +60,13 @@ Replace the sample with the administrator's verified SIG email. The admin then o
 
 ## LLM token preparation
 
-AI remains disabled, but both environment templates contain provider, model, base URL, output limit, and `AI_KEY_FILE_ADPC`. Store a local token through hidden input:
+AI is enabled only in the local Docker Desktop configuration and still defaults off for server deployments. Both environment templates contain provider, model, base URL, output limit, and `AI_KEY_FILE_ADPC`. Store a local token through hidden input:
 
 ```powershell
 python -m grp.configure set-ai-key
 ```
 
-This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Enabling `AI_FEATURE_ENABLED` does not yet add LLM behavior.
+This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Do not enable AI outside the approved local configuration until its deployment and budget controls are accepted.
 
 ## Run in Docker Desktop
 
@@ -113,7 +113,7 @@ make compose-config  # validate the staging Compose model
 
 Development follows the approved increments: server foundation; signed Chiang Yuen RP100 golden assessment; access and Admin; SIG sharing and evidence; review/downloads; additional data; vulnerability and AI; pilot hardening. The access foundation was brought forward to support the requested SIG account test. No fallback geography, dataset, or provider is permitted.
 
-The next assessment work is Increment 1: add its remaining architecture-defined tables and build the queued assessment workflow against a scientifically approved Chiang Yuen RP100 golden fixture. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
+The queued assessment workflow is proved with a synthetic fixture. The next assessment-data work is to add the scientifically approved Chiang Yuen RP100 golden fixture and load approved Thailand boundaries, shelters and flood data under the rules in `docs/thailand-dataset-ingestion-plan.md`. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
 
 ## Security
 

@@ -2,7 +2,7 @@
 
 ## Current state
 
-Read [`handovers.md`](handovers.md) first. It has the current branch (`feat/planning-chatbot-ux`), how to run the Docker Desktop stack, the architecture map, known gaps and the recommended next work. Record decisions in `docs/adr/` and update `handovers.md` at the end of each work session.
+Read [`handovers.md`](handovers.md) first. It has the current branch (`codex/sig-embedded-flood-map`), how to run the Docker Desktop stack, the architecture map, known gaps and the recommended next work. Record decisions in `docs/adr/` and update `handovers.md` at the end of each work session.
 
 ## Project Structure & Module Organization
 

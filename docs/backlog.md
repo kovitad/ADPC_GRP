@@ -55,10 +55,10 @@ The owner wants to **see** the delivered data on the map before the blockers are
 
 | # | Item | Size | Blocked by | Done when |
 |---|---|---|---|---|
-| D1 | PostgreSQL CI job: migrations from empty plus golden tests | S | — | CI runs on PostgreSQL, not only SQLite |
+| D1 | **Built 19 Sep.** PostgreSQL CI job: migrations from empty plus golden tests | S | — | CI runs migrations on PostGIS and the golden suite on every pull request |
 | D2 | Move rate limits and the SIG token out of process memory | M | — | Two API copies behave identically |
 | D3 | Two-worker concurrency test in CI | S | D1 | No job is processed twice |
-| D4 | Secret scan in CI | S | — | A pushed key fails the build |
+| D4 | **Built 19 Sep.** Secret scan in CI | S | — | Gitleaks checks full history and fails the build on detected secrets |
 | D5 | Vendor Leaflet; contracted tile and geocoding provider | M | Provider choice | No public CDN in the served page |
 | D6 | Split `api/planning.py` and `web/planning.js` by concern | M | — | No file over about 400 lines; tests unchanged |
 | D7 | Real streaming progress (server-sent events) replacing estimated steps | M | — | The progress card shows true steps and durations |
@@ -105,7 +105,7 @@ The owner wants to **see** the delivered data on the map before the blockers are
 
 ## Suggested first sprint (two weeks, one or two developers)
 
-1. **D1, D4** — CI on PostgreSQL with a secret scan. Everything else rests on this.
+1. ~~**D1, D4** — CI on PostgreSQL with a secret scan.~~ **Built 19 Sep.**
 2. **A2 follow-up** — take the inspector's counts to DDPM; the report itself is built.
 3. **A3, A4** — PostGIS geometry and one province of real districts.
 4. **A5** — shelters for that province.
