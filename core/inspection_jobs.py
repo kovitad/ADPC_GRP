@@ -11,6 +11,7 @@ while those exact files are unchanged.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -145,6 +146,11 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID) -> str
     except (OperationalError, OSError) as error:
         session.rollback()
         return _retry_or_fail(session, inspection_id, error)
+    except Exception as error:  # noqa: BLE001 - one bad layer must not stop the worker
+        logger.exception("Inspection %s crashed", inspection_id)
+        session.rollback()
+        inspection = session.get(DatasetInspection, inspection_id)
+        return _fail(session, inspection, "INTERNAL_ERROR", type(error).__name__)
 
     report["files"] = [
         {
@@ -155,6 +161,7 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID) -> str
         }
         for item in files
     ]
+    report = _json_safe(report)
     report["fingerprint"] = inspection.fingerprint
     report["partly_fingerprinted"] = not all(item.fully_fingerprinted for item in files)
     inspection.report = report
@@ -164,6 +171,18 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID) -> str
     session.commit()
     logger.info("Inspection %s described %d layers", inspection_id, len(report["layers"]))
     return inspection.state
+
+
+def _json_safe(value):
+    """PostgreSQL JSON has no NaN or infinity: an empty raster's statistics become None."""
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 def _fail(session: Session, inspection: DatasetInspection, code: str, detail: str) -> str:

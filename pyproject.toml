@@ -28,6 +28,7 @@ dev = [
 ]
 gis = [
   "rasterio>=1.4,<2",
+  "pyogrio>=0.10,<1",
   "shapely>=2.0,<3",
 ]
 

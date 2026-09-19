@@ -22,6 +22,17 @@ How to read this: **S** is about a day, **M** two to four days, **L** a week or 
 
 > **Before starting any of Epic A, open the Source data page and read the findings for the folder you are about to load.** It is faster than reading the file by hand and it names the decision each blocker waits on.
 
+## Epic P — Preview the real data on the map now, with warnings (owner request, 19 Sep 2026)
+
+The owner wants to **see** the delivered data on the map before the blockers are settled, with every known gap stated beside it. This is a preview, never a result: it reads the unapproved files, is Admin-only like the Source data page, carries a fixed "Unapproved preview — not a GRP assessment" label, and cannot start an assessment or reach SIG.
+
+| # | Item | Size | Blocked by | Done when |
+|---|---|---|---|---|
+| P1 | "Show on map" from a Source data report: district outline, shelters (coloured by whether they sit in the district they name), province/sub-district outlines | M | — | An Admin sees one district's real outline and shelters over OSM |
+| P2 | Flood depth preview for that district: clip the RP100 tile, draw depth classes, draw no-value pixels as hatched "no data — meaning undecided (DEP-05)" | M | — | Real flood colours appear, no-value areas are visibly different from dry |
+| P3 | Warnings panel beside the map, taken from the inspector findings for the layers shown, each with **why** it matters and which decision it waits on | S | P1 | Every blocker/problem for the visible layers is listed in plain words |
+| P4 | Preview counts per district ("n shelters on a flood pixel, n on no-value, n misplaced") labelled as preview | S | P2 | Counts match `tools/prove_dataset.py` for the same district |
+
 ## Epic B — Make the map show real flood depth
 
 | # | Item | Size | Blocked by | Done when |

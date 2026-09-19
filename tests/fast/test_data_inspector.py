@@ -212,6 +212,35 @@ def test_an_expired_lease_is_claimed_again(db: Session, source: Path) -> None:
 # ---------- findings say the right thing ----------
 
 
+def test_a_crash_inside_one_inspection_fails_it_and_does_not_stop_the_worker(
+    db: Session, source: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked = _ask(db, source)
+    claim_next_inspection(db, lease_minutes=15)
+
+    def broken(*_args, **_kwargs):
+        raise ModuleNotFoundError("No module named 'pyogrio'")
+
+    monkeypatch.setattr("core.dataset_scan.scan_folder", broken)
+    assert process_inspection(db, source, asked.inspection_id) == AssessmentState.FAILED
+    stored = db.get(DatasetInspection, asked.inspection_id)
+    assert stored.error_code == "INTERNAL_ERROR"
+
+
+def test_an_empty_raster_statistic_is_stored_as_no_value(
+    db: Session, source: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked = _ask(db, source)
+    claim_next_inspection(db, lease_minutes=15)
+    monkeypatch.setattr(
+        "core.dataset_scan.scan_folder",
+        lambda *_a, **_k: {"layers": [{"value_min": float("nan"), "value_max": float("inf")}]},
+    )
+    assert process_inspection(db, source, asked.inspection_id) == AssessmentState.SUCCEEDED
+    layer = db.get(DatasetInspection, asked.inspection_id).report["layers"][0]
+    assert layer["value_min"] is None and layer["value_max"] is None
+
+
 def _grades(findings: list[Finding], title_part: str) -> list[str]:
     return [f.grade for f in findings if title_part in f.title]
 
