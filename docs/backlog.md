@@ -2,7 +2,7 @@
 
 **Updated:** 18 September 2026. Ordered so the top item is always the next sensible one to pick up.
 
-How to read this: **S** is about a day, **M** two to four days, **L** a week or more, for one developer who has read `handovers.md`. "Blocked by" names another team; do not start those without the answer. Every item must meet the definition of done in [`development-plan.md`](development-plan.md).
+How to read this: **S** is about a day, **M** two to four days, **L** a week or more, for one developer who has read `handovers.md`. "Blocked by" names another team; do not start those without the answer. Every item must meet the definition of done in [`development-plan.md`](development-plan.md). The cross-cutting baseline/import/Hub-override design is in [`data-library-sig-assessment-design.md`](data-library-sig-assessment-design.md) and ADR-0008; approve that decision before implementing A3–A9 or F2.
 
 ---
 
@@ -13,8 +13,8 @@ How to read this: **S** is about a day, **M** two to four days, **L** a week or 
 | A1 | ~~Prove the datasets on a real district~~ **done**, see [`dataset-proof-results.md`](dataset-proof-results.md) | S | — | — |
 | A2 | ~~Nationwide quality report~~ **done** — the Admin **Source data** page (ADR-0006) runs it on demand: **1,139 of 10,303 shelters are in a different district from the one they name**, 255 of 928 districts hold no shelter, every flood tile is mostly no-value. What is left is to send these to DDPM and agree fixes | S | — | The Hub has taken the counts to the provider |
 | A3 | Boundary geometry moves to PostGIS, with a simplified copy for the map | M | — | Migration runs on PostgreSQL; the map loads outlines without full detail; golden tests still pass |
-| A4 | Boundary loader: `python -m grp.load boundaries --shapefile … --province …` with provenance (source, edition `2025-10`, licence, checksum) | M | Licence (DEP-04) | One province's districts are supported areas, each with admin code and fingerprint |
-| A5 | Shelter loader for `ddpm_shelters` (**the 1,139 mismatches must be reported at load time, never silently accepted**): field mapping is in [`thailand-dataset-ingestion-plan.md`](thailand-dataset-ingestion-plan.md) §4.2, membership decided by geometry, mismatches reported not hidden | M | Meaning of `สถา` and `รอง` (DEP-06) | A district's shelters load with a stated count of rejected or suspicious points |
+| A4 | Boundary loader plus existing-source import job, with provenance (source, edition `2025-10`, licence terms, checksum) | M | ADR-0008 approval | One province's districts are supported areas, each with admin code and fingerprint |
+| A5 | Shelter loader and Hub-override path for `ddpm_shelters` (**the 1,139 mismatches must be reported at load time, never silently accepted**): field mapping is in [`thailand-dataset-ingestion-plan.md`](thailand-dataset-ingestion-plan.md) §4.2, membership decided by geometry, mismatches reported not hidden | M | Meaning of `สถา` and `รอง` (DEP-06) | A district's shelters load with a stated count of rejected or suspicious points |
 | A6 | Flood tiles to Cloud-Optimized GeoTIFF with overviews; registered as a dataset version with provenance | M | Licence (DEP-05) | Six tiles stored once, fingerprinted; the worker samples them unchanged |
 | A7 | **No-data rule**: method version stating what an absent value means, with the modelled-area mask if one exists | M | **DEP-05 decision** | A new method version is recorded; Pua-style districts report a defensible status |
 | A8 | Permanent-water handling: mask or flag depths over the agreed threshold | S | DEP-05 | Extreme depths are explained, not silently reported |
@@ -79,7 +79,7 @@ The owner wants to **see** the delivered data on the map before the method block
 | # | Item | Size | Blocked by | Done when |
 |---|---|---|---|---|
 | F1 | Seven return periods with a golden case each | L | DEP-05 layers | Each scenario passes its own case |
-| F2 | Upload, validate and accept one current local dataset per type | L | — | Invalid uploads are refused with clear reasons; replacement never changes old results |
+| F2 | Browser upload, quarantine, validate and Hub Admin acceptance for one current local dataset per type (ADR-0008; existing-source import is built first) | L | Security review | Invalid uploads are refused with clear reasons; replacement never changes old results |
 | F3 | Widen supported districts province by province | S each | Review | Only reviewed districts are selectable |
 | F4 | Data-help request flow | S | — | A planner can ask for help preparing data |
 
