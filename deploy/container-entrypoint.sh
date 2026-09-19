@@ -14,6 +14,12 @@ if [ "$(id -u)" -eq 0 ]; then
         done
     fi
 
+    # Storage volumes are created root-owned. The app must be able to add new folders
+    # (district previews, results); existing files keep their owner and stay readable.
+    if [ -n "${STORAGE_ROOT:-}" ] && [ -d "$STORAGE_ROOT" ]; then
+        chown 10001:10001 "$STORAGE_ROOT"
+    fi
+
     exec gosu 10001:10001 "$@"
 fi
 

@@ -2059,3 +2059,49 @@ h4, h5, h6, strong { font-weight: var(--weight-semibold); }
 @media (max-width: 860px) {
   .grp-topbar__jobs { max-width: 9rem; }
 }
+
+/* District preview (web/data-preview.js): unapproved data on the map, with its warnings. */
+.preview-ask label { display: block; margin-bottom: 0.4rem; font-weight: 600; }
+.preview-ask__row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.preview-ask__row input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+.preview-chip {
+  margin: 0.2rem 0.3rem 0.2rem 0;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--servir-blue-dark);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.preview-chip:hover { border-color: var(--servir-blue); background: #eef5fa; }
+.preview-candidates { margin-top: 0.8rem; }
+.preview-label { background: #fff5f5; color: #98243a; }
+.preview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: start;
+}
+.preview-map { height: 560px; margin: 0; }
+.preview-warnings .inspector-subheading { margin-top: 0; }
+.preview-legend__row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.9rem; margin: 0.6rem 0 0; font-size: 0.82rem; }
+.preview-legend__item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.preview-legend__dot { width: 0.75rem; height: 0.75rem; border-radius: 50%; border: 1px solid #fff; box-shadow: 0 0 0 1px #9aa9b1; }
+.preview-legend__box { width: 1rem; height: 0.75rem; border: 1px solid #9aa9b1; }
+.preview-legend__hatch {
+  background: repeating-linear-gradient(45deg, rgba(150, 60, 160, 0.6) 0 2px, transparent 2px 6px) !important;
+}
+@media (max-width: 960px) {
+  .preview-layout { grid-template-columns: 1fr; }
+  .preview-map { height: 420px; }
+}

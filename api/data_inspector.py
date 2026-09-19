@@ -14,6 +14,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from api.dependencies import DatabaseSession
@@ -25,12 +26,18 @@ from core.data_folder import DataFolderError, list_folders
 from core.inspection_jobs import request_inspection
 from core.inspection_models import DatasetInspection
 from core.models import AssessmentState
+from core.storage import LocalStorage
 
 router = APIRouter(prefix="/data-inspector", tags=["data-inspector"])
 
 
 class InspectionAsk(BaseModel):
     folder: str = Field(default="", max_length=400)
+
+
+class PreviewAsk(BaseModel):
+    # An English or Thai district name, or its admin code.
+    district: str = Field(min_length=1, max_length=200)
 
 
 def _available(settings: Settings) -> Path:
@@ -123,6 +130,7 @@ def read_inspection(
     return {
         "inspection_id": str(inspection.id),
         "folder": inspection.folder,
+        "district": inspection.district,
         "state": inspection.state,
         "error_code": inspection.error_code,
         "support_ref": inspection.support_ref,
@@ -130,5 +138,68 @@ def read_inspection(
         "completed_at": (
             inspection.completed_at.isoformat() if inspection.completed_at else None
         ),
-        "report": inspection.report if inspection.state == AssessmentState.SUCCEEDED else None,
+        # A preview that named no known district keeps its reason so the page can say it.
+        "report": (
+            inspection.report
+            if inspection.state == AssessmentState.SUCCEEDED
+            or (inspection.report or {}).get("not_found")
+            else None
+        ),
     }
+
+
+@router.post(
+    "/previews",
+    summary="Queue an unapproved map preview of one district (or return the stored one)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def ask_for_preview(
+    ask: PreviewAsk,
+    principal: AdminUser,
+    session: DatabaseSession,
+) -> dict[str, object]:
+    root = _available(get_settings())
+    try:
+        result = request_inspection(
+            session,
+            root=root,
+            folder="",
+            district=ask.district,
+            hub_id=_hub_for(principal),
+            user_id=principal.user_id,
+            support_ref=new_support_ref(),
+        )
+    except DataFolderError as error:
+        session.rollback()
+        raise validation_failed(str(error)) from error
+    return {
+        "inspection_id": str(result.inspection_id),
+        "state": result.state,
+        "from_cache": result.cached,
+    }
+
+
+@router.get(
+    "/previews/{inspection_id}/flood.png",
+    summary="Display-only flood depth picture for a district preview",
+    openapi_extra={"x-grp-access": "protected"},
+    response_class=Response,
+)
+def preview_flood_picture(
+    inspection_id: UUID,
+    principal: AdminUser,
+    session: DatabaseSession,
+) -> Response:
+    settings = get_settings()
+    _available(settings)
+    inspection = session.get(DatasetInspection, inspection_id)
+    flood = ((inspection.report or {}).get("flood") or {}) if inspection else {}
+    key = flood.get("image_key")
+    storage = LocalStorage(settings.storage_root)
+    if not inspection or not inspection.district or not key or not storage.exists(str(key)):
+        raise not_found()
+    return Response(
+        storage.read_bytes(str(key)),
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )

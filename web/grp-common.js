@@ -116,6 +116,7 @@ window.GRP = (() => {
     "/workspace.html": "access",
     "/platform.html": "platform",
     "/data-inspector.html": "data",
+    "/data-preview.html": "data",
   };
 
   let mePromise = null;

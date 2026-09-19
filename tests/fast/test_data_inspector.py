@@ -21,6 +21,7 @@ from core.data_folder import (
 )
 from core.dataset_scan import Finding, LayerReport, find_problems
 from core.inspection_jobs import (
+    PREVIEW_FOLDERS,
     claim_next_inspection,
     process_inspection,
     request_inspection,
@@ -239,6 +240,21 @@ def test_an_empty_raster_statistic_is_stored_as_no_value(
     assert process_inspection(db, source, asked.inspection_id) == AssessmentState.SUCCEEDED
     layer = db.get(DatasetInspection, asked.inspection_id).report["layers"][0]
     assert layer["value_min"] is None and layer["value_max"] is None
+
+
+def test_a_district_preview_and_a_folder_report_never_share_a_cache_entry(
+    db: Session, tmp_path: Path
+) -> None:
+    for folder in PREVIEW_FOLDERS:
+        (tmp_path / folder).mkdir(parents=True)
+        (tmp_path / folder / "layer.txt").write_text(folder, encoding="utf-8")
+    common = {"root": tmp_path, "hub_id": None, "user_id": uuid4(), "support_ref": "GRP-T"}
+    folder_report = request_inspection(db, folder="", **common)
+    pua = request_inspection(db, folder="", district="Pua", **common)
+    nan = request_inspection(db, folder="", district="Nan", **common)
+    again = request_inspection(db, folder="", district="Pua", **common)
+    assert len({folder_report.inspection_id, pua.inspection_id, nan.inspection_id}) == 3
+    assert again.inspection_id == pua.inspection_id
 
 
 def _grades(findings: list[Finding], title_part: str) -> list[str]:

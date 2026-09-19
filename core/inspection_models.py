@@ -33,7 +33,7 @@ class DatasetInspection(Base):
             "state IN ('queued', 'running', 'succeeded', 'failed')",
             name="ck_dataset_inspection_state",
         ),
-        Index("ix_dataset_inspection_cache", "folder", "fingerprint", "state"),
+        Index("ix_dataset_inspection_cache", "folder", "district", "fingerprint", "state"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
@@ -47,6 +47,10 @@ class DatasetInspection(Base):
     )
     # Folder relative to the configured source root; the empty string is the root itself.
     folder: Mapped[str] = mapped_column(String(400), nullable=False)
+    # Empty for a folder report; the district asked for when this is a district preview.
+    district: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="", server_default=""
+    )
     # Fingerprint of every file in scope: the cache key (see core/data_folder.py).
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     state: Mapped[str] = mapped_column(String(16), nullable=False, index=True)

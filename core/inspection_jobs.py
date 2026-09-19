@@ -31,6 +31,13 @@ from core.inspection_models import DatasetInspection
 from core.models import AssessmentState
 
 logger = logging.getLogger("grp.worker.inspection")
+# The folders a district preview reads (core/district_preview.py). Only these are fingerprinted,
+# so an unrelated file arriving does not throw a preview away.
+PREVIEW_FOLDERS = (
+    "administrative_boundary/district_boundary",
+    "evacuation_centers/shelters",
+    "floods/flood_depth_rp100",
+)
 MAX_ATTEMPTS = 2
 
 
@@ -49,24 +56,31 @@ def request_inspection(
     hub_id: UUID | None,
     user_id: UUID,
     support_ref: str,
+    district: str = "",
 ) -> InspectionRequest:
-    """Return the cached report for this folder, or queue a job to build one.
+    """Return the cached report for this folder (or district preview), or queue a job for one.
 
     Raises DataFolderError when the folder cannot be used. Fingerprinting reads the files, which
     is cheap compared with opening them as GIS layers, and keeps the API free of GIS (AD-03).
     """
 
-    target = resolve_folder(root, folder)
-    files = list_files(target, root)
+    district = district.strip()
+    if district:
+        files = preview_files(root)
+        relative = ""
+    else:
+        target = resolve_folder(root, folder)
+        files = list_files(target, root)
+        relative = "" if target == root.resolve() else target.relative_to(root.resolve()).as_posix()
     if not files:
         raise DataFolderError("That folder holds no files.")
     fingerprint = folder_fingerprint(files)
-    relative = "" if target == root.resolve() else target.relative_to(root.resolve()).as_posix()
 
     cached = session.scalar(
         select(DatasetInspection)
         .where(
             DatasetInspection.folder == relative,
+            DatasetInspection.district == district,
             DatasetInspection.fingerprint == fingerprint,
             DatasetInspection.state.in_(
                 (AssessmentState.SUCCEEDED, AssessmentState.QUEUED, AssessmentState.RUNNING)
@@ -83,6 +97,7 @@ def request_inspection(
         hub_id=hub_id,
         requested_by=user_id,
         folder=relative,
+        district=district,
         fingerprint=fingerprint,
         state=AssessmentState.QUEUED,
         support_ref=support_ref,
@@ -90,6 +105,15 @@ def request_inspection(
     session.add(inspection)
     session.commit()
     return InspectionRequest(inspection.id, inspection.state, False)
+
+
+def preview_files(root: Path) -> list:
+    """Every file a district preview reads. A missing folder is refused, not skipped."""
+
+    files = []
+    for folder in PREVIEW_FOLDERS:
+        files.extend(list_files(resolve_folder(root, folder), root))
+    return files
 
 
 def claim_next_inspection(
@@ -124,23 +148,35 @@ def claim_next_inspection(
     return inspection.id
 
 
-def process_inspection(session: Session, root: Path, inspection_id: UUID) -> str:
+def process_inspection(session: Session, root: Path, inspection_id: UUID, storage=None) -> str:
     """Run one claimed inspection to a final state. Returns the resulting state."""
 
     # GIS libraries load only in the worker; the API never imports them (AD-03).
     from core.dataset_scan import scan_folder
+    from core.district_preview import PreviewError, build_preview
 
     inspection = session.get(DatasetInspection, inspection_id)
     if inspection is None or inspection.state != AssessmentState.RUNNING:
         return inspection.state if inspection else "missing"
 
     try:
-        target = resolve_folder(root, inspection.folder)
-        files = list_files(target, root)
+        if inspection.district:
+            files = preview_files(root)
+        else:
+            target = resolve_folder(root, inspection.folder)
+            files = list_files(target, root)
         if folder_fingerprint(files) != inspection.fingerprint:
             # The files changed while the job waited; the report would describe something else.
             return _fail(session, inspection, "INPUT_FINGERPRINT_MISMATCH", "files changed")
-        report = scan_folder(target, root, files)
+        if inspection.district:
+            report = build_preview(
+                root, inspection.district, storage, f"previews/{inspection.id}/flood.png"
+            )
+        else:
+            report = scan_folder(target, root, files)
+    except PreviewError as error:
+        inspection.report = {"kind": "district_preview", "not_found": str(error)}
+        return _fail(session, inspection, "VALIDATION_FAILED", str(error))
     except DataFolderError as error:
         return _fail(session, inspection, "VALIDATION_FAILED", str(error))
     except (OperationalError, OSError) as error:
@@ -152,7 +188,7 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID) -> str
         inspection = session.get(DatasetInspection, inspection_id)
         return _fail(session, inspection, "INTERNAL_ERROR", type(error).__name__)
 
-    report["files"] = [
+    report["files"] = [] if inspection.district else [
         {
             "path": item.relative_path,
             "size_bytes": item.size_bytes,
@@ -169,7 +205,7 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID) -> str
     inspection.lease_until = None
     inspection.completed_at = datetime.now(UTC)
     session.commit()
-    logger.info("Inspection %s described %d layers", inspection_id, len(report["layers"]))
+    logger.info("Inspection %s finished (%s)", inspection_id, inspection.district or "folder")
     return inspection.state
 
 

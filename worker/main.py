@@ -42,7 +42,7 @@ def run() -> None:
         worked = run_one_job(storage, settings.job_lease_minutes)
         # Assessments are a planner waiting; inspections are an Admin looking. Planners win.
         if not worked:
-            worked = run_one_inspection(settings.data_in_root, settings.job_lease_minutes)
+            worked = run_one_inspection(settings.data_in_root, settings.job_lease_minutes, storage)
         if not worked:
             stop_event.wait(POLL_SECONDS)
 
@@ -64,7 +64,7 @@ def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:
         return False
 
 
-def run_one_inspection(root: Path, lease_minutes: int) -> bool:
+def run_one_inspection(root: Path, lease_minutes: int, storage: LocalStorage | None = None) -> bool:
     """Claim and run at most one data inspection (ADR-0006). Returns True if one was handled."""
 
     try:
@@ -73,7 +73,7 @@ def run_one_inspection(root: Path, lease_minutes: int) -> bool:
             if inspection_id is None:
                 return False
             logger.info("Claimed inspection %s", inspection_id)
-            state = process_inspection(session, root, inspection_id)
+            state = process_inspection(session, root, inspection_id, storage)
             logger.info("Inspection %s finished: %s", inspection_id, state)
             return True
     except SQLAlchemyError:

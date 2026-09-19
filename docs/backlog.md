@@ -28,10 +28,10 @@ The owner wants to **see** the delivered data on the map before the blockers are
 
 | # | Item | Size | Blocked by | Done when |
 |---|---|---|---|---|
-| P1 | "Show on map" from a Source data report: district outline, shelters (coloured by whether they sit in the district they name), province/sub-district outlines | M | — | An Admin sees one district's real outline and shelters over OSM |
-| P2 | Flood depth preview for that district: clip the RP100 tile, draw depth classes, draw no-value pixels as hatched "no data — meaning undecided (DEP-05)" | M | — | Real flood colours appear, no-value areas are visibly different from dry |
-| P3 | Warnings panel beside the map, taken from the inspector findings for the layers shown, each with **why** it matters and which decision it waits on | S | P1 | Every blocker/problem for the visible layers is listed in plain words |
-| P4 | Preview counts per district ("n shelters on a flood pixel, n on no-value, n misplaced") labelled as preview | S | P2 | Counts match `tools/prove_dataset.py` for the same district |
+| P1 | **Built 19 Sep** (`/data-preview.html`, linked from Source data). "Show on map" from a Source data report: district outline, shelters (coloured by whether they sit in the district they name), province/sub-district outlines | M | — | An Admin sees one district's real outline and shelters over OSM |
+| P2 | **Built 19 Sep.** Flood depth preview for that district: clip the RP100 tile, draw depth classes, draw no-value pixels as hatched "no data — meaning undecided (DEP-05)" | M | — | Real flood colours appear, no-value areas are visibly different from dry |
+| P3 | **Built 19 Sep** (warnings are written by `core/district_preview.py`, not copied from the folder report). Warnings panel beside the map, taken from the inspector findings for the layers shown, each with **why** it matters and which decision it waits on | S | P1 | Every blocker/problem for the visible layers is listed in plain words |
+| P4 | **Built 19 Sep**, checked against the proof tool for Pua (29 shelters, all on no-value). Preview counts per district ("n shelters on a flood pixel, n on no-value, n misplaced") labelled as preview | S | P2 | Counts match `tools/prove_dataset.py` for the same district |
 
 ## Epic B — Make the map show real flood depth
 

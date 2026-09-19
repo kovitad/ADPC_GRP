@@ -55,6 +55,9 @@ MATRIX = {
     # ADR-0006: the data inspector is for Admins. A Hub Expert or Planner is not one.
     "source_folders": (401, 403, 200, 200, 200),
     "ask_for_inspection": (401, 403, 200, 200, 200),
+    "ask_for_preview": (401, 403, 200, 200, 200),
+    # No picture exists for a made-up id: allowed callers get 404, the rest are refused first.
+    "preview_flood_picture": (401, 403, 404, 404, 404),
 }
 
 
@@ -64,6 +67,13 @@ def world(tmp_path_factory) -> Iterator[dict]:
     secret.write_text("contract-session-secret-with-enough-length", encoding="utf-8")
     data_in = tmp_path_factory.mktemp("data-in")
     (data_in / "notes.txt").write_text("a file, so the folder is not empty", encoding="utf-8")
+    for folder in (
+        "administrative_boundary/district_boundary",
+        "evacuation_centers/shelters",
+        "floods/flood_depth_rp100",
+    ):
+        (data_in / folder).mkdir(parents=True)
+        (data_in / folder / "placeholder.txt").write_text("x", encoding="utf-8")
     settings = Settings(
         _env_file=None,
         session_secret_file=secret,
@@ -183,6 +193,12 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         ),
         "source_folders": ("GET", "/api/v1/data-inspector/folders", None),
         "ask_for_inspection": ("POST", "/api/v1/data-inspector/inspections", {"folder": ""}),
+        "ask_for_preview": ("POST", "/api/v1/data-inspector/previews", {"district": "Pua"}),
+        "preview_flood_picture": (
+            "GET",
+            f"/api/v1/data-inspector/previews/{user_id}/flood.png",
+            None,
+        ),
     }
     method, path, body = requests[route]
     return client.request(method, path, json=body, headers=headers)
