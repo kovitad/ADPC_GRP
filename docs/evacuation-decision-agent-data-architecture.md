@@ -4,6 +4,9 @@
 **Date:** 20 September 2026
 **Primary outcome:** candidate movement options for vulnerable people plus a traceable preparedness investment case
 
+**Editable diagrams:** [`GRP_Evacuation_Decision_Agent_and_Data_Architecture.drawio`](GRP_Evacuation_Decision_Agent_and_Data_Architecture.drawio)
+**Detailed Word handover:** [`GRP_Local_Data_Library_Implementation_and_Backlog.docx`](GRP_Local_Data_Library_Implementation_and_Backlog.docx)
+
 ## 1. Architecture principles
 
 1. Build a **bounded evidence orchestrator**, not an unrestricted autonomous agent.

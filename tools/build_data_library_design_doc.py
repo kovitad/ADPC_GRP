@@ -124,14 +124,14 @@ def configure(document: Document) -> None:
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.add_run(
-        "SERVIR Global Risk Platform — Local data-library implementation — 20 September 2026"
+        "SERVIR Global Risk Platform — Evacuation decision and data architecture — 20 September 2026"
     )
 
 
-def add_diagram(document: Document, path: Path, caption: str) -> None:
+def add_diagram(document: Document, path: Path, caption: str, *, width: float = 6.8) -> None:
     paragraph = document.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    paragraph.add_run().add_picture(str(path), width=Inches(6.8))
+    paragraph.add_run().add_picture(str(path), width=Inches(width))
     caption_p = document.add_paragraph(caption)
     caption_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     caption_p.style = "Caption"
@@ -215,17 +215,154 @@ def build() -> None:
         }""",
     )
 
+    agent_context = render_dot(
+        "evacuation-agent-system-context",
+        r"""digraph G {
+          graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.35, ranksep=0.55];
+          node [shape=box, style="rounded,filled", fontname="Arial", fontsize=9, color="#1769AA", fillcolor="#F5F9FD"];
+          edge [fontname="Arial", fontsize=8, color="#4B6478"];
+          planner [label="Planner / Hub reviewer\nConfirm AOI + scenario\nReview candidates and gaps", fillcolor="#DCEAF7"];
+          subgraph cluster_grp { label="ADPC GRP trust boundary"; color="#1769AA"; style="rounded";
+            web [label="Planning web\nPurpose, AOI, coverage, map"];
+            api [label="FastAPI\nAuth, Hub policy, typed APIs"];
+            orch [label="Bounded decision orchestrator\nFixed task plan + tool budgets", fillcolor="#FFF4D6", color="#C48A00"];
+            local [label="Local evidence tools\nCatalog, PostGIS, locked results", fillcolor="#E7F2E8", color="#4E8A57"];
+            queue [label="PostgreSQL leased queues\nAssessment / package / export", fillcolor="#FFF4D6", color="#C48A00"];
+            workers [label="GIS + evidence + export workers", fillcolor="#FFF4D6", color="#C48A00"];
+            db [shape=cylinder, label="PostgreSQL + PostGIS\nVersions, jobs, results, revisions", fillcolor="#E7F2E8", color="#4E8A57"];
+            store [shape=folder, label="Managed storage\nCOGs, previews, private exports", fillcolor="#E7F2E8", color="#4E8A57"];
+            aigw [label="AI gateway\nAllowance + usage + trace", fillcolor="#F0E8F7", color="#704A8E"];
+            web -> api -> orch;
+            orch -> local;
+            local -> db;
+            orch -> queue;
+            queue -> workers;
+            workers -> db;
+            workers -> store;
+            orch -> aigw [label="validated envelope"];
+          }
+          subgraph cluster_sig { label="SIG trust boundary"; color="#704A8E"; style="rounded";
+            mcp [label="SIG MCP screening pack", fillcolor="#F0E8F7", color="#704A8E"];
+            gate [label="Grounding gate", fillcolor="#F0E8F7", color="#704A8E"];
+            receipt [label="Receipt-bound map", fillcolor="#F0E8F7", color="#704A8E"];
+            mcp -> gate -> receipt;
+          }
+          planner -> web;
+          orch -> mcp [label="only if complementary"];
+          planner -> gate [label="explicit publish", style=dashed];
+        }""",
+    )
+    agent_flow = render_dot(
+        "evacuation-bounded-agent-flow",
+        r"""digraph G {
+          graph [rankdir=TB, bgcolor="white", pad=0.2, nodesep=0.25, ranksep=0.35];
+          node [shape=box, style="rounded,filled", fontname="Arial", fontsize=9, color="#1769AA", fillcolor="#F5F9FD"];
+          edge [fontname="Arial", fontsize=8, color="#4B6478"];
+          q [label="Planner question / purpose"];
+          auth [label="Session, role, Hub, allowance"];
+          route [label="Intent proposal\n(enum + slots only)", fillcolor="#F0E8F7", color="#704A8E"];
+          aoi [shape=diamond, label="AOI uniquely confirmed?", fillcolor="#FFF4D6", color="#C48A00"];
+          ask [label="Ask planner to confirm"];
+          cover [label="Evidence coverage matrix\navailable / partial / missing / blocked", fillcolor="#E7F2E8", color="#4E8A57"];
+          plan [label="Deterministic task plan\nallow-listed tools + budgets", fillcolor="#FFF4D6", color="#C48A00"];
+          local [label="Local branch\nlocked result or queued GIS job", fillcolor="#E7F2E8", color="#4E8A57"];
+          sig [label="SIG branch\nMCP screening with timeout", fillcolor="#F0E8F7", color="#704A8E"];
+          gaps [label="Typed gaps\nreadiness / missing / timeout / refusal", fillcolor="#FBE5E5", color="#B33A3A"];
+          env [label="Typed evidence envelope\nfacts + scope + versions + units + disclosure", fillcolor="#FFF4D6", color="#C48A00"];
+          valid [label="Schema + provenance + privacy checks"];
+          compose [label="LLM composes cited draft only", fillcolor="#F0E8F7", color="#704A8E"];
+          claims [label="Deterministic citation / claim checks"];
+          rev [label="Immutable package revision\nreview → private export / explicit receipt", fillcolor="#E7F2E8", color="#4E8A57"];
+          q -> auth -> route -> aoi;
+          aoi -> ask [label="No"];
+          aoi -> cover [label="Yes"];
+          cover -> plan;
+          plan -> local [label="if needed"];
+          plan -> sig [label="if needed"];
+          plan -> gaps [label="blocked"];
+          local -> env;
+          sig -> env;
+          gaps -> env;
+          env -> valid -> compose -> claims -> rev;
+        }""",
+    )
+    decision_data = render_dot(
+        "evacuation-decision-data-model",
+        r"""digraph G {
+          graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.3, ranksep=0.5];
+          node [shape=record, style="filled", fontname="Arial", fontsize=8, color="#1769AA", fillcolor="#F5F9FD"];
+          edge [fontname="Arial", fontsize=8, color="#4B6478", arrowsize=0.7];
+          version [label="{dataset_version|readiness + checksum\lscenario + provenance\l}", fillcolor="#E7F2E8", color="#4E8A57"];
+          boundary [label="{boundary|admin level + code\lparent + PostGIS geometry\l}"];
+          method [label="{method|version + requirements\lreason codes\l}"];
+          assessment [label="{assessment|Hub + boundary + method\lpinned versions + result\l}", fillcolor="#E7F2E8", color="#4E8A57"];
+          af [label="{assessment_feature|centre status + reason\ldepth + approved metrics\l}"];
+          package [label="{decision_package|Hub + creator + AOI\lpurpose + scenario + state\l}", fillcolor="#FFF4D6", color="#C48A00"];
+          revision [label="{decision_package_revision|immutable envelope + narrative hashes\lassessment link + sharing state\l}", fillcolor="#FFF4D6", color="#C48A00"];
+          evidence [label="{evidence_item|source/ref + scope\lunit + denominator + readiness\ldisclosure + checksum\l}"];
+          gap [label="{evidence_gap|dimension + status + reason\lblocking + required owner\l}", fillcolor="#FBE5E5", color="#B33A3A"];
+          intervention [label="{intervention_option|approved category + rationale\levidence keys + reviewed cost\l}"];
+          export [label="{package_export|leased state + template\lprivate managed output\l}"];
+          sig [label="{normalized SIG evidence|approved fields + citations only\l}", fillcolor="#F0E8F7", color="#704A8E"];
+          version -> boundary;
+          version -> assessment [label="pins"];
+          boundary -> assessment;
+          method -> assessment;
+          assessment -> af;
+          boundary -> package;
+          package -> revision;
+          assessment -> revision [label="optional locked result"];
+          revision -> evidence;
+          revision -> gap;
+          revision -> intervention;
+          revision -> export;
+          version -> evidence [label="provenance"];
+          af -> evidence [label="result facts"];
+          sig -> evidence [label="normalizes"];
+        }""",
+    )
+    vm_deployment = render_dot(
+        "evacuation-ubuntu-vm-deployment",
+        r"""digraph G {
+          graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.35, ranksep=0.55];
+          node [shape=box, style="rounded,filled", fontname="Arial", fontsize=9, color="#1769AA", fillcolor="#F5F9FD"];
+          edge [fontname="Arial", fontsize=8, color="#4B6478"];
+          browser [label="Planner browser"];
+          servir [label="SERVIR OIDC / SIG MCP", fillcolor="#F0E8F7", color="#704A8E"];
+          llm [label="LLM + Langfuse", fillcolor="#F0E8F7", color="#704A8E"];
+          subgraph cluster_vm { label="Current Ubuntu VM /srv/grp"; color="#1769AA"; style="rounded";
+            caddy [label="Host Caddy\nTLS + static web + /api proxy"];
+            api [label="grp-api container\n127.0.0.1:8000\nread-only root"];
+            worker [label="grp-worker container\nassessment/import now\npackage/export next", fillcolor="#FFF4D6", color="#C48A00"];
+            db [shape=cylinder, label="PostGIS 16\nDocker named volume grp_db", fillcolor="#E7F2E8", color="#4E8A57"];
+            data [shape=folder, label="/srv/grp/data\nUID 10001 / mode 0750\nmanaged files + exports", fillcolor="#E7F2E8", color="#4E8A57"];
+            secrets [shape=folder, label="/srv/grp/secrets\nroot:root / mode 0600", fillcolor="#FBE5E5", color="#B33A3A"];
+            releases [shape=folder, label="/srv/grp/app + releases\ncheckout/image + manifests"];
+            caddy -> api [label="loopback"];
+            api -> db;
+            db -> worker [label="leased jobs"];
+            worker -> data;
+            api -> secrets [style=dashed];
+            worker -> secrets [style=dashed];
+            releases -> caddy [label="static web"];
+          }
+          browser -> caddy [label="HTTPS 443"];
+          api -> servir [label="OIDC / MCP"];
+          api -> llm [label="AI gateway"];
+        }""",
+    )
+
     document = Document()
     configure(document)
-    document.core_properties.title = "GRP local data-library implementation and backlog"
+    document.core_properties.title = "GRP evacuation decision, AI-agent and data architecture"
     document.core_properties.subject = (
-        "Local GIS data handling, validation, architecture and delivery plan"
+        "Evacuation preparedness decisions, bounded AI orchestration, local GIS data and VM deployment"
     )
     document.core_properties.author = "ADPC GRP project"
 
     title = document.add_paragraph(style="Title")
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title.add_run("GRP local data library\nImplementation, verification and backlog")
+    title.add_run("GRP evacuation preparedness platform\nAI-agent, data, implementation and deployment architecture")
     subtitle = document.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = subtitle.add_run(
@@ -237,7 +374,7 @@ def build() -> None:
     add_callout(
         document,
         "Current position",
-        "The accepted Data Science delivery is visible in Source data, District preview, Data library and the Planning map. Managed staging, immutable manifests, fenced atomic publication, district boundaries, 10,303 DDPM evacuation centres and the six-tile RP100 flood baseline are implemented. The flood map remains display-only and opt-in; no district is assessment-supported and DEP-05 still blocks a real flood assessment.",
+        "The accepted Data Science delivery is visible in Source data, District preview, Data library and the Planning map. Managed staging, immutable manifests, fenced publication, 928 district boundaries, 10,303 DDPM evacuation centres and RP100 are implemented. ADR-0013 now makes the primary output an Evacuation Preparedness Decision Package: candidate movement options plus a traceable investment case. Real classification remains blocked by DEP-05; vulnerability, route, capacity and costs require approved sources and methods.",
         LIGHT_GREEN,
     )
 
@@ -762,11 +899,288 @@ def build() -> None:
             "docs/data-library-solution-review.md",
             "docs/adr/0007-delivered-data-acceptance.md",
             "docs/adr/0008-baseline-and-hub-data-overrides.md",
+            "docs/adr/0013-decision-first-evacuation-preparedness.md",
+            "docs/evacuation-decision-agent-data-architecture.md",
+            "docs/GRP_Evacuation_Decision_Agent_and_Data_Architecture.drawio",
             "docs/thailand-dataset-inventory.md",
             "docs/thailand-dataset-ingestion-plan.md",
             "docs/dataset-proof-results.md",
             "docs/backlog.md and handovers.md",
         ],
+    )
+
+    document.add_heading("17. Decision-first product architecture", level=1)
+    document.add_paragraph(
+        "ADR-0013 changes the center of gravity from a general flood chatbot to an Evacuation Preparedness Decision Package. The package links two outcomes: evidence-backed candidate movement options for vulnerable people, and a traceable preparedness investment case. Maximum result means maximum decision completeness and provenance, not maximum model output or tool calls."
+    )
+    add_diagram(
+        document,
+        agent_context,
+        "Figure 4 — System context and trust boundaries for the bounded decision agent",
+    )
+    add_callout(
+        document,
+        "Safety language",
+        "A center with lower mapped flood exposure is a candidate only. GRP does not certify safety without approved capacity, building, accessibility, route, service and multi-hazard evidence.",
+        "FBE5E5",
+    )
+    add_table(
+        document,
+        ["Output section", "Required evidence", "Current readiness"],
+        [
+            ["Movement options", "Confirmed AOI/scenario, locked flood classification, center location; later capacity/accessibility/routes", "Synthetic only; real run waits for DEP-05 and pilot approval"],
+            ["Vulnerable groups", "Authoritative population/indicator source, year, unit, denominator and approved aggregation method", "Blocked on DEP-07 and source semantics"],
+            ["Investment gaps", "Coverage status for hazard, centers, capacity, accessibility, routes, vulnerable groups and costs", "Coverage contract can be built now; many dimensions remain missing"],
+            ["Interventions", "Approved intervention categories tied to evidence gaps", "Template design required; AI cannot invent costs"],
+            ["Brief and map", "Locked package revision, approved template and private export job", "Blocked on DEP-12"],
+            ["Public SIG receipt", "Reviewed public subset, signed draft token and SIG gate", "Implemented for generic screening; package contract is future"],
+        ],
+    )
+
+    document.add_heading("18. Bounded AI-agent design", level=1)
+    add_diagram(
+        document,
+        agent_flow,
+        "Figure 5 — Bounded orchestration from confirmed intent to immutable package revision",
+        width=5.4,
+    )
+    document.add_paragraph(
+        "The current platform is closest to an LLM-with-tools architecture. The target adds planning across multiple approved tools but deliberately does not give the model autonomous SQL, filesystem, GIS or MCP access. The model proposes an intent and structured slots; deterministic application code authorizes and executes a fixed task plan."
+    )
+    add_table(
+        document,
+        ["Component", "Allowed", "Prohibited"],
+        [
+            ["Intent router", "Propose movement_options, investment_case, explain_result, sig_screening or general; extract AOI/scenario proposal", "Execute a tool, authorize access or choose authoritative data"],
+            ["Policy/task planner", "Choose a fixed workflow after Hub, AOI, scenario, readiness and disclosure checks", "Accept arbitrary model-authored tool names or arguments"],
+            ["Local tools", "Read managed area/catalog/readiness/locked-result facts", "Run raster GIS in an HTTP handler or activate preview-only data"],
+            ["SIG adapter", "Call reviewed MCP contracts with confirmed place and bounded question class", "Send raw/private Hub files or treat screening as a GRP result"],
+            ["LLM composer", "Explain and structure only normalized cited evidence", "Invent capacity, population, costs, routes, benefits or safety claims"],
+            ["Claim checker", "Check required headings, citations and prohibited language", "Replace scientific method approval"],
+            ["Human reviewer", "Review interpretation, approved assumptions, private export and explicit publication", "Turn missing evidence into a fact"],
+        ],
+    )
+    document.add_heading("18.1 Allow-listed tool contract", level=2)
+    for command in [
+        "area.resolve(query, allowed_levels)",
+        "area.get(area_id)",
+        "coverage.build(area_id, scenario, hub_id)",
+        "catalog.resolve_inputs(area_id, scenario, hub_id)",
+        "assessment.get_result(assessment_id)",
+        "assessment.queue(resolved_input_token)",
+        "sig.screen(confirmed_place, hazard, question_class)",
+        "evidence.validate(envelope)",
+        "package.compose(envelope, purpose)",
+        "export.queue(package_revision_id, template_id)",
+        "publish.sig(package_revision_id, reviewed_draft_token)",
+    ]:
+        paragraph = document.add_paragraph(style="List Bullet")
+        run = paragraph.add_run(command)
+        run.font.name = "Consolas"
+        run.font.size = Pt(8.5)
+
+    document.add_heading("19. Evidence contract and coverage", level=1)
+    document.add_paragraph(
+        "Local GRP facts and SIG screening must be normalized before drafting. Do not append local figures to an already generated SIG answer. The evidence envelope is versioned as decision-evidence-v1 and carries confirmed area geometry fingerprint, scenario, coverage, GRP results, SIG screening, planner-approved assumptions, gaps, sources and disclosure policy."
+    )
+    add_table(
+        document,
+        ["Required fact metadata", "Purpose"],
+        [
+            ["Evidence ID and source kind", "Stable citation and separation of locked result, catalog fact, SIG screening and planner assumption"],
+            ["Source/version/reference/checksum", "Reproducibility and immutable lineage"],
+            ["Area and scenario scope", "Prevents district/sub-district or return-period mixing"],
+            ["Timestamp/readiness/scientific status", "Shows currency and whether evidence can drive an assessment"],
+            ["Unit and denominator", "Prevents ambiguous percentages, population totals and area values"],
+            ["Disclosure classification", "Controls what may enter the LLM, export or public SIG path"],
+        ],
+    )
+    add_table(
+        document,
+        ["Coverage dimension", "Example current state", "Required to become available"],
+        [
+            ["Hazard", "RP100 display available; assessment blocked", "DEP-05, compatible accepted version and approved method"],
+            ["Center location", "10,303 managed points", "Scope to confirmed boundary/result"],
+            ["Center capacity", "Source field meaning unconfirmed", "Accepted mapping and validation"],
+            ["Accessibility/services", "Not in planner result", "Approved fields/source and method"],
+            ["Route condition", "Missing", "Approved road/network and flood-route method"],
+            ["Vulnerable groups/population", "Rasters deferred", "DEP-07, authoritative denominator and aggregation"],
+            ["Intervention options", "Missing", "Approved intervention catalogue"],
+            ["Cost assumptions", "Missing", "Authorized entry or approved cost catalogue; never model-generated"],
+        ],
+    )
+
+    document.add_heading("20. Decision-package data architecture", level=1)
+    add_diagram(
+        document,
+        decision_data,
+        "Figure 6 — Existing immutable assessment records and proposed decision-package records",
+    )
+    add_table(
+        document,
+        ["Proposed record", "Role", "Key rules"],
+        [
+            ["decision_package", "Mutable workflow header scoped to Hub, creator, AOI, purpose and scenario", "States draft/gathering/ready_for_review/failed/archived; cross-Hub reads return 404"],
+            ["decision_package_revision", "Immutable envelope and narrative revision", "Hashes envelope and narrative; optional locked assessment; new evidence creates a new revision"],
+            ["evidence_item", "Normalized citable fact or grouped result", "Schema and size limited; source/scope/unit/denominator/readiness/disclosure/checksum required"],
+            ["evidence_gap", "Missing/partial/blocked decision dimension", "Typed reason, blocking flag and required owner"],
+            ["intervention_option", "Approved intervention category tied to evidence", "Cost stays null until authorized or sourced from approved catalogue"],
+            ["package_export", "Leased private brief/map export", "Managed storage key; never rendered in web request"],
+        ],
+    )
+    add_callout(
+        document,
+        "Immutability boundary",
+        "Dataset versions, successful assessments and package revisions are append-only. The workflow header may advance state; a finalized result or revision is never edited in place.",
+        LIGHT_GREEN,
+    )
+
+    document.add_heading("21. Developer API and module blueprint", level=1)
+    add_table(
+        document,
+        ["API", "Access and behavior"],
+        [
+            ["GET /api/v1/areas", "Protected; searchable managed district/sub-district records with parent names and eligibility reason"],
+            ["POST /api/v1/assessment-config/resolve", "Protected + CSRF; deterministic selected versions, alternatives, checks and signed resolution token"],
+            ["POST /api/v1/decision-packages", "Protected + CSRF + idempotency; create Hub-scoped workflow"],
+            ["POST /api/v1/decision-packages/{id}/gather", "Protected + CSRF + idempotency; enqueue durable evidence/package job"],
+            ["GET /api/v1/decision-packages/{id}/coverage", "Protected; decision dimensions and typed reasons"],
+            ["GET /api/v1/decision-packages/{id}/events", "Protected SSE with polling fallback; real job steps"],
+            ["GET /api/v1/decision-packages/{id}/revisions/{revision}", "Protected; immutable review record"],
+            ["POST /api/v1/decision-packages/{id}/exports", "Protected + CSRF + idempotency; private worker export"],
+            ["POST /api/v1/decision-packages/{id}/publish-sig", "Protected + CSRF; exact reviewed public subset only"],
+        ],
+    )
+    add_table(
+        document,
+        ["Module", "Responsibility"],
+        [
+            ["core/area_catalog.py", "AOI search, ambiguity and parent resolution"],
+            ["core/input_resolution.py", "Compatible platform/Hub input selection and signed resolution"],
+            ["core/evidence_models.py", "Pydantic envelope, fact, source, coverage and gap contracts"],
+            ["core/evidence_policy.py", "Readiness, compatibility, privacy and disclosure rules"],
+            ["core/decision_package_models.py", "SQLAlchemy package/revision/evidence/gap/intervention/export records"],
+            ["core/decision_package_jobs.py", "Idempotent leased gathering and finalization"],
+            ["core/intervention_rules.py", "Approved categories; no generated costs"],
+            ["api/areas.py, assessment_config.py, decision_packages.py", "Thin authorization/validation/enqueue/read routes"],
+            ["worker/decision_package_tasks.py, export_tasks.py", "Slow evidence, composition finalization and rendering"],
+            ["web/planning-area.js, planning-config.js, planning-package.js, planning-map.js", "Split the current large planning.js before adding the workflow"],
+        ],
+    )
+
+    document.add_heading("22. Technology and reliability", level=1)
+    add_table(
+        document,
+        ["Layer", "Current/recommended technology", "Scale path"],
+        [
+            ["Browser", "Static HTML/CSS/JavaScript, Leaflet, accessible DOM construction", "Split modules; SSE with polling fallback; vendor external assets before staging"],
+            ["API", "Python 3.12, FastAPI, Pydantic, SQLAlchemy", "Replicas only after shared token/cache/rate-limit state"],
+            ["Authoritative data", "PostgreSQL 16 + PostGIS, Alembic forward migrations", "Retain transactions and spatial indexes"],
+            ["Jobs", "PostgreSQL SKIP LOCKED leases, idempotency and fencing", "Separate assessment/package/export queues, then add worker processes"],
+            ["GIS", "rasterio, pyogrio, shapely; COG working files", "TiTiler/rio-tiler only after measured national-browsing need"],
+            ["Storage", "Existing replaceable storage protocol over /srv/grp/data", "S3-compatible storage without domain changes"],
+            ["AI", "Existing gateway, allowance/usage, prompt versioning and Langfuse best effort", "No direct tools; validated envelope only"],
+            ["External evidence", "Reviewed SIG MCP adapter, gate and receipt", "Contract fixtures, deadlines, retries and circuit breaker"],
+            ["Edge", "Host Caddy TLS, headers, static files and loopback reverse proxy", "Keep API port non-public"],
+        ],
+    )
+    add_bullets(
+        document,
+        [
+            "Move combined evidence/package generation to a durable leased job before calling multiple slow tools.",
+            "Publish real step events with SSE; retain polling when intermediaries block streams.",
+            "Give each tool a deadline, bounded retry with jitter, cancellation and a SIG circuit breaker.",
+            "Cache validated SIG evidence separately from prose and never broaden cache scope without a disclosure review.",
+            "Return a labelled partial package when SIG or one local dimension fails; never fabricate the missing half.",
+            "Before multiple API replicas, move SIG token, answer/evidence caches and rate-limit state out of process.",
+        ],
+    )
+
+    document.add_heading("23. Deployment on the current Ubuntu VM", level=1)
+    add_diagram(
+        document,
+        vm_deployment,
+        "Figure 7 — Current Ubuntu VM deployment and proposed package/export worker responsibilities",
+    )
+    document.add_heading("23.1 Filesystem, containers and network", level=2)
+    add_table(
+        document,
+        ["Item", "Required state"],
+        [
+            ["Supported host", "Ubuntu 22.04 or 24.04 with Docker Engine/Compose plugin and host Caddy"],
+            ["/srv/grp/app", "Clean deployment checkout or release metadata; non-secret .env mode 0640"],
+            ["/srv/grp/data", "Container UID/GID 10001, mode 0750; managed originals, COGs, previews and private exports"],
+            ["/srv/grp/secrets", "root:root 0700 directory; each secret 0600; mounted read-only"],
+            ["PostGIS", "postgis/postgis:16-3.4 on internal Docker network; named volume grp_db"],
+            ["API", "Read-only root, no-new-privileges, dropped capabilities; only 127.0.0.1:8000 exposed"],
+            ["Worker", "Same hardened image and internal network; managed data volume; no public port"],
+            ["Caddy", "Public 80/443; TLS, security headers, static web and /api reverse proxy"],
+            ["Firewall", "80/443 public; SSH restricted to approved CIDRs; database/API not publicly exposed"],
+        ],
+    )
+    document.add_heading("23.2 Preferred release procedure", level=2)
+    add_numbered(
+        document,
+        [
+            "Run tests, Ruff, JavaScript checks, migration checks, secret scan and container build in CI.",
+            "Publish a versioned immutable image to GHCR; record image digest and Git revision.",
+            "Back up PostgreSQL and /srv/grp/data as one recovery point; verify free disk and backup completion.",
+            "Run bootstrap-ubuntu.sh in image mode for the staging domain; never copy local .env or tokens.",
+            "The bootstrap validates Compose, pulls the image, starts PostGIS, runs alembic upgrade head once, then starts API and worker.",
+            "Check loopback /api/v1/healthz, public TLS, sign-in, role access, worker claim, storage write and a synthetic assessment.",
+            "Record the release manifest and run the full signed-in browser checklist before promoting beyond staging.",
+        ],
+    )
+    for command in [
+        "sudo /srv/grp/app/deploy/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:<version> --domain <staging-domain> --enable-ufw --ssh-allow-cidr <approved-cidr>",
+        "sudo /srv/grp/app/deploy/bootstrap-ubuntu.sh --check-only",
+        "docker compose --env-file /srv/grp/app/.env -f /srv/grp/app/deploy/compose.yml ps",
+        "curl --fail https://<staging-domain>/api/v1/healthz",
+        "docker compose --env-file /srv/grp/app/.env -f /srv/grp/app/deploy/compose.yml logs --tail=200 api worker",
+    ]:
+        paragraph = document.add_paragraph()
+        run = paragraph.add_run(command)
+        run.font.name = "Consolas"
+        run.font.size = Pt(8.0)
+        properties = paragraph._p.get_or_add_pPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:fill"), LIGHT_GREY)
+        properties.append(shd)
+    add_callout(
+        document,
+        "Backup warning",
+        "The database contains metadata and immutable references while /srv/grp/data contains the referenced bytes. Back up and restore them consistently; test restoration on an isolated host before claiming recovery readiness.",
+        "FBE5E5",
+    )
+
+    document.add_heading("24. Implementation phases and acceptance", level=1)
+    add_table(
+        document,
+        ["Phase", "Deliverable", "Exit condition"],
+        [
+            ["A — contracts and honest UX", "Managed AOI API, evidence envelope, coverage matrix, input resolver and separate GRP/SIG sections", "Synthetic flow works unchanged; unsupported real areas stop with typed reasons"],
+            ["B — sub-district catalogue", "7,436 managed polygons, parent links and qualified Thai/English search", "Valid geometry and deterministic parent-qualified search; unsupported cannot run"],
+            ["C — durable package", "Package/revision/evidence/gap tables, leased job, SSE and partial-failure handling", "Reproducible immutable revisions; SIG timeout yields useful labelled partial output"],
+            ["D — real movement screening", "DEP-05 and pilot approval, compatible input activation and real locked classifications", "Authority-approved golden district reproduces exactly"],
+            ["E — vulnerability and suitability", "Approved population, capacity, accessibility, services and route dimensions", "Each number/source/method passes an approved golden case"],
+            ["F — investment and comparison", "Approved intervention/cost inputs, multiple return periods and DEP-12 exports", "Private brief/map matches locked revision; no AI-created figure"],
+        ],
+    )
+    add_bullets(
+        document,
+        [
+            "Every number has an evidence key, source/version, scope, unit and denominator.",
+            "Every route declares x-grp-access; mutating routes require CSRF and idempotency; cross-Hub IDs fail closed.",
+            "Every slow job is leased, fenced, idempotent, traceable and cancellable where practical.",
+            "GIS remains outside request handlers.",
+            "Candidate centers are never labelled safe.",
+            "Fast, contract, PostgreSQL, golden, browser and relevant load tests pass.",
+        ],
+    )
+
+    document.add_heading("25. Editable architecture source", level=1)
+    document.add_paragraph(
+        "The editable draw.io source is docs/GRP_Evacuation_Decision_Agent_and_Data_Architecture.drawio. It contains five pages: context/trust boundaries, bounded agent workflow, data/lineage, current Ubuntu VM deployment, and implementation/technology. Regenerate it with python tools/build_agent_architecture_drawio.py. The detailed Markdown blueprint is docs/evacuation-decision-agent-data-architecture.md."
     )
 
     document.add_section(WD_SECTION.NEW_PAGE)
