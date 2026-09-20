@@ -376,19 +376,18 @@
     const welcome = $("[data-welcome]");
     if (!welcome) return;
     const area = state.selected ? state.selected.name : null;
-    welcome.querySelector("h2").textContent = "What decision are you preparing for?";
+    welcome.querySelector("h2").textContent = "Build an evacuation preparedness decision package";
     const intro = welcome.querySelector("p");
     intro.textContent =
-      "For a Thailand district or sub-district and an agreed flood scenario, I can help you " +
-      "answer two linked questions: Where could people move? and Which vulnerable people need " +
-      "support? Then I can prepare a traceable preparedness investment brief. A red/yellow/green " +
-      "risk map is available as further information.";
+      "For a confirmed Thailand area and flood scenario, I can help identify candidate evacuation " +
+      "centers with lower mapped exposure and show the evidence gaps that matter for vulnerable " +
+      "people and preparedness funding. A candidate is not a certification that a place is safe.";
     const box = $("[data-suggestions]");
     box.replaceChildren();
     [
       area
-        ? ["Where could people move?", `Run a 100-year flood assessment for ${area}`,
-          `Where could people move if a 100-year flood hits ${area}?`]
+        ? ["Find candidate places for movement", `Screen evacuation centers in ${area}`,
+          `Where could vulnerable people move if a 100-year flood hits ${area}?`]
         : ["Use my current district", "Find your Thailand district before asking SIG",
           null],
       ["Explain what the map shows", "After a result appears",
@@ -418,12 +417,13 @@
     }
     coming.innerHTML = "";
     const strong = document.createElement("strong");
-    strong.textContent = "Coming next: ";
+    strong.textContent = "Decision coverage today: ";
     coming.append(
       strong,
       document.createTextNode(
-        "vulnerable people who need support (Increment 6), the preparedness investment brief, " +
-          "and the red/yellow/green risk map. Today the map shows flood depth and evacuation centers.",
+        "flood depth and evacuation-center locations. Vulnerable-group, capacity, accessibility, " +
+          "route and cost evidence will be added only from approved sources. Missing evidence is " +
+          "shown as a preparation or funding gap, never estimated by AI.",
       ),
     );
   };

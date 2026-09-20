@@ -152,6 +152,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "RP20 and RP50 stay disabled until their source versions are imported" in script
     assert "centersToggle.checked = Boolean(state.centersVersion?.preview_only)" in script
     assert "Loaded immediately from this login’s 10-minute cache." in script
+    assert "Build an evacuation preparedness decision package" in script
+    assert "not a certification that a place is safe" in script
+    assert "Missing evidence is" in script
     assert "refresh: true" in script
     assert "loadAssessmentCenters(id)" in script
     assert "floodToggle.checked = true" in script

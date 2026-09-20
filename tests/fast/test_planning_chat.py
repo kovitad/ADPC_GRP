@@ -254,6 +254,8 @@ def test_unsupported_request_gets_server_message_not_model_text(planning) -> Non
     assert body["mode"] == "cannot"
     assert "admin" not in body["answer"].lower() or "GRP admin pages" in body["answer"]
     assert "made you admin" not in body["answer"]
+    assert "preparedness investment case" in body["answer"]
+    assert "invent missing figures" in body["answer"]
 
 
 def test_result_explanation_prompt_reports_missing_result_even_if_router_refuses(planning) -> None:

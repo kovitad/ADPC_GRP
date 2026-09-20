@@ -8,6 +8,8 @@
 
 The mock-up is a product-direction reference, not evidence that the pictured data, calculations or integrations exist. Implement the workflow without copying illustrative values into production or weakening the approved GRP trust boundaries.
 
+Under ADR-0013, the primary outcome is an **Evacuation Preparedness Decision Package**: evidence-backed candidate movement options for vulnerable people plus a traceable preparedness investment case. The workflow optimizes decision completeness and exposes missing evidence; it does not maximize tool calls or certify a location as safe.
+
 The following rules remain mandatory:
 
 - Keep SERVIR/SIG OIDC as the configured identity provider. The note “log in with Google account” is interpreted as account-provider UX to confirm with the identity owner, not permission to add a separate Google login.
@@ -317,7 +319,7 @@ This gives most of the value pictured in #5—planning and multiple tools—with
 
 ## 7. Recommended first delivery slice
 
-Implement **M1 plus the synthetic portion of M3** first. It produces the visible mock workflow—searchable AOI, planning information, map-only mode and a trustworthy configuration drawer—without inventing RP20/RP50, vulnerability, population or risk results. In parallel, prepare M2's schema/import review. Do not start M4–M7 as UI-only simulations.
+Implement **M1 plus the synthetic portion of M3** first, organized around ADR-0013's decision package. It produces the visible mock workflow—searchable AOI, planning information, map-only mode and a trustworthy configuration drawer—and shows an evidence-coverage matrix for movement and investment decisions. It must not invent RP20/RP50, vulnerability, population, capacity, cost or risk results. In parallel, prepare M2's schema/import review. Do not start M4–M7 as UI-only simulations.
 
 ## 8. Explicit non-goals for the first slice
 
