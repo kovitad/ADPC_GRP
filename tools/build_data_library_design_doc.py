@@ -237,7 +237,7 @@ def build() -> None:
     add_callout(
         document,
         "Current position",
-        "The accepted Data Science delivery is visible in Source data and District preview. Managed staging, immutable manifests, fenced atomic database publication and the district-boundary loader are implemented. A real 928-feature import passed against an isolated PostGIS database and managed storage; the operational baseline has not yet been imported through the future Admin API, and no real flood assessment is enabled.",
+        "The accepted Data Science delivery is visible in Source data, District preview and the new Data library page. Managed staging, immutable manifests, fenced atomic publication and the district-boundary loader are implemented. The persistent local library contains edition 2025-10 with 928 districts, six immutable source files and 928 valid PostGIS geometries. No district is assessment-supported yet, and no real flood assessment is enabled.",
         LIGHT_GREEN,
     )
 
@@ -575,7 +575,7 @@ def build() -> None:
         ],
     )
     document.add_paragraph(
-        "Current automated status at publication: 290 repository tests pass (the two PostgreSQL-only tests skip outside their database job), both PostgreSQL tests pass in Docker, Ruff passes, migration 0009 succeeds from an empty PostGIS 16 database, and a real 928-feature boundary import produced six immutable source-file records and 928 valid PostGIS geometries."
+        "Current automated status at publication: 293 repository tests pass (the two PostgreSQL-only tests skip outside their database job), both PostgreSQL tests pass in Docker, Ruff passes, migration 0009 succeeds from an empty PostGIS 16 database, and a real 928-feature boundary import produced six immutable source-file records and 928 valid PostGIS geometries."
     )
 
     document.add_heading("12. Ordered implementation backlog", level=1)
@@ -601,7 +601,7 @@ def build() -> None:
             [
                 "4",
                 "Boundary collection loader",
-                "Built: all 928 validated in isolated PostGIS; expose the Admin start/status API next.",
+                "Done: all 928 imported locally and visible with provenance and readiness in the Admin UI.",
             ],
             [
                 "5",
@@ -616,12 +616,12 @@ def build() -> None:
             [
                 "7",
                 "Data library API",
-                "Admin-only import/status/accept/read routes pass permission matrix.",
+                "Boundary slice done: protected read/start/status, Platform Admin write and audit.",
             ],
             [
                 "8",
                 "Data library UI",
-                "Admin starts baseline import and receives cross-page completion notice.",
+                "Boundary slice done: real version, counts, readiness, progress and completion notice.",
             ],
             [
                 "9",

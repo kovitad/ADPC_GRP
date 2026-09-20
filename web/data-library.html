@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Data library | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="/styles.css?v=20260920a" />
+    <script src="/grp-common.js?v=20260920a" defer></script>
+    <script src="/data-library.js?v=20260920a" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header data-grp-topbar></header>
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <p class="eyebrow">Administration</p>
+      <h1>Data library</h1>
+      <p class="workspace-intro">
+        Register immutable baseline versions from the accepted source delivery. Imported files and
+        exact versions persist across container rebuilds.
+      </p>
+
+      <section class="admin-card" aria-labelledby="boundary-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">Platform baseline</p>
+            <h2 id="boundary-heading">Thailand district boundaries</h2>
+          </div>
+          <span class="status-pill" data-boundary-state>Loading</span>
+        </div>
+        <p class="admin-card__intro">
+          The worker validates the complete shapefile, copies and checksums all six source files,
+          and writes full and simplified indexed PostGIS geometry. Imported districts are not yet
+          approved assessment areas.
+        </p>
+        <div class="library-actions">
+          <button class="button button--primary" type="button" data-import-boundaries disabled>
+            Import accepted boundary baseline
+          </button>
+          <a href="/data-inspector.html">Inspect source files</a>
+        </div>
+        <p class="inspector-note" data-source-note>Checking the required files…</p>
+        <div data-import-progress hidden>
+          <div class="inspector-bar"><span data-import-fill></span></div>
+          <p class="inspector-note" data-import-text></p>
+        </div>
+        <p class="inspector-error" data-error hidden></p>
+
+        <h3 class="inspector-subheading">Imported versions</h3>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Edition</th><th>Readiness</th><th>Districts</th><th>Files</th>
+                <th>Supported</th><th>Imported</th><th>Version</th>
+              </tr>
+            </thead>
+            <tbody data-boundary-versions></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="admin-card" aria-labelledby="vulnerability-heading">
+        <div class="admin-card__heading">
+          <div><p class="eyebrow">Deferred</p><h2 id="vulnerability-heading">Vulnerability</h2></div>
+          <span class="status-pill">Not imported</span>
+        </div>
+        <p class="admin-card__intro" data-vulnerability-message></p>
+      </section>
+    </main>
+  </body>
+</html>

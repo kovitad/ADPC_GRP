@@ -1833,6 +1833,19 @@ h4, h5, h6, strong { font-weight: var(--weight-semibold); }
   transition: width 400ms ease;
 }
 
+.library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 1rem 0 0.65rem;
+}
+
+.library-actions .button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .inspector-tally {
   display: flex;
   flex-wrap: wrap;

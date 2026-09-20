@@ -221,11 +221,11 @@ Add an Admin-only **Data library** page:
 1. ~~Migration and domain state model.~~ **Built in migrations `20260919_0008` and `20260920_0009`; the latter adds boundary datasets and indexed PostGIS geometry.**
 2. ~~Safe import queue.~~ **Built:** idempotent request, lease renewal, attempt fencing and one-time finalization are covered by fast tests and a two-worker PostgreSQL publication test.
 3. ~~Managed staging, manifests, checksums and atomic promotion.~~ **Built:** copies are re-hashed, final keys are immutable and deterministic, database publication is one transaction, materializer failures roll back, and failed handled imports remove unreferenced bytes.
-4. **Built and integration-tested:** the boundary loader requires the complete same-stem delivery, validates EPSG:4326, required fields, unique codes and valid polygon geometry, writes full and simplified indexed PostGIS geometry, and leaves all areas unsupported. A real isolated Docker run imported all 928 features and six source files. The operational Admin start/status API is still pending, so the local baseline database has not been populated.
+4. **Built, integration-tested and imported locally:** the boundary loader requires the complete same-stem delivery, validates EPSG:4326, required fields, unique codes and valid polygon geometry, writes full and simplified indexed PostGIS geometry, and leaves all areas unsupported. The persistent local library now contains all 928 features, six source files and 928 valid PostGIS geometries.
 5. **Next:** shelter loader and spatial mismatch report.
 6. RP100 six-tile logical manifest and bounded COG conversion.
-7. Data library APIs, permission matrix and audit events.
-8. Data library UI and background notifications.
+7. **Boundary slice built:** protected Data library summary, Platform Admin import request, status, audit event and permission classification. Extend the same API to shelters and hazard after their loaders exist.
+8. **Boundary slice built:** Admin Data library page, imported-version table, readiness/counts, progress and shared completion notification. Extend category cards with the remaining loaders.
 9. Docker Desktop rebuild and complete browser acceptance.
 10. Update handover with measured durations, memory and disk use.
 
