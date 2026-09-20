@@ -104,12 +104,18 @@ def ensure_overlay(session: Session, storage: LocalStorage, version: DatasetVers
     """Add the display-only flood overlay. It is a picture of the input, not an input, so
     adding it to metadata does not change the pinned fingerprint."""
 
-    if version.meta.get("overlay_key") and storage.exists(str(version.meta["overlay_key"])):
+    if (
+        version.meta.get("palette") == "red_depth_v1"
+        and version.meta.get("overlay_key")
+        and storage.exists(str(version.meta["overlay_key"]))
+    ):
         return
     overlay = render_overlay(
-        storage, str(version.storage_key), f"overlays/{version.sha256[:16]}/flood.png"
+        storage,
+        str(version.storage_key),
+        f"overlays/{version.sha256[:16]}/flood-red-v1.png",
     )
-    version.meta = {**version.meta, **overlay}
+    version.meta = {**version.meta, **overlay, "palette": "red_depth_v1"}
     session.flush()
 
 

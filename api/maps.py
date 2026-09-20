@@ -80,6 +80,7 @@ def map_layers(
             "available": bool(version.meta.get("overlay_key")),
             "preview_only": bool(version.meta.get("map_preview") and not version.is_current),
             "readiness": version.readiness,
+            "palette": version.meta.get("palette"),
         }
         for version, dataset in rows
         if dataset.type == "hazard"

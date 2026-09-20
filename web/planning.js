@@ -504,7 +504,7 @@
   const loadFloodOverlay = async (layer) => {
     if (floodOverlay) floodOverlay.remove();
     floodOverlay = null;
-    if (!layer || !layer.available || !layer.bounds) return;
+    if (!layer || layer.available === false || !layer.bounds) return;
     const response = await fetch(layer.image_url, { credentials: "same-origin" });
     if (!response.ok) return;
     const url = URL.createObjectURL(await response.blob());
@@ -599,12 +599,53 @@
     $("[data-result-link]").hidden = true;
   };
 
+  const loadAssessmentCenters = async (id) => {
+    const first = await GRP.request(`/api/v1/assessments/${id}/centers?size=1000`);
+    const centers = [...first.centers];
+    const pages = Math.ceil(first.total / first.size);
+    for (let page = 2; page <= pages; page += 1) {
+      const next = await GRP.request(
+        `/api/v1/assessments/${id}/centers?size=1000&page=${page}`,
+      );
+      centers.push(...next.centers);
+    }
+    return { ...first, centers };
+  };
+
   const showResult = async (id, { quiet = false } = {}) => {
     const [result, centers] = await Promise.all([
       GRP.request(`/api/v1/assessments/${id}/result`),
-      GRP.request(`/api/v1/assessments/${id}/centers?size=200`),
+      loadAssessmentCenters(id),
     ]);
     drawResultCenters(centers.centers, result.reason_codes);
+    const centersToggle = $('[data-layer="centers"]');
+    centersToggle.checked = true;
+    centersLayer.addTo(map);
+    if (result.map) {
+      let matchingLayer = state.floodLayers.find(
+        (layer) => layer.version_id === result.map.version_id,
+      );
+      if (!matchingLayer) {
+        matchingLayer = {
+          ...result.map,
+          id: `assessment-${result.map.version_id}`,
+          title: `Flood depth RP${result.map.return_period_years} · assessment input`,
+          available: true,
+        };
+        state.floodLayers.push(matchingLayer);
+      }
+      const scenarioSelect = $("[data-flood-scenario]");
+      if (![...scenarioSelect.options].some((option) => option.value === matchingLayer.id)) {
+        const pinnedOption = document.createElement("option");
+        pinnedOption.value = matchingLayer.id;
+        pinnedOption.textContent = `RP${result.map.return_period_years} · pinned assessment input`;
+        scenarioSelect.append(pinnedOption);
+      }
+      scenarioSelect.value = matchingLayer.id;
+      const floodToggle = $('[data-layer="flood"]');
+      floodToggle.checked = true;
+      await loadFloodOverlay({ ...result.map, available: true });
+    }
     resultCard.hidden = false;
     $("[data-progress]").hidden = true;
     $("[data-synthetic]").hidden = !result.synthetic;

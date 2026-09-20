@@ -101,6 +101,10 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
     assert south_west == pytest.approx([14.99, 100.0])
     assert north_east == pytest.approx([15.11, 100.12])
     assert len(layers["flood_legend"]["classes"]) == 5
+    assert all(
+        item["rgba"][0] > item["rgba"][2]
+        for item in layers["flood_legend"]["classes"]
+    )
     assert layers["flood_scenarios"] == [
         {
             "return_period_years": 20,

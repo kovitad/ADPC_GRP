@@ -31,7 +31,7 @@ from core.storage import Storage
 HAZARD_SOURCE_REF = "floods/flood_depth_rp100"
 EXPECTED_TILE_COUNT = 6
 RETURN_PERIOD_YEARS = 100
-IMPORTER_VERSION = "grp-hazard-rp100/1"
+IMPORTER_VERSION = "grp-hazard-rp100/2"
 PLATFORM_HAZARD_DATASET_ID = uuid5(
     NAMESPACE_URL, "grp:platform-dataset:thailand-flood-depth-rp100"
 )
@@ -323,6 +323,7 @@ def process_hazard_import(
                 [collection.bounds[3], collection.bounds[2]],
             ],
             "map_preview": True,
+            "palette": "red_depth_v1",
             "no_data_decision": "pending_DEP_05",
         },
         report={

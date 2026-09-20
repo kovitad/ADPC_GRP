@@ -25,7 +25,7 @@ from api.settings import get_settings
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_jobs import SubmitError, SubmitRequest, pin_inputs
-from core.assessment_models import Assessment, AssessmentFeature, Feature, Method
+from core.assessment_models import Assessment, AssessmentFeature, DatasetVersion, Feature, Method
 from core.models import AssessmentState
 from core.validation import canonical_sha256
 
@@ -273,6 +273,16 @@ def assessment_result(
         raise GrpError(409, "ASSESSMENT_NOT_READY", "The assessment is still running.")
     pins = assessment.inputs
     method = session.get(Method, assessment.method_id)
+    hazard_version = session.get(DatasetVersion, UUID(pins["hazard"]["version_id"]))
+    hazard_map = None
+    if hazard_version is not None and hazard_version.meta.get("overlay_key"):
+        hazard_map = {
+            "version_id": str(hazard_version.id),
+            "return_period_years": pins["scenario"]["return_period_years"],
+            "image_url": f"/api/v1/maps/hazard/{hazard_version.id}/overlay.png",
+            "bounds": hazard_version.meta.get("overlay_bounds"),
+            "palette": hazard_version.meta.get("palette"),
+        }
     gaps = ["Vulnerability is not included in this assessment."]
     if pins["method"]["status"] != "approved":
         gaps.append("The method is a draft and has not been scientifically approved.")
@@ -290,6 +300,7 @@ def assessment_result(
             {"role": "evacuation_centers", **pins["evacuation_centers"]},
         ],
         "reason_codes": method.reason_codes if method else {},
+        "map": hazard_map,
         "gaps": gaps,
         "limits": LIMITS,
         "trust": {
@@ -311,7 +322,7 @@ def assessment_centers(
     principal: SignedInMember,
     session: DatabaseSession,
     page: int = Query(default=1, ge=1),
-    size: int = Query(default=50, ge=1, le=200),
+    size: int = Query(default=50, ge=1, le=1000),
 ) -> dict[str, object]:
     assessment = _load_visible(session, principal, assessment_id)
     if assessment.state != AssessmentState.SUCCEEDED:

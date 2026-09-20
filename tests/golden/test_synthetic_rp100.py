@@ -145,6 +145,10 @@ def test_synthetic_case_matches_hand_designed_expected_result_exactly(world) -> 
 
     expected_summary = json.loads((CASE / "expected_summary.json").read_text(encoding="utf-8"))
     assert result["summary"] == expected_summary
+    assert result["map"]["version_id"] == world["seed"].hazard_version_id
+    assert result["map"]["return_period_years"] == 100
+    assert result["map"]["palette"] == "red_depth_v1"
+    assert result["map"]["image_url"].endswith("/overlay.png")
 
     with (CASE / "expected_centers.csv").open(encoding="utf-8", newline="") as handle:
         expected = [

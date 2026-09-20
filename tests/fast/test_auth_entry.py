@@ -153,3 +153,6 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "centersToggle.checked = Boolean(state.centersVersion?.preview_only)" in script
     assert "Loaded immediately from this login’s 10-minute cache." in script
     assert "refresh: true" in script
+    assert "loadAssessmentCenters(id)" in script
+    assert "floodToggle.checked = true" in script
+    assert "await loadFloodOverlay({ ...result.map, available: true })" in script

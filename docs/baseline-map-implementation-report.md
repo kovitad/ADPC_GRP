@@ -28,6 +28,8 @@ Neither layer is assessment-ready. The flood version is `waiting_for_method` bec
 | Keep uncertain fields away from planners | `สถา` and `รอง` are not materialized; the import report records their exclusion | Unit test and report payload |
 | GIS only in worker | Validation, point-in-polygon assignment, COG creation and PNG rendering run in the import worker | API only queues and serves stored output |
 | Show layers without implying a result | Non-current versions require `map_preview`; API returns `preview_only`; UI says centres are not assessed and DEP-05 is pending | ADR-0009 and static UI tests/full suite |
+| Show a completed assessment on its own map | Result returns its pinned hazard display metadata; browser enables that flood layer, loads every paged assessed centre and fits the pinned boundary | ADR-0012 and golden result tests |
+| Distinguish flood depth visually | Worker products and legend use a sequential red palette; grey remains NoData and zero remains transparent | Palette assertions; importer-v2 version `02e40c73-8b41-54bc-ad82-37d4e67add0c` verified with 123,470 red and zero blue visible pixels |
 
 ## Local import results
 
@@ -43,7 +45,8 @@ The complete local managed `datasets/` tree is 325 MB including the previously i
 1. Open **Planning** and then **Layers**.
 2. Open **Layers**, choose the return period and check **Flood depth**. RP100 is available; RP20 and RP50 are configured but disabled as **not imported**, because no accepted source versions exist for them.
 3. **Evacuation centers** is enabled by default and draws the DDPM points. A point popup says **Evacuation center · not assessed yet**.
-4. Read the visible preview warning. No centre is classified and no assessment can be started from these imported versions.
+4. Read the visible preview warning. No preview centre is classified and no assessment can be started from these imported versions.
+5. When a supported assessment is run, its completed result automatically opens the exact pinned flood picture and only the assessed centres inside that district or future supported sub-district. Red means flood depth, not vulnerability-weighted risk.
 5. Platform Admins can inspect version, readiness, conflict and file counts on **Data library**.
 
 Flood depth is opt-in and changing scenario replaces the single display overlay; selecting a district never silently enables it. The Planning client uses Leaflet's canvas renderer for the national point layer. Repeated exact SIG questions use the ten-minute, login-bound cache in [ADR-0010](adr/0010-session-bound-sig-answer-cache.md); this does not make a first upstream SIG request faster. This remains a local acceptance implementation; browser timing and phone layout still require a signed-in browser pass.

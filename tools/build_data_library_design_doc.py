@@ -294,7 +294,7 @@ def build() -> None:
             [
                 "Planning map controls",
                 "Built for local validation",
-                "Flood depth is opt-in. RP20 and RP50 are configured but disabled until source versions are imported; RP100 is available.",
+                "Preview flood depth is opt-in. RP20/RP50 are disabled until imported; RP100 is available. A completed assessment opens its pinned red-tone flood picture and in-scope centres.",
             ],
             [
                 "Real flood assessment",
@@ -412,7 +412,7 @@ def build() -> None:
                 "RP100 flood",
                 "Six TIF files",
                 "One scenario, stable ordering, checksum, CRS, resolution, bounds, overlap/gaps, NoData and value range.",
-                "One logical RP100 version in waiting-for-method state; RP20 and RP50 configured but unavailable until imported.",
+                "One logical RP100 version in waiting-for-method state; RP20/RP50 unavailable. Importer v2 produces a sequential red depth display product.",
             ],
             [
                 "Vulnerability",
@@ -580,7 +580,7 @@ def build() -> None:
             ],
             [
                 "Browser",
-                "Verify compact/wrapped navigation, opt-in flood checkbox, RP20/RP50 disabled state, RP100 display, completion notices and persistence after rebuild.",
+                "Verify compact/wrapped navigation, opt-in preview checkbox, RP20/RP50 disabled state, RP100 red depth display, and that a completed assessment opens its pinned flood and in-boundary centres.",
             ],
             [
                 "Recovery",
