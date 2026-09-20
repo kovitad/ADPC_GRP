@@ -124,7 +124,7 @@ def configure(document: Document) -> None:
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.add_run(
-        "SERVIR Global Risk Platform — Local data-library implementation — 19 September 2026"
+        "SERVIR Global Risk Platform — Local data-library implementation — 20 September 2026"
     )
 
 
@@ -229,7 +229,7 @@ def build() -> None:
     subtitle = document.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = subtitle.add_run(
-        "Detailed technical handover • 19 September 2026 • Branch codex/sig-embedded-flood-map"
+        "Detailed technical handover • 20 September 2026 • Branch codex/sig-embedded-flood-map"
     )
     run.font.size = Pt(12)
     run.font.color.rgb = RGBColor.from_string(BLUE)
@@ -237,7 +237,7 @@ def build() -> None:
     add_callout(
         document,
         "Current position",
-        "The accepted Data Science delivery is visible in Source data and District preview. The data-library schema and safe import-job foundation are implemented and migrated locally. No baseline files have been promoted into the managed data library yet, and no real flood assessment is enabled.",
+        "The accepted Data Science delivery is visible in Source data and District preview. Managed staging, immutable manifests, fenced atomic database publication and the district-boundary loader are implemented. A real 928-feature import passed against an isolated PostGIS database and managed storage; the operational baseline has not yet been imported through the future Admin API, and no real flood assessment is enabled.",
         LIGHT_GREEN,
     )
 
@@ -277,9 +277,9 @@ def build() -> None:
                 "ADR-0008 authorizes the bounded Docker Desktop baseline implementation.",
             ],
             [
-                "Migration 0008",
-                "Built and applied",
-                "Adds readiness, import jobs, manifests, boundary collection links and Hub selections.",
+                "Migrations 0008–0009",
+                "Built and tested",
+                "Adds jobs, manifests, Hub selections, boundary lineage and indexed PostGIS geometry.",
             ],
             [
                 "Import-job controls",
@@ -287,9 +287,9 @@ def build() -> None:
                 "Idempotent request, renewable lease, fencing attempt and one-time finalization.",
             ],
             [
-                "Managed staging and loaders",
-                "Next",
-                "No baseline version is promoted until this is complete.",
+                "Managed staging and boundary loader",
+                "Built and integration-tested",
+                "Checksummed immutable files and all 928 boundaries publish in one fenced transaction.",
             ],
             [
                 "Real flood assessment",
@@ -337,7 +337,7 @@ def build() -> None:
 
     document.add_heading("5. Database design", level=1)
     add_diagram(document, data_model, "Figure 3 — Data-library records and assessment pinning")
-    document.add_heading("5.1 Migration 0008 implemented so far", level=2)
+    document.add_heading("5.1 Migrations 0008–0009 implemented so far", level=2)
     add_table(
         document,
         ["Record", "Purpose", "Important controls"],
@@ -485,7 +485,7 @@ def build() -> None:
             [
                 "Migrations",
                 "Alembic, forward only",
-                "Explicit release step; migration 0008 tested from empty PostGIS.",
+                "Explicit release step; migrations 0008–0009 tested from empty PostGIS.",
             ],
             [
                 "External evidence",
@@ -575,7 +575,7 @@ def build() -> None:
         ],
     )
     document.add_paragraph(
-        "Current automated status at publication: 269 tests pass, Ruff passes, migration 0008 succeeds on a fresh PostGIS 16 database, and the local Docker database is at migration head with a green health endpoint."
+        "Current automated status at publication: 290 repository tests pass (the two PostgreSQL-only tests skip outside their database job), both PostgreSQL tests pass in Docker, Ruff passes, migration 0009 succeeds from an empty PostGIS 16 database, and a real 928-feature boundary import produced six immutable source-file records and 928 valid PostGIS geometries."
     )
 
     document.add_heading("12. Ordered implementation backlog", level=1)
@@ -583,21 +583,25 @@ def build() -> None:
         document,
         ["Order", "Work item", "Completion condition"],
         [
-            ["1", "Data model and migration", "Done: migration 0008 and domain records exist."],
+            [
+                "1",
+                "Data model and migration",
+                "Done: migrations 0008–0009 and domain records exist.",
+            ],
             [
                 "2",
                 "Safe import queue",
-                "Foundation done; add PostgreSQL two-worker processor test.",
+                "Done: lease fencing and two-worker PostgreSQL publication test pass.",
             ],
             [
                 "3",
                 "Managed staging and atomic promotion",
-                "Failure leaves no selectable version or orphaned final key.",
+                "Done: verified copy, immutable manifest, deterministic retry and rollback tests pass.",
             ],
             [
                 "4",
                 "Boundary collection loader",
-                "All 928 imported with provenance; reviewed subset marked supported.",
+                "Built: all 928 validated in isolated PostGIS; expose the Admin start/status API next.",
             ],
             [
                 "5",

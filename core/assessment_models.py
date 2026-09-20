@@ -30,6 +30,7 @@ RETURN_PERIODS = (10, 20, 50, 75, 100, 200, 500)
 
 
 class DatasetType(StrEnum):
+    BOUNDARY = "boundary"
     HAZARD = "hazard"
     EVACUATION_CENTERS = "evacuation_centers"
     VULNERABILITY = "vulnerability"
@@ -51,11 +52,19 @@ def _created() -> Mapped[datetime]:
 
 class Boundary(Base):
     __tablename__ = "boundary"
+    __table_args__ = (
+        UniqueConstraint(
+            "collection_version_id", "admin_code", name="uq_boundary_collection_admin_code"
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
     admin_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     admin_level: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    name_th: Mapped[str | None] = mapped_column(String(200))
+    province_name: Mapped[str | None] = mapped_column(String(200))
+    province_name_th: Mapped[str | None] = mapped_column(String(200))
     geom: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
     source: Mapped[str] = mapped_column(String(200), nullable=False)
     edition: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -71,7 +80,8 @@ class Dataset(Base):
     __tablename__ = "dataset"
     __table_args__ = (
         CheckConstraint(
-            "type IN ('hazard', 'evacuation_centers', 'vulnerability')", name="ck_dataset_type"
+            "type IN ('boundary', 'hazard', 'evacuation_centers', 'vulnerability')",
+            name="ck_dataset_type",
         ),
         CheckConstraint("owner_kind IN ('platform', 'hub_local')", name="ck_dataset_owner"),
     )

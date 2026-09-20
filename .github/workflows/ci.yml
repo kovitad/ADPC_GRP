@@ -54,6 +54,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL_FILE: ${{ github.workspace }}/.ci-secrets/database_url
+      GRP_POSTGRES_TEST_URL_FILE: ${{ github.workspace }}/.ci-secrets/database_url
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -71,5 +72,7 @@ jobs:
         run: python -m alembic upgrade head
       - name: Verify migration head
         run: python -m alembic current --check-heads
+      - name: Run PostgreSQL data-library tests
+        run: python -m pytest tests/contract/test_postgres_data_import.py
       - name: Run golden tests
         run: python -m pytest tests/golden

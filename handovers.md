@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 19 September 2026 (data-library schema and fenced import-job foundation implemented)
+**Updated:** 20 September 2026 (managed staging and PostGIS district-boundary loader implemented)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **269 tests pass**; Ruff and JavaScript syntax checks are clean.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **290 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests pass in the Docker database job.
 
 **Handing over:** nothing is half-finished in the tree. The next person should start at Section 9, and first do the browser acceptance pass in Section 3 (nothing on this branch has been confirmed against live SIG and OpenAI yet).
 
@@ -99,8 +99,9 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 
 ### 4.0 Proposed data-library and SIG flow
 
-This is the retained design direction, not implemented behavior. ADR-0008 is accepted for the bounded
-local baseline scope; browser upload, scientific activation and server rollout remain gated. SIG
+This is the retained target design. Its import foundation, managed storage publication and boundary
+loader are now implemented; the API/UI, shelters, hazard and assessments are not. ADR-0008 is accepted
+for the bounded local baseline scope; browser upload, scientific activation and server rollout remain gated. SIG
 screening is optional; a SIG outage must never block a valid GRP assessment. Hub data overrides are visible Hub-level choices accepted by a Hub Admin, not
 hidden per-user defaults.
 
@@ -191,7 +192,7 @@ Design notes to read before large changes:
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py` | See 4.3 |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
-| Migrations | `migrations/versions/20260916_0001`…`20260919_0008` | Forward-only; `0008` adds data-library readiness, import jobs, file manifests, boundary collection links and Hub selections |
+| Migrations | `migrations/versions/20260916_0001`…`20260920_0009` | Forward-only; `0008` adds the data-library foundation; `0009` adds boundary datasets, attributes and full/simplified indexed PostGIS geometry |
 
 ### 4.2 Frontend (static, no build step)
 
@@ -317,10 +318,19 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   selections. Import jobs now use attempt numbers as fencing tokens: an expired stale worker cannot
   renew or finalize after another worker reclaims the job. Requests are idempotent and successful
   finalization can happen only once.
-- Full validation: 269 tests pass; Ruff and JavaScript syntax checks pass. A fresh PostGIS 16 database
-  migrated through all eight revisions and Alembic confirmed `20260919_0008` as head. Docker Desktop
-  API and worker were rebuilt from the committed image, the persistent local database was upgraded to
-  `0008`, and `/api/v1/healthz` is green. Sign in again because the API restart cleared the SIG token.
+- Managed staging and atomic publication are built. Worker copies are verified after writing, manifests
+  and final keys are immutable and deterministic, stale attempts cannot publish, and any materializer
+  failure rolls the complete database version back. Handled failures clean their unreferenced bytes.
+- Migration `0009` adds boundary datasets plus full and simplified GiST-indexed PostGIS geometry. The
+  loader requires the complete shapefile set, validates EPSG:4326, required fields, unique codes and
+  polygon validity, and leaves every imported district unsupported pending scientific approval.
+- Full validation: 290 repository tests pass and Ruff is clean; two PostgreSQL-only tests prove spatial
+  schema creation and that two workers cannot publish one import twice. A fresh PostGIS 16 database
+  migrated through all nine revisions. A real isolated Docker import produced 928 boundary records,
+  928 valid PostGIS geometries, six immutable file records and one manifest. The persistent Docker
+  Desktop database is now at `0009`; API and worker were rebuilt, recreated and health-checked. The
+  operational local baseline remains unpopulated until the Admin start/status API is built. Sign in
+  again because recreation cleared the in-memory SIG token.
 
 ---
 
@@ -399,11 +409,11 @@ Each item has a clear "done when". Keep the spec guardrails (Section 11).
 
 Execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data-library-implementation-plan.md) in order:
 
-1. ~~Migration and readiness/domain states.~~ **Built:** migration `0008` passes from an empty PostGIS database.
-2. **In progress:** import queue has idempotent requests, lease renewal and fenced finalization; add the PostgreSQL two-worker claim/promotion test with the processor.
-3. **Next:** managed staging, checksums and atomic promotion.
-4. Versioned district-boundary collection and PostGIS loader.
-5. DDPM shelter loader with geometric membership and mismatch reporting.
+1. ~~Migration and readiness/domain states.~~ **Built:** migrations `0008`–`0009` pass from an empty PostGIS database.
+2. ~~Safe import queue.~~ **Built:** idempotency, lease renewal, fencing and two-worker PostgreSQL publication test.
+3. ~~Managed staging, checksums and atomic promotion.~~ **Built and tested.**
+4. ~~Versioned district-boundary collection and PostGIS loader.~~ **Built and tested with all 928 real features; operational API trigger still pending.**
+5. **Next:** DDPM shelter loader with geometric membership and mismatch reporting.
 6. One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.
 7. Data library API/UI, permission matrix, audit events and shared completion notices.
 8. Docker Desktop browser acceptance and measured memory, duration and disk use.
@@ -494,6 +504,6 @@ git fetch; git switch codex/sig-embedded-flood-map
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 269 passed
+python -m pytest            # expect 290 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```
