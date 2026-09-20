@@ -20,6 +20,7 @@ import api.planning
 from api.dependencies import database_session
 from api.main import app
 from api.mcp_client import McpToolResult, SigMcpClient
+from api.planning_cache import planning_answer_cache
 from api.rate_limits import limiter
 from api.sessions import CSRF_COOKIE, set_session_cookie
 from api.settings import Settings
@@ -198,10 +199,12 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
 
     app.dependency_overrides[database_session] = test_session
     limiter.reset()
+    planning_answer_cache.clear()
     try:
         yield {"settings": settings, "engine": engine, "users": users, "replies": replies,
                "monkeypatch": monkeypatch}
     finally:
+        planning_answer_cache.clear()
         app.dependency_overrides.clear()
 
 
@@ -285,6 +288,40 @@ def test_flood_question_draft_only_by_default_no_receipt(planning) -> None:
     with Session(planning["engine"]) as session:
         assert session.scalar(select(func.count()).select_from(LlmUsage)) == 2
         assert "planning_sig_evidence" in set(session.scalars(select(AuditEvent.action)))
+
+
+def test_same_sig_question_uses_session_cache_and_refresh_bypasses_it(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\n3 [1]",
+    ]
+    client = _client(planning, "planner@example.test")
+    question = "Which schools are exposed?"
+
+    first = _ask(
+        client,
+        message=question,
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+    cached = _ask(client, message=question).json()
+
+    assert first.get("cached") is None
+    assert cached["cached"] is True
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
+
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\n3 [1]",
+    ]
+    refreshed = _ask(
+        client,
+        message=question,
+        place="Mueang Nan District, Nan, Thailand",
+        refresh=True,
+    ).json()
+
+    assert refreshed.get("cached") is None
+    assert [name for name, _ in FakeMcp.calls] == ["assemble_pack", "assemble_pack"]
 
 
 def test_confirmed_area_overrides_a_different_model_place(planning) -> None:

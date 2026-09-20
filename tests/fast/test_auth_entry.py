@@ -135,3 +135,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "not a vulnerability-weighted" in page
     assert "Verify this exact brief and create a public receipt?" in page
     assert "replayable public receipt" in page
+
+    script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+    assert "floodToggle.checked = Boolean(state.floodLayers[0]?.preview_only)" in script
+    assert "centersToggle.checked = Boolean(state.centersVersion?.preview_only)" in script
+    assert "Loaded immediately from this login’s 10-minute cache." in script
+    assert "refresh: true" in script

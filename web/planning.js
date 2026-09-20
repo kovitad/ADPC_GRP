@@ -921,9 +921,11 @@
           "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
       } else {
         mapButton.textContent = "Retry brief generation";
-        mapButton.onclick = () => send(message, { echo: false, confirmedPlace: evidence.place });
+        mapButton.onclick = () => send(message, {
+          echo: false, confirmedPlace: evidence.place, refresh: true,
+        });
         $("[data-ev-foot]").textContent =
-          "The evidence lookup succeeded, but the brief was incomplete and cannot be published. Retry to generate a new brief; no public record exists.";
+          "The evidence lookup succeeded, but the brief was incomplete and cannot be published, so SIG’s receipt-bound map cannot open. The right-hand map shows the local RP100 baseline and evacuation centers only; this pack supplied no school, hospital or road geometry. Retry generates a fresh brief.";
       }
     }
     outlineSigArea(evidence);
@@ -964,7 +966,12 @@
       card.append(sourceNote);
     }
     const steps = (evidence.grp_trace || []).filter((step) => typeof step.duration_ms === "number");
-    if (evidence.total_ms || steps.length) {
+    if (payload.cached) {
+      const timing = document.createElement("span");
+      timing.className = "pw-status__timing";
+      timing.textContent = "Loaded immediately from this login’s 10-minute cache.";
+      card.append(timing);
+    } else if (evidence.total_ms || steps.length) {
       const timing = document.createElement("span");
       timing.className = "pw-status__timing";
       const parts = steps.map((step) => `${STEP_LABELS[step.step] || step.step} ${seconds(step.duration_ms)}`);
@@ -1011,7 +1018,9 @@
     }
   };
 
-  const send = async (text, { publish = false, publishToken = null, echo = true, confirmedPlace = null } = {}) => {
+  const send = async (text, {
+    publish = false, publishToken = null, echo = true, confirmedPlace = null, refresh = false,
+  } = {}) => {
     const message = (text ?? input.value).trim();
     if (!message || state.busy || !state.hubCode) return;
     if (!state.chatAvailable) {
@@ -1081,6 +1090,7 @@
           assessment_id: state.assessmentId,
           publish_receipt: publish,
           publish_token: publishToken,
+          refresh,
           history: state.history.slice(-8),
         },
       });
@@ -1504,6 +1514,10 @@
         $("[data-centers-title]").textContent = "Evacuation centers";
       }
       const mapPreview = state.floodLayers[0]?.preview_only || state.centersVersion?.preview_only;
+      const floodToggle = $('[data-layer="flood"]');
+      const centersToggle = $('[data-layer="centers"]');
+      floodToggle.checked = Boolean(state.floodLayers[0]?.preview_only);
+      centersToggle.checked = Boolean(state.centersVersion?.preview_only);
       const previewNote = $("[data-map-preview-note]");
       previewNote.hidden = !mapPreview;
       previewNote.textContent = mapPreview
@@ -1513,10 +1527,12 @@
       drawLegend(layers.flood_legend);
       drawDistricts();
       await Promise.all([loadFloodOverlay(state.floodLayers[0]), drawPendingCenters()]);
-      // Synthetic fixtures remain available from Layers for demonstration, but never define
-      // the default map or analysis area for a real person.
+      // Synthetic assessment boundaries remain opt-in. Real imported preview layers are visible
+      // immediately, so the right-hand map is not blank after an evidence-only SIG response.
       districtLayer.remove();
-      centersLayer.remove();
+      if (state.centersVersion?.preview_only) centersLayer.addTo(map);
+      else centersLayer.remove();
+      if (state.floodLayers[0]?.preview_only && floodOverlay) floodOverlay.addTo(map);
       renderWelcome();
       ownerEmail = identity.email;
       await restoreState();

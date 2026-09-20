@@ -15,6 +15,7 @@ from api.oidc import (
     ServirSigIdentityProvider,
     generate_pkce_pair,
 )
+from api.planning_cache import planning_answer_cache
 from api.sessions import (
     AUTH_TRANSACTION_COOKIE,
     CSRF_HEADER,
@@ -156,6 +157,7 @@ async def complete_login(
         location = "/workspace.html#admin-panel" if intent == "admin" else "/workspace.html"
         response = RedirectResponse(url=location, status_code=status.HTTP_303_SEE_OTHER)
         session_id = str(uuid4())
+        planning_answer_cache.delete_user(str(result.user_id))
         set_session_cookie(response, settings, result, session_id=session_id)
         if planning_chat_available(settings):
             # Interim exception (ADR-0002, ADR-0004): SIG MCP token kept in memory, dev only.
@@ -186,6 +188,7 @@ def logout(request: Request, session: DatabaseSession) -> JSONResponse:
             if not hmac.compare_digest(supplied, csrf_token(settings, decoded["session_id"])):
                 raise GrpError(403, "ACCESS_NOT_AUTHORIZED", "Access not authorized.")
             session_token_store.delete(decoded["session_id"])
+            planning_answer_cache.delete_session(decoded["session_id"])
             user = session.get(AppUser, UUID(decoded["user_id"]))
             if user is not None:
                 revoke_user_sessions(user)

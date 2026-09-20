@@ -26,6 +26,7 @@ from api.langfuse import send_ai_call
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
+from api.planning_cache import planning_answer_cache
 from api.planning_publish import decode_publish_token, encode_publish_token
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
@@ -101,6 +102,7 @@ class PlanningChat(BaseModel):
     hub_code: str | None = Field(default=None, max_length=64)
     publish_receipt: bool = False
     publish_token: str | None = Field(default=None, max_length=100_000)
+    refresh: bool = False
     assessment_id: UUID | None = None
     boundary_id: UUID | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=8)
@@ -420,6 +422,16 @@ async def planning_chat(
     hub = planner_membership(principal, payload.hub_code)
     if payload.publish_receipt:
         return await _publish_reviewed_draft(payload, principal, session, hub, settings)
+    cached = None if payload.refresh else planning_answer_cache.get(
+        user_id=str(principal.user_id),
+        session_id=principal.session_id,
+        hub_id=str(hub.hub_id),
+        message=payload.message,
+        place=payload.place,
+    )
+    if cached is not None:
+        cached["usage"] = _usage(session, settings, principal)
+        return cached
     limiter.check(
         "ai_requests_per_person_per_hour",
         str(principal.user_id),
@@ -724,7 +736,7 @@ async def planning_chat(
             # The browser must return the signed draft; an oversized pack cannot round-trip.
             publish_token = None
             issues = ["This evidence pack is too large to publish from this screen"]
-    return {
+    response = {
         **base,
         "mode": "sig_evidence",
         "answer": answer,
@@ -752,6 +764,16 @@ async def planning_chat(
         "evidence": evidence,
         "usage": _usage(session, settings, principal),
     }
+    for cache_place in {None, payload.place, area.sig_place or place}:
+        planning_answer_cache.put(
+            user_id=str(principal.user_id),
+            session_id=principal.session_id,
+            hub_id=str(hub.hub_id),
+            message=payload.message,
+            place=cache_place,
+            value=response,
+        )
+    return response
 
 
 EVIDENCE_FIELDS = ("n", "kind", "title", "source", "validation", "retrieval", "method", "text")

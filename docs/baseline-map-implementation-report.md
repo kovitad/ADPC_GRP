@@ -41,16 +41,16 @@ The complete local managed `datasets/` tree is 325 MB including the previously i
 ## User experience
 
 1. Open **Planning** and then **Layers**.
-2. Turn on **Flood depth · 100-year** to draw the stored national flood-depth picture.
-3. Turn on **Evacuation centers** to draw the DDPM points. A point popup says **Evacuation center · not assessed yet**.
+2. **Flood depth · 100-year** is enabled by default and draws the stored national flood-depth picture; it can be hidden under **Layers**.
+3. **Evacuation centers** is enabled by default and draws the DDPM points. A point popup says **Evacuation center · not assessed yet**.
 4. Read the visible preview warning. No centre is classified and no assessment can be started from these imported versions.
 5. Platform Admins can inspect version, readiness, conflict and file counts on **Data library**.
 
-The Planning client uses Leaflet's canvas renderer for the national point layer. This remains a local acceptance implementation; browser timing and phone layout still require a signed-in browser pass.
+The Planning client uses Leaflet's canvas renderer for the national point layer. Repeated exact SIG questions use the ten-minute, login-bound cache in [ADR-0010](adr/0010-session-bound-sig-answer-cache.md); this does not make a first upstream SIG request faster. This remains a local acceptance implementation; browser timing and phone layout still require a signed-in browser pass.
 
 ## Validation
 
-- `python -m pytest -q`: **297 passed, 2 PostgreSQL-only skipped**.
+- `python -m pytest -q`: **301 passed, 2 PostgreSQL-only skipped** (including the later login-bound cache tests).
 - `python -m ruff check .`: clean.
 - `node --check web/planning.js` and `node --check web/data-library.js`: clean.
 - Docker Desktop image rebuilt; migration `0010` applied; API health returned `{"status":"ok"}`.
