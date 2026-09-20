@@ -3,6 +3,8 @@
 **Status:** Accepted by Product Owner for incremental implementation  
 **Date:** 20 September 2026
 
+**Developer blueprint:** [`../evacuation-decision-agent-data-architecture.md`](../evacuation-decision-agent-data-architecture.md)
+
 ## Context
 
 The Product Owner wants Planning to maximize decision value around two linked outcomes:
