@@ -41,12 +41,12 @@ The complete local managed `datasets/` tree is 325 MB including the previously i
 ## User experience
 
 1. Open **Planning** and then **Layers**.
-2. **Flood depth · 100-year** is enabled by default and draws the stored national flood-depth picture; it can be hidden under **Layers**.
+2. Open **Layers**, choose the return period and check **Flood depth**. RP100 is available; RP20 and RP50 are configured but disabled as **not imported**, because no accepted source versions exist for them.
 3. **Evacuation centers** is enabled by default and draws the DDPM points. A point popup says **Evacuation center · not assessed yet**.
 4. Read the visible preview warning. No centre is classified and no assessment can be started from these imported versions.
 5. Platform Admins can inspect version, readiness, conflict and file counts on **Data library**.
 
-The Planning client uses Leaflet's canvas renderer for the national point layer. Repeated exact SIG questions use the ten-minute, login-bound cache in [ADR-0010](adr/0010-session-bound-sig-answer-cache.md); this does not make a first upstream SIG request faster. This remains a local acceptance implementation; browser timing and phone layout still require a signed-in browser pass.
+Flood depth is opt-in and changing scenario replaces the single display overlay; selecting a district never silently enables it. The Planning client uses Leaflet's canvas renderer for the national point layer. Repeated exact SIG questions use the ten-minute, login-bound cache in [ADR-0010](adr/0010-session-bound-sig-answer-cache.md); this does not make a first upstream SIG request faster. This remains a local acceptance implementation; browser timing and phone layout still require a signed-in browser pass.
 
 ## Validation
 

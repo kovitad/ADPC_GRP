@@ -101,6 +101,29 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
     assert south_west == pytest.approx([14.99, 100.0])
     assert north_east == pytest.approx([15.11, 100.12])
     assert len(layers["flood_legend"]["classes"]) == 5
+    assert layers["flood_scenarios"] == [
+        {
+            "return_period_years": 20,
+            "label": "RP20",
+            "available": False,
+            "layer_id": None,
+            "message": "Not imported into the managed data library yet.",
+        },
+        {
+            "return_period_years": 50,
+            "label": "RP50",
+            "available": False,
+            "layer_id": None,
+            "message": "Not imported into the managed data library yet.",
+        },
+        {
+            "return_period_years": 100,
+            "label": "RP100",
+            "available": True,
+            "layer_id": flood["id"],
+            "message": None,
+        },
+    ]
     assert layers["evacuation_centers"][0]["title"] == "Synthetic evacuation centers"
     assert layers["vulnerability"]["available"] is False
     assert "Increment 6" in layers["vulnerability"]["message"]

@@ -109,6 +109,15 @@ def test_every_signed_in_page_uses_the_same_top_bar() -> None:
         assert "workspace-nav" not in page and "pw-nav" not in page, name
 
 
+def test_shared_menu_is_compact_and_wraps_on_small_screens() -> None:
+    styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    assert "@media (max-width: 900px)" in styles
+    assert "flex-wrap: wrap" in styles
+    assert "flex: 1 0 100%" in styles
+    assert "padding: 0.36rem 0.58rem" in styles
+
+
 def test_planning_location_lookup_requires_an_administrative_district() -> None:
     script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
 
@@ -137,7 +146,10 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "replayable public receipt" in page
 
     script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
-    assert "floodToggle.checked = Boolean(state.floodLayers[0]?.preview_only)" in script
+    assert "floodToggle.checked = false" in script
+    assert "configureFloodScenarios(layers.flood_scenarios)" in script
+    assert 'data-flood-scenario' in page
+    assert "RP20 and RP50 stay disabled until their source versions are imported" in script
     assert "centersToggle.checked = Boolean(state.centersVersion?.preview_only)" in script
     assert "Loaded immediately from this login’s 10-minute cache." in script
     assert "refresh: true" in script

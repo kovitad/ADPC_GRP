@@ -237,7 +237,7 @@ def build() -> None:
     add_callout(
         document,
         "Current position",
-        "The accepted Data Science delivery is visible in Source data, District preview and the new Data library page. Managed staging, immutable manifests, fenced atomic publication and the district-boundary loader are implemented. The persistent local library contains edition 2025-10 with 928 districts, six immutable source files and 928 valid PostGIS geometries. No district is assessment-supported yet, and no real flood assessment is enabled.",
+        "The accepted Data Science delivery is visible in Source data, District preview, Data library and the Planning map. Managed staging, immutable manifests, fenced atomic publication, district boundaries, 10,303 DDPM evacuation centres and the six-tile RP100 flood baseline are implemented. The flood map remains display-only and opt-in; no district is assessment-supported and DEP-05 still blocks a real flood assessment.",
         LIGHT_GREEN,
     )
 
@@ -248,7 +248,7 @@ def build() -> None:
     add_bullets(
         document,
         [
-            "Baseline now: Thailand district boundaries, DDPM shelters and six RP100 flood-depth tiles.",
+            "Baseline now: 928 Thailand district boundaries, 10,303 DDPM shelters and six RP100 flood-depth tiles as one managed version.",
             "Deferred: child, elderly and disability vulnerability rasters; process separately on the deployment VM.",
             "Hub overrides are Hub-level accepted versions, not hidden per-user defaults.",
             "Every assessment pins exact IDs and checksums; replacements never change old results.",
@@ -277,9 +277,9 @@ def build() -> None:
                 "ADR-0008 authorizes the bounded Docker Desktop baseline implementation.",
             ],
             [
-                "Migrations 0008–0009",
+                "Migrations 0008–0010",
                 "Built and tested",
-                "Adds jobs, manifests, Hub selections, boundary lineage and indexed PostGIS geometry.",
+                "Adds jobs, manifests, Hub selections, boundary lineage, indexed boundary geometry and shelter point membership.",
             ],
             [
                 "Import-job controls",
@@ -287,9 +287,14 @@ def build() -> None:
                 "Idempotent request, renewable lease, fencing attempt and one-time finalization.",
             ],
             [
-                "Managed staging and boundary loader",
+                "Managed baseline loaders",
                 "Built and integration-tested",
-                "Checksummed immutable files and all 928 boundaries publish in one fenced transaction.",
+                "Publishes 928 boundaries, 10,303 shelters and one six-tile RP100 version with immutable originals, COGs and a map preview.",
+            ],
+            [
+                "Planning map controls",
+                "Built for local validation",
+                "Flood depth is opt-in. RP20 and RP50 are configured but disabled until source versions are imported; RP100 is available.",
             ],
             [
                 "Real flood assessment",
@@ -337,7 +342,7 @@ def build() -> None:
 
     document.add_heading("5. Database design", level=1)
     add_diagram(document, data_model, "Figure 3 — Data-library records and assessment pinning")
-    document.add_heading("5.1 Migrations 0008–0009 implemented so far", level=2)
+    document.add_heading("5.1 Migrations 0008–0010 implemented so far", level=2)
     add_table(
         document,
         ["Record", "Purpose", "Important controls"],
@@ -367,17 +372,22 @@ def build() -> None:
                 "Pins boundary lineage",
                 "Boundary feature points back to the immutable collection version.",
             ],
+            [
+                "feature boundary_id and geom_postgis",
+                "Pins geometric shelter membership",
+                "Every imported shelter points to the containing district and has an indexed EPSG:4326 point.",
+            ],
         ],
     )
     document.add_heading("5.2 Required next database behavior", level=2)
     add_bullets(
         document,
         [
-            "PostGIS geometry and spatial indexes for full and simplified boundary geometry.",
-            "Job-scoped staging tables or equivalent non-selectable staging records.",
+            "Import accepted RP20 and RP50 source versions before their Planning map options can become enabled.",
             "Atomic selection update with one current Hub/category/scenario binding.",
             "Method compatibility records for category, hazard, return period, units, required fields and NoData policy.",
-            "PostgreSQL concurrency test proving that two workers cannot promote one import twice.",
+            "Viewport or vector-tile delivery if measured browser performance makes the 10,303-point local preview unsuitable for staging.",
+            "Shared cache/state before deploying more than one API process.",
         ],
     )
 
@@ -402,7 +412,7 @@ def build() -> None:
                 "RP100 flood",
                 "Six TIF files",
                 "One scenario, stable ordering, checksum, CRS, resolution, bounds, overlap/gaps, NoData and value range.",
-                "One logical version in waiting-for-method state.",
+                "One logical RP100 version in waiting-for-method state; RP20 and RP50 configured but unavailable until imported.",
             ],
             [
                 "Vulnerability",
@@ -485,7 +495,7 @@ def build() -> None:
             [
                 "Migrations",
                 "Alembic, forward only",
-                "Explicit release step; migrations 0008–0009 tested from empty PostGIS.",
+                "Explicit release step; migrations 0008–0010 tested and local database upgraded through shelter point geometry.",
             ],
             [
                 "External evidence",
@@ -521,6 +531,10 @@ def build() -> None:
             [
                 "Docker cleanup",
                 "Build cache may be pruned when disk is tight; never delete the GRP data or database volumes.",
+            ],
+            [
+                "Package downloads",
+                "Container pip uses a 300-second read timeout and ten retries because GIS wheels are large and the local connection is variable.",
             ],
         ],
     )
@@ -566,7 +580,7 @@ def build() -> None:
             ],
             [
                 "Browser",
-                "Leave import page, receive completion, inspect findings, verify persistence after container rebuild.",
+                "Verify compact/wrapped navigation, opt-in flood checkbox, RP20/RP50 disabled state, RP100 display, completion notices and persistence after rebuild.",
             ],
             [
                 "Recovery",
@@ -575,7 +589,7 @@ def build() -> None:
         ],
     )
     document.add_paragraph(
-        "Current automated status at publication: 293 repository tests pass (the two PostgreSQL-only tests skip outside their database job), both PostgreSQL tests pass in Docker, Ruff passes, migration 0009 succeeds from an empty PostGIS 16 database, and a real 928-feature boundary import produced six immutable source-file records and 928 valid PostGIS geometries."
+        "Current automated status at publication: 302 repository tests pass (the two PostgreSQL-only tests skip outside their database job), both PostgreSQL tests pass in Docker, Ruff passes, migration 0010 is applied locally, and real imports contain 928 boundaries, 10,303 shelter points, six RP100 originals, six COGs and one display PNG."
     )
 
     document.add_heading("12. Ordered implementation backlog", level=1)
@@ -586,7 +600,7 @@ def build() -> None:
             [
                 "1",
                 "Data model and migration",
-                "Done: migrations 0008–0009 and domain records exist.",
+                "Done: migrations 0008–0010 and domain records exist.",
             ],
             [
                 "2",
@@ -606,27 +620,27 @@ def build() -> None:
             [
                 "5",
                 "Shelter loader",
-                "10,303 points imported; geometric membership and 1,139 mismatch report reproduced.",
+                "Done: 10,303 points imported; geometric membership and 1,139 mismatch report reproduced.",
             ],
             [
                 "6",
                 "RP100 logical manifest",
-                "Six checksummed tiles appear as one waiting-for-method version.",
+                "Done: six originals, six COGs and one preview appear as one waiting-for-method version.",
             ],
             [
                 "7",
                 "Data library API",
-                "Boundary slice done: protected read/start/status, Platform Admin write and audit.",
+                "Done for boundaries, shelters and RP100: protected read/start/status, Platform Admin write and audit.",
             ],
             [
                 "8",
-                "Data library UI",
-                "Boundary slice done: real version, counts, readiness, progress and completion notice.",
+                "Data library and Planning UI",
+                "Done locally: versions, counts, readiness, progress, map preview, opt-in flood checkbox and RP20/RP50/RP100 scenario configuration.",
             ],
             [
                 "9",
                 "Docker acceptance",
-                "Data persists across rebuild; measured time, memory and disk recorded.",
+                "Persistence, API health, import duration and disk are recorded; signed-in visual acceptance remains.",
             ],
             [
                 "10",

@@ -30,6 +30,7 @@
     explicitSelection: false,
     currentPlace: null,
     floodLayers: [],
+    floodScenarios: [],
     centersVersion: null,
     assessmentId: null,
     pollTimer: null,
@@ -455,12 +456,10 @@
     state.explicitSelection = explicit;
     if (explicit) {
       const districtToggle = $('[data-layer="districts"]');
-      const floodToggle = $('[data-layer="flood"]');
       const centersToggle = $('[data-layer="centers"]');
-      districtToggle.checked = floodToggle.checked = centersToggle.checked = true;
+      districtToggle.checked = centersToggle.checked = true;
       districtLayer.addTo(map);
       centersLayer.addTo(map);
-      if (floodOverlay) floodOverlay.addTo(map);
     }
     placeLayer.clearLayers();
     $("[data-place-chip]").hidden = true;
@@ -475,6 +474,31 @@
         actions: [chipButton("Run 100-year flood assessment", () => send(`Run a 100-year flood assessment for ${boundary.name}`))],
       });
     }
+  };
+
+  const selectedFloodLayer = () => {
+    const selectedId = $("[data-flood-scenario]").value;
+    return state.floodLayers.find((layer) => layer.id === selectedId) || null;
+  };
+
+  const configureFloodScenarios = (scenarios) => {
+    state.floodScenarios = scenarios || [];
+    const select = $("[data-flood-scenario]");
+    select.replaceChildren();
+    state.floodScenarios.forEach((scenario) => {
+      const option = document.createElement("option");
+      option.value = scenario.layer_id || `rp-${scenario.return_period_years}`;
+      option.textContent = `${scenario.label} · ${scenario.available ? "available" : "not imported"}`;
+      option.disabled = !scenario.available;
+      select.append(option);
+    });
+    const preferred = state.floodScenarios.find((scenario) => scenario.return_period_years === 100 && scenario.available)
+      || state.floodScenarios.find((scenario) => scenario.available);
+    select.disabled = !preferred;
+    if (preferred) select.value = preferred.layer_id;
+    $("[data-flood-scenario-note]").textContent = preferred
+      ? "Choose a return period, then check Flood depth to draw it. RP20 and RP50 stay disabled until their source versions are imported."
+      : "No flood-depth scenario has been imported.";
   };
 
   const loadFloodOverlay = async (layer) => {
@@ -539,6 +563,10 @@
         .addTo(centersLayer);
     });
   };
+
+  $("[data-flood-scenario]").addEventListener("change", async () => {
+    await loadFloodOverlay(selectedFloodLayer());
+  });
 
   document.querySelectorAll("[data-layer]").forEach((toggle) => {
     toggle.addEventListener("change", () => {
@@ -1509,6 +1537,7 @@
       }
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;
+      configureFloodScenarios(layers.flood_scenarios);
       state.centersVersion = layers.evacuation_centers[0] || null;
       if (state.centersVersion) {
         $("[data-centers-title]").textContent = "Evacuation centers";
@@ -1516,7 +1545,8 @@
       const mapPreview = state.floodLayers[0]?.preview_only || state.centersVersion?.preview_only;
       const floodToggle = $('[data-layer="flood"]');
       const centersToggle = $('[data-layer="centers"]');
-      floodToggle.checked = Boolean(state.floodLayers[0]?.preview_only);
+      // Flood depth is always opt-in: selecting a scenario does not draw it until checked.
+      floodToggle.checked = false;
       centersToggle.checked = Boolean(state.centersVersion?.preview_only);
       const previewNote = $("[data-map-preview-note]");
       previewNote.hidden = !mapPreview;
@@ -1526,13 +1556,13 @@
       $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
       drawLegend(layers.flood_legend);
       drawDistricts();
-      await Promise.all([loadFloodOverlay(state.floodLayers[0]), drawPendingCenters()]);
+      await Promise.all([loadFloodOverlay(selectedFloodLayer()), drawPendingCenters()]);
       // Synthetic assessment boundaries remain opt-in. Real imported preview layers are visible
       // immediately, so the right-hand map is not blank after an evidence-only SIG response.
       districtLayer.remove();
       if (state.centersVersion?.preview_only) centersLayer.addTo(map);
       else centersLayer.remove();
-      if (state.floodLayers[0]?.preview_only && floodOverlay) floodOverlay.addTo(map);
+      if (floodOverlay) floodOverlay.remove();
       renderWelcome();
       ownerEmail = identity.email;
       await restoreState();

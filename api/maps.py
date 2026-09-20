@@ -17,6 +17,8 @@ from core.storage import LocalStorage
 
 router = APIRouter(prefix="/maps", tags=["maps"])
 
+MAP_RETURN_PERIODS = (20, 50, 100)
+
 VULNERABILITY_PLACEHOLDER = {
     "id": "vulnerable-people",
     "title": "Vulnerable people",
@@ -82,6 +84,23 @@ def map_layers(
         for version, dataset in rows
         if dataset.type == "hazard"
     ]
+    scenario_layers: dict[int, dict[str, object]] = {}
+    for layer in flood:
+        years = layer["return_period_years"]
+        if years in MAP_RETURN_PERIODS and years not in scenario_layers:
+            scenario_layers[int(years)] = layer
+    flood_scenarios = [
+        {
+            "return_period_years": years,
+            "label": f"RP{years}",
+            "available": years in scenario_layers and bool(scenario_layers[years]["available"]),
+            "layer_id": scenario_layers[years]["id"] if years in scenario_layers else None,
+            "message": None
+            if years in scenario_layers and scenario_layers[years]["available"]
+            else "Not imported into the managed data library yet.",
+        }
+        for years in MAP_RETURN_PERIODS
+    ]
     centers = [
         {
             "id": f"centers-{version.id}",
@@ -98,6 +117,7 @@ def map_layers(
     ]
     return {
         "flood": flood,
+        "flood_scenarios": flood_scenarios,
         "flood_legend": legend(),
         "evacuation_centers": centers,
         "vulnerability": VULNERABILITY_PLACEHOLDER,

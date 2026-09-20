@@ -356,6 +356,20 @@
 .pw-toggle { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; cursor: pointer; }
 .pw-toggle input { accent-color: var(--pw-forest); width: 16px; height: 16px; }
 .pw-toggle.is-disabled { color: #a3b1ae; cursor: default; }
+.pw-layer-choice { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.35rem 0.6rem; }
+.pw-scenario-label { color: var(--pw-muted); font-size: 0.68rem; font-weight: 700; }
+.pw-layer-choice select {
+  max-width: 9.5rem;
+  min-height: 2rem;
+  padding: 0 1.8rem 0 0.55rem;
+  border: 1px solid #cbd8d6;
+  border-radius: 0.45rem;
+  background: #fff;
+  color: var(--pw-ink);
+  font: inherit;
+  font-size: 0.74rem;
+}
+.pw-layer-choice .pw-muted { grid-column: 1 / -1; margin-left: 1.5rem; }
 .pw-legend { display: grid; gap: 0.2rem; margin: 0 0 0.35rem 1.5rem; color: #52645f; font-size: 0.72rem; }
 .pw-legend span { display: flex; align-items: center; gap: 0.4rem; }
 .pw-swatch { width: 18px; height: 10px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.08); }

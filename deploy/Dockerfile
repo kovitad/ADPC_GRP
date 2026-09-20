@@ -1,7 +1,9 @@
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=10
 
 RUN groupadd --system --gid 10001 grp \
     && useradd --system --uid 10001 --gid grp --home-dir /nonexistent grp \
