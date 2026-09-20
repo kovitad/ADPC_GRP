@@ -1,7 +1,7 @@
 # Demo mock feature implementation plan
 
 **Status:** Proposed implementation sequence  
-**Source reviewed:** `example/The_Demo_Mock_Version.docx` (six embedded mock-up screenshots)  
+**Source reviewed:** `example/The_Demo_Mock_Version.docx` (seven embedded mock-up/architecture images)
 **Reviewed:** 20 September 2026
 
 ## 1. Purpose and guardrails
@@ -45,6 +45,7 @@ The following rules remain mandatory:
 | Risk map | SIG hazard/exposure embed and local flood-depth map exist; no GRP risk method | Block on vulnerability and approved risk classification; never relabel depth as risk |
 | Investment brief | Mentioned as future; no export template | Build only from immutable results and cited evidence after DEP-12 templates |
 | Upload | Source-folder imports exist; browser upload is gated | Implement quarantine, malware/type/size checks, worker validation and Hub Admin acceptance first |
+| “Evolution of AI Agents” architecture | Current implementation is primarily diagram **#3: LLM with tools/retrieval**, with controlled session state resembling part of #4; it is not an autonomous #5 agent | Keep deterministic orchestration and evolve to a bounded, policy-controlled agent rather than a free-running autonomous agent |
 
 ## 3. Data and decision gaps
 
@@ -139,6 +140,63 @@ These are separate increments, not presentation-only fields:
 - preserve source year, unit, denominator and overlap behavior for every indicator;
 - calculate proximity using an approved method and keep “distance” distinct from “safe route”;
 - generate the investment brief as a background export from locked result fields and cited evidence; AI may explain but cannot create figures.
+
+### 4.6 Recommended AI-agent architecture
+
+The current implementation is closest to **#3, LLM with RAG and tools**, in the mock's “Evolution of AI Agents” diagram:
+
+- one LLM call proposes a route;
+- server policy validates area, access and permitted action;
+- server code—not the model—invokes the allow-listed SIG MCP sequence;
+- another LLM call drafts only from the returned evidence;
+- local GRP assessments run through a separate deterministic resolver and GIS worker;
+- session state and a ten-minute answer cache provide limited workflow memory, but the model does not inspect map imagery and there is no autonomous long-term agent memory.
+
+Therefore it is not yet #4 in the full multimodal sense and is deliberately not #5's free-running advanced agent.
+
+The recommended target is a **bounded evidence-orchestration agent**, conceptually between #3 and #5:
+
+```mermaid
+flowchart LR
+    U[Planner question] --> R[Intent and AOI proposal]
+    R --> C[Access, confirmation and policy checks]
+    C --> P[Deterministic task plan]
+    P --> L[Local context tools\nPostGIS, catalog, locked results]
+    P --> S[SIG MCP evidence pack]
+    L --> E[Typed evidence envelope]
+    S --> E
+    E --> V[Schema, provenance and grounding checks]
+    V --> A[LLM explanation or brief]
+    A --> H[Human review]
+    H -->|explicit publish| G[SIG gate, receipt and embed]
+```
+
+Important behavior:
+
+1. **Do not always call MCP first.** Resolve intent and AOI first. If a locked local result fully answers the question, avoid the external call. If both sources are needed and independent, fetch local context and SIG evidence concurrently.
+2. **Do not append arbitrary local data after drafting.** Normalize both sources into a typed evidence envelope before the final model call. Every item carries source, version/fingerprint, geographic scope, timestamp, readiness and permitted use.
+3. **Keep meanings separate.** Local display-only baseline facts, locked GRP result facts and SIG screening evidence are separate sections. Never silently merge their counts or imply identifier equivalence.
+4. **Give the model no direct database, filesystem or unrestricted MCP access.** It chooses only among server-approved intents; server policy constructs tool arguments and enforces step/time/token limits.
+5. **Fail usefully.** A SIG timeout may return labelled local context when permitted; it must not block a valid GRP assessment. A local readiness failure may still permit labelled SIG screening.
+6. **Publish only after review.** Existing signed-draft, SIG gate, receipt and sandboxed-embed controls remain.
+
+#### Performance and reliability assessment
+
+The current design is safe but a first SIG request is **not fast**: one observed Chiang Yuen request took 151 seconds, including 138 seconds in external SIG MCP. Exact repeats within one login are fast because ADR-0010 caches completed answers for ten minutes. Reliability is bounded by the external MCP service, an in-memory access token/cache and one synchronous HTTP request; estimated progress is not true streaming.
+
+Before expanding agent autonomy, improve the workflow in this order:
+
+- run independent local/SIG retrieval concurrently and skip SIG when it is unnecessary;
+- move long evidence gathering to a durable background job and stream real step events with SSE;
+- add per-tool timeout budgets, bounded retries with jitter, cancellation and a circuit breaker;
+- cache validated SIG packs separately from drafted wording, keyed by confirmed AOI, hazard, pack contract and security scope;
+- validate every tool response against versioned schemas and retain sanitized contract fixtures;
+- expose trace IDs, tool durations, cache status and typed partial-failure reasons;
+- keep an explicit maximum tool-step and token budget;
+- move shared token/cache state out of process before multiple API replicas;
+- provide a labelled local-only or SIG-only partial response rather than fabricating the missing half.
+
+This gives most of the value pictured in #5—planning and multiple tools—without allowing an LLM to bypass scientific, security or publication controls.
 
 ## 5. Ordered implementation increments
 
