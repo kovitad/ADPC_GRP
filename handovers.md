@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 20 September 2026 (real boundary baseline visible in the Data library UI)
+**Updated:** 20 September 2026 (real RP100 flood depth and evacuation centres imported for display on the Planning map)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices and the one-district data preview. **293 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests pass in the Docker database job.
+**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices, one-district data preview, and display-only national RP100 and evacuation-centre layers. **297 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests pass in the Docker database job.
 
 **Handing over:** nothing is half-finished in the tree. The next person should start at Section 9, and first do the browser acceptance pass in Section 3 (nothing on this branch has been confirmed against live SIG and OpenAI yet).
 
@@ -24,6 +24,7 @@
 | Planner assistant and map (ADR-0004) | **Built, Docker Desktop only**: chat bot plus OSM map, SIG MCP evidence, evidence panel, downloads, progress, Thai input; browser location accepts a confirmed district only |
 | SIG live hazard-map embed | **Implemented on `codex/sig-embedded-flood-map`**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path, sandboxed iframe and explicit hazard/exposure—not full risk—education |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, findings graded blocker / problem / known, points cross-checked against boundaries on a map |
+| Baseline map preview (ADR-0009) | **Built and imported locally**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. Planning can draw both without making them assessment inputs; DEP-05 still blocks classification |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
@@ -47,7 +48,7 @@ The original feature branches are **stacked** through `feat/planning-chatbot-ux`
 | 3 | `feat/increment-1-assessment` | Assessment tables, storage, method, worker, API, synthetic seed and golden test, `/assessments.html` |
 | 4 | `feat/planning-map-workspace` | Map layers API, flood overlay picture, center points, explain API |
 | 5 | `feat/planning-chatbot-ux` | Natural chat routing, chat-bot UI, SIG evidence panel and downloads, progress and timings, Thai place names, state kept across pages, shared top bar, SERVIR logo and theme |
-| 6 | `codex/sig-embedded-flood-map` | Hardens the live SIG map embed and documents the scientific meaning, trust cues, security boundary and staging acceptance plan |
+| 6 | `codex/sig-embedded-flood-map` | Hardens the live SIG map embed; adds the local versioned data library and display-only real Thailand flood/shelter layers |
 
 **Merge status:** `feat/planning-chatbot-ux` has been fast-forward merged into `main` and pushed. The feature branch is retained temporarily for recovery. `experiment/planning-chat` is superseded; **never merge it**.
 
@@ -82,7 +83,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 1. `http://127.0.0.1:8000/admin`: sign in with SERVIR (`kovitad.janlakhon@adpc.net` is Platform Admin and Hub Admin of `adpc`)
 2. `/platform.html`: set a token limit (for example 50,000), AI **On**, Save; **Send test call**; **Reset now**; create, close and reopen a Hub; security log
 3. `/planning.html`:
-   - The page opens on Thailand, with no assessment area selected. **Use my current district** / **Use my location** identifies a real Thailand district for SIG-only evidence. The synthetic fixture is hidden by default under Layers as **Demo** data; selecting it explicitly runs the 7 / 3 / 2 / 2 test assessment.
+   - The page opens on Thailand, with no assessment area selected. Under **Layers**, turn on **Flood depth · 100-year** and **Evacuation centers**; expect the real display-only baseline, a preview warning and centre popups saying they are not assessed. **Use my current district** / **Use my location** identifies a real Thailand district for SIG-only evidence. The synthetic fixture remains available only as the demo assessment area; selecting it explicitly runs the 7 / 3 / 2 / 2 test assessment.
    - "Which centers could not be assessed, and why?" explains the stored result
    - `where could people move if flood happen in บางบัวทอง นนทบุรี`: confirm the AI-proposed district before any SIG request; then the progress card, status card with a note that this is not a GRP area, evidence panel and Bang Bua Thong outline appear
    - **Use my location**: allow the browser prompt; the map accepts only a real Thailand district returned by OpenStreetMap (not a city-wide or approximate result), labels it as SIG-only and offers **Check SIG flood exposure**. Location coordinates are not stored and cannot start a GRP assessment.
@@ -99,8 +100,8 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 
 ### 4.0 Proposed data-library and SIG flow
 
-This is the retained target design. Its import foundation, managed storage publication and boundary
-loader are now implemented; the API/UI, shelters, hazard and assessments are not. ADR-0008 is accepted
+This is the retained target design. Its import foundation, managed storage publication, boundaries,
+shelters, RP100 hazard and local API/UI are implemented. Real assessments are not. ADR-0008 is accepted
 for the bounded local baseline scope; browser upload, scientific activation and server rollout remain gated. SIG
 screening is optional; a SIG outage must never block a valid GRP assessment. Hub data overrides are visible Hub-level choices accepted by a Hub Admin, not
 hidden per-user defaults.
@@ -192,7 +193,7 @@ Design notes to read before large changes:
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py` | See 4.3 |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
-| Migrations | `migrations/versions/20260916_0001`…`20260920_0009` | Forward-only; `0008` adds the data-library foundation; `0009` adds boundary datasets, attributes and full/simplified indexed PostGIS geometry |
+| Migrations | `migrations/versions/20260916_0001`…`20260920_0010` | Forward-only; `0008` adds the data-library foundation; `0009` adds boundary PostGIS geometry; `0010` adds shelter district membership and indexed PostGIS points |
 
 ### 4.2 Frontend (static, no build step)
 
@@ -334,6 +335,15 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   the persistent local library: edition `2025-10`, 928 districts, six files and 928 valid PostGIS
   geometries. Open `/data-library.html` after signing in to see it. Recreation cleared the SIG token.
 
+### 20 Sep — real baseline flood and evacuation-centre map layers
+
+- Added migration `0010`, the DDPM shelter worker loader and geometry-based district membership. The real local import materialized 10,303 points, all with PostGIS geometry and a boundary ID; 1,139 source-name conflicts are reported and no point falls outside all districts. Unconfirmed `สถา` and `รอง` fields are not planner-facing.
+- Added the six-tile RP100 worker loader. It validates CRS, resolution, manifest order, gaps and overlaps; preserves six originals; creates six COGs sequentially with a 256 MB GDAL cache; and creates one 1,200 px national map PNG. The version remains `waiting_for_method` for DEP-05.
+- ADR-0009 separates `map_preview` from assessment activation. Planning shows **Flood depth · 100-year** and **Evacuation centers**, with explicit preview/not-assessed language, while Catalog continues to exclude the non-current versions.
+- Expanded the Data library UI/API with shelter and hazard imports, counts, findings, progress and shared notices. The Planning point layer uses Leaflet canvas for the 10,303 points.
+- Real Docker results: shelter import 5.55 s and 29,987,922 managed bytes; hazard import 31.64 s and 279,132,713 managed bytes; complete managed datasets tree 325 MB. Full details are in [`docs/baseline-map-implementation-report.md`](docs/baseline-map-implementation-report.md).
+- Validation: 297 tests pass (two PostgreSQL-only skips in the normal run), Ruff and both JavaScript syntax checks are clean. Docker image rebuilt, migration head is `0010`, real imports succeeded and API health is green. The rebuild cleared browser/SIG sessions, so a person must sign in for the final protected visual acceptance pass.
+
 ---
 
 ## 6. Decisions and ADRs
@@ -347,6 +357,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0006 | Admin data inspector over a read-only source folder | Accepted for local Docker Desktop testing; browser acceptance pending |
 | ADR-0007 | Data Science delivery is accepted source data; provenance is registered during ingestion | Accepted by product owner; DEP-05 method decision still blocks real results |
 | ADR-0008 | Immutable platform baseline plus Hub-level, category-by-category accepted overrides | Accepted for bounded local baseline implementation; browser upload, scientific activation and server rollout remain gated |
+| ADR-0009 | Technically validated, non-current baseline versions may be display-only Planning map previews | Accepted for local validation; does not activate assessment inputs |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
@@ -379,7 +390,7 @@ Owner decisions (16–17 Sep):
   fixture. Capture a sanitized live response before staging and adjust the allow-list only through a
   reviewed contract change.
 - **External browser calls:** `unpkg.com` (Leaflet) and `openstreetmap.org` (tiles, Nominatim). Acceptable for local use only; vendor Leaflet and use a contracted tile and geocoder before staging.
-- **Real data missing:** the only GRP assessment area is synthetic; the method is draft; geometry is GeoJSON, not PostGIS.
+- **Real assessment still blocked:** real boundaries, shelters and RP100 are imported with PostGIS geometry, but no real district is supported, the imported versions are not assessment-current and DEP-05/method approval remain open. The only runnable GRP assessment is synthetic.
 - **Single-process memory** holds rate limits and the SIG token store; there is no lease renewal for long jobs.
 - `web/planning.js` (~1,200 lines) and `api/planning.py` (~650 lines) are large. Split them before adding much more.
 - **Spec text** needs updating for ADR-0003, ADR-0004 and the Increment 2 scope change.
@@ -415,10 +426,10 @@ Execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data
 2. ~~Safe import queue.~~ **Built:** idempotency, lease renewal, fencing and two-worker PostgreSQL publication test.
 3. ~~Managed staging, checksums and atomic promotion.~~ **Built and tested.**
 4. ~~Versioned district-boundary collection and PostGIS loader.~~ **Built and imported: all 928 real features are now visible in the Data library UI.**
-5. **Next:** DDPM shelter loader with geometric membership and mismatch reporting.
-6. One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.
-7. **Boundary slice built:** Data library API/UI, permission classification, audit event, status polling and shared completion notice; extend it for shelters and hazard.
-8. Docker Desktop browser acceptance and measured memory, duration and disk use.
+5. ~~DDPM shelter loader with geometric membership and mismatch reporting.~~ **Built and imported:** 10,303 points, 1,139 reported name conflicts, zero outside all districts.
+6. ~~One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.~~ **Built and imported:** six originals, six COGs, one national preview; `waiting_for_method`.
+7. ~~Extend Data library API/UI to shelters and hazard.~~ **Built:** import cards, status, counts, audit and notices for all baseline categories.
+8. **Next:** signed-in browser acceptance of the Planning layers and Data library, including measured browser rendering time for 10,303 points. See [`docs/baseline-map-implementation-report.md`](docs/baseline-map-implementation-report.md).
 
 Do not import the vulnerability rasters in this slice. Do not enable a real flood assessment until
 DEP-05 is resolved. Do not add browser upload or deploy this feature to a server before its security

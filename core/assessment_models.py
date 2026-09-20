@@ -139,6 +139,9 @@ class Feature(Base):
     dataset_version_id: Mapped[UUID] = mapped_column(
         ForeignKey("dataset_version.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+    boundary_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("boundary.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     lon: Mapped[float] = mapped_column(Float, nullable=False)
     lat: Mapped[float] = mapped_column(Float, nullable=False)

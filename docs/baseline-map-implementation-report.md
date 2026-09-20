@@ -1,0 +1,66 @@
+# Baseline flood and evacuation-centre implementation report
+
+**Date:** 20 September 2026  
+**Scope:** Local Docker Desktop baseline; not a real GRP assessment  
+**Decision:** [ADR-0009](adr/0009-display-only-baseline-map-layers.md)
+
+## Outcome
+
+The accepted Thailand source delivery is now visible on the Planning map as two display-only baseline layers:
+
+- **Flood depth · 100-year** — a worker-produced national picture from one immutable six-tile RP100 version;
+- **Evacuation centers** — 10,303 materialized DDPM points assigned to imported districts by geometry.
+
+Neither layer is assessment-ready. The flood version is `waiting_for_method` because DEP-05 has not defined NoData, modelled-area and permanent-water behavior. The shelter version is `technically_valid`; the uncertain `สถา` and `รอง` fields are excluded. Imported boundaries remain unsupported assessment areas.
+
+## Requirement traceability
+
+| Requirement | Implementation | Verification |
+|---|---|---|
+| One logical RP100 version | Six source TIFFs are sorted into one stable manifest and one dataset version | Local version reports `tile_count=6` |
+| Preserve immutable source | Originals are staged, re-hashed and promoted under generated version keys | Six original `dataset_file` rows |
+| Bounded raster processing | COGs are generated sequentially with a 256 MB GDAL cache; map preview is capped at 1,200 px wide | Six COG rows and one PNG row |
+| Stable edges | CRS, resolution, band count, tile union, overlap and gap are validated before publication | Fast tests plus successful real import |
+| Do not activate flood assessment | Version ends in `waiting_for_method`; Catalog does not expose it as current | Local database check |
+| Materialize shelters as points | Confirmed name, longitude and latitude are written to `feature`; PostGIS `Point` is populated | 10,303 feature and geometry rows |
+| Membership by geometry | Every point is spatially assigned to a versioned district boundary; source district text is never used as membership | 10,303 populated `boundary_id` rows |
+| Report name/geometry conflicts | Conflicts are retained and reported, not moved or silently removed | 1,139 mismatches; 10 safe examples in the job report |
+| Keep uncertain fields away from planners | `สถา` and `รอง` are not materialized; the import report records their exclusion | Unit test and report payload |
+| GIS only in worker | Validation, point-in-polygon assignment, COG creation and PNG rendering run in the import worker | API only queues and serves stored output |
+| Show layers without implying a result | Non-current versions require `map_preview`; API returns `preview_only`; UI says centres are not assessed and DEP-05 is pending | ADR-0009 and static UI tests/full suite |
+
+## Local import results
+
+| Category | Result | Duration | Managed file records | Managed bytes |
+|---|---:|---:|---:|---:|
+| Evacuation centres | 10,303 points; 1,139 name conflicts; 0 outside all districts | 5.55 s | 8 | 29,987,922 |
+| RP100 flood depth | 6 originals; 6 COGs; 1 national PNG | 31.64 s | 13 | 279,132,713 |
+
+The complete local managed `datasets/` tree is 325 MB including the previously imported boundary collection. PostgreSQL contains 10,303 shelter `Point` geometries and district foreign keys. Migration head is `20260920_0010`.
+
+## User experience
+
+1. Open **Planning** and then **Layers**.
+2. Turn on **Flood depth · 100-year** to draw the stored national flood-depth picture.
+3. Turn on **Evacuation centers** to draw the DDPM points. A point popup says **Evacuation center · not assessed yet**.
+4. Read the visible preview warning. No centre is classified and no assessment can be started from these imported versions.
+5. Platform Admins can inspect version, readiness, conflict and file counts on **Data library**.
+
+The Planning client uses Leaflet's canvas renderer for the national point layer. This remains a local acceptance implementation; browser timing and phone layout still require a signed-in browser pass.
+
+## Validation
+
+- `python -m pytest -q`: **297 passed, 2 PostgreSQL-only skipped**.
+- `python -m ruff check .`: clean.
+- `node --check web/planning.js` and `node --check web/data-library.js`: clean.
+- Docker Desktop image rebuilt; migration `0010` applied; API health returned `{"status":"ok"}`.
+- Real local imports succeeded with the counts above.
+- Database checks: 10,303/10,303 shelter rows have district membership and PostGIS geometry; 1,139 carry the mismatch flag; hazard has six COGs and one map preview.
+
+## Open gates
+
+- A person must sign in again after the image rebuild and visually accept the Planning map; the rebuild cleared the local session and in-memory SIG token.
+- DEP-05 blocks flood classification and real assessment activation.
+- DEP-06 must confirm `สถา` and `รอง` before either can be planner-facing.
+- Before staging, measure rendering of all 10,303 points. Add viewport queries or vector tiles if needed.
+- External Leaflet, OSM tiles and Nominatim remain local-only dependencies.

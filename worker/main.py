@@ -18,8 +18,18 @@ from core.boundary_import import (
 from core.data_import_jobs import ImportClaim, claim_next_import, fail_import, version_id_for_import
 from core.data_library_models import DataImportJob
 from core.db import get_engine, session_scope
+from core.hazard_import import (
+    PLATFORM_HAZARD_DATASET_ID,
+    HazardImportError,
+    process_hazard_import,
+)
 from core.import_staging import cleanup_import_staging
 from core.inspection_jobs import claim_next_inspection, process_inspection
+from core.shelter_import import (
+    PLATFORM_SHELTER_DATASET_ID,
+    ShelterImportError,
+    process_shelter_import,
+)
 from core.storage import LocalStorage
 
 logger = logging.getLogger("grp.worker")
@@ -98,20 +108,39 @@ def _run_one_import_session(
     logger.info("Claimed data import %s attempt %d", claim.import_id, claim.attempt)
     try:
         job = session.get(DataImportJob, claim.import_id)
-        if job is None or job.category != "boundary":
+        if job is None:
+            raise BoundaryImportError("This import job no longer exists")
+        if job.category == "boundary":
+            version_id = process_boundary_import(
+                session,
+                storage,
+                root,
+                claim,
+                lease_minutes=lease_minutes,
+            )
+        elif job.category == "evacuation_centers":
+            version_id = process_shelter_import(
+                session,
+                storage,
+                root,
+                claim,
+                lease_minutes=lease_minutes,
+            )
+        elif job.category == "hazard":
+            version_id = process_hazard_import(
+                session,
+                storage,
+                root,
+                claim,
+                lease_minutes=lease_minutes,
+            )
+        else:
             raise BoundaryImportError("This import category is not enabled yet")
-        version_id = process_boundary_import(
-            session,
-            storage,
-            root,
-            claim,
-            lease_minutes=lease_minutes,
-        )
         if version_id is None:
             logger.warning("Data import %s lost its lease", claim.import_id)
         else:
             logger.info("Data import %s published version %s", claim.import_id, version_id)
-    except BoundaryImportError as error:
+    except (BoundaryImportError, ShelterImportError, HazardImportError) as error:
         logger.warning("Data import %s failed validation: %s", claim.import_id, error)
         failed = fail_import(
             session,
@@ -141,9 +170,16 @@ def _cleanup_failed_import(session: Session, storage: LocalStorage, claim: Impor
         cleanup_import_staging(storage, claim)
         session.expire_all()
         job = session.get(DataImportJob, claim.import_id)
-        if job is not None and job.dataset_version_id is None and job.category == "boundary":
-            version_id = version_id_for_import(claim.import_id)
-            storage.delete_prefix(f"datasets/{PLATFORM_BOUNDARY_DATASET_ID}/{version_id}")
+        if job is not None and job.dataset_version_id is None:
+            dataset_ids = {
+                "boundary": PLATFORM_BOUNDARY_DATASET_ID,
+                "evacuation_centers": PLATFORM_SHELTER_DATASET_ID,
+                "hazard": PLATFORM_HAZARD_DATASET_ID,
+            }
+            dataset_id = dataset_ids.get(job.category)
+            if dataset_id is not None:
+                version_id = version_id_for_import(claim.import_id)
+                storage.delete_prefix(f"datasets/{dataset_id}/{version_id}")
     except Exception:  # noqa: BLE001 - cleanup is retried by later housekeeping
         logger.exception("Could not clean failed data import %s", claim.import_id)
 

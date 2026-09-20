@@ -56,12 +56,16 @@ def map_layers(
     rows = session.execute(
         select(DatasetVersion, Dataset)
         .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
-        .where(
-            DatasetVersion.is_current,
-            or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id),
-        )
+        .where(or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id))
         .order_by(Dataset.type, DatasetVersion.return_period_years)
     ).all()
+    # Technically validated baseline imports may be drawn for orientation before scientific
+    # activation. They stay non-current, so catalog/assessment input selection cannot use them.
+    rows = [row for row in rows if row[0].is_current or row[0].meta.get("map_preview")]
+    rows.sort(
+        key=lambda row: (bool(row[0].meta.get("map_preview")), row[0].created_at),
+        reverse=True,
+    )
     flood = [
         {
             "id": f"flood-{version.id}",
@@ -72,6 +76,8 @@ def map_layers(
             "image_url": f"/api/v1/maps/hazard/{version.id}/overlay.png",
             "bounds": version.meta.get("overlay_bounds"),
             "available": bool(version.meta.get("overlay_key")),
+            "preview_only": bool(version.meta.get("map_preview") and not version.is_current),
+            "readiness": version.readiness,
         }
         for version, dataset in rows
         if dataset.type == "hazard"
@@ -84,6 +90,8 @@ def map_layers(
             "owner_kind": dataset.owner_kind,
             "provider": dataset.provider,
             "features_url": f"/api/v1/maps/datasets/{version.id}/features",
+            "preview_only": bool(version.meta.get("map_preview") and not version.is_current),
+            "readiness": version.readiness,
         }
         for version, dataset in rows
         if dataset.type == "evacuation_centers"

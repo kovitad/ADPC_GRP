@@ -222,12 +222,12 @@ Add an Admin-only **Data library** page:
 2. ~~Safe import queue.~~ **Built:** idempotent request, lease renewal, attempt fencing and one-time finalization are covered by fast tests and a two-worker PostgreSQL publication test.
 3. ~~Managed staging, manifests, checksums and atomic promotion.~~ **Built:** copies are re-hashed, final keys are immutable and deterministic, database publication is one transaction, materializer failures roll back, and failed handled imports remove unreferenced bytes.
 4. **Built, integration-tested and imported locally:** the boundary loader requires the complete same-stem delivery, validates EPSG:4326, required fields, unique codes and valid polygon geometry, writes full and simplified indexed PostGIS geometry, and leaves all areas unsupported. The persistent local library now contains all 928 features, six source files and 928 valid PostGIS geometries.
-5. **Next:** shelter loader and spatial mismatch report.
-6. RP100 six-tile logical manifest and bounded COG conversion.
-7. **Boundary slice built:** protected Data library summary, Platform Admin import request, status, audit event and permission classification. Extend the same API to shelters and hazard after their loaders exist.
-8. **Boundary slice built:** Admin Data library page, imported-version table, readiness/counts, progress and shared completion notification. Extend category cards with the remaining loaders.
-9. Docker Desktop rebuild and complete browser acceptance.
-10. Update handover with measured durations, memory and disk use.
+5. **Built and imported locally:** the shelter loader materializes all 10,303 points, assigns district membership by geometry, populates PostGIS points and reports all 1,139 district-name conflicts without moving them. The uncertain `สถา` and `รอง` fields are excluded.
+6. **Built and imported locally:** six RP100 originals form one ordered logical version; six COGs are generated sequentially with bounded GDAL cache and one national display PNG is stored. The version is `waiting_for_method` pending DEP-05.
+7. **Built:** protected Data library summary and Platform Admin import actions now cover boundaries, shelters and hazard, with audit, status polling and shared completion notices.
+8. **Built:** the Admin Data library page shows all three categories, readiness, counts, shelter conflicts and flood waiting state. ADR-0009 permits non-current `map_preview` versions on the Planning map without exposing them to assessment selection.
+9. **Partly complete:** Docker Desktop rebuilt, migration `0010` applied and real imports verified. A person must sign in again for visual browser acceptance of the protected map.
+10. **Complete for the imports:** measured results are in [`baseline-map-implementation-report.md`](baseline-map-implementation-report.md) and `handovers.md`.
 
 ## 11. Plan after the local baseline is complete
 

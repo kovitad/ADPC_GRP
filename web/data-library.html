@@ -8,7 +8,7 @@
     <title>Data library | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="/styles.css?v=20260920a" />
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/data-library.js?v=20260920a" defer></script>
+    <script src="/data-library.js?v=20260920b" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -58,6 +58,54 @@
             <tbody data-boundary-versions></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="admin-card" aria-labelledby="shelter-heading">
+        <div class="admin-card__heading">
+          <div><p class="eyebrow">Platform baseline</p><h2 id="shelter-heading">Evacuation centers</h2></div>
+          <span class="status-pill" data-shelter-state>Loading</span>
+        </div>
+        <p class="admin-card__intro">
+          The worker assigns every DDPM point to a district by geometry. It reports attribute/geometry
+          conflicts without moving points, and excludes unconfirmed fields from the planner map.
+        </p>
+        <div class="library-actions">
+          <button class="button button--primary" type="button" data-import-shelters disabled>Import accepted shelter baseline</button>
+        </div>
+        <p class="inspector-note" data-shelter-source-note>Checking the required files…</p>
+        <div data-shelter-progress hidden>
+          <div class="inspector-bar"><span data-shelter-fill></span></div>
+          <p class="inspector-note" data-shelter-progress-text></p>
+        </div>
+        <h3 class="inspector-subheading">Imported versions</h3>
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Readiness</th><th>Centers</th><th>Files</th><th>Name conflicts</th><th>Outside</th><th>Imported</th><th>Version</th></tr></thead>
+          <tbody data-shelter-versions></tbody>
+        </table></div>
+      </section>
+
+      <section class="admin-card" aria-labelledby="hazard-heading">
+        <div class="admin-card__heading">
+          <div><p class="eyebrow">Platform baseline</p><h2 id="hazard-heading">Flood depth · 100-year</h2></div>
+          <span class="status-pill" data-hazard-state>Loading</span>
+        </div>
+        <p class="admin-card__intro">
+          Six source tiles are registered as one immutable RP100 version. The worker creates bounded-memory
+          COGs and a display-only map picture. DEP-05 keeps this version out of assessments.
+        </p>
+        <div class="library-actions">
+          <button class="button button--primary" type="button" data-import-hazard disabled>Import accepted RP100 baseline</button>
+        </div>
+        <p class="inspector-note" data-hazard-source-note>Checking the required files…</p>
+        <div data-hazard-progress hidden>
+          <div class="inspector-bar"><span data-hazard-fill></span></div>
+          <p class="inspector-note" data-hazard-progress-text></p>
+        </div>
+        <h3 class="inspector-subheading">Imported versions</h3>
+        <div class="table-scroll"><table class="data-table">
+          <thead><tr><th>Readiness</th><th>Tiles</th><th>Files</th><th>Return period</th><th>Imported</th><th>Version</th></tr></thead>
+          <tbody data-hazard-versions></tbody>
+        </table></div>
       </section>
 
       <section class="admin-card" aria-labelledby="vulnerability-heading">

@@ -77,6 +77,7 @@
   }).addTo(map);
   const districtLayer = window.L.featureGroup().addTo(map);
   const centersLayer = window.L.featureGroup().addTo(map);
+  const centerRenderer = window.L.canvas({ padding: 0.35 });
   const placeLayer = window.L.featureGroup().addTo(map);
   let floodOverlay = null;
 
@@ -518,7 +519,7 @@
     centersLayer.clearLayers();
     collection.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
-      window.L.circleMarker([lat, lon], { radius: 6, color: "#374151", weight: 2, fillColor: "#fff", fillOpacity: 1 })
+      window.L.circleMarker([lat, lon], { renderer: centerRenderer, radius: 4, color: "#374151", weight: 1, fillColor: "#fff", fillOpacity: 0.9 })
         .bindPopup(popup(feature.properties.name, ["Evacuation center · not assessed yet"]))
         .addTo(centersLayer);
     });
@@ -1499,6 +1500,15 @@
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;
       state.centersVersion = layers.evacuation_centers[0] || null;
+      if (state.centersVersion) {
+        $("[data-centers-title]").textContent = "Evacuation centers";
+      }
+      const mapPreview = state.floodLayers[0]?.preview_only || state.centersVersion?.preview_only;
+      const previewNote = $("[data-map-preview-note]");
+      previewNote.hidden = !mapPreview;
+      previewNote.textContent = mapPreview
+        ? "Baseline preview only — source versions are pinned, but no assessment method has classified these centers. Flood NoData meaning is pending DEP-05."
+        : "";
       $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
       drawLegend(layers.flood_legend);
       drawDistricts();

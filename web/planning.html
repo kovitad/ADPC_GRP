@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/planning.css?v=20260918c" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260919a" defer></script>
+    <script src="/planning.js?v=20260920b" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -92,7 +92,7 @@
           <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span>Demo assessment area</span></label>
           <label class="pw-toggle"><input type="checkbox" data-layer="flood" /><span data-flood-title>Demo flood depth</span></label>
           <div class="pw-legend" data-flood-legend></div>
-          <label class="pw-toggle"><input type="checkbox" data-layer="centers" /><span>Demo evacuation centers</span></label>
+          <label class="pw-toggle"><input type="checkbox" data-layer="centers" /><span data-centers-title>Demo evacuation centers</span></label>
           <div class="pw-legend">
             <span><i class="pw-dot" style="--c:#c2410c"></i>Potentially exposed</span>
             <span><i class="pw-dot" style="--c:#0f766e"></i>Not exposed under this scenario</span>
@@ -100,6 +100,7 @@
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
           <label class="pw-toggle is-disabled"><input type="checkbox" disabled /><span>Vulnerable people</span></label>
+          <p class="pw-muted" data-map-preview-note hidden></p>
           <p class="pw-muted" data-vulnerability-note>Not available yet.</p>
         </div>
 
