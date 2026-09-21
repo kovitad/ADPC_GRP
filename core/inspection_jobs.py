@@ -42,7 +42,10 @@ PREVIEW_FOLDERS = (
 MAX_ATTEMPTS = 2
 # Include report semantics in the cache key. Bump this whenever findings or preview wording change,
 # otherwise an unchanged source folder can keep serving an obsolete stored report.
-REPORT_FORMAT_VERSION = "2"
+REPORT_FORMAT_VERSION = "3"
+INSPECTION_PROFILES = frozenset(
+    {"general", "grp_baseline", "flood_depth", "points_boundaries"}
+)
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,7 @@ def request_inspection(
     user_id: UUID,
     support_ref: str,
     district: str = "",
+    profile: str = "grp_baseline",
 ) -> InspectionRequest:
     """Return the cached report for this folder (or district preview), or queue a job for one.
 
@@ -69,6 +73,8 @@ def request_inspection(
     """
 
     district = district.strip()
+    if profile not in INSPECTION_PROFILES:
+        raise DataFolderError("That validation profile is not supported.")
     if district:
         files = preview_files(root)
         relative = ""
@@ -85,6 +91,7 @@ def request_inspection(
         .where(
             DatasetInspection.folder == relative,
             DatasetInspection.district == district,
+            DatasetInspection.profile == profile,
             DatasetInspection.fingerprint == fingerprint,
             DatasetInspection.state.in_(
                 (AssessmentState.SUCCEEDED, AssessmentState.QUEUED, AssessmentState.RUNNING)
@@ -102,6 +109,7 @@ def request_inspection(
         requested_by=user_id,
         folder=relative,
         district=district,
+        profile=profile,
         fingerprint=fingerprint,
         state=AssessmentState.QUEUED,
         support_ref=support_ref,
@@ -184,7 +192,7 @@ def process_inspection(session: Session, root: Path, inspection_id: UUID, storag
                 root, inspection.district, storage, f"previews/{inspection.id}/flood.png"
             )
         else:
-            report = scan_folder(target, root, files)
+            report = scan_folder(target, root, files, profile=inspection.profile)
     except PreviewError as error:
         inspection.report = {"kind": "district_preview", "not_found": str(error)}
         return _fail(session, inspection, "VALIDATION_FAILED", str(error))

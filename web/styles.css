@@ -1791,6 +1791,30 @@ h4, h5, h6, strong { font-weight: var(--weight-semibold); }
   line-height: 1.5;
 }
 
+[data-validation-profile] {
+  display: block;
+  width: min(38rem, 100%);
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  color: var(--ink-900);
+  font: inherit;
+}
+
+.inspector-simple-summary {
+  margin: 0 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid #b9d9d2;
+  border-left: 4px solid var(--servir-green);
+  border-radius: var(--radius-md);
+  background: #f3faf8;
+}
+
+.inspector-simple-summary h3 { margin: 0 0 0.4rem; }
+.inspector-simple-summary > p { margin: 0.25rem 0; line-height: 1.55; }
+
 .inspector-folders {
   display: flex;
   flex-direction: column;

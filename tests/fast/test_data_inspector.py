@@ -19,7 +19,7 @@ from core.data_folder import (
     list_folders,
     resolve_folder,
 )
-from core.dataset_scan import Finding, LayerReport, find_problems
+from core.dataset_scan import Finding, LayerReport, describe_raster, find_problems
 from core.inspection_jobs import (
     PREVIEW_FOLDERS,
     claim_next_inspection,
@@ -163,6 +163,23 @@ def test_an_unchanged_folder_reuses_the_stored_report(db: Session, source: Path)
 
 
 @pytest.mark.fast
+def test_the_same_folder_uses_a_separate_cache_entry_per_profile(
+    db: Session, source: Path
+) -> None:
+    common = {
+        "root": source,
+        "folder": "",
+        "hub_id": None,
+        "user_id": uuid4(),
+        "support_ref": "GRP-TEST-PROFILE",
+    }
+
+    baseline = request_inspection(db, profile="grp_baseline", **common)
+    general = request_inspection(db, profile="general", **common)
+
+    assert baseline.inspection_id != general.inspection_id
+
+
 def test_an_old_report_format_is_not_reused(db: Session, source: Path) -> None:
     first = _ask(db, source)
     stored = db.get(DatasetInspection, first.inspection_id)
@@ -311,6 +328,28 @@ def test_an_unexpected_projection_is_a_problem_not_a_known_one() -> None:
 
 
 @pytest.mark.fast
+def test_general_profile_does_not_apply_grp_or_flood_assumptions() -> None:
+    layer = LayerReport(
+        path="local/elevation.tif",
+        kind="raster",
+        crs_epsg=3857,
+        nodata=-9999.0,
+        nodata_share=0.8,
+        value_min=-20.0,
+        value_max=3000.0,
+    )
+
+    findings = find_problems(
+        [layer], ["local/elevation.tif", "metadata.txt"], profile="general"
+    )
+
+    titles = [finding.title for finding in findings]
+    assert not any("not EPSG:4326" in title for title in titles)
+    assert not any("mostly empty" in title for title in titles)
+    assert not any("holds values over" in title for title in titles)
+    assert not any("negative values" in title for title in titles)
+
+
 def test_missing_provenance_is_registration_work_not_a_data_blocker() -> None:
     layer = LayerReport(path="flood.tif", kind="raster", crs_epsg=4326, nodata=0.0)
 
@@ -370,6 +409,38 @@ def test_cut_short_thai_columns_are_reported_as_known() -> None:
 
 
 # ---------- the worker path, end to end on a generated raster ----------
+
+
+@pytest.mark.fast
+def test_raster_extrema_are_read_at_full_resolution(tmp_path: Path) -> None:
+    rasterio = pytest.importorskip("rasterio")
+    import numpy as np
+    from rasterio.transform import from_origin
+
+    path = tmp_path / "large-flood.tif"
+    values = np.zeros((2048, 2048), dtype="float32")
+    values[1, 1] = 99.0
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=2048,
+        width=2048,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=from_origin(100.0, 14.0, 0.01, 0.01),
+        nodata=-9999.0,
+        tiled=True,
+        blockxsize=256,
+        blockysize=256,
+    ) as target:
+        target.write(values, 1)
+
+    layer = describe_raster(path, "large-flood.tif")
+
+    assert layer.value_max == 99.0
+    assert layer.value_stats_scope == "full_resolution"
 
 
 @pytest.mark.fast

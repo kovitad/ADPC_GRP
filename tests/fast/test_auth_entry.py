@@ -118,6 +118,22 @@ def test_shared_menu_is_compact_and_wraps_on_small_screens() -> None:
     assert "padding: 0.36rem 0.58rem" in styles
 
 
+def test_data_inspector_supports_profiles_and_shareable_reports() -> None:
+    page = (WEB_ROOT / "data-inspector.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "data-inspector.js").read_text(encoding="utf-8")
+
+    assert 'value="general"' in page
+    assert 'value="grp_baseline"' in page
+    assert "Download simple report" in page
+    assert "Download technical JSON" in page
+    assert ".local/data-in" in page
+    assert "simpleReportHtml" in script
+    assert "full-resolution min/max" in script
+    assert "sampled" in script
+    assert 'body: { folder, profile }' in script
+    assert "innerHTML" not in script
+
+
 def test_planning_location_lookup_requires_an_administrative_district() -> None:
     script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
 

@@ -33,6 +33,10 @@ class DatasetInspection(Base):
             "state IN ('queued', 'running', 'succeeded', 'failed')",
             name="ck_dataset_inspection_state",
         ),
+        CheckConstraint(
+            "profile IN ('general', 'grp_baseline', 'flood_depth', 'points_boundaries')",
+            name="ck_dataset_inspection_profile",
+        ),
         Index("ix_dataset_inspection_cache", "folder", "district", "fingerprint", "state"),
     )
 
@@ -50,6 +54,10 @@ class DatasetInspection(Base):
     # Empty for a folder report; the district asked for when this is a district preview.
     district: Mapped[str] = mapped_column(
         String(200), nullable=False, default="", server_default=""
+    )
+    # Validation purpose controls domain-specific rules and is part of cache identity.
+    profile: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="grp_baseline", server_default="grp_baseline"
     )
     # Fingerprint of every file in scope: the cache key (see core/data_folder.py).
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)

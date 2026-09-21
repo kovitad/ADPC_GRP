@@ -7,10 +7,10 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Source data | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="/styles.css?v=20260920e" />
+    <link rel="stylesheet" href="/styles.css?v=20260921f" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/data-inspector.js?v=20260919b" defer></script>
+    <script src="/data-inspector.js?v=20260921c" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -30,6 +30,13 @@
       </p>
 
       <p class="inspector-note">
+        For another local dataset, make a new folder under <code>.local/data-in</code>, copy the
+        files into it, refresh this page, choose <strong>General GIS data</strong>, and select that
+        folder. The source mount is read-only, so validation cannot alter the files. Supported
+        layers are Shapefile, GeoJSON, GeoPackage and GeoTIFF.
+      </p>
+
+      <p class="inspector-note">
         Want to see the files on a map? <a href="/data-preview.html">Preview one district</a> —
         outline, shelters and flood depth, with the warnings beside it. Ready to register the
         accepted baseline? Open the <a href="/data-library.html">Data library</a>.
@@ -46,6 +53,14 @@
         <p class="admin-card__intro" data-pick-intro>
           Reading the folder list…
         </p>
+        <label class="field-label" for="validation-profile">What are these files for?</label>
+        <select id="validation-profile" data-validation-profile>
+          <option value="general">General GIS data — structural checks, no GRP assumptions</option>
+          <option value="grp_baseline" selected>GRP Thailand baseline bundle</option>
+          <option value="flood_depth">GRP flood-depth raster</option>
+          <option value="points_boundaries">Points checked against boundaries</option>
+        </select>
+        <p class="inspector-note" data-profile-note></p>
         <div class="inspector-folders" data-folders role="list"></div>
       </section>
 
@@ -71,6 +86,24 @@
           </div>
           <span class="status-pill" data-cache-pill hidden>From cache</span>
         </div>
+
+        <section class="inspector-simple-summary" aria-labelledby="simple-summary-heading">
+          <h3 id="simple-summary-heading">Simple summary</h3>
+          <p data-simple-decision></p>
+          <p data-simple-explanation></p>
+          <div class="library-actions">
+            <button class="button button--primary" type="button" data-download-simple disabled>
+              Download simple report
+            </button>
+            <button class="button button--secondary" type="button" data-download-json disabled>
+              Download technical JSON
+            </button>
+          </div>
+          <p class="inspector-note">
+            Send the simple HTML report to the data team. It includes questions to answer, exact
+            file fingerprints and a technical appendix. JSON preserves the complete machine report.
+          </p>
+        </section>
 
         <div class="inspector-tally" data-tally></div>
         <div class="inspector-findings" data-findings></div>

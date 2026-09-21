@@ -46,6 +46,7 @@ NAME_AGREEMENT_FLOOR = 0.5
 MAX_SAMPLE_VALUES = 4
 SAMPLE_TEXT_CHARS = 60
 RASTER_STAT_PIXELS = 512
+RASTER_EXACT_BLOCK_PIXELS = 1024
 # Field names that plausibly name the district a point claims to be in.
 DISTRICT_FIELD_HINTS = ("อำเ", "ampho", "district", "amphoe")
 
@@ -79,6 +80,7 @@ class LayerReport:
     value_max: float | None = None
     nodata_share: float | None = None
     bounds: list[float] | None = None
+    value_stats_scope: str | None = None
     note: str | None = None
 
 
@@ -162,13 +164,42 @@ def describe_raster(path: Path, relative: str) -> LayerReport:
             total = int(values.size)
             missing = int(np.ma.count_masked(values))
             report.nodata_share = round(missing / total, 4) if total else None
-            if missing < total:
-                report.value_min = round(float(values.min()), 4)
-                report.value_max = round(float(values.max()), 4)
+            report.value_min, report.value_max = _full_resolution_min_max(raster)
+            report.value_stats_scope = "full_resolution"
     except Exception as error:  # noqa: BLE001 - an unreadable file is a finding, not a crash
         report.readable = False
         report.note = f"Could not be read: {type(error).__name__}"
     return report
+
+
+def _full_resolution_min_max(raster: Any) -> tuple[float | None, float | None]:
+    """Read bounded windows so extrema are exact without loading a whole raster into memory."""
+
+    import numpy as np
+    from rasterio.windows import Window
+
+    minimum: float | None = None
+    maximum: float | None = None
+    for row in range(0, raster.height, RASTER_EXACT_BLOCK_PIXELS):
+        for column in range(0, raster.width, RASTER_EXACT_BLOCK_PIXELS):
+            window = Window(
+                column,
+                row,
+                min(RASTER_EXACT_BLOCK_PIXELS, raster.width - column),
+                min(RASTER_EXACT_BLOCK_PIXELS, raster.height - row),
+            )
+            values = raster.read(1, window=window, masked=True).compressed()
+            finite = values[np.isfinite(values)]
+            if not finite.size:
+                continue
+            block_min = float(finite.min())
+            block_max = float(finite.max())
+            minimum = block_min if minimum is None else min(minimum, block_min)
+            maximum = block_max if maximum is None else max(maximum, block_max)
+    return (
+        round(minimum, 4) if minimum is not None else None,
+        round(maximum, 4) if maximum is not None else None,
+    )
 
 
 def _pixel_size_m(raster: Any) -> float | None:
@@ -209,7 +240,12 @@ def _shapefile_findings(layer: LayerReport, suffixes_by_stem: dict[str, set[str]
     return findings
 
 
-def _vector_findings(layer: LayerReport, suffixes_by_stem: dict[str, set[str]]) -> list[Finding]:
+def _vector_findings(
+    layer: LayerReport,
+    suffixes_by_stem: dict[str, set[str]],
+    *,
+    enforce_wgs84: bool,
+) -> list[Finding]:
     findings: list[Finding] = []
     if layer.path.lower().endswith(".shp"):
         findings.extend(_shapefile_findings(layer, suffixes_by_stem))
@@ -238,7 +274,7 @@ def _vector_findings(layer: LayerReport, suffixes_by_stem: dict[str, set[str]]) 
                 "Decide whether they are expected to be empty, or the export dropped them.",
             )
         )
-    if layer.crs_epsg not in (4326, None):
+    if enforce_wgs84 and layer.crs_epsg not in (4326, None):
         findings.append(
             Finding(
                 "problem",
@@ -261,7 +297,12 @@ def _vector_findings(layer: LayerReport, suffixes_by_stem: dict[str, set[str]]) 
     return findings
 
 
-def _raster_findings(layer: LayerReport) -> list[Finding]:
+def _raster_findings(
+    layer: LayerReport,
+    *,
+    enforce_wgs84: bool,
+    flood_depth_rules: bool,
+) -> list[Finding]:
     findings: list[Finding] = []
     if layer.crs_epsg is None:
         findings.append(
@@ -273,7 +314,7 @@ def _raster_findings(layer: LayerReport) -> list[Finding]:
                 "Ask the provider for the projection.",
             )
         )
-    elif layer.crs_epsg != 4326:
+    elif enforce_wgs84 and layer.crs_epsg != 4326:
         known = _is_known_utm(layer)
         findings.append(
             Finding(
@@ -297,7 +338,7 @@ def _raster_findings(layer: LayerReport) -> list[Finding]:
                 "Confirm the no-data value with the provider.",
             )
         )
-    if layer.nodata_share is not None and layer.nodata_share > 0.5:
+    if flood_depth_rules and layer.nodata_share is not None and layer.nodata_share > 0.5:
         findings.append(
             Finding(
                 "blocker",
@@ -310,7 +351,7 @@ def _raster_findings(layer: LayerReport) -> list[Finding]:
                 "modelled-area mask.",
             )
         )
-    if layer.value_max is not None and layer.value_max > DEEP_WATER_M:
+    if flood_depth_rules and layer.value_max is not None and layer.value_max > DEEP_WATER_M:
         findings.append(
             Finding(
                 "problem",
@@ -321,7 +362,7 @@ def _raster_findings(layer: LayerReport) -> list[Finding]:
                 "Agree a permanent-water rule: mask it, or flag it.",
             )
         )
-    if layer.value_min is not None and layer.value_min < 0:
+    if flood_depth_rules and layer.value_min is not None and layer.value_min < 0:
         findings.append(
             Finding(
                 "problem",
@@ -335,14 +376,20 @@ def _raster_findings(layer: LayerReport) -> list[Finding]:
     return findings
 
 
-def find_problems(layers: list[LayerReport], file_names: list[str]) -> list[Finding]:
-    """Grade what the layers show. Known issues are listed so they are not rediscovered."""
+def find_problems(
+    layers: list[LayerReport],
+    file_names: list[str],
+    *,
+    profile: str = "grp_baseline",
+) -> list[Finding]:
+    """Grade what the layers show under the selected, explicit validation purpose."""
 
     suffixes_by_stem: dict[str, set[str]] = {}
     for name in file_names:
         suffixes_by_stem.setdefault(Path(name).stem, set()).add(Path(name).suffix.lower())
 
     findings: list[Finding] = []
+    enforce_wgs84 = profile in {"grp_baseline", "flood_depth"}
     for layer in layers:
         if not layer.readable:
             findings.append(
@@ -356,9 +403,20 @@ def find_problems(layers: list[LayerReport], file_names: list[str]) -> list[Find
             )
             continue
         if layer.kind == "vector":
-            findings.extend(_vector_findings(layer, suffixes_by_stem))
+            findings.extend(
+                _vector_findings(layer, suffixes_by_stem, enforce_wgs84=enforce_wgs84)
+            )
         else:
-            findings.extend(_raster_findings(layer))
+            flood_rules = profile == "flood_depth" or (
+                profile == "grp_baseline" and "flood" in layer.path.casefold()
+            )
+            findings.extend(
+                _raster_findings(
+                    layer,
+                    enforce_wgs84=enforce_wgs84,
+                    flood_depth_rules=flood_rules,
+                )
+            )
 
     if not any(_is_licence_file(name) for name in file_names):
         findings.append(
@@ -599,8 +657,14 @@ def _cross_check_findings(
     return findings
 
 
-def scan_folder(folder: Path, root: Path, files: list[Any]) -> dict[str, Any]:
-    """Describe every readable layer in scope, grade it, and cross-check points against areas."""
+def scan_folder(
+    folder: Path,
+    root: Path,
+    files: list[Any],
+    *,
+    profile: str = "grp_baseline",
+) -> dict[str, Any]:
+    """Describe every readable layer using an explicit validation purpose."""
 
     base = root.resolve()
     layers: list[LayerReport] = []
@@ -617,12 +681,25 @@ def scan_folder(folder: Path, root: Path, files: list[Any]) -> dict[str, Any]:
         else:
             layers.append(describe_raster(path, item.relative_path))
 
-    findings = find_problems(layers, [item.relative_path for item in files])
+    findings = find_problems(
+        layers, [item.relative_path for item in files], profile=profile
+    )
+    if not layers:
+        findings.append(
+            Finding(
+                "blocker",
+                "No supported GIS layer was found",
+                "This inspector currently opens Shapefile, GeoJSON, GeoPackage and GeoTIFF layers.",
+                "the selected folder",
+                "Ask the data team for one of the supported formats, or add a validated reader "
+                "before relying on this report.",
+            )
+        )
 
     cross = None
     area_layers = _polygon_layers(layers)
     points = _largest(layers, "Point")
-    if area_layers and points is not None:
+    if profile in {"grp_baseline", "points_boundaries"} and area_layers and points is not None:
         extra, cross = cross_check_points(
             [paths[layer.path] for layer in area_layers], paths[points.path], points
         )
@@ -637,8 +714,25 @@ def scan_folder(folder: Path, root: Path, files: list[Any]) -> dict[str, Any]:
 
     order = {"blocker": 0, "problem": 1, "known": 2}
     findings.sort(key=lambda item: (order.get(item.grade, 3), item.title))
+    profile_notes = {
+        "general": (
+            "Generic structural GIS checks only. No GRP-specific CRS, flood-depth or spatial "
+            "membership rule was assumed."
+        ),
+        "grp_baseline": (
+            "GRP baseline checks, including EPSG:4326, flood-depth and point-versus-boundary rules."
+        ),
+        "flood_depth": (
+            "GRP flood-depth checks, including exact extrema and sampled no-data coverage."
+        ),
+        "points_boundaries": (
+            "Generic structural checks plus point-versus-boundary membership where both exist."
+        ),
+    }
     return {
         "folder": folder.resolve().relative_to(base).as_posix() if folder != base else "",
+        "profile": profile,
+        "profile_note": profile_notes[profile],
         "layers": [asdict(layer) for layer in layers],
         "findings": [asdict(item) for item in findings],
         "cross_check": cross,

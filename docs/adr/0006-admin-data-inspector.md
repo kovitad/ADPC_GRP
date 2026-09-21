@@ -41,12 +41,22 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
   Windows bind mount it can shift without a change and stay still despite one. A report is reused
   only while its files are unchanged, and a job whose files changed while it waited stops with
   `INPUT_FINGERPRINT_MISMATCH` rather than describing something else.
-- **What it reports.** Per layer: CRS, size, resolution, value range, no-data share, columns with
-  fill counts and sample values. Findings are graded **blocker** (cannot be loaded, or would be
-  loaded wrongly, until someone decides), **problem** (usable but something is wrong) and
-  **known** (already understood and on the backlog, shown so it is not rediscovered as a
-  surprise). When both boundaries and points are in scope it cross-checks every point against the
-  polygons and maps them.
+- **Validation purpose.** The person explicitly chooses General GIS, GRP baseline, GRP flood
+  depth, or points-versus-boundaries. General GIS checks readability and basic metadata without
+  imposing GRP's EPSG:4326, flood-depth or spatial-membership assumptions. The chosen profile is
+  stored with the job and is part of cache identity, so the same bytes can be checked for a
+  different purpose without reusing an incompatible report.
+- **What it reports.** Per layer: CRS, size, resolution, exact full-resolution minimum/maximum,
+  sampled no-data share, and columns with fill counts and sample values. Exact extrema are read in
+  bounded windows; decimation is valid for an approximate share but not for discovering rare
+  extreme values. Findings are graded **blocker** (cannot be loaded, or would be loaded wrongly,
+  until someone decides), **problem** (usable but something is wrong) and **known** (already
+  understood and on the backlog, shown so it is not rediscovered as a surprise). Under a profile
+  that requests it, boundaries and points are cross-checked and mapped.
+- **Shareable output.** The browser can download a standalone, escaped HTML report written for a
+  non-specialist and the complete technical JSON. The HTML leads with whether to stop or review,
+  explains the three grades, lists each question/action for the data team, and includes layer and
+  file-fingerprint appendices. Export does not turn inspection into approval.
 - **It is never a result.** No version is pinned, no method is recorded, nothing is approved. The
   page says so at the top, and no number from it may be shown to a planner, put in a brief or sent
   to SIG. An inspection is not an assessment and shares no table with one.
@@ -82,5 +92,6 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
 - [x] Read-only mount, settings flag, migration `20260918_0006`, worker claim loop
 - [x] Findings graded blocker / problem / known, with the known ones naming their backlog item
 - [x] Permission matrix rows, path-traversal tests, cache and concurrency tests
+- [x] Explicit validation profiles, exact bounded-window extrema, simple HTML and technical JSON downloads
 - [ ] Product owner accepts the page in the browser against the real `.local/data-in`
 - [ ] Feed the nationwide counts into backlog A2 and the provider conversation

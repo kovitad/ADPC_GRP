@@ -1,10 +1,10 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 21 September 2026 (`codex/sig-embedded-flood-map` validated and merged into `main`)
+**Updated:** 21 September 2026 (`main`; decision-first Planning and flexible source-data reporting added)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `codex/sig-embedded-flood-map` was validated and fast-forward merged into `main` at `b6b29ed`; the feature branch is retained as a recovery reference. `main` now includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **346 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests pass in the Docker database job.
+**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. `main` includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **354 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests remain available through the Docker database job.
 
 **Handing over:** nothing is half-finished in the tree. Continue from `main`, start at Section 9, and first do the browser acceptance pass in Section 3 (the merged baseline work has not been confirmed against live SIG and OpenAI yet).
 
@@ -384,6 +384,15 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - The return-period contradiction detector is intentionally recorded as known debt: it matches current SIG gap prose until SIG supplies typed contradiction flags.
 - A raw `docker compose up` rebuild omitted the shell-only `SERVIR_AUTH_CLIENT_ID` and temporarily made login unavailable. Restarted with `scripts/docker-desktop.ps1`; the client ID and session secret are present, `/api/v1/auth/login` redirects to SERVIR again, and health is green. Use the launcher for full starts.
 - The sole developer requested direct integration after review. The decision-summary and deterministic-fallback commits were fast-forwarded to `main` and pushed; feature branches remain only as references.
+
+### 21 Sep — flexible, shareable source-data validation
+
+- Source data now asks for an explicit validation purpose: General GIS, GRP baseline, GRP flood depth, or points versus boundaries. The profile is stored on `dataset_inspection` by migration `20260921_0011` and included in cache identity. General GIS does not invent GRP EPSG:4326, flood-depth or membership requirements for an unrelated local dataset.
+- A non-specialist summary leads each report with “do not load,” “review with the data team,” or “no blocker found,” while retaining blocker/problem/known meanings and every finding's requested action.
+- Reports download as a standalone escaped HTML file suitable for emailing/printing and as complete technical JSON. Both include the validation purpose, timestamp, folder fingerprint, findings, layer inventory and exact file fingerprints.
+- Any new supported GIS dataset can be placed in its own folder under the read-only `.local/data-in` mount and checked with the General profile. Current supported formats are Shapefile, GeoJSON, GeoPackage and GeoTIFF; unsupported-only folders fail visibly instead of producing an empty clean report.
+- Raster minimum and maximum are now exact full-resolution statistics read in bounded 1024×1024 windows, fixing the reviewed risk that a 512×512 decimation could miss rare deep-water extremes. No-data share remains explicitly approximate and sampled. DEP-05-dependent “mostly empty” and depth rules run only under flood-aware profiles.
+- Updated ADR-0006. Migration `0011` is applied locally; API, worker and database are healthy, and SERVIR remains configured. Validation: 354 tests pass with two PostgreSQL-only skips; Ruff, both JavaScript checks and whitespace checks are clean. Mocked browser acceptance at 1440×1000 confirmed the profile workflow, simple report, exact-versus-sampled labels and a real downloaded standalone HTML file with no console errors.
 
 ---
 

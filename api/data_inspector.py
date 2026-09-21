@@ -11,6 +11,7 @@ reading to the worker.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -33,6 +34,9 @@ router = APIRouter(prefix="/data-inspector", tags=["data-inspector"])
 
 class InspectionAsk(BaseModel):
     folder: str = Field(default="", max_length=400)
+    profile: Literal["general", "grp_baseline", "flood_depth", "points_boundaries"] = (
+        "grp_baseline"
+    )
 
 
 class PreviewAsk(BaseModel):
@@ -99,6 +103,7 @@ def ask_for_inspection(
             session,
             root=root,
             folder=ask.folder,
+            profile=ask.profile,
             hub_id=_hub_for(principal),
             user_id=principal.user_id,
             support_ref=new_support_ref(),
@@ -131,6 +136,7 @@ def read_inspection(
         "inspection_id": str(inspection.id),
         "folder": inspection.folder,
         "district": inspection.district,
+        "profile": inspection.profile,
         "state": inspection.state,
         "error_code": inspection.error_code,
         "support_ref": inspection.support_ref,
