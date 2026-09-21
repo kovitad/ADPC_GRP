@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from core.dataset_scan import read_vector_explicit
 from core.hazard_overlay import DEPTH_CLASSES, colourise
 
 DISTRICTS = "administrative_boundary/district_boundary/Thailand_District_Boundaries.shp"
@@ -53,10 +54,10 @@ def _text(value: Any) -> str:
 def find_district(root: Path, query: str) -> dict[str, Any]:
     """Match an English name, Thai name or admin code. Several matches return the candidates."""
 
-    from pyogrio.raw import read as read_vector
     from shapely import from_wkb
 
-    meta, _, geometries, fields = read_vector(root / DISTRICTS, read_geometry=True)
+    result, _, _, _ = read_vector_explicit(root / DISTRICTS, read_geometry=True)
+    meta, _, geometries, fields = result
     columns = _columns(meta, fields)
     wanted = query.strip().lower()
     matches = []
@@ -89,11 +90,11 @@ def _shelters(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Shelters inside the outline, and shelters that name this district but lie elsewhere."""
 
-    from pyogrio.raw import read as read_vector
     from shapely import from_wkb
     from shapely.prepared import prep
 
-    meta, _, geometries, fields = read_vector(root / SHELTERS, read_geometry=True)
+    result, _, _, _ = read_vector_explicit(root / SHELTERS, read_geometry=True)
+    meta, _, geometries, fields = result
     columns = _columns(meta, fields)
     inside_area = prep(area)
     inside: list[dict[str, Any]] = []

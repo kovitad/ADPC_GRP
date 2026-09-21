@@ -164,7 +164,7 @@ def _encoding_candidates(path: Path) -> list[tuple[str, str]]:
     return unique
 
 
-def _read_vector(path: Path, *, read_geometry: bool = True):
+def read_vector_explicit(path: Path, *, read_geometry: bool = True):
     from pyogrio.raw import read as read_vector
 
     errors: list[Exception] = []
@@ -195,7 +195,7 @@ def describe_vector(path: Path, relative: str) -> LayerReport:
 
     report = LayerReport(path=relative, kind="vector")
     try:
-        result, encoding, source, attempts = _read_vector(path, read_geometry=True)
+        result, encoding, source, attempts = read_vector_explicit(path, read_geometry=True)
         meta, _, geometries, columns = result
         report.encoding = encoding
         report.encoding_source = source
@@ -593,7 +593,7 @@ def choose_area_layer(
     scored: list[tuple[Path, float, int]] = []
     for path in area_paths:
         try:
-            result, _, _, _ = _read_vector(path, read_geometry=False)
+            result, _, _, _ = read_vector_explicit(path, read_geometry=False)
             meta, _, _, columns = result
         except Exception:  # noqa: BLE001 - an unreadable layer simply cannot be chosen
             continue
@@ -627,7 +627,7 @@ def cross_check_points(
     from shapely.strtree import STRtree
 
     try:
-        point_result, _, _, _ = _read_vector(point_path, read_geometry=True)
+        point_result, _, _, _ = read_vector_explicit(point_path, read_geometry=True)
         point_meta, _, point_geoms, point_columns = point_result
     except Exception as error:  # noqa: BLE001 - reported, never raised
         logger.warning("Cross-check skipped: %s", type(error).__name__)
@@ -645,7 +645,7 @@ def cross_check_points(
     if area_path is None:
         return [], None
     try:
-        area_result, _, _, _ = _read_vector(area_path, read_geometry=True)
+        area_result, _, _, _ = read_vector_explicit(area_path, read_geometry=True)
         area_meta, _, area_geoms, area_columns = area_result
     except Exception as error:  # noqa: BLE001 - reported, never raised
         logger.warning("Cross-check skipped: %s", type(error).__name__)

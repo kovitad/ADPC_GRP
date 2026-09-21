@@ -22,6 +22,7 @@ from core.data_import_jobs import (
 )
 from core.data_library_models import DataImportJob
 from core.dataset_readiness import DatasetReadiness
+from core.dataset_scan import read_vector_explicit
 from core.import_staging import (
     SourceFile,
     cleanup_import_staging,
@@ -106,14 +107,14 @@ def _source_files(root: Path) -> tuple[SourceFile, ...]:
 def validate_boundary_collection(root: Path) -> ValidatedBoundaryCollection:
     """Read all 928 delivered features and reject ambiguous or invalid geometry."""
 
-    from pyogrio.raw import read as read_vector
     from shapely import from_wkb, to_wkb
     from shapely.geometry import MultiPolygon, Polygon, mapping
 
     source_files = _source_files(root)
     shp = root / BOUNDARY_SOURCE_REF / f"{BOUNDARY_STEM}.shp"
     try:
-        meta, _, geometries, fields = read_vector(shp, read_geometry=True)
+        result, _, _, _ = read_vector_explicit(shp, read_geometry=True)
+        meta, _, geometries, fields = result
     except Exception as exc:  # noqa: BLE001 - converted into a safe import finding
         raise BoundaryImportError("District boundary shapefile could not be read") from exc
     if str(meta.get("crs") or "").upper() != "EPSG:4326":

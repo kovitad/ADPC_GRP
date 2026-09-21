@@ -20,7 +20,7 @@ from core.data_import_jobs import (
 )
 from core.data_library_models import DataImportJob
 from core.dataset_readiness import DatasetReadiness
-from core.dataset_scan import pick_district_field
+from core.dataset_scan import pick_district_field, read_vector_explicit
 from core.import_staging import (
     SourceFile,
     cleanup_import_staging,
@@ -107,14 +107,14 @@ def _source_files(root: Path) -> tuple[SourceFile, ...]:
 def validate_shelter_collection(root: Path) -> ValidatedShelterCollection:
     """Read the complete point layer without exposing fields whose meaning is unconfirmed."""
 
-    from pyogrio.raw import read as read_vector
     from shapely import from_wkb
     from shapely.geometry import Point
 
     source_files = _source_files(root)
     shp = root / SHELTER_SOURCE_REF / f"{SHELTER_STEM}.shp"
     try:
-        meta, _, geometries, fields = read_vector(shp, read_geometry=True)
+        result, _, _, _ = read_vector_explicit(shp, read_geometry=True)
+        meta, _, geometries, fields = result
     except Exception as exc:  # noqa: BLE001 - converted to a safe import finding
         raise ShelterImportError("Evacuation-centre shapefile could not be read") from exc
     if str(meta.get("crs") or "").upper() != "EPSG:4326":
