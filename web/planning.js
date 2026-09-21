@@ -158,7 +158,7 @@
     const row = addMessage("assistant", "", {
       label: payload.label,
       record: false,
-      actions: [chipButton(payload.map_url ? "Open map & evidence" : "Open evidence", () => renderEvidence(payload, question))],
+      actions: [chipButton(payload.map_url ? "Open summary, map & evidence" : "Open planning summary", () => renderEvidence(payload, question))],
     });
     const bubble = row.querySelector(".pw-bubble");
     row.dataset.packId = packId;
@@ -415,7 +415,7 @@
       coming.className = "pw-coming";
       welcome.append(coming);
     }
-    coming.innerHTML = "";
+    coming.replaceChildren();
     const strong = document.createElement("strong");
     strong.textContent = "Decision coverage today: ";
     coming.append(
@@ -596,6 +596,7 @@
     $("[data-result-meta]").textContent = "Screening evacuation centers in the background…";
     $("[data-progress]").hidden = false;
     $("[data-stats]").replaceChildren();
+    $("[data-result-summary]").hidden = true;
     $("[data-result-link]").hidden = true;
   };
 
@@ -669,6 +670,9 @@
       tile.append(strong, span);
       stats.append(tile);
     });
+    const summaryButton = $("[data-result-summary]");
+    summaryButton.hidden = false;
+    summaryButton.onclick = () => renderAssessmentSummary(result, centers.centers);
     $("[data-result-link]").hidden = false;
     state.assessmentId = id;
     state.pendingAssessmentId = null;
@@ -677,6 +681,7 @@
     if (boundary) selectBoundary(boundary, { explicit: true });
     saveState();
     if (quiet) return;
+    renderAssessmentSummary(result, centers.centers);
     addMessage(
       "assistant",
       `The ${result.scenario.return_period_years}-year flood screening for ${result.area} is on the map. ` +
@@ -767,6 +772,182 @@
       });
     });
   });
+
+  const setPanelMode = (mode) => {
+    evidencePanel.dataset.mode = mode;
+    $("[data-ev-actions]").hidden = mode !== "sig";
+    $("[data-ev-foot]").hidden = mode !== "sig";
+    document.querySelectorAll("[data-ev-tab]").forEach((tab) => {
+      tab.hidden = mode !== "sig" && tab.dataset.evTab !== "summary";
+    });
+    document.querySelector('[data-ev-tab="summary"]').click();
+  };
+
+  const summaryNotice = (title, text, modifier = "") => {
+    const card = document.createElement("article");
+    card.className = `pw-decision-notice ${modifier}`.trim();
+    const strong = document.createElement("strong");
+    const body = document.createElement("p");
+    strong.textContent = title;
+    body.textContent = text;
+    card.append(strong, body);
+    return card;
+  };
+
+  const renderCoverage = (items) => {
+    const box = $("[data-summary-coverage]");
+    box.replaceChildren(...items.map(({ label, status, detail }) => {
+      const row = document.createElement("div");
+      row.className = `pw-coverage__row is-${status}`;
+      const dot = document.createElement("span");
+      dot.className = "pw-coverage__dot";
+      const text = document.createElement("div");
+      const strong = document.createElement("strong");
+      const small = document.createElement("span");
+      strong.textContent = label;
+      small.textContent = detail;
+      text.append(strong, small);
+      row.append(dot, text);
+      return row;
+    }));
+  };
+
+  const renderAssessmentSummary = (result, centers) => {
+    setPanelMode("assessment");
+    currentEvidence = null;
+    openEvidencePayload = null;
+    $("[data-ev-eyebrow]").textContent = "GRP decision summary";
+    $("[data-ev-title]").textContent = result.area;
+    $("[data-ev-counts]").textContent =
+      `${result.summary.in_scope} centres · RP${result.scenario.return_period_years} · locked result`;
+    $("[data-ev-area]").textContent =
+      `${result.synthetic ? "Synthetic demonstration" : "Assessment"} · ${result.method.key} ${result.method.version}`;
+    $("[data-summary-status]").textContent = result.synthetic
+      ? "Synthetic demonstration — not a scientific result"
+      : "Locked assessment result";
+    $("[data-summary-title]").textContent = "Movement options under this flood scenario";
+    $("[data-summary-lead]").textContent =
+      `${result.summary.potentially_exposed} centre(s) may be exposed, ` +
+      `${result.summary.not_exposed_under_scenario} have lower mapped exposure, and ` +
+      `${result.summary.unable_to_assess} could not be assessed. Red shading on the map shows ` +
+      "flood depth from lighter to deeper red; it is not a risk or safety rating.";
+
+    const candidates = centers.filter(
+      (center) => center.status === "not_exposed_under_scenario",
+    );
+    const exposed = centers.filter((center) => center.status === "potentially_exposed");
+    const unable = centers.filter((center) => center.status === "unable_to_assess");
+    const movement = $("[data-summary-movement]");
+    movement.replaceChildren();
+    if (!candidates.length) {
+      movement.append(summaryNotice(
+        "No candidate movement options from this result",
+        "Do not infer a destination from the map. Review exposed and unable-to-assess centres and resolve the missing evidence.",
+        "is-blocked",
+      ));
+    } else {
+      const list = document.createElement("div");
+      list.className = "pw-candidates";
+      candidates.slice(0, 6).forEach((center) => {
+        const item = document.createElement("article");
+        item.className = "pw-candidate";
+        const marker = document.createElement("span");
+        marker.className = "pw-candidate__marker";
+        marker.style.background = STATUS_COLOR.not_exposed_under_scenario;
+        const text = document.createElement("div");
+        const name = document.createElement("strong");
+        const detail = document.createElement("span");
+        name.textContent = center.name;
+        detail.textContent = center.flood_depth_m === null
+          ? "Not exposed under this scenario"
+          : `Flood depth ${center.flood_depth_m} m · not exposed under this scenario`;
+        text.append(name, detail);
+        item.append(marker, text);
+        list.append(item);
+      });
+      movement.append(list);
+      if (candidates.length > 6) {
+        const more = document.createElement("p");
+        more.className = "pw-decision-intro";
+        more.textContent = `Plus ${candidates.length - 6} more candidate centre(s) in the full table.`;
+        movement.append(more);
+      }
+    }
+    const centerNames = (items) => {
+      const visible = items.slice(0, 3).map((center) => center.name).join(", ");
+      return items.length > 3 ? `${visible}, and ${items.length - 3} more` : visible;
+    };
+    const cautions = document.createElement("div");
+    cautions.className = "pw-status-breakdown";
+    if (exposed.length) {
+      cautions.append(summaryNotice(
+        `${exposed.length} potentially exposed centre(s)`,
+        centerNames(exposed),
+        "is-exposed",
+      ));
+    }
+    if (unable.length) {
+      cautions.append(summaryNotice(
+        `${unable.length} centre(s) unable to assess`,
+        centerNames(unable),
+        "is-unable",
+      ));
+    }
+    if (cautions.childElementCount) movement.append(cautions);
+
+    renderCoverage([
+      { label: "Flood hazard", status: "available", detail: `RP${result.scenario.return_period_years} locked input` },
+      { label: "Evacuation-centre locations", status: "available", detail: `${result.summary.in_scope} centres screened` },
+      { label: "Movement screening", status: candidates.length ? "available" : "blocked", detail: candidates.length ? `${candidates.length} lower-exposure candidate(s)` : "No candidate from this result" },
+      { label: "Capacity and essential services", status: "missing", detail: "No approved source in this result" },
+      { label: "Accessibility and routes", status: "missing", detail: "Travel safety has not been assessed" },
+      { label: "Vulnerable groups", status: "missing", detail: "Waits on DEP-07" },
+      { label: "Interventions and costs", status: "missing", detail: "Waits on approved DEP-12 template" },
+    ]);
+    $("[data-summary-brief]").replaceChildren(summaryNotice(
+      "What a planner can say now",
+      candidates.length
+        ? `${candidates.length} centre(s) are candidate movement options because they have lower mapped exposure in this scenario. Check capacity, accessibility, services, routes and other hazards before making a movement decision.`
+        : "This screening does not identify a lower-exposure candidate. Resolve the unable-to-assess and missing-evidence items before making a movement decision.",
+    ));
+    openEvidence();
+  };
+
+  const renderSigSummary = (payload) => {
+    const evidence = payload.evidence;
+    setPanelMode("sig");
+    $("[data-ev-eyebrow]").textContent = "Planning summary · SIG screening";
+    $("[data-summary-status]").textContent = evidence.receipt
+      ? `Source-checked · receipt ${evidence.receipt.receipt_id}`
+      : "Unverified screening draft";
+    $("[data-summary-title]").textContent = "Flood evidence and decision gaps";
+    $("[data-summary-lead]").textContent =
+      "SIG provides hazard and asset-exposure context. It does not assess which evacuation centre people should use. Red flood shading shows depth or hazard, not a risk or safety rating.";
+    $("[data-summary-movement]").replaceChildren(summaryNotice(
+      "No GRP movement recommendation for this area",
+      "Evacuation-centre points on the local map are display-only and have not been assessed for this district. Use them for orientation, not as safe destinations.",
+      "is-blocked",
+    ));
+    renderCoverage([
+      { label: "Flood hazard and exposure", status: "available", detail: `${evidence.summary.computed} computed evidence item(s)` },
+      { label: "Evacuation-centre locations", status: state.centersVersion ? "partial" : "missing", detail: state.centersVersion ? "Display-only national baseline; not assessed" : "No managed layer available" },
+      { label: "Centre capacity and services", status: "missing", detail: "Not returned in this evidence pack" },
+      { label: "Accessibility and safe routes", status: "missing", detail: "No route suitability evidence" },
+      { label: "Vulnerable groups", status: "missing", detail: "No approved vulnerability result" },
+      { label: "Interventions and costs", status: "missing", detail: "No approved cost template or figures" },
+    ]);
+    const brief = $("[data-summary-brief]");
+    brief.replaceChildren();
+    if (payload.answer && payload.answer.trim()) {
+      brief.append(renderBrief(payload.answer, (n) => focusCitation(n)));
+    } else {
+      brief.append(summaryNotice(
+        "Brief unavailable",
+        "Review the evidence and gaps. Nothing should be published or used as a movement recommendation.",
+        "is-blocked",
+      ));
+    }
+  };
 
   const downloadFile = (name, content, type) => {
     const url = URL.createObjectURL(new Blob([content], { type }));
@@ -896,6 +1077,7 @@
     currentEvidence = { evidence, answer: payload.answer, message };
     openEvidencePayload = payload;
     saveState();
+    renderSigSummary(payload);
     const counts = evidence.summary;
     $("[data-ev-title]").textContent = (evidence.area && evidence.area.sig_place) || evidence.place;
     $("[data-ev-counts]").textContent =

@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260920e" />
-    <link rel="stylesheet" href="/planning.css?v=20260920d" />
+    <link rel="stylesheet" href="/planning.css?v=20260921e" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260920g" defer></script>
+    <script src="/planning.js?v=20260921h" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -122,20 +122,23 @@
           </div>
           <div class="pw-progress" data-progress hidden><span></span></div>
           <div class="pw-stats" data-stats></div>
-          <a class="pw-result__link" data-result-link href="/assessments.html">Sources, limits and full table →</a>
+          <div class="pw-result__actions">
+            <button class="pw-result__summary" type="button" data-result-summary>Decision summary</button>
+            <a class="pw-result__link" data-result-link href="/assessments.html">Sources, limits and full table →</a>
+          </div>
         </div>
 
         <aside class="pw-evidence" data-evidence hidden aria-label="Evidence">
           <div class="pw-evidence__head">
             <div>
-              <span class="pw-eyebrow">SIG evidence</span>
+              <span class="pw-eyebrow" data-ev-eyebrow>Planning summary</span>
               <h2 data-ev-title>Evidence</h2>
               <p class="pw-evidence__counts" data-ev-counts></p>
             </div>
             <button class="pw-icon-button" type="button" data-ev-close aria-label="Close evidence">×</button>
           </div>
           <div class="pw-area" data-ev-area></div>
-          <div class="pw-evidence__actions">
+          <div class="pw-evidence__actions" data-ev-actions>
             <button class="pw-chip-button" type="button" data-ev-map>Show hazard &amp; exposure map</button>
             <div class="pw-download">
               <button class="pw-chip-button" type="button" data-ev-download-toggle aria-expanded="false">
@@ -165,12 +168,39 @@
             </div>
           </section>
           <div class="pw-tabs" role="tablist">
-            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="true">Evidence</button>
-            <button type="button" role="tab" data-ev-tab="missing" aria-selected="false">What is missing</button>
-            <button type="button" role="tab" data-ev-tab="trace" aria-selected="false">How it was produced</button>
+            <button type="button" role="tab" data-ev-tab="summary" aria-selected="true">Summary</button>
+            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="false">Evidence</button>
+            <button type="button" role="tab" data-ev-tab="missing" aria-selected="false">Gaps</button>
+            <button type="button" role="tab" data-ev-tab="trace" aria-selected="false">Technical trace</button>
           </div>
           <div class="pw-evidence__body">
-            <div data-ev-panel="evidence">
+            <div data-ev-panel="summary">
+              <section class="pw-decision-hero">
+                <span class="pw-decision-hero__label" data-summary-status>Screening summary</span>
+                <h3 data-summary-title>What this means for the decision</h3>
+                <p data-summary-lead></p>
+              </section>
+              <section class="pw-decision-section">
+                <h3>Where people could move</h3>
+                <div data-summary-movement></div>
+                <p class="pw-candidate-caveat">
+                  Candidate means lower mapped flood exposure under this scenario. It does not
+                  certify the centre, building or route as safe.
+                </p>
+              </section>
+              <section class="pw-decision-section">
+                <h3>Preparedness funding case</h3>
+                <p class="pw-decision-intro">
+                  Use available evidence now and treat missing checks as preparation or funding gaps.
+                </p>
+                <div class="pw-coverage" data-summary-coverage></div>
+              </section>
+              <section class="pw-decision-section" data-summary-brief-section>
+                <h3>Plain-language brief</h3>
+                <div data-summary-brief></div>
+              </section>
+            </div>
+            <div data-ev-panel="evidence" hidden>
               <div class="pw-numbers" data-ev-numbers></div>
               <div class="pw-cards" data-ev-cards></div>
             </div>

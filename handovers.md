@@ -363,6 +363,15 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Removed the 2.4 MB demo mock DOCX from Git and ignored its local path; the derived implementation plan remains tracked.
 - Validation: 346 tests pass with two PostgreSQL-only skips in the normal run; both PostgreSQL/PostGIS contract tests pass separately against the Docker database. Ruff and both JavaScript syntax checks are clean.
 
+### 21 Sep — decision-first Planning summary
+
+- Started branch `codex/planning-decision-summary` from pushed `main` at `95344c0`.
+- Added a prominent Planning summary for both locked GRP assessments and live SIG evidence. Locked results lead with scenario counts and named lower-exposure candidate centres; SIG summaries explicitly state that they cannot recommend a movement destination.
+- Added a human-readable funding-case coverage checklist for hazard, centre locations, movement screening, capacity/services, routes/accessibility, vulnerable groups and intervention costs. Missing evidence stays visible as a preparation or funding gap.
+- Retained Evidence, Gaps and Technical trace as secondary tabs for SIG verification. Assessment summaries link back to the full sources, limits and centre table.
+- Kept the safety boundary explicit: teal means lower mapped exposure under the selected scenario, not certified safety; red map shading communicates flood depth/hazard rather than a risk or safety rating.
+- Validation: 346 tests pass with two PostgreSQL-only skips; Ruff, JavaScript syntax and whitespace checks are clean. Browser acceptance with mocked authenticated API responses passed at desktop and mobile widths; the panel now stays above Leaflet controls. Live protected acceptance still requires an interactive signed-in session.
+
 ---
 
 ## 6. Decisions and ADRs

@@ -159,3 +159,10 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "loadAssessmentCenters(id)" in script
     assert "floodToggle.checked = true" in script
     assert "await loadFloodOverlay({ ...result.map, available: true })" in script
+    assert 'data-ev-tab="summary"' in page
+    assert "Where people could move" in page
+    assert "Preparedness funding case" in page
+    assert "renderAssessmentSummary(result, centers.centers)" in script
+    assert "No GRP movement recommendation for this area" in script
+    assert "Candidate means lower mapped flood exposure" in page
+    assert "innerHTML" not in script
