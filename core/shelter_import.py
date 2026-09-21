@@ -20,6 +20,7 @@ from core.data_import_jobs import (
 )
 from core.data_library_models import DataImportJob
 from core.dataset_readiness import DatasetReadiness
+from core.dataset_scan import pick_district_field
 from core.import_staging import (
     SourceFile,
     cleanup_import_staging,
@@ -32,11 +33,9 @@ SHELTER_SOURCE_REF = "evacuation_centers/shelters"
 SHELTER_STEM = "ddpm_shelters"
 REQUIRED_SUFFIXES = (".shp", ".shx", ".dbf", ".prj")
 OPTIONAL_SUFFIXES = (".cpg", ".sbn", ".sbx", ".shp.xml")
-SHELTER_NAME = "สถ_1"
-SHELTER_DISTRICT = "อำเ"
 SHELTER_PROVINCE = "จัง"
-REQUIRED_FIELDS = (SHELTER_NAME, SHELTER_DISTRICT, SHELTER_PROVINCE)
-IMPORTER_VERSION = "grp-shelters/1"
+REQUIRED_FIELDS = (SHELTER_PROVINCE,)
+IMPORTER_VERSION = "grp-shelters/2"
 PLATFORM_SHELTER_DATASET_ID = uuid5(
     NAMESPACE_URL, "grp:platform-dataset:thailand-ddpm-evacuation-centres"
 )
@@ -62,6 +61,7 @@ class ShelterSourceRecord:
 class ValidatedShelterCollection:
     records: tuple[ShelterSourceRecord, ...]
     source_files: tuple[SourceFile, ...]
+    district_field: str
 
 
 @dataclass(frozen=True)
@@ -120,7 +120,8 @@ def validate_shelter_collection(root: Path) -> ValidatedShelterCollection:
     if str(meta.get("crs") or "").upper() != "EPSG:4326":
         raise ShelterImportError("Evacuation centres must declare EPSG:4326")
     field_names = [str(name) for name in meta.get("fields", [])]
-    if not set(REQUIRED_FIELDS).issubset(field_names):
+    district_field = pick_district_field(field_names)
+    if not set(REQUIRED_FIELDS).issubset(field_names) or district_field is None:
         raise ShelterImportError("Evacuation-centre attributes are incomplete")
     if geometries is None or len(geometries) == 0:
         raise ShelterImportError("Evacuation-centre collection has no features")
@@ -132,20 +133,20 @@ def validate_shelter_collection(root: Path) -> ValidatedShelterCollection:
         point = from_wkb(raw_geometry)
         if not isinstance(point, Point) or point.is_empty or not point.is_valid:
             raise ShelterImportError("Evacuation-centre collection contains invalid point geometry")
-        # DEP-06 has not confirmed `สถา` or `รอง`; neither is materialized or shown to planners.
-        confirmed_name = _text(columns[SHELTER_NAME][index])
+        # DEP-06 has not confirmed either truncated `สถ...` field or `รอง`. Do not
+        # infer a planner-facing facility name merely from values that look name-like.
         records.append(
             ShelterSourceRecord(
                 source_index=index,
-                name=confirmed_name or f"Evacuation centre {index + 1}",
-                claimed_district=_text(columns[SHELTER_DISTRICT][index]),
+                name=f"Evacuation centre {index + 1}",
+                claimed_district=_text(columns[district_field][index]),
                 claimed_province=_text(columns[SHELTER_PROVINCE][index]),
                 lon=float(point.x),
                 lat=float(point.y),
                 point=point,
             )
         )
-    return ValidatedShelterCollection(tuple(records), source_files)
+    return ValidatedShelterCollection(tuple(records), source_files, district_field)
 
 
 def _name_disagrees(claimed: str, actual: str) -> bool:
@@ -316,6 +317,8 @@ def process_shelter_import(
             "boundary_version_id": str(boundary_version.id),
             "source_ref": SHELTER_SOURCE_REF,
             "map_preview": True,
+            "shelter_names_confirmed": False,
+            "district_field": collection.district_field,
         },
         report={
             "message": (
@@ -325,7 +328,8 @@ def process_shelter_import(
             "outside_boundary_count": outside,
             "district_name_mismatch_count": mismatch_count,
             "mismatch_examples": examples,
-            "unconfirmed_fields_excluded": ["สถา", "รอง"],
+            "district_field": collection.district_field,
+            "unconfirmed_fields_excluded": ["สถา", "สถ_1", "รอง"],
         },
         materialize=_materialize_shelters(assigned),
     )

@@ -12,6 +12,7 @@ Findings are graded so a reader can tell the three apart:
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -375,14 +376,19 @@ def find_problems(layers: list[LayerReport], file_names: list[str]) -> list[Find
     return findings
 
 
+def pick_district_field(field_names: Iterable[str]) -> str | None:
+    """Choose the claimed-district field using the shared inspector/import rule."""
+
+    for candidate in field_names:
+        if any(hint in candidate.lower() for hint in DISTRICT_FIELD_HINTS):
+            return candidate
+    return None
+
+
 def _pick_district_field(layer: LayerReport) -> str | None:
     """The field in a point layer that claims which area each point is in."""
 
-    for candidate in layer.fields:
-        name = candidate["name"].lower()
-        if any(hint in name for hint in DISTRICT_FIELD_HINTS):
-            return candidate["name"]
-    return None
+    return pick_district_field(candidate["name"] for candidate in layer.fields)
 
 
 def _area_names(meta: dict[str, Any], columns: Any) -> list[str]:

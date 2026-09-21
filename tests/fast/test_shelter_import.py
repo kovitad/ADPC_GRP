@@ -34,7 +34,7 @@ def _fake_read(*_args, **_kwargs):
     from shapely.geometry import Point
 
     return (
-        {"crs": "EPSG:4326", "fields": ["สถ_1", "อำเ", "จัง"]},
+        {"crs": "EPSG:4326", "fields": ["สถ_1", "district_name", "จัง"]},
         None,
         [to_wkb(Point(100.25, 14.25)), to_wkb(Point(101.25, 14.25))],
         [
@@ -89,14 +89,18 @@ def _boundary_version(session: Session) -> DatasetVersion:
 
 
 @pytest.mark.fast
-def test_validate_shelters_keeps_only_confirmed_fields(tmp_path: Path, monkeypatch) -> None:
+def test_validate_shelters_excludes_unconfirmed_names_and_selects_district_field(
+    tmp_path: Path, monkeypatch
+) -> None:
     _delivery(tmp_path)
     monkeypatch.setattr("pyogrio.raw.read", _fake_read)
 
     collection = validate_shelter_collection(tmp_path)
 
     assert len(collection.records) == 2
-    assert collection.records[0].name == "Shelter one"
+    assert collection.records[0].name == "Evacuation centre 1"
+    assert collection.records[0].claimed_district == "เขตหนึ่ง"
+    assert collection.district_field == "district_name"
     assert {item.storage_name for item in collection.source_files} == {
         "shelters.shp", "shelters.shx", "shelters.dbf", "shelters.prj", "shelters.cpg"
     }
@@ -142,6 +146,13 @@ def test_process_shelters_assigns_geometry_and_reports_name_mismatch(
         assert job.report["district_name_mismatch_count"] == 1
         assert version.meta["boundary_version_id"] == str(boundary_version.id)
         assert version.meta["feature_count"] == 2
+        assert version.meta["district_field"] == "district_name"
+        assert version.meta["shelter_names_confirmed"] is False
+        assert job.report["unconfirmed_fields_excluded"] == ["สถา", "สถ_1", "รอง"]
+        assert [feature.name for feature in features] == [
+            "Evacuation centre 1",
+            "Evacuation centre 2",
+        ]
         assert features[0].attributes["district_name_mismatch"] is False
         assert features[1].attributes["district_name_mismatch"] is True
         assert features[0].boundary_id != features[1].boundary_id

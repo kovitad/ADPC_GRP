@@ -11,7 +11,7 @@ The accepted Thailand source delivery is now visible on the Planning map as two 
 - **Flood depth · 100-year** — a worker-produced national picture from one immutable six-tile RP100 version;
 - **Evacuation centers** — 10,303 materialized DDPM points assigned to imported districts by geometry.
 
-Neither layer is assessment-ready. The flood version is `waiting_for_method` because DEP-05 has not defined NoData, modelled-area and permanent-water behavior. The shelter version is `technically_valid`; the uncertain `สถา` and `รอง` fields are excluded. Imported boundaries remain unsupported assessment areas.
+Neither layer is assessment-ready. The flood version is `waiting_for_method` because DEP-05 has not defined NoData, modelled-area and permanent-water behavior. The shelter version is `technically_valid`; the uncertain `สถา`, `สถ_1` and `รอง` fields are excluded, with generated centre labels used instead. Imported boundaries remain unsupported assessment areas.
 
 ## Requirement traceability
 
@@ -22,10 +22,10 @@ Neither layer is assessment-ready. The flood version is `waiting_for_method` bec
 | Bounded raster processing | COGs are generated sequentially with a 256 MB GDAL cache; map preview is capped at 1,200 px wide | Six COG rows and one PNG row |
 | Stable edges | CRS, resolution, band count, tile union, overlap and gap are validated before publication | Fast tests plus successful real import |
 | Do not activate flood assessment | Version ends in `waiting_for_method`; Catalog does not expose it as current | Local database check |
-| Materialize shelters as points | Confirmed name, longitude and latitude are written to `feature`; PostGIS `Point` is populated | 10,303 feature and geometry rows |
+| Materialize shelters as points | Generated label, longitude and latitude are written to `feature`; PostGIS `Point` is populated | 10,303 feature and geometry rows |
 | Membership by geometry | Every point is spatially assigned to a versioned district boundary; source district text is never used as membership | 10,303 populated `boundary_id` rows |
 | Report name/geometry conflicts | Conflicts are retained and reported, not moved or silently removed | 1,139 mismatches; 10 safe examples in the job report |
-| Keep uncertain fields away from planners | `สถา` and `รอง` are not materialized; the import report records their exclusion | Unit test and report payload |
+| Keep uncertain fields away from planners | Importer v2 does not materialize `สถา`, `สถ_1` or `รอง`; the map API also redacts names on legacy versions without explicit confirmation | Unit and map contract tests plus report payload |
 | GIS only in worker | Validation, point-in-polygon assignment, COG creation and PNG rendering run in the import worker | API only queues and serves stored output |
 | Show layers without implying a result | Non-current versions require `map_preview`; API returns `preview_only`; UI says centres are not assessed and DEP-05 is pending | ADR-0009 and static UI tests/full suite |
 | Show a completed assessment on its own map | Result returns its pinned hazard display metadata; browser enables that flood layer, loads every paged assessed centre and fits the pinned boundary | ADR-0012 and golden result tests |
@@ -64,6 +64,6 @@ Flood depth is opt-in and changing scenario replaces the single display overlay;
 
 - A person must sign in again after the image rebuild and visually accept the Planning map; the rebuild cleared the local session and in-memory SIG token.
 - DEP-05 blocks flood classification and real assessment activation.
-- DEP-06 must confirm `สถา` and `รอง` before either can be planner-facing.
+- DEP-06 must confirm the source mapping and meaning of `สถา`, `สถ_1` and `รอง` before any can be planner-facing.
 - Before staging, measure rendering of all 10,303 points. Add viewport queries or vector tiles if needed.
 - External Leaflet, OSM tiles and Nominatim remain local-only dependencies.

@@ -31,7 +31,7 @@ Deepest samples in Mueang Nonthaburi: 7.07 m, 7.03 m, 4.24 m, 3.79 m, 3.43 m.
 1. **Shelter district names cannot be joined.** Many rows carry only `เมือง`, and Bang Bua Thong appears nowhere, although Nonthaburi has 68 shelters. **Membership must be decided by geometry**, which is what GRP's method does anyway; name fields are display-only.
 2. **At least one shelter is in the wrong place.** The single point inside Bang Bua Thong is named `อบต.ลาดตะเคียน`, which belongs to Prachinburi. A district with 68 shelters in its province having one mislocated point suggests coordinate errors across the file. **An ingest-time check is needed**: does each point fall inside the district its own attributes name? Report the mismatches rather than silently accepting them.
 3. **Coverage is uneven.** 38 shelters in one district and 1 in a neighbouring one is a completeness question for the Hub, not a software problem, but a planner must be told what "in scope" covered.
-4. **Truncated Thai columns** (`สถา`, `รอง`, `ละต`, `ลอง`) still need confirming before they are shown to anyone.
+4. **Truncated Thai columns** (`สถา`, `สถ_1`, `รอง`, `ละต`, `ลอง`) still need source mapping before they are shown to anyone. `สถ_1` appears to be GDAL's de-duplicated name for a second `สถ...` column; name-like values alone are not confirmation.
 
 ## 5. What to prove next
 

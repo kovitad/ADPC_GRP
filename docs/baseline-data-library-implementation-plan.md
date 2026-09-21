@@ -134,7 +134,7 @@ Source: `evacuation_centers/shelters`.
 - Materialize the safe confirmed fields only.
 - Assign district membership spatially, never from the unreliable district-name column.
 - Report all 1,139 known name/geometry mismatches rather than moving points.
-- Keep `สถา` and `รอง` out of planner-facing attributes until DEP-06 confirms their meaning.
+- Keep `สถา`, `สถ_1` and `รอง` out of planner-facing attributes until DEP-06 confirms their source mapping and meaning.
 
 ### 6.3 RP100 flood hazard
 
@@ -222,7 +222,7 @@ Add an Admin-only **Data library** page:
 2. ~~Safe import queue.~~ **Built:** idempotent request, lease renewal, attempt fencing and one-time finalization are covered by fast tests and a two-worker PostgreSQL publication test.
 3. ~~Managed staging, manifests, checksums and atomic promotion.~~ **Built:** copies are re-hashed, final keys are immutable and deterministic, database publication is one transaction, materializer failures roll back, and failed handled imports remove unreferenced bytes.
 4. **Built, integration-tested and imported locally:** the boundary loader requires the complete same-stem delivery, validates EPSG:4326, required fields, unique codes and valid polygon geometry, writes full and simplified indexed PostGIS geometry, and leaves all areas unsupported. The persistent local library now contains all 928 features, six source files and 928 valid PostGIS geometries.
-5. **Built and imported locally:** the shelter loader materializes all 10,303 points, assigns district membership by geometry, populates PostGIS points and reports all 1,139 district-name conflicts without moving them. The uncertain `สถา` and `รอง` fields are excluded.
+5. **Built and imported locally:** the shelter loader materializes all 10,303 points, assigns district membership by geometry, populates PostGIS points and reports all 1,139 district-name conflicts without moving them. The uncertain `สถา`, `สถ_1` and `รอง` fields are excluded; generated centre labels are used instead.
 6. **Built and imported locally:** six RP100 originals form one ordered logical version; six COGs are generated sequentially with bounded GDAL cache and one national display PNG is stored. The version is `waiting_for_method` pending DEP-05.
 7. **Built:** protected Data library summary and Platform Admin import actions now cover boundaries, shelters and hazard, with audit, status polling and shared completion notices.
 8. **Built:** the Admin Data library page shows all three categories, readiness, counts, shelter conflicts and flood waiting state. ADR-0009 permits non-current `map_preview` versions on the Planning map without exposing them to assessment selection. ADR-0011 makes preview display opt-in and configures RP20/RP50/RP100 explicitly; only imported scenarios are enabled. ADR-0012 makes a completed assessment open its exact pinned red-tone hazard picture and all in-scope assessed centres.

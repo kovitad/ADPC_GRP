@@ -54,14 +54,14 @@ Rough size expectation for a country-wide flood raster: a few hundred megabytes 
 
   | Column | Holds | Confidence |
   |---|---|---|
-  | `สถ_1` | Shelter name | Confirmed by reading values |
-  | `สถา` | Place or facility name | Likely; used as the fallback name |
+  | `สถ_1` | Values look like facility names, but the suffix appears to be GDAL's de-duplication of a second truncated `สถ...` source column | **Unconfirmed — exclude before DEP-06** |
+  | `สถา` | Values look like a shelter category or place type | **Unconfirmed — exclude before DEP-06** |
   | `อำเ` | District (abbreviated, unreliable) | Confirmed unusable for joining |
   | `จัง` | Province | Likely |
   | `ละต` / `ลอง` | Latitude / longitude in EPSG:4326 | Confirmed by sampling |
   | `รอง` | Capacity or a supporting attribute | **Unknown — confirm before display** |
 
-- Required fields, the provider and the meaning of `สถา` and `รอง` must come with DEP-06. Nothing uncertain is shown to a planner.
+- Required fields, the provider and the source mapping for `สถา`, `สถ_1` and `รอง` must come with DEP-06. Until then imports use generated evacuation-centre labels and none of those fields is shown to a planner.
 
 ### 4.3 Flood depth RP100
 - **Settled:** the six tiles hold **depth in metres** at about 90 m resolution, not the 1 to 5 severity classes. The legend classes are derived at display time from the depth.
@@ -91,7 +91,7 @@ Recommendation: **A now, B when planners ask to browse the whole country.** B is
 3. **Option A or B** for drawing flood depth. Recommendation: A now.
 4. **Licence and edition** for each dataset, for the provenance record.
 5. **Which districts are approved** as supported assessment areas at pilot start.
-6. **What `สถา` and `รอง` mean** in the shelter file, before either is shown to a planner.
+6. **What `สถา`, `สถ_1` and `รอง` mean** in the shelter file, before any is shown to a planner.
 
 Answered already: the flood tiles hold depth in metres at about 90 m resolution (Section 4.3); shelter membership is decided by geometry (Section 4.2).
 

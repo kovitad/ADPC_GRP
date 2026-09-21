@@ -183,7 +183,12 @@ def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
         dataset_id=centers_dataset.id,
         storage_key=None,
         sha256=centers_sha256(feature_rows),
-        meta={"edition": "synthetic-v0", "crs": "EPSG:4326", "licence": "synthetic test data"},
+        meta={
+            "edition": "synthetic-v0",
+            "crs": "EPSG:4326",
+            "licence": "synthetic test data",
+            "shelter_names_confirmed": True,
+        },
     )
     method = Method(
         key=METHOD_KEY,
