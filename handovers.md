@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 21 September 2026 (`grp` CLI package renamed to `grpcli` for Linux portability)
+**Updated:** 21 September 2026 (`codex/sig-embedded-flood-map` validated and merged into `main`)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** `feat/planning-chatbot-ux` was validated and fast-forward merged into `main`; the feature branch is retained as a recovery reference. Work continues on `codex/sig-embedded-flood-map`. The branch includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **346 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests pass in the Docker database job.
+**Delivery status:** `codex/sig-embedded-flood-map` was validated and fast-forward merged into `main` at `b6b29ed`; the feature branch is retained as a recovery reference. `main` now includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **346 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests pass in the Docker database job.
 
-**Handing over:** nothing is half-finished in the tree. The next person should start at Section 9, and first do the browser acceptance pass in Section 3 (nothing on this branch has been confirmed against live SIG and OpenAI yet).
+**Handing over:** nothing is half-finished in the tree. Continue from `main`, start at Section 9, and first do the browser acceptance pass in Section 3 (the merged baseline work has not been confirmed against live SIG and OpenAI yet).
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -22,7 +22,7 @@
 | Increment 2, access and admin | **Complete in code**: NDMO Planner, Hub Expert / GIS Specialist, Hub Admin and Platform Admin; security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
 | Increment 1, golden assessment | **Built on a synthetic case**: job, worker, locked result, API, screen, golden test. Real acceptance needs DEP-04, DEP-06 and method approval |
 | Planner assistant and map (ADR-0004) | **Built, Docker Desktop only**: chat bot plus OSM map, SIG MCP evidence, evidence panel, downloads, progress, Thai input; browser location accepts a confirmed district only |
-| SIG live hazard-map embed | **Implemented on `codex/sig-embedded-flood-map`**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path, sandboxed iframe and explicit hazard/exposure—not full risk—education |
+| SIG live hazard-map embed | **Implemented on `main`**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path, sandboxed iframe and explicit hazard/exposure—not full risk—education |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, findings graded blocker / problem / known, points cross-checked against boundaries on a map |
 | Baseline map preview (ADR-0009) | **Built and imported locally**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. Planning can draw both without making them assessment inputs; DEP-05 still blocks classification |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
@@ -38,11 +38,11 @@
 
 ## 2. Branches
 
-The original feature branches are **stacked** through `feat/planning-chatbot-ux`. Current work continues from that baseline on `codex/sig-embedded-flood-map`.
+The original feature branches were stacked through `feat/planning-chatbot-ux`; the complete stack through `codex/sig-embedded-flood-map` is now on `main`.
 
 | # | Branch | Adds |
 |---|---|---|
-| — | `main` | Increment 0, access foundation, Phase A and B security fixes, Docker Desktop stack |
+| — | `main` | Complete validated stack through the local baseline data library and display-only Thailand map layers |
 | 1 | `feat/increment-2-complete` | Roles, SIG service login, Hub close, security log views, AI limit, manual reset, AI gateway, Langfuse, `/platform.html` |
 | 2 | `feat/planner-chat-map` | ADR-0004 chat on SIG evidence, area check, opt-in receipts |
 | 3 | `feat/increment-1-assessment` | Assessment tables, storage, method, worker, API, synthetic seed and golden test, `/assessments.html` |
@@ -50,7 +50,7 @@ The original feature branches are **stacked** through `feat/planning-chatbot-ux`
 | 5 | `feat/planning-chatbot-ux` | Natural chat routing, chat-bot UI, SIG evidence panel and downloads, progress and timings, Thai place names, state kept across pages, shared top bar, SERVIR logo and theme |
 | 6 | `codex/sig-embedded-flood-map` | Hardens the live SIG map embed; adds the local versioned data library and display-only real Thailand flood/shelter layers |
 
-**Merge status:** `feat/planning-chatbot-ux` has been fast-forward merged into `main` and pushed. The feature branch is retained temporarily for recovery. `experiment/planning-chat` is superseded; **never merge it**.
+**Merge status:** `codex/sig-embedded-flood-map` was fast-forward merged into `main` and pushed at `b6b29ed`. Feature branches are retained temporarily for recovery. `experiment/planning-chat` is superseded; **never merge it**.
 
 ---
 
