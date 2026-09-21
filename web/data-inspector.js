@@ -1,7 +1,8 @@
 /* Admin data inspector (ADR-0006).
  *
- * Shows what is in the read-only source folder, what is wrong with it and what is missing.
- * Everything here describes delivered source files before ingestion: it is never a GRP result.
+ * Shows what is in the read-only source folder and prepares neutral, evidence-led questions for
+ * the data team. Everything here describes delivered source files before ingestion: it is never
+ * a GRP result or an approval decision.
  */
 (() => {
   "use strict";
@@ -227,37 +228,37 @@
 
   /* ---------- step 3: the report ---------- */
 
-  const GRADE_LABELS = {
-    blocker: "Blocker",
-    problem: "Problem",
-    known: "Known already",
-  };
-
-  const renderTally = (counts) => {
+  const renderTally = (findings) => {
     tally.replaceChildren();
-    ["blocker", "problem", "known"].forEach((grade) => {
-      const box = el("div", `inspector-tally__item is-${grade}`);
-      box.append(el("strong", null, String(counts[grade] ?? 0)));
-      box.append(el("span", null, GRADE_LABELS[grade]));
-      tally.append(box);
-    });
+    const box = el("div", "inspector-tally__item");
+    box.append(el("strong", null, String(findings.length)));
+    box.append(
+      el("span", null, findings.length === 1 ? "point for confirmation" : "points for confirmation")
+    );
+    tally.append(box);
   };
 
   const renderFindings = (findings) => {
     findingsBox.replaceChildren();
     if (!findings.length) {
-      findingsBox.append(el("p", "inspector-note", "Nothing to report for this folder."));
+      findingsBox.append(
+        el(
+          "p",
+          "inspector-note",
+          "The selected automated checks produced no points for confirmation."
+        )
+      );
       return;
     }
-    findings.forEach((finding) => {
-      const card = el("article", `inspector-finding is-${finding.grade}`);
+    findings.forEach((finding, index) => {
+      const card = el("article", "inspector-finding");
       const head = el("div", "inspector-finding__head");
-      head.append(el("span", "inspector-finding__grade", GRADE_LABELS[finding.grade]));
+      head.append(el("span", "inspector-finding__grade", `Point ${index + 1}`));
       head.append(el("h4", null, finding.title));
       card.append(head);
       card.append(el("p", null, finding.detail));
       if (finding.action) {
-        card.append(el("p", "inspector-finding__action", `What to do: ${finding.action}`));
+        card.append(el("p", "inspector-finding__action", `Advice requested: ${finding.action}`));
       }
       if (finding.affects) {
         card.append(el("p", "inspector-finding__affects", finding.affects));
@@ -447,27 +448,24 @@
   const reportName = (report, extension) => {
     const scope = String(report.folder || "all-source-data")
       .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "source-data";
-    return `grp-validation-${scope}.${extension}`;
+    return `grp-source-data-confirmation-${scope}.${extension}`;
   };
 
   const simpleReportHtml = (payload) => {
     const report = payload.report || {};
-    const counts = report.counts || {};
     const findings = report.findings || [];
-    const decision = (counts.blocker || 0) > 0
-      ? "DO NOT LOAD YET — blocking issues must be resolved."
-      : (counts.problem || 0) > 0
-        ? "REVIEW WITH THE DATA TEAM before accepting this dataset."
-        : "NO BLOCKING ISSUE FOUND by the selected checks; scientific approval is still separate.";
+    const purpose =
+      "Please review these automated observations and advise whether our interpretation and " +
+      "intended use are correct. This request does not approve or reject the dataset.";
     const findingRows = findings.length
-      ? findings.map((finding) => `<article class="finding ${escapeHtml(finding.grade)}">
-          <p class="grade">${escapeHtml(GRADE_LABELS[finding.grade] || finding.grade)}</p>
+      ? findings.map((finding, index) => `<article class="finding">
+          <p class="point">Point ${index + 1}</p>
           <h3>${escapeHtml(finding.title)}</h3>
-          <p>${escapeHtml(finding.detail)}</p>
-          ${finding.action ? `<p><strong>Question/action for the data team:</strong> ${escapeHtml(finding.action)}</p>` : ""}
-          ${finding.affects ? `<p class="muted"><strong>Applies to:</strong> ${escapeHtml(finding.affects)}</p>` : ""}
+          <p><strong>What we observed:</strong> ${escapeHtml(finding.detail)}</p>
+          ${finding.action ? `<p><strong>Advice requested:</strong> ${escapeHtml(finding.action)}</p>` : ""}
+          ${finding.affects ? `<p class="muted"><strong>Evidence applies to:</strong> ${escapeHtml(finding.affects)}</p>` : ""}
         </article>`).join("")
-      : "<p>No finding was produced by the selected checks.</p>";
+      : "<p>The selected automated checks produced no review points. Please confirm that the selected review scope is appropriate for the intended use.</p>";
     const layerRows = (report.layers || []).map((layer) => `<tr>
       <td>${escapeHtml(layer.path)}</td><td>${escapeHtml(layer.kind)}</td>
       <td>${escapeHtml(layer.crs_epsg ? `EPSG:${layer.crs_epsg}` : layer.crs || "Not declared")}</td>
@@ -481,24 +479,26 @@
     </tr>`).join("");
     const cross = report.cross_check;
     const crossText = cross
-      ? `${cross.points} points checked against ${cross.areas} areas; ${cross.outside_every_area} outside every area; ${cross.mismatched} name/location mismatches; ${cross.areas_without_points} areas without points.`
+      ? `${cross.points} points checked against ${cross.areas} areas; ` +
+        `${cross.outside_every_area} outside every area; ${cross.mismatched} recorded area names ` +
+        `differ from the containing area; ${cross.areas_without_points} areas without points.`
       : "Not run under this profile, or compatible point and polygon layers were not both present.";
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Dataset validation report</title><style>
-      body{max-width:960px;margin:32px auto;padding:0 20px;color:#17342f;font:16px/1.55 Arial,sans-serif}h1,h2,h3{line-height:1.25}.decision{padding:16px;border-left:5px solid #c2410c;background:#fff7ed;font-weight:700}.meta,.muted{color:#52645f}.counts{display:flex;gap:12px;flex-wrap:wrap}.counts span{padding:8px 12px;border:1px solid #ccd9d6;border-radius:8px}.finding{margin:12px 0;padding:14px;border:1px solid #d8e2df;border-left:5px solid #687b77;border-radius:8px}.finding.blocker{border-left-color:#98243a}.finding.problem{border-left-color:#c2410c}.grade{margin:0;font-size:12px;font-weight:700;text-transform:uppercase}.finding h3{margin:4px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px;border:1px solid #d8e2df;text-align:left;vertical-align:top}code{word-break:break-all}@media print{body{margin:0}.finding{break-inside:avoid}}</style></head><body>
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Source data confirmation request</title><style>
+      body{max-width:960px;margin:32px auto;padding:0 20px;color:#17342f;font:16px/1.55 Arial,sans-serif}h1,h2,h3{line-height:1.25}.purpose{padding:16px;border-left:5px solid #287a6f;background:#f0faf7;font-weight:700}.meta,.muted{color:#52645f}.count{display:inline-block;padding:8px 12px;border:1px solid #ccd9d6;border-radius:8px}.finding{margin:12px 0;padding:14px;border:1px solid #d8e2df;border-left:5px solid #287a6f;border-radius:8px}.point{margin:0;font-size:12px;font-weight:700;text-transform:uppercase}.finding h3{margin:4px 0}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px;border:1px solid #d8e2df;text-align:left;vertical-align:top}code{word-break:break-all}@media print{body{margin:0}.finding{break-inside:avoid}}</style></head><body>
       <p class="meta">SERVIR Global Risk Platform · Source data inspector</p>
-      <h1>Dataset validation report</h1>
-      <p class="decision">${escapeHtml(decision)}</p>
-      <p><strong>Folder:</strong> ${escapeHtml(report.folder || "All source data")}<br>
-      <strong>Validation purpose:</strong> ${escapeHtml(report.profile_note || payload.profile)}<br>
-      <strong>Completed:</strong> ${escapeHtml(payload.completed_at ? new Date(payload.completed_at).toLocaleString() : "—")}<br>
+      <h1>Source data confirmation request</h1>
+      <p class="purpose">${escapeHtml(purpose)}</p>
+      <p><strong>Folder reviewed:</strong> ${escapeHtml(report.folder || "All source data")}<br>
+      <strong>Review scope:</strong> ${escapeHtml(report.profile_note || payload.profile)}<br>
+      <strong>Automated review completed:</strong> ${escapeHtml(payload.completed_at ? new Date(payload.completed_at).toLocaleString() : "—")}<br>
       <strong>Folder fingerprint:</strong> <code>${escapeHtml(report.fingerprint || "—")}</code></p>
-      <div class="counts"><span>${counts.blocker || 0} blocker(s)</span><span>${counts.problem || 0} problem(s)</span><span>${counts.known || 0} known item(s)</span></div>
-      <h2>How to read this</h2><ul><li><strong>Blocker:</strong> proceeding can fail or produce a wrong result.</li><li><strong>Problem:</strong> the files may be usable, but the data team must review or decide.</li><li><strong>Known:</strong> already tracked setup or backlog work; not a new data defect.</li></ul>
-      <h2>Questions and findings</h2>${findingRows}
+      <p class="count">${findings.length} point(s) for confirmation</p>
+      <h2>What we are asking</h2><p>Please advise on each point below. The observations are generated from structural and spatial checks; they record our current understanding and are not a judgement on prior scientific approval or usability.</p>
+      <h2>Observations and advice requested</h2>${findingRows}
       <h2>Points against boundaries</h2><p>${escapeHtml(crossText)}</p>
       <h2>Technical appendix — layers</h2><table><thead><tr><th>File</th><th>Kind</th><th>CRS</th><th>Size and values</th></tr></thead><tbody>${layerRows}</tbody></table>
       <h2>Files and fingerprints</h2><table><thead><tr><th>File</th><th>Size</th><th>Fingerprint</th></tr></thead><tbody>${fileRows}</tbody></table>
-      <p class="muted">This report describes source files before ingestion. It is not a GRP assessment, scientific approval, or declaration that the data is fit for every use. Full-resolution raster minima and maxima are exact; no-data share is sampled and approximate.</p>
+      <p class="muted">This consultation record describes source files before ingestion. It does not replace data-team advice, a GRP assessment, or scientific approval. Full-resolution raster minima and maxima are exact; no-data share is sampled and approximate.</p>
     </body></html>`;
   };
 
@@ -511,11 +511,24 @@
     );
   });
 
+  const consultationJson = (payload) => {
+    const copy = JSON.parse(JSON.stringify(payload));
+    if (copy.report) {
+      const findings = copy.report.findings || [];
+      copy.report.review_item_count = findings.length;
+      delete copy.report.counts;
+      findings.forEach((finding) => delete finding.grade);
+      copy.report.report_purpose =
+        "Request data-team advice on automated observations; this does not approve or reject the dataset.";
+    }
+    return JSON.stringify(copy, null, 2);
+  };
+
   downloadJson.addEventListener("click", () => {
     if (!currentPayload) return;
     download(
       reportName(currentPayload.report || {}, "json"),
-      JSON.stringify(currentPayload, null, 2),
+      consultationJson(currentPayload),
       "application/json",
     );
   });
@@ -529,22 +542,15 @@
     reportScope.textContent = report.folder ? `Report · ${report.folder}` : "Report · all source data";
     cachePill.hidden = !payload.completed_at || payload.state !== "succeeded";
     cachePill.textContent = `Read ${new Date(payload.completed_at).toLocaleString()}`;
-    const counts = report.counts || {};
-    if ((counts.blocker || 0) > 0) {
-      simpleDecision.textContent =
-        "Do not load this dataset yet. At least one issue can make the data unreadable or produce a wrong result.";
-    } else if ((counts.problem || 0) > 0) {
-      simpleDecision.textContent =
-        "The files can be read, but the data team should answer the questions below before this dataset is accepted.";
-    } else {
-      simpleDecision.textContent =
-        "No blocking issue was found by the selected checks. This is a validation summary, not scientific approval.";
-    }
+    const findings = report.findings || [];
+    simpleDecision.textContent = "Request data-team confirmation of our current understanding.";
+    const scope = report.profile_note || payload.profile;
+    const scopeSentence = String(scope).endsWith(".") ? scope : `${scope}.`;
     simpleExplanation.textContent =
-      `${counts.blocker || 0} blocker(s), ${counts.problem || 0} problem(s), and ` +
-      `${counts.known || 0} known item(s). Profile: ${report.profile_note || payload.profile}.`;
-    renderTally(counts);
-    renderFindings(report.findings || []);
+      `The automated review produced ${findings.length} point(s) for advice. ` +
+      `Review scope: ${scopeSentence} This does not approve or reject the dataset.`;
+    renderTally(findings);
+    renderFindings(findings);
     renderCross(report.cross_check);
     renderLayers(report.layers || []);
     renderColumns(report.layers || []);

@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/styles.css?v=20260921f" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/data-inspector.js?v=20260921c" defer></script>
+    <script src="/data-inspector.js?v=20260921d" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -19,8 +19,8 @@
       <p class="eyebrow">Administration</p>
       <h1>Source data</h1>
       <p class="workspace-intro">
-        Look at the files in the read-only source folder before anyone builds a loader against
-        them: what arrived, what is wrong with it, and what is missing.
+        Review the files in the read-only source folder and prepare evidence for the data team:
+        what arrived, how the automated checks interpreted it, and what needs confirmation.
       </p>
 
       <p class="inspector-warning">
@@ -82,7 +82,7 @@
         <div class="admin-card__heading">
           <div>
             <p class="eyebrow" data-report-scope>Report</p>
-            <h2 id="findings-heading">What is wrong and what is missing</h2>
+            <h2 id="findings-heading">Observations to confirm with the data team</h2>
           </div>
           <span class="status-pill" data-cache-pill hidden>From cache</span>
         </div>
@@ -96,12 +96,13 @@
               Download simple report
             </button>
             <button class="button button--secondary" type="button" data-download-json disabled>
-              Download technical JSON
+              Download consultation JSON
             </button>
           </div>
           <p class="inspector-note">
-            Send the simple HTML report to the data team. It includes questions to answer, exact
-            file fingerprints and a technical appendix. JSON preserves the complete machine report.
+            Send the simple HTML report to the data team. It presents each automated observation,
+            the supporting evidence, and the advice requested without approving or rejecting the
+            dataset. JSON contains the same consultation record in a structured form.
           </p>
         </section>
 

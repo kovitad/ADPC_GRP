@@ -125,9 +125,16 @@ def test_data_inspector_supports_profiles_and_shareable_reports() -> None:
     assert 'value="general"' in page
     assert 'value="grp_baseline"' in page
     assert "Download simple report" in page
-    assert "Download technical JSON" in page
+    assert "Download consultation JSON" in page
+    assert "Observations to confirm with the data team" in page
     assert ".local/data-in" in page
     assert "simpleReportHtml" in script
+    assert "Source data confirmation request" in script
+    assert "Request data-team confirmation of our current understanding" in script
+    assert "Advice requested:" in script
+    assert "delete finding.grade" in script
+    assert "Do not load this dataset" not in script
+    assert "Known already" not in script
     assert "full-resolution min/max" in script
     assert "text encoding" in script
     assert "(assumed)" in script

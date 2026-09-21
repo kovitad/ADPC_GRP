@@ -49,20 +49,22 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
 - **What it reports.** Per layer: CRS, size, resolution, exact full-resolution minimum/maximum,
   sampled no-data share, and columns with fill counts and sample values. Exact extrema are read in
   bounded windows; decimation is valid for an approximate share but not for discovering rare
-  extreme values. Findings are graded **blocker** (cannot be loaded, or would be loaded wrongly,
-  until someone decides), **problem** (usable but something is wrong) and **known** (already
-  understood and on the backlog, shown so it is not rediscovered as a surprise). Under a profile
-  that requests it, boundaries and points are cross-checked and mapped.
+  extreme values. The worker retains internal severity classes for deterministic processing and
+  future ingestion controls, but the human-facing page and exports do not present those classes as
+  judgements. They number neutral observations and ask the data team to confirm the interpretation
+  and intended use. Under a profile that requests it, boundaries and points are cross-checked and
+  mapped.
 - **Text encoding.** Every vector read passes an explicit encoding. A Shapefile's same-name `.cpg`
   is authoritative when usable; otherwise the worker tries UTF-8, TIS-620 and CP874 in order. An
-  assumed encoding is always a `known` finding naming the successful encoding and asking the
-  provider to confirm it—never a silent success. If all attempts fail, the blocker and remediation
-  distinguish decoding failure from a truncated/damaged file. GeoJSON and GeoPackage use their
-  format-defined UTF-8.
-- **Shareable output.** The browser can download a standalone, escaped HTML report written for a
-  non-specialist and the complete technical JSON. The HTML leads with whether to stop or review,
-  explains the three grades, lists each question/action for the data team, and includes layer and
-  file-fingerprint appendices. Export does not turn inspection into approval.
+  assumed encoding is always recorded as an observation naming the successful encoding and asking
+  the provider to confirm it—never a silent success. If all attempts fail, the observation and
+  requested advice distinguish decoding failure from a truncated/damaged file. GeoJSON and
+  GeoPackage use their format-defined UTF-8.
+- **Shareable output.** The browser can download a standalone, escaped HTML confirmation request
+  and a structured consultation JSON. Both lead with the purpose, number each observation, show
+  the evidence and state the advice requested. Neither export contains the internal severity
+  classes or tells the recipient that the dataset is approved, rejected, blocked or already
+  understood. Layer and exact file-fingerprint appendices support the conversation.
 - **It is never a result.** No version is pinned, no method is recorded, nothing is approved. The
   page says so at the top, and no number from it may be shown to a planner, put in a brief or sent
   to SIG. An inspection is not an assessment and shares no table with one.
@@ -96,8 +98,8 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
 ## Action items
 
 - [x] Read-only mount, settings flag, migration `20260918_0006`, worker claim loop
-- [x] Findings graded blocker / problem / known, with the known ones naming their backlog item
+- [x] Internal deterministic classifications with neutral confirmation points in the page and exports
 - [x] Permission matrix rows, path-traversal tests, cache and concurrency tests
-- [x] Explicit validation profiles, exact bounded-window extrema, encoding fallbacks, simple HTML and technical JSON downloads
+- [x] Explicit validation profiles, exact bounded-window extrema, encoding fallbacks, consultation HTML and JSON downloads
 - [ ] Product owner accepts the page in the browser against the real `.local/data-in`
 - [ ] Feed the nationwide counts into backlog A2 and the provider conversation
