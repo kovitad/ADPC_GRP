@@ -41,6 +41,9 @@ def _visible_version(session, version_id: UUID, hub_id: UUID) -> tuple[DatasetVe
     ).first()
     if row is None:
         raise not_found()
+    version, _ = row
+    if not (version.is_current or version.meta.get("map_preview") is True):
+        raise not_found()
     return row
 
 
@@ -63,9 +66,11 @@ def map_layers(
     ).all()
     # Technically validated baseline imports may be drawn for orientation before scientific
     # activation. They stay non-current, so catalog/assessment input selection cannot use them.
-    rows = [row for row in rows if row[0].is_current or row[0].meta.get("map_preview")]
+    rows = [
+        row for row in rows if row[0].is_current or row[0].meta.get("map_preview") is True
+    ]
     rows.sort(
-        key=lambda row: (bool(row[0].meta.get("map_preview")), row[0].created_at),
+        key=lambda row: (row[0].meta.get("map_preview") is True, row[0].created_at),
         reverse=True,
     )
     flood = [
@@ -78,7 +83,7 @@ def map_layers(
             "image_url": f"/api/v1/maps/hazard/{version.id}/overlay.png",
             "bounds": version.meta.get("overlay_bounds"),
             "available": bool(version.meta.get("overlay_key")),
-            "preview_only": bool(version.meta.get("map_preview") and not version.is_current),
+            "preview_only": version.meta.get("map_preview") is True and not version.is_current,
             "readiness": version.readiness,
             "palette": version.meta.get("palette"),
         }
@@ -110,7 +115,7 @@ def map_layers(
             "owner_kind": dataset.owner_kind,
             "provider": dataset.provider,
             "features_url": f"/api/v1/maps/datasets/{version.id}/features",
-            "preview_only": bool(version.meta.get("map_preview") and not version.is_current),
+            "preview_only": version.meta.get("map_preview") is True and not version.is_current,
             "readiness": version.readiness,
         }
         for version, dataset in rows
@@ -167,8 +172,9 @@ def dataset_features(
     if dataset.type != "evacuation_centers":
         raise not_found()
     features = session.scalars(
-        select(Feature).where(Feature.dataset_version_id == version.id).order_by(Feature.name)
+        select(Feature).where(Feature.dataset_version_id == version.id).order_by(Feature.id)
     ).all()
+    names_confirmed = version.meta.get("shelter_names_confirmed") is True
     return {
         "type": "FeatureCollection",
         "features": [
@@ -176,8 +182,12 @@ def dataset_features(
                 "type": "Feature",
                 "id": str(feature.id),
                 "geometry": {"type": "Point", "coordinates": [feature.lon, feature.lat]},
-                "properties": {"name": feature.name},
+                "properties": {
+                    "name": feature.name
+                    if names_confirmed or feature.attributes.get("synthetic") is True
+                    else f"Evacuation centre {position}"
+                },
             }
-            for feature in features
+            for position, feature in enumerate(features, start=1)
         ],
     }

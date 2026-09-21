@@ -29,7 +29,7 @@ from api.settings import Settings  # noqa: E402
 from core.access_models import AppUser, Base  # noqa: E402
 from core.ai_allowance import update_setting  # noqa: E402
 from core.assessment_jobs import claim_next_job, process_job  # noqa: E402
-from core.assessment_models import DatasetVersion  # noqa: E402
+from core.assessment_models import DatasetVersion, Feature  # noqa: E402
 from core.identity import IdentityLinkResult  # noqa: E402
 from core.storage import LocalStorage  # noqa: E402
 from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
@@ -157,6 +157,29 @@ def test_center_points_are_geojson(world) -> None:
     assert collection["type"] == "FeatureCollection"
     assert len(collection["features"]) == 8
     assert collection["features"][0]["geometry"]["type"] == "Point"
+    names = {feature["properties"]["name"] for feature in collection["features"]}
+    assert "Synthetic Clinic E" in names
+
+
+def test_unconfirmed_source_names_are_not_returned_to_planners(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        version = session.get(DatasetVersion, UUID(world["seed"].centers_version_id))
+        version.meta = {**version.meta, "shelter_names_confirmed": False}
+        for feature in session.scalars(
+            select(Feature).where(Feature.dataset_version_id == version.id)
+        ):
+            feature.name = "Unconfirmed raw facility value"
+            feature.attributes = {}
+        session.commit()
+
+    collection = client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
+    ).json()
+
+    names = [feature["properties"]["name"] for feature in collection["features"]]
+    assert "Unconfirmed raw facility value" not in names
+    assert names == [f"Evacuation centre {index}" for index in range(1, 9)]
 
 
 def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
@@ -169,6 +192,46 @@ def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
     assert planner.get(
         f"/api/v1/maps/hazard/{world['seed'].centers_version_id}/overlay.png"
     ).status_code == 404
+
+
+def test_map_bytes_hide_non_current_versions_without_preview_permission(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        for version_id in (world["seed"].hazard_version_id, world["seed"].centers_version_id):
+            version = session.get(DatasetVersion, UUID(version_id))
+            version.is_current = False
+            version.meta = {
+                key: value for key, value in version.meta.items() if key != "map_preview"
+            }
+        session.commit()
+
+    layers = client.get("/api/v1/maps/layers").json()
+
+    assert layers["flood"] == []
+    assert layers["evacuation_centers"] == []
+    assert client.get(
+        f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
+    ).status_code == 404
+
+
+def test_map_bytes_allow_explicit_non_current_previews(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        for version_id in (world["seed"].hazard_version_id, world["seed"].centers_version_id):
+            version = session.get(DatasetVersion, UUID(version_id))
+            version.is_current = False
+            version.meta = {**version.meta, "map_preview": True}
+        session.commit()
+
+    assert client.get(
+        f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
+    ).status_code == 200
+    assert client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
+    ).status_code == 200
 
 
 def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:

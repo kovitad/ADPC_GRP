@@ -12,7 +12,7 @@ The product owner nevertheless needs to see **Flood depth · 100-year** and the 
 ## Decision
 
 1. An imported version may set immutable metadata `map_preview: true` after worker validation.
-2. `/api/v1/maps/layers` may expose a visible platform or Hub version when it is either current or explicitly marked `map_preview`.
+2. `/api/v1/maps/layers` and its hazard-image and feature-data endpoints may expose a visible platform or Hub version only when it is either current or explicitly marked `map_preview`; direct byte URLs enforce the same rule.
 3. The Catalog and assessment input routes continue to require current versions. A map preview does not activate an input.
 4. The map API labels a non-current preview with `preview_only: true` and its readiness state.
 5. The Planning map states that the baseline is a preview, centres are not assessed, and DEP-05 remains unresolved.
