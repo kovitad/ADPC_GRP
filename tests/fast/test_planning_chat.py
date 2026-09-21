@@ -94,6 +94,41 @@ def test_embed_url_rejects_non_hazard_component_on_sig_host() -> None:
     assert embed_url(result, "sig.example") is None
 
 
+def test_deterministic_summary_marks_truncation_and_preserves_cross_references() -> None:
+    long_text = "See the registered method [12]. " + "A long evidence sentence. " * 80
+    pack = {
+        **PACK,
+        "citations": [
+            {"n": 1, "text": f"{long_text} [1]", "retrieval": "computed-at-pack-time"},
+        ],
+    }
+
+    answer = api.planning._deterministic_evidence_summary(
+        pack, movement_unavailable=False
+    )
+
+    assert "[12]" in answer
+    assert "… (full text in Evidence) [1]" in answer
+    assert len(answer.split("## Key SIG findings\n", 1)[1].split("\n", 1)[0]) < len(long_text)
+
+
+def test_deterministic_summary_reports_findings_hidden_by_display_limit() -> None:
+    pack = {
+        **PACK,
+        "citations": [
+            {"n": number, "text": f"Computed finding {number}",
+             "retrieval": "computed-at-pack-time"}
+            for number in range(1, 11)
+        ],
+    }
+
+    answer = api.planning._deterministic_evidence_summary(
+        pack, movement_unavailable=False
+    )
+
+    assert "Plus 4 more numbered finding(s) in the Evidence tab" in answer
+
+
 def test_sig_mcp_client_initializes_then_calls_tool() -> None:
     methods: list[str] = []
 

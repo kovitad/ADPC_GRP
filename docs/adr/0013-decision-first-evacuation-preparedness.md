@@ -85,6 +85,6 @@ Each dimension is `available`, `partial`, `missing` or `blocked`, with a source 
 - SIG is complementary, not mandatory. Its latency or outage cannot block a valid local GRP result.
 - AI cannot invent vulnerable-population totals, costs, benefits, centre capacities or recommendations unsupported by evidence.
 - If an AI brief fails deterministic heading or citation checks, Planning still presents a non-publishable deterministic digest copied from numbered structured evidence. The failed model text is discarded, and the digest cannot receive a public receipt.
-- Contradictory evidence metadata is shown as a blocking contract warning rather than silently choosing one claim.
+- Contradictory evidence metadata is shown as a blocking contract warning rather than silently choosing one claim. The initial return-period check necessarily matches current SIG gap prose; replace it with typed contradiction flags when the SIG pack contract supplies them.
 - Sub-district support remains part of the target, but requires managed geometry, parent linkage and explicit assessment eligibility.
 - The first implementation slice can improve purpose/AOI/configuration UX now, while unavailable scientific outputs remain visibly blocked.

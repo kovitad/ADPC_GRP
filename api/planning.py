@@ -218,6 +218,20 @@ def _evidence_contract_warnings(pack: dict[str, Any]) -> list[str]:
     return warnings
 
 
+def _truncate_evidence_text(text: str, max_chars: int = 1200) -> str:
+    """Truncate visibly, preferring a complete sentence and pointing to full evidence."""
+
+    if len(text) <= max_chars:
+        return text
+    marker = " … (full text in Evidence)"
+    limit = max_chars - len(marker)
+    candidate = text[:limit].rstrip()
+    boundaries = [match.end() for match in re.finditer(r"[.!?](?=\s|$)", candidate)]
+    if boundaries and boundaries[-1] >= limit // 2:
+        candidate = candidate[:boundaries[-1]].rstrip()
+    return candidate + marker
+
+
 def _deterministic_evidence_summary(
     pack: dict[str, Any],
     *,
@@ -264,10 +278,20 @@ def _deterministic_evidence_summary(
         )
     lines.extend(["", "## Key SIG findings"])
     if findings:
-        for item in sorted(findings, key=priority)[:6]:
-            text = " ".join(str(item["text"]).split())[:1200]
-            text = re.sub(r"\[\d+\]", "", text).strip()
+        ordered = sorted(findings, key=priority)
+        visible = ordered[:6]
+        for item in visible:
+            text = " ".join(str(item["text"]).split())
+            # Avoid duplicating only this finding's own trailing marker. Preserve inline
+            # cross-references to method or source citations such as [12].
+            text = re.sub(rf"\s*\[{int(item['n'])}\]\s*$", "", text).strip()
+            text = _truncate_evidence_text(text)
             lines.append(f"- {text} [{item['n']}]")
+        if len(ordered) > len(visible):
+            lines.append(
+                f"- Plus {len(ordered) - len(visible)} more numbered finding(s) in the Evidence "
+                "tab."
+            )
     else:
         lines.append("No numbered computed finding was available in this evidence pack.")
     lines.extend(
