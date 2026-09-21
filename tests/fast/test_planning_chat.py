@@ -282,6 +282,7 @@ def test_flood_question_draft_only_by_default_no_receipt(planning) -> None:
     body = response.json()
     assert response.status_code == 200, body
     assert body["mode"] == "sig_evidence"
+    assert body["answer_source"] == "ai_draft"
     assert body["area"]["verified"] is True
     assert body["receipt"] is None and body["map_url"] is None
     assert "Unverified draft" in body["label"]
@@ -455,8 +456,11 @@ def test_non_ok_publish_status_never_requests_an_embed(planning) -> None:
     assert "Publication is unavailable." in body["answer"]
 
 
-def test_incomplete_draft_cannot_be_published(planning) -> None:
-    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "####\n####"]
+def test_incomplete_draft_uses_non_publishable_deterministic_summary(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "####\nUNCITED MODEL CLAIM\n####",
+    ]
 
     body = _ask(
         _client(planning, "planner@example.test"),
@@ -465,7 +469,10 @@ def test_incomplete_draft_cannot_be_published(planning) -> None:
     ).json()
 
     assert body["mode"] == "sig_evidence"
-    assert body["answer"] == ""
+    assert body["answer_source"] == "deterministic_fallback"
+    assert "3 of 9 schools [1]" in body["answer"]
+    assert "UNCITED MODEL CLAIM" not in body["answer"]
+    assert "not current flooding" in body["answer"]
     assert body["publish_token"] is None
     assert "Missing required heading" in body["draft_issues"][0]
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
@@ -585,6 +592,25 @@ def test_evidence_bundle_counts_sources_and_keeps_traces() -> None:
     assert bundle["sig_trace"][0].startswith("aoi[")
     assert bundle["grp_trace"][0]["step"] == "assemble_pack"
     assert bundle["gather_ms"] == 1200.5
+    assert bundle["warnings"] == []
+
+
+def test_evidence_bundle_flags_conflicting_return_period_metadata() -> None:
+    pack = {
+        **PACK,
+        "citations": [
+            {"n": 1, "title": "100-year flood hazard", "text": "Hazard classes 1 to 5"},
+        ],
+        "gaps": ["no return period: this hazard layer is a single scenario"],
+    }
+
+    bundle = api.planning.evidence_bundle(
+        "What is exposed?", "Mueang Nan District, Nan, Thailand", pack,
+        {"verified": True}, [], None,
+    )
+
+    assert len(bundle["warnings"]) == 1
+    assert "return period" in bundle["warnings"][0]
 
 
 def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning) -> None:
@@ -615,6 +641,27 @@ def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning)
     assert body["evidence"]["summary"]["sources"] == 1
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
     assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
+
+
+def test_movement_request_with_bad_draft_leads_with_unavailable_decision(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "run_assessment", "reply": "", "place": "Mueang Nan District, Nan, Thailand",'
+        ' "return_period_years": null}',
+        "uncited and malformed draft",
+    ]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Where could people move in Mueang Nan?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    assert body["answer_source"] == "deterministic_fallback"
+    assert body["answer"].startswith(
+        "## Decision availability\nNo evacuation-centre recommendation"
+    )
+    assert "3 of 9 schools [1]" in body["answer"]
+    assert body["publish_token"] is None
 
 
 def test_publish_token_is_dropped_when_the_pack_is_too_large(planning, monkeypatch) -> None:

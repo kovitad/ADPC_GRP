@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/planning.css?v=20260921e" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260921h" defer></script>
+    <script src="/planning.js?v=20260921i" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -175,12 +175,12 @@
           </div>
           <div class="pw-evidence__body">
             <div data-ev-panel="summary">
-              <section class="pw-decision-hero">
+              <section class="pw-decision-hero" data-summary-hero>
                 <span class="pw-decision-hero__label" data-summary-status>Screening summary</span>
                 <h3 data-summary-title>What this means for the decision</h3>
                 <p data-summary-lead></p>
               </section>
-              <section class="pw-decision-section">
+              <section class="pw-decision-section" data-summary-movement-section>
                 <h3>Where people could move</h3>
                 <div data-summary-movement></div>
                 <p class="pw-candidate-caveat">
@@ -188,7 +188,7 @@
                   certify the centre, building or route as safe.
                 </p>
               </section>
-              <section class="pw-decision-section">
+              <section class="pw-decision-section" data-summary-funding-section>
                 <h3>Preparedness funding case</h3>
                 <p class="pw-decision-intro">
                   Use available evidence now and treat missing checks as preparation or funding gaps.

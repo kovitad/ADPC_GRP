@@ -33,6 +33,7 @@
     floodScenarios: [],
     centersVersion: null,
     assessmentId: null,
+    sigConnected: false,
     pollTimer: null,
     busy: false,
     history: [],
@@ -168,19 +169,24 @@
     if (payload.answer && payload.answer.trim()) {
       const brief = document.createElement("details");
       brief.className = "pw-brief";
+      brief.open = payload.answer_source === "deterministic_fallback";
       const summary = document.createElement("summary");
-      summary.textContent = "Read the brief";
+      summary.textContent = payload.answer_source === "deterministic_fallback"
+        ? "Key findings from SIG evidence"
+        : "Read the brief";
       const text = renderBrief(payload.answer, (n) => {
         renderEvidence(payload, question);
         focusCitation(n);
       });
       brief.append(summary, text);
       bubble.querySelector(".pw-bubble__label").before(brief);
-    } else {
-      const warning = document.createElement("p");
-      warning.className = "pw-draft-warning";
-      warning.textContent = "The AI did not produce a complete brief. The evidence is still available, but nothing can be published yet.";
-      bubble.querySelector(".pw-bubble__label").before(warning);
+    }
+    if (restoring && !state.sigConnected) {
+      const restored = document.createElement("p");
+      restored.className = "pw-draft-warning";
+      restored.textContent =
+        "Restored evidence from this browser tab. SIG is currently disconnected; sign in again before refreshing it.";
+      bubble.querySelector(".pw-bubble__label").before(restored);
     }
     scrollDown();
   };
@@ -814,6 +820,14 @@
 
   const renderAssessmentSummary = (result, centers) => {
     setPanelMode("assessment");
+    const hero = $("[data-summary-hero]");
+    const movementSection = $("[data-summary-movement-section]");
+    const fundingSection = $("[data-summary-funding-section]");
+    const briefSection = $("[data-summary-brief-section]");
+    hero.after(movementSection);
+    movementSection.after(fundingSection);
+    fundingSection.after(briefSection);
+    briefSection.querySelector("h3").textContent = "Plain-language brief";
     currentEvidence = null;
     openEvidencePayload = null;
     $("[data-ev-eyebrow]").textContent = "GRP decision summary";
@@ -916,13 +930,26 @@
   const renderSigSummary = (payload) => {
     const evidence = payload.evidence;
     setPanelMode("sig");
+    const hero = $("[data-summary-hero]");
+    const movementSection = $("[data-summary-movement-section]");
+    const fundingSection = $("[data-summary-funding-section]");
+    const briefSection = $("[data-summary-brief-section]");
+    hero.after(briefSection);
+    briefSection.after(movementSection);
+    movementSection.after(fundingSection);
+    briefSection.querySelector("h3").textContent = payload.answer_source === "deterministic_fallback"
+      ? "Key findings from the evidence"
+      : "Evidence-based brief";
     $("[data-ev-eyebrow]").textContent = "Planning summary · SIG screening";
     $("[data-summary-status]").textContent = evidence.receipt
       ? `Source-checked · receipt ${evidence.receipt.receipt_id}`
-      : "Unverified screening draft";
-    $("[data-summary-title]").textContent = "Flood evidence and decision gaps";
-    $("[data-summary-lead]").textContent =
-      "SIG provides hazard and asset-exposure context. It does not assess which evacuation centre people should use. Red flood shading shows depth or hazard, not a risk or safety rating.";
+      : payload.answer_source === "deterministic_fallback"
+        ? "Deterministic evidence summary · not publishable"
+        : "Unverified screening draft";
+    $("[data-summary-title]").textContent = "What SIG found — and what it cannot decide";
+    $("[data-summary-lead]").textContent = payload.answer_source === "deterministic_fallback"
+      ? "The AI brief failed formatting checks, so GRP is showing only numbered findings copied from the structured evidence pack."
+      : "SIG provides hazard and asset-exposure context. Red flood shading shows depth or hazard, not a risk or safety rating.";
     $("[data-summary-movement]").replaceChildren(summaryNotice(
       "No GRP movement recommendation for this area",
       "Evacuation-centre points on the local map are display-only and have not been assessed for this district. Use them for orientation, not as safe destinations.",
@@ -933,8 +960,13 @@
       { label: "Evacuation-centre locations", status: state.centersVersion ? "partial" : "missing", detail: state.centersVersion ? "Display-only national baseline; not assessed" : "No managed layer available" },
       { label: "Centre capacity and services", status: "missing", detail: "Not returned in this evidence pack" },
       { label: "Accessibility and safe routes", status: "missing", detail: "No route suitability evidence" },
-      { label: "Vulnerable groups", status: "missing", detail: "No approved vulnerability result" },
+      { label: "Vulnerability", status: "partial", detail: "SIG generic screening may be present; no GRP-approved vulnerability input" },
       { label: "Interventions and costs", status: "missing", detail: "No approved cost template or figures" },
+      ...(evidence.warnings || []).map((warning) => ({
+        label: "SIG metadata consistency",
+        status: "blocked",
+        detail: warning,
+      })),
     ]);
     const brief = $("[data-summary-brief]");
     brief.replaceChildren();
@@ -977,6 +1009,9 @@
       "GRP steps:",
       ...evidence.grp_trace.map((step, i) => `  ${i + 1}. ${step.step}: ${step.detail}`),
       "",
+      "Evidence contract warnings:",
+      ...(evidence.warnings || []).map((warning) => `  - ${warning}`),
+      "",
       "Declared gaps:",
       ...evidence.gaps.map((gap) => `  - ${gap}`),
     ];
@@ -996,8 +1031,13 @@
       const { evidence, answer } = currentEvidence;
       const base = `grp-${slug(evidence.place)}-${(evidence.pack_id || "pack").slice(0, 8)}`;
       if (button.dataset.download === "brief") {
+        const answerStatus = evidence.receipt
+          ? `receipt ${evidence.receipt.receipt_id}`
+          : openEvidencePayload?.answer_source === "deterministic_fallback"
+            ? "deterministic evidence summary (not publishable)"
+            : "unverified draft (no receipt)";
         const header = `# ${evidence.question}\n\nArea: ${evidence.place}\nSIG pack: ${evidence.pack_id}\n` +
-          `Status: ${evidence.receipt ? `receipt ${evidence.receipt.receipt_id}` : "unverified draft (no receipt)"}\n\n` +
+          `Status: ${answerStatus}\n\n` +
           "_SIG generic evidence. Not a GRP assessment and not a decision that any place is safe._\n\n";
         downloadFile(`${base}-brief.md`, header + answer, "text/markdown");
       } else if (button.dataset.download === "evidence") {
@@ -1106,7 +1146,11 @@
     cards.replaceChildren(...evidence.citations.map(evidenceCard));
 
     const gaps = $("[data-ev-gaps]");
-    gaps.replaceChildren(...evidence.gaps.map((gap) => {
+    const gapItems = [
+      ...(evidence.warnings || []).map((warning) => `Evidence contract warning: ${warning}`),
+      ...evidence.gaps,
+    ];
+    gaps.replaceChildren(...gapItems.map((gap) => {
       const item = document.createElement("li");
       item.textContent = gap;
       return item;
@@ -1171,12 +1215,13 @@
         $("[data-ev-foot]").textContent =
           "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
       } else {
-        mapButton.textContent = "Retry brief generation";
+        mapButton.textContent = "Retry AI brief";
         mapButton.onclick = () => send(message, {
           echo: false, confirmedPlace: evidence.place, refresh: true,
         });
-        $("[data-ev-foot]").textContent =
-          "The evidence lookup succeeded, but the brief was incomplete and cannot be published, so SIG’s receipt-bound map cannot open. The right-hand map shows the local RP100 baseline and evacuation centers only; this pack supplied no school, hospital or road geometry. Retry generates a fresh brief.";
+        $("[data-ev-foot]").textContent = payload.answer_source === "deterministic_fallback"
+          ? "The evidence lookup succeeded. GRP generated the visible summary deterministically because the AI brief failed formatting checks. It cannot be published; retry asks for a fresh AI brief."
+          : "The evidence lookup succeeded, but no publishable brief is available. Retry asks for a fresh AI brief.";
       }
     }
     outlineSigArea(evidence);
@@ -1200,7 +1245,9 @@
     badge.className = `pw-status__badge${evidence.receipt ? " is-ok" : ""}`;
     badge.textContent = evidence.receipt
       ? `Receipt ${evidence.receipt.receipt_id}`
-      : payload.publish_token ? "Unverified draft" : "Brief incomplete · evidence only";
+      : payload.answer_source === "deterministic_fallback"
+        ? "Deterministic summary · not publishable"
+        : payload.publish_token ? "Unverified draft" : "Evidence only";
     card.append(title);
     if (payload.note) {
       const note = document.createElement("span");
@@ -1728,6 +1775,31 @@
   };
 
   // ---------- start ----------
+  const refreshSigConnection = async () => {
+    if (!state.hubCode || !state.chatAvailable) return;
+    try {
+      const planning = await GRP.request("/api/v1/planning/status");
+      state.sigConnected = Boolean(planning.sig_connected);
+      const banner = $("[data-banner]");
+      if (state.sigConnected && banner.dataset.notice === "sig-connection") {
+        banner.hidden = true;
+        delete banner.dataset.notice;
+      } else if (!state.sigConnected) {
+        banner.textContent =
+          "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run.";
+        banner.dataset.notice = "sig-connection";
+        banner.hidden = false;
+      }
+    } catch (_error) {
+      // The next request will show the normal API error; do not replace another banner here.
+    }
+  };
+
+  window.addEventListener("focus", refreshSigConnection);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshSigConnection();
+  });
+
   GRP.bindSignOut();
 
   GRP.me()
@@ -1749,13 +1821,17 @@
         GRP.request(`/api/v1/maps/layers${query}`),
       ]);
       state.chatAvailable = Boolean(planning.available);
+      state.sigConnected = Boolean(planning.sig_connected);
       if (planning.usage) showAllowance(planning.usage);
       else GRP.request("/api/v1/me/ai-usage").then(showAllowance).catch(() => {});
       if (!planning.available) {
         banner.textContent = "The chat assistant runs only in the local Docker Desktop test right now.";
+        banner.dataset.notice = "planning-unavailable";
         banner.hidden = false;
       } else if (!planning.sig_connected) {
-        banner.textContent = "SIG evidence needs a fresh sign-in (the server restarted). Assessments and explanations still work.";
+        banner.textContent =
+          "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run.";
+        banner.dataset.notice = "sig-connection";
         banner.hidden = false;
       }
       state.boundaries = areas.boundaries;

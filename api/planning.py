@@ -198,6 +198,93 @@ def _asks_to_explain_result(message: str) -> bool:
     return bool(RESULT_EXPLANATION_PATTERN.search(message))
 
 
+def _evidence_contract_warnings(pack: dict[str, Any]) -> list[str]:
+    """Flag contradictions that make an otherwise valid SIG pack easy to misread."""
+
+    citations = pack.get("citations", [])
+    gaps = pack.get("gaps", [])
+    citation_text = " ".join(
+        " ".join(str(item.get(key, "")) for key in ("title", "source", "text"))
+        for item in citations
+        if isinstance(item, dict)
+    ).casefold()
+    gap_text = " ".join(str(gap) for gap in gaps).casefold()
+    warnings: list[str] = []
+    if re.search(r"\b\d+\s*[- ]?year\b", citation_text) and "no return period" in gap_text:
+        warnings.append(
+            "SIG labels the hazard with a return period but also declares that no return-period "
+            "metadata is available. Treat the scenario label as unresolved."
+        )
+    return warnings
+
+
+def _deterministic_evidence_summary(
+    pack: dict[str, Any],
+    *,
+    movement_unavailable: bool,
+) -> str:
+    """Build a safe, non-publishable digest when the model's Markdown fails preflight.
+
+    The digest makes no inference from arbitrary ``stats`` keys. It repeats numbered evidence
+    text already returned by SIG, preferring pack-time computations, and appends GRP caveats.
+    """
+
+    records = [
+        item
+        for item in pack.get("citations", [])
+        if isinstance(item, dict)
+        and isinstance(item.get("n"), int)
+        and str(item.get("text", "")).strip()
+        and str(item.get("kind", "")).casefold() not in {"gaps", "method"}
+    ]
+    computed = [
+        item
+        for item in records
+        if str(item.get("retrieval", "")).casefold().startswith("computed")
+    ]
+    findings = computed or records
+
+    def priority(item: dict[str, Any]) -> tuple[int, int]:
+        value = f"{item.get('title', '')} {item.get('text', '')}".casefold()
+        terms = ("evacuation", "shelter", "hospital", "school", "building", "road")
+        return (next((index for index, term in enumerate(terms) if term in value), len(terms)),
+                int(item["n"]))
+
+    lines = ["## Decision availability"]
+    if movement_unavailable:
+        lines.append(
+            "No evacuation-centre recommendation is available for this district. The SIG pack "
+            "does not assess GRP evacuation centres, their capacity, services, accessibility or "
+            "routes."
+        )
+    else:
+        lines.append(
+            "This is generic SIG flood screening, not a GRP evacuation-centre assessment or a "
+            "decision that any place is safe."
+        )
+    lines.extend(["", "## Key SIG findings"])
+    if findings:
+        for item in sorted(findings, key=priority)[:6]:
+            text = " ".join(str(item["text"]).split())[:1200]
+            text = re.sub(r"\[\d+\]", "", text).strip()
+            lines.append(f"- {text} [{item['n']}]")
+    else:
+        lines.append("No numbered computed finding was available in this evidence pack.")
+    lines.extend(
+        [
+            "",
+            "## How to use this",
+            "These findings describe mapped screening evidence, not current flooding. Review the "
+            "declared gaps before using them for preparedness work. They do not establish that a "
+            "centre, building or route is safe.",
+        ]
+    )
+    warnings = _evidence_contract_warnings(pack)
+    if warnings:
+        lines.extend(["", "## Evidence warnings", *[f"- {warning}" for warning in warnings]])
+    return "\n".join(lines)
+
+
 def _draft_issues(
     text: str, required_sections: list[object], citations: list[object]
 ) -> list[str]:
@@ -713,7 +800,15 @@ async def planning_chat(
     issues = _draft_issues(
         draft.text, pack.get("required_sections", []), pack.get("citations", [])
     )
-    answer = "" if issues else draft.text
+    answer_source = "ai_draft"
+    if issues:
+        answer_source = "deterministic_fallback"
+        answer = _deterministic_evidence_summary(
+            pack,
+            movement_unavailable=fallback_note is not None,
+        )
+    else:
+        answer = draft.text
     evidence = {
         **evidence_bundle(payload.message, place, pack, area_payload, trace, None),
         "total_ms": elapsed_ms(request_started),
@@ -743,10 +838,12 @@ async def planning_chat(
         **base,
         "mode": "sig_evidence",
         "answer": answer,
+        "answer_source": answer_source,
         "label": EVIDENCE_LABEL
         + (
-            " Draft formatting was incomplete; evidence remains available."
-            if issues
+            " The AI brief was incomplete; a deterministic evidence summary is shown instead "
+            "and cannot be published."
+            if answer_source == "deterministic_fallback"
             else " Unverified draft: not checked by the SIG gate, no receipt."
         ),
         "note": fallback_note,
@@ -817,6 +914,7 @@ def evidence_bundle(
         },
         "citations": citations,
         "gaps": pack.get("gaps", []) or [],
+        "warnings": _evidence_contract_warnings(pack),
         "stats": pack.get("stats", {}),
         "sig_trace": [str(line) for line in pack.get("trace", []) if isinstance(line, str)],
         "grp_trace": trace,

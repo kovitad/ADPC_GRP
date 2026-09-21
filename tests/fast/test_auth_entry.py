@@ -165,4 +165,8 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "renderAssessmentSummary(result, centers.centers)" in script
     assert "No GRP movement recommendation for this area" in script
     assert "Candidate means lower mapped flood exposure" in page
+    assert "Deterministic evidence summary · not publishable" in script
+    assert "Key findings from SIG evidence" in script
+    assert "Existing evidence may be restored from this browser tab" in script
+    assert "SIG metadata consistency" in script
     assert "innerHTML" not in script
