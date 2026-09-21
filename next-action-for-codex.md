@@ -105,7 +105,7 @@ Three things are not code and have the longest lead time. They should be moving 
 
 This is the largest finding of the review. It is not Slice 1 work, but it should not be rediscovered later.
 
-All 928 districts imported successfully and no planner can see any of them. `promote_import_version` sets `is_current=False` (`core/data_import_jobs.py:246`) and the boundary loader sets `is_supported=False` (`core/boundary_import.py:195`). Every consumer filters on exactly those two flags — `api/catalog.py:25` and `:59`, `api/planning.py:433`, `api/maps.py:60`, `core/assessment_jobs.py:90`. Nothing in the repository sets either to `True` except `grpcli/seed.py` for the synthetic case. `HubDatasetSelection` is defined in `core/data_library_models.py:100` and is neither read nor written by any code.
+All 928 districts imported successfully and no planner can see any of them. `promote_import_version` sets `is_current=False` (`core/data_import_jobs.py:246`) and the boundary loader sets `is_supported=False` (`core/boundary_import.py:195`). Every consumer filters on exactly those two flags — `api/catalog.py:25` and `:59`, `api/planning.py:433`, `api/maps.py:60`, `core/assessment_jobs.py:90`. Nothing in the repository sets either to `True` except `grp/seed.py` (`grpcli/seed.py` after Task 1) for the synthetic case. `HubDatasetSelection` is defined in `core/data_library_models.py:100` and is neither read nor written by any code.
 
 Failing closed is the right default. The gap is that there is no path out of it, so every further loader adds more data that nobody can use. Slice 3 exists to close it, and it is what will let the product owner pick a real Thai district in the app instead of the synthetic one.
 
