@@ -32,8 +32,8 @@ from core.assessment_jobs import claim_next_job, process_job  # noqa: E402
 from core.assessment_models import DatasetVersion  # noqa: E402
 from core.identity import IdentityLinkResult  # noqa: E402
 from core.storage import LocalStorage  # noqa: E402
-from grp.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
-from grp.seed import seed_synthetic_rp100  # noqa: E402
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
+from grpcli.seed import seed_synthetic_rp100  # noqa: E402
 
 
 @pytest.fixture

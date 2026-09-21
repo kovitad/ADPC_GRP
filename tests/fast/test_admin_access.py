@@ -14,7 +14,7 @@ from api.planning_access import planner_membership
 from api.sessions import CurrentPrincipal
 from core.access_models import AppUser, Base, Hub, HubMembership
 from core.identity import MembershipView, VerifiedIdentity, link_verified_identity
-from grp.admin import assign_member, bootstrap_platform_admin, ensure_hub
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
 
 
 def test_admin_access_queue_and_membership_assignment() -> None:

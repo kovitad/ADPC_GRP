@@ -13,10 +13,10 @@ $Python = if (Test-Path -LiteralPath $VenvPython) { $VenvPython } else { "python
 $ClientIdFile = Join-Path $RepositoryRoot ".local\servir_auth_client_id"
 $RedirectUri = "http://127.0.0.1:$Port/api/v1/auth/callback"
 
-& $Python -m grp.dev
+& $Python -m grpcli.dev
 
 if ($RegisterSigClient) {
-    & $Python -m grp.oauth register-client `
+    & $Python -m grpcli.oauth register-client `
         --redirect-uri $RedirectUri `
         --client-name "ADPC GRP local" `
         --output-file $ClientIdFile

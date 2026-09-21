@@ -145,7 +145,7 @@ def bootstrap_platform_admin(session: Session, email: str) -> CommandResult:
             target_id=str(user.id),
             new_value={"email": normalized, "is_platform_admin": True},
             result=AuditResult.SUCCESS,
-            support_ref="grp.admin bootstrap-platform-admin",
+            support_ref="grpcli.admin bootstrap-platform-admin",
         )
     )
     return CommandResult(True, "Platform Admin provisioned")
@@ -187,7 +187,7 @@ def create_hub_as_actor(
             target_id=str(hub.id),
             new_value={"code": normalized_code, "name": name.strip()},
             result=AuditResult.SUCCESS,
-            support_ref="grp.admin ensure-hub",
+            support_ref="grpcli.admin ensure-hub",
         )
     )
     return CommandResult(True, "Hub provisioned")
@@ -318,7 +318,7 @@ def assign_member_as_actor(
             target_id=str(membership.id),
             new_value={"email": normalized_email, "role": normalized_role},
             result=AuditResult.SUCCESS,
-            support_ref="grp.admin assign-member",
+            support_ref="grpcli.admin assign-member",
         )
     )
     return CommandResult(True, "Membership assigned")
@@ -514,7 +514,7 @@ def rotate_sig_service_token(session: Session, hash_file: Path) -> str:
             target_type="sig_service_login",
             target_id=digest[:12],
             result=AuditResult.SUCCESS,
-            support_ref="grp.admin rotate-sig-token",
+            support_ref="grpcli.admin rotate-sig-token",
         )
     )
     return token

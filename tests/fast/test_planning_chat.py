@@ -30,7 +30,7 @@ from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import update_setting
 from core.ai_models import LlmUsage
 from core.identity import IdentityLinkResult
-from grp.admin import assign_member, bootstrap_platform_admin, ensure_hub
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
 
 PACK = {
     "status": "ok",

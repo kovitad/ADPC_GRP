@@ -1,6 +1,6 @@
 # SYNTHETIC test case (risk R-02). Invented inputs for software testing only.
 # Not the Chiang Yuen golden case. Expected values were designed by hand from the seed
-# description in grp/seed.py, before the code was run, and must not be edited to pass a test.
+# description in grpcli/seed.py, before the code was run, and must not be edited to pass a test.
 case: synthetic_rp100
 version: 1
 area:

@@ -8,7 +8,7 @@ from api.dependencies import DatabaseSession
 from api.errors import GrpError, access_not_authorized, not_found, validation_failed
 from api.sessions import CurrentPrincipal, load_principal
 from api.settings import get_settings
-from grp.admin import (
+from grpcli.admin import (
     HubAccessDenied,
     ItemNotFound,
     LastAdminRequired,

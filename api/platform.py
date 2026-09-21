@@ -19,7 +19,7 @@ from core.ai_allowance import (
     reset_person_usage,
     update_setting,
 )
-from grp.admin import (
+from grpcli.admin import (
     HubAccessDenied,
     ItemNotFound,
     create_hub_as_actor,

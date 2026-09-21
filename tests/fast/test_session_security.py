@@ -17,7 +17,7 @@ from api.sessions import CSRF_COOKIE, SESSION_COOKIE, set_session_cookie
 from api.settings import Settings
 from core.access_models import AppUser, Base, HubMembership
 from core.identity import IdentityLinkResult
-from grp.admin import assign_member, bootstrap_platform_admin, ensure_hub
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
 
 
 @pytest.fixture

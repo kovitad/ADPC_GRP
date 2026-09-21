@@ -2,7 +2,7 @@
 
 Everything here is invented test data, labelled "synthetic" in every name and source.
 It is NOT the Chiang Yuen golden case and must never be shown as a real result.
-Run: python -m grp.seed synthetic-rp100
+Run: python -m grpcli.seed synthetic-rp100
 """
 
 from __future__ import annotations
@@ -208,7 +208,7 @@ def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
             target_id=str(hazard_version.id),
             new_value={"seed": "synthetic-rp100", "sha256": file_sha},
             result=AuditResult.SUCCESS,
-            support_ref="grp.seed synthetic-rp100",
+            support_ref="grpcli.seed synthetic-rp100",
         )
     )
     return SeedResult(True, str(boundary.id), str(hazard_version.id), str(centers_version.id),

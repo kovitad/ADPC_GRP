@@ -33,7 +33,7 @@ gis = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["api*", "core*", "grp*", "worker*"]
+include = ["api*", "core*", "grpcli*", "worker*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
@@ -54,4 +54,4 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api", "core", "grp", "worker"]
+known-first-party = ["api", "core", "grpcli", "worker"]

@@ -16,7 +16,7 @@ from api.main import app
 from api.rate_limits import limiter
 from api.settings import Settings
 from core.access_models import AuditEvent, Base
-from grp.admin import rotate_sig_service_token
+from grpcli.admin import rotate_sig_service_token
 
 
 @pytest.fixture

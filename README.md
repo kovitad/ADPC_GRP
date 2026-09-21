@@ -28,7 +28,7 @@ api/              FastAPI entry point and bounded API modules
 worker/           Background job and GIS-worker boundary
 core/             Shared models, validation, result rules, and storage protocol
 migrations/       Alembic environment and versioned database migrations
-grp/              Server-side access administration commands
+grpcli/           Server-side access administration commands
 web/              Existing-SIG registration, sign-in, and protected workspace screens
 deploy/           Ubuntu Compose, Caddy, and deployment guidance
 tests/            Fast, contract, golden, live, and load test layers
@@ -63,7 +63,7 @@ Replace the sample with the administrator's verified SIG email. The admin then o
 AI is enabled only in the local Docker Desktop configuration and still defaults off for server deployments. Both environment templates contain provider, model, base URL, output limit, and `AI_KEY_FILE_ADPC`. Store a local token through hidden input:
 
 ```powershell
-python -m grp.configure set-ai-key
+python -m grpcli.configure set-ai-key
 ```
 
 This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Do not enable AI outside the approved local configuration until its deployment and budget controls are accepted.

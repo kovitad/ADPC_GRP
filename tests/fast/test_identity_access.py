@@ -10,7 +10,7 @@ from core.access_models import (
     uuid7,
 )
 from core.identity import VerifiedIdentity, link_verified_identity
-from grp.admin import (
+from grpcli.admin import (
     assign_member,
     bootstrap_platform_admin,
     ensure_hub,

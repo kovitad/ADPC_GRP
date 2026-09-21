@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, inspect
 
-from grp.dev import initialize_local_environment
+from grpcli.dev import initialize_local_environment
 
 
 def test_local_environment_setup_is_idempotent(tmp_path) -> None:
