@@ -19,7 +19,13 @@ from core.data_folder import (
     list_folders,
     resolve_folder,
 )
-from core.dataset_scan import Finding, LayerReport, describe_raster, find_problems
+from core.dataset_scan import (
+    Finding,
+    LayerReport,
+    describe_raster,
+    describe_vector,
+    find_problems,
+)
 from core.inspection_jobs import (
     PREVIEW_FOLDERS,
     claim_next_inspection,
@@ -368,6 +374,114 @@ def test_a_provenance_file_clears_that_finding() -> None:
 
 
 @pytest.mark.fast
+def _fake_vector_result():
+    import numpy as np
+
+    return (
+        {"crs": "EPSG:4326", "geometry_type": "Point", "fields": ["name"]},
+        None,
+        np.array([], dtype=object),
+        [np.array(["ศูนย์พักพิง"], dtype=object)],
+    )
+
+
+@pytest.mark.parametrize("cpg_name", ["shelters.cpg", "shelters.dbf.cpg"])
+def test_vector_reader_honours_declared_cpg_encoding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cpg_name: str
+) -> None:
+    path = tmp_path / "shelters.shp"
+    path.touch()
+    (tmp_path / cpg_name).write_text("CP874", encoding="ascii")
+    seen: list[str] = []
+
+    def fake_read(_path, *, read_geometry, encoding):
+        seen.append(encoding)
+        return _fake_vector_result()
+
+    monkeypatch.setattr("pyogrio.raw.read", fake_read)
+
+    layer = describe_vector(path, "shelters.shp")
+
+    assert layer.readable
+    assert layer.encoding == "CP874"
+    assert layer.encoding_source == "cpg"
+    assert seen == ["CP874"]
+
+
+def test_vector_reader_records_a_successful_thai_encoding_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "shelters.shp"
+    path.touch()
+    seen: list[str] = []
+
+    def fake_read(_path, *, read_geometry, encoding):
+        seen.append(encoding)
+        if encoding != "CP874":
+            raise UnicodeDecodeError("utf-8", b"\x80", 0, 1, "invalid byte")
+        return _fake_vector_result()
+
+    monkeypatch.setattr("pyogrio.raw.read", fake_read)
+
+    layer = describe_vector(path, "shelters.shp")
+    findings = find_problems(
+        [layer],
+        ["shelters.shp", "shelters.shx", "shelters.dbf", "shelters.prj", "metadata.txt"],
+        profile="general",
+    )
+
+    assert layer.encoding == "CP874"
+    assert layer.encoding_source == "assumed"
+    assert seen == ["UTF-8", "TIS-620", "CP874"]
+    encoding_finding = next(item for item in findings if "encoding was assumed" in item.title)
+    assert encoding_finding.grade == "known"
+    assert "CP874" in encoding_finding.action
+
+
+def test_encoding_failure_has_encoding_specific_remediation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "shelters.shp"
+    path.touch()
+
+    def fake_read(_path, *, read_geometry, encoding):
+        raise UnicodeDecodeError("utf-8", b"\x80", 0, 1, "invalid byte")
+
+    monkeypatch.setattr("pyogrio.raw.read", fake_read)
+
+    layer = describe_vector(path, "shelters.shp")
+    findings = find_problems([layer], ["shelters.shp"], profile="general")
+    blocker = findings[0]
+
+    assert layer.error_category == "encoding"
+    assert blocker.grade == "blocker"
+    assert "could not be decoded" in blocker.title
+    assert ".cpg" in blocker.action
+    assert "UTF-8" in blocker.action and "CP874" in blocker.action
+    assert "still being copied" not in blocker.action
+
+
+def test_truncated_vector_has_damage_specific_remediation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "shelters.shp"
+    path.touch()
+
+    def fake_read(_path, *, read_geometry, encoding):
+        raise OSError("premature end: truncated file")
+
+    monkeypatch.setattr("pyogrio.raw.read", fake_read)
+
+    layer = describe_vector(path, "shelters.shp")
+    findings = find_problems([layer], ["shelters.shp"], profile="general")
+    blocker = findings[0]
+
+    assert layer.error_category == "truncated"
+    assert "incomplete or damaged" in blocker.title
+    assert "checksum" in blocker.action
+    assert "encoding" not in blocker.action
+
+
 def test_a_shapefile_missing_its_projection_file_blocks() -> None:
     layer = LayerReport(
         path="shelters.shp",

@@ -42,7 +42,7 @@ PREVIEW_FOLDERS = (
 MAX_ATTEMPTS = 2
 # Include report semantics in the cache key. Bump this whenever findings or preview wording change,
 # otherwise an unchanged source folder can keep serving an obsolete stored report.
-REPORT_FORMAT_VERSION = "3"
+REPORT_FORMAT_VERSION = "4"
 INSPECTION_PROFILES = frozenset(
     {"general", "grp_baseline", "flood_depth", "points_boundaries"}
 )

@@ -359,7 +359,10 @@
                 ? ` · ~${Math.round(layer.nodata_share * 100)}% no data (sampled)`
                 : "");
       } else if (layer.fields) {
-        values = `${layer.fields.length} columns`;
+        const encoding = layer.encoding
+          ? ` · text ${layer.encoding}${layer.encoding_source === "assumed" ? " (assumed)" : ""}`
+          : "";
+        values = `${layer.fields.length} columns${encoding}`;
       }
       if (!layer.readable) values = layer.note || "could not be read";
       row.append(el("td", null, values));
@@ -470,7 +473,7 @@
       <td>${escapeHtml(layer.crs_epsg ? `EPSG:${layer.crs_epsg}` : layer.crs || "Not declared")}</td>
       <td>${escapeHtml(layer.kind === "raster"
         ? `${layer.width} × ${layer.height}; exact range ${layer.value_min ?? "—"} to ${layer.value_max ?? "—"}; sampled no-data ${layer.nodata_share === null || layer.nodata_share === undefined ? "—" : `${Math.round(layer.nodata_share * 100)}%`}`
-        : `${layer.feature_count ?? 0} ${layer.geometry_type || "features"}`)}</td>
+        : `${layer.feature_count ?? 0} ${layer.geometry_type || "features"}; text encoding ${layer.encoding || "—"}${layer.encoding_source === "assumed" ? " (assumed)" : ""}`)}</td>
     </tr>`).join("");
     const fileRows = (report.files || []).map((file) => `<tr>
       <td>${escapeHtml(file.path)}</td><td>${escapeHtml(bytes(file.size_bytes))}</td>

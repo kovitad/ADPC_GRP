@@ -4,7 +4,7 @@
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. `main` includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **354 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests remain available through the Docker database job.
+**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. `main` includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **359 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests remain available through the Docker database job.
 
 **Handing over:** nothing is half-finished in the tree. Continue from `main`, start at Section 9, and first do the browser acceptance pass in Section 3 (the merged baseline work has not been confirmed against live SIG and OpenAI yet).
 
@@ -392,7 +392,8 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Reports download as a standalone escaped HTML file suitable for emailing/printing and as complete technical JSON. Both include the validation purpose, timestamp, folder fingerprint, findings, layer inventory and exact file fingerprints.
 - Any new supported GIS dataset can be placed in its own folder under the read-only `.local/data-in` mount and checked with the General profile. Current supported formats are Shapefile, GeoJSON, GeoPackage and GeoTIFF; unsupported-only folders fail visibly instead of producing an empty clean report.
 - Raster minimum and maximum are now exact full-resolution statistics read in bounded 1024×1024 windows, fixing the reviewed risk that a 512×512 decimation could miss rare deep-water extremes. No-data share remains explicitly approximate and sampled. DEP-05-dependent “mostly empty” and depth rules run only under flood-aware profiles.
-- Updated ADR-0006. Migration `0011` is applied locally; API, worker and database are healthy, and SERVIR remains configured. Validation: 354 tests pass with two PostgreSQL-only skips; Ruff, both JavaScript checks and whitespace checks are clean. Mocked browser acceptance at 1440×1000 confirmed the profile workflow, simple report, exact-versus-sampled labels and a real downloaded standalone HTML file with no console errors.
+- Vector reads now use explicit text encoding. A same-name `.cpg` (including delivered `.dbf.cpg` variants) is honoured first; otherwise the worker tries UTF-8, TIS-620 and CP874. An assumed encoding produces a visible `known` finding. Exhausted decoding and truncated/corrupt files produce different blocker explanations and remediation. Real shelter and district Shapefiles were confirmed readable as declared UTF-8.
+- Updated ADR-0006. Migration `0011` is applied locally; API, worker and database are healthy, and SERVIR remains configured. Validation: 359 tests pass with two PostgreSQL-only skips; Ruff, both JavaScript checks and whitespace checks are clean. Mocked browser acceptance at 1440×1000 confirmed the profile workflow, simple report, exact-versus-sampled labels and a real downloaded standalone HTML file with no console errors.
 
 ---
 

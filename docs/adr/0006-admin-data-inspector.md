@@ -53,6 +53,12 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
   until someone decides), **problem** (usable but something is wrong) and **known** (already
   understood and on the backlog, shown so it is not rediscovered as a surprise). Under a profile
   that requests it, boundaries and points are cross-checked and mapped.
+- **Text encoding.** Every vector read passes an explicit encoding. A Shapefile's same-name `.cpg`
+  is authoritative when usable; otherwise the worker tries UTF-8, TIS-620 and CP874 in order. An
+  assumed encoding is always a `known` finding naming the successful encoding and asking the
+  provider to confirm it—never a silent success. If all attempts fail, the blocker and remediation
+  distinguish decoding failure from a truncated/damaged file. GeoJSON and GeoPackage use their
+  format-defined UTF-8.
 - **Shareable output.** The browser can download a standalone, escaped HTML report written for a
   non-specialist and the complete technical JSON. The HTML leads with whether to stop or review,
   explains the three grades, lists each question/action for the data team, and includes layer and
@@ -92,6 +98,6 @@ Add an Admin-only **Source data** page and `/api/v1/data-inspector/*`, enabled o
 - [x] Read-only mount, settings flag, migration `20260918_0006`, worker claim loop
 - [x] Findings graded blocker / problem / known, with the known ones naming their backlog item
 - [x] Permission matrix rows, path-traversal tests, cache and concurrency tests
-- [x] Explicit validation profiles, exact bounded-window extrema, simple HTML and technical JSON downloads
+- [x] Explicit validation profiles, exact bounded-window extrema, encoding fallbacks, simple HTML and technical JSON downloads
 - [ ] Product owner accepts the page in the browser against the real `.local/data-in`
 - [ ] Feed the nationwide counts into backlog A2 and the provider conversation

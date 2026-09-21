@@ -129,6 +129,8 @@ def test_data_inspector_supports_profiles_and_shareable_reports() -> None:
     assert ".local/data-in" in page
     assert "simpleReportHtml" in script
     assert "full-resolution min/max" in script
+    assert "text encoding" in script
+    assert "(assumed)" in script
     assert "sampled" in script
     assert 'body: { folder, profile }' in script
     assert "innerHTML" not in script

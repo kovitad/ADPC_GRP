@@ -81,6 +81,10 @@ class LayerReport:
     nodata_share: float | None = None
     bounds: list[float] | None = None
     value_stats_scope: str | None = None
+    encoding: str | None = None
+    encoding_source: str | None = None
+    encoding_attempts: list[str] = field(default_factory=list)
+    error_category: str | None = None
     note: str | None = None
 
 
@@ -108,16 +112,98 @@ def _looks_truncated(name: str) -> bool:
     return bool(thai) and len(name) <= 4
 
 
-def describe_vector(path: Path, relative: str) -> LayerReport:
-    """Field names, fill rate and sample values, plus the geometry envelope."""
+class VectorEncodingError(Exception):
+    """All explicit encoding attempts failed; keep only safe diagnostic metadata."""
 
+    def __init__(self, errors: list[Exception], attempts: list[str]) -> None:
+        super().__init__(type(errors[-1]).__name__)
+        self.errors = errors
+        self.original = errors[-1]
+        self.attempts = attempts
+
+
+def _cpg_encoding(path: Path) -> str | None:
+    if path.suffix.casefold() != ".shp":
+        return None
+    cpg = next(
+        (
+            candidate
+            for candidate in path.parent.iterdir()
+            if candidate.is_file()
+            and candidate.stem.casefold()
+            in {path.stem.casefold(), f"{path.stem.casefold()}.dbf"}
+            and candidate.suffix.casefold() == ".cpg"
+        ),
+        None,
+    )
+    if cpg is None:
+        return None
+    value = cpg.read_bytes()[:128].decode("ascii", errors="ignore").strip().strip("\ufeff")
+    aliases = {"65001": "UTF-8", "874": "CP874", "WINDOWS-874": "CP874"}
+    return aliases.get(value.upper(), value) or None
+
+
+def _encoding_candidates(path: Path) -> list[tuple[str, str]]:
+    """Declared shapefile encoding first; otherwise explicit, auditable Thai fallbacks."""
+
+    if path.suffix.casefold() != ".shp":
+        return [("UTF-8", "format")]
+    declared = _cpg_encoding(path)
+    candidates = ([(declared, "cpg")] if declared else []) + [
+        ("UTF-8", "assumed"),
+        ("TIS-620", "assumed"),
+        ("CP874", "assumed"),
+    ]
+    unique: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for encoding, source in candidates:
+        key = encoding.casefold().replace("_", "-")
+        if key not in seen:
+            unique.append((encoding, source))
+            seen.add(key)
+    return unique
+
+
+def _read_vector(path: Path, *, read_geometry: bool = True):
     from pyogrio.raw import read as read_vector
+
+    errors: list[Exception] = []
+    candidates = _encoding_candidates(path)
+    for encoding, source in candidates:
+        try:
+            result = read_vector(path, read_geometry=read_geometry, encoding=encoding)
+            return result, encoding, source, [item[0] for item in candidates[: len(errors) + 1]]
+        except Exception as error:  # noqa: BLE001 - try the next declared fallback
+            errors.append(error)
+    raise VectorEncodingError(errors, [item[0] for item in candidates])
+
+
+def _read_error_category(error: Exception) -> str:
+    errors = error.errors if isinstance(error, VectorEncodingError) else [error]
+    text = " ".join(f"{type(item).__name__} {item}" for item in errors).casefold()
+    if any(word in text for word in ("truncated", "corrupt", "premature end", "unexpected eof")):
+        return "truncated"
+    if any(isinstance(item, UnicodeDecodeError) for item in errors) or any(
+        word in text for word in ("encoding", "decode", "codec", "invalid byte sequence")
+    ):
+        return "encoding"
+    return "unreadable"
+
+
+def describe_vector(path: Path, relative: str) -> LayerReport:
+    """Field names, fill rate and sample values, plus explicit text encoding."""
 
     report = LayerReport(path=relative, kind="vector")
     try:
-        meta, _, geometries, columns = read_vector(path, read_geometry=True)
+        result, encoding, source, attempts = _read_vector(path, read_geometry=True)
+        meta, _, geometries, columns = result
+        report.encoding = encoding
+        report.encoding_source = source
+        report.encoding_attempts = attempts
     except Exception as error:  # noqa: BLE001 - an unreadable file is a finding, not a crash
         report.readable = False
+        report.error_category = _read_error_category(error)
+        report.encoding_attempts = error.attempts if isinstance(error, VectorEncodingError) else []
         report.note = f"Could not be read: {type(error).__name__}"
         return report
 
@@ -249,6 +335,18 @@ def _vector_findings(
     findings: list[Finding] = []
     if layer.path.lower().endswith(".shp"):
         findings.extend(_shapefile_findings(layer, suffixes_by_stem))
+    if layer.encoding and layer.encoding_source == "assumed":
+        findings.append(
+            Finding(
+                "known",
+                f"Text encoding was assumed to be {layer.encoding}",
+                "The shapefile has no usable declared encoding, so the inspector tried "
+                f"{', '.join(layer.encoding_attempts)} and opened it with {layer.encoding}. "
+                "The values are readable, but the provider should confirm that interpretation.",
+                layer.path,
+                f"Confirm {layer.encoding} with the data team and add a same-name .cpg file.",
+            )
+        )
     truncated = [f["name"] for f in layer.fields if f["possibly_truncated"]]
     if truncated:
         findings.append(
@@ -392,15 +490,35 @@ def find_problems(
     enforce_wgs84 = profile in {"grp_baseline", "flood_depth"}
     for layer in layers:
         if not layer.readable:
-            findings.append(
-                Finding(
-                    "blocker",
-                    f"{layer.path} could not be read",
-                    layer.note or "",
-                    layer.path,
-                    "Check the file is complete and not still being copied.",
+            if layer.error_category == "encoding":
+                title = f"{layer.path} could not be decoded"
+                attempted = ", ".join(layer.encoding_attempts) or "none"
+                detail = (
+                    "The geometry file was found, but its attribute text did not open with the "
+                    f"declared or supported encodings: {attempted}."
                 )
-            )
+                action = (
+                    "Ask the provider for the text encoding and a matching .cpg file. For Thai "
+                    "shapefiles, confirm whether it is UTF-8, TIS-620 or CP874."
+                )
+            elif layer.error_category == "truncated":
+                title = f"{layer.path} appears incomplete or damaged"
+                detail = (
+                    "The reader reported a truncated or corrupt dataset, not a text-encoding "
+                    "issue."
+                )
+                action = (
+                    "Ask the provider to re-export the complete dataset and verify its checksum "
+                    "after transfer."
+                )
+            else:
+                title = f"{layer.path} could not be read"
+                detail = layer.note or "The GIS reader rejected this layer."
+                action = (
+                    "Ask the provider to verify the format and required companion files, then "
+                    "re-export it if necessary."
+                )
+            findings.append(Finding("blocker", title, detail, layer.path, action))
             continue
         if layer.kind == "vector":
             findings.extend(
@@ -469,15 +587,14 @@ def choose_area_layer(
     problem. The layer whose names overlap the claimed names most is the one being referred to.
     """
 
-    from pyogrio.raw import read as read_vector
-
     wanted = {value for value in claimed if value}
     if not wanted:
         return (area_paths[0] if area_paths else None), 0.0
     scored: list[tuple[Path, float, int]] = []
     for path in area_paths:
         try:
-            meta, _, _, columns = read_vector(path, read_geometry=False)
+            result, _, _, _ = _read_vector(path, read_geometry=False)
+            meta, _, _, columns = result
         except Exception:  # noqa: BLE001 - an unreadable layer simply cannot be chosen
             continue
         values = _area_names(meta, columns)
@@ -506,12 +623,12 @@ def cross_check_points(
     than the one they name, and areas holding no points at all.
     """
 
-    from pyogrio.raw import read as read_vector
     from shapely import from_wkb
     from shapely.strtree import STRtree
 
     try:
-        point_meta, _, point_geoms, point_columns = read_vector(point_path, read_geometry=True)
+        point_result, _, _, _ = _read_vector(point_path, read_geometry=True)
+        point_meta, _, point_geoms, point_columns = point_result
     except Exception as error:  # noqa: BLE001 - reported, never raised
         logger.warning("Cross-check skipped: %s", type(error).__name__)
         return [], None
@@ -528,7 +645,8 @@ def cross_check_points(
     if area_path is None:
         return [], None
     try:
-        area_meta, _, area_geoms, area_columns = read_vector(area_path, read_geometry=True)
+        area_result, _, _, _ = _read_vector(area_path, read_geometry=True)
+        area_meta, _, area_geoms, area_columns = area_result
     except Exception as error:  # noqa: BLE001 - reported, never raised
         logger.warning("Cross-check skipped: %s", type(error).__name__)
         return [], None
