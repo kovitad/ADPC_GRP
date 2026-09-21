@@ -1,7 +1,7 @@
 # Demo mock feature implementation plan
 
 **Status:** Proposed implementation sequence  
-**Source reviewed:** `example/The_Demo_Mock_Version.docx` (seven embedded mock-up/architecture images)
+**Source reviewed:** local ignored file `example/The_Demo_Mock_Version.docx` (seven embedded mock-up/architecture images; not stored in Git)
 **Reviewed:** 20 September 2026
 
 ## 1. Purpose and guardrails
