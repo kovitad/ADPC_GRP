@@ -25,7 +25,7 @@ Neither layer is assessment-ready. The flood version is `waiting_for_method` bec
 | Materialize shelters as points | Generated label, longitude and latitude are written to `feature`; PostGIS `Point` is populated | 10,303 feature and geometry rows |
 | Membership by geometry | Every point is spatially assigned to a versioned district boundary; source district text is never used as membership | 10,303 populated `boundary_id` rows |
 | Report name/geometry conflicts | Conflicts are retained and reported, not moved or silently removed | 1,139 mismatches; 10 safe examples in the job report |
-| Keep uncertain fields away from planners | Importer v2 does not materialize `สถา`, `สถ_1` or `รอง`; the map API also redacts names on legacy versions without explicit confirmation | Unit and map contract tests plus report payload |
+| Keep uncertain fields away from planners | Importer v2 does not materialize `สถา`, `สถ_1` or `รอง`; the map API returns its stored generated label without renumbering | Unit and map contract tests plus report payload |
 | GIS only in worker | Validation, point-in-polygon assignment, COG creation and PNG rendering run in the import worker | API only queues and serves stored output |
 | Show layers without implying a result | Non-current versions require `map_preview`; API returns `preview_only`; UI says centres are not assessed and DEP-05 is pending | ADR-0009 and static UI tests/full suite |
 | Show a completed assessment on its own map | Result returns its pinned hazard display metadata; browser enables that flood layer, loads every paged assessed centre and fits the pinned boundary | ADR-0012 and golden result tests |

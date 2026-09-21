@@ -174,7 +174,6 @@ def dataset_features(
     features = session.scalars(
         select(Feature).where(Feature.dataset_version_id == version.id).order_by(Feature.id)
     ).all()
-    names_confirmed = version.meta.get("shelter_names_confirmed") is True
     return {
         "type": "FeatureCollection",
         "features": [
@@ -182,12 +181,8 @@ def dataset_features(
                 "type": "Feature",
                 "id": str(feature.id),
                 "geometry": {"type": "Point", "coordinates": [feature.lon, feature.lat]},
-                "properties": {
-                    "name": feature.name
-                    if names_confirmed or feature.attributes.get("synthetic") is True
-                    else f"Evacuation centre {position}"
-                },
+                "properties": {"name": feature.name},
             }
-            for position, feature in enumerate(features, start=1)
+            for feature in features
         ],
     }

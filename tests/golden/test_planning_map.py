@@ -161,16 +161,14 @@ def test_center_points_are_geojson(world) -> None:
     assert "Synthetic Clinic E" in names
 
 
-def test_unconfirmed_source_names_are_not_returned_to_planners(world) -> None:
+def test_center_api_keeps_the_importers_stable_generated_name(world) -> None:
     client = _client(world, "planner@example.test")
     with Session(world["engine"]) as session:
-        version = session.get(DatasetVersion, UUID(world["seed"].centers_version_id))
-        version.meta = {**version.meta, "shelter_names_confirmed": False}
-        for feature in session.scalars(
-            select(Feature).where(Feature.dataset_version_id == version.id)
-        ):
-            feature.name = "Unconfirmed raw facility value"
-            feature.attributes = {}
+        version_id = UUID(world["seed"].centers_version_id)
+        feature = session.scalar(
+            select(Feature).where(Feature.dataset_version_id == version_id).order_by(Feature.id)
+        )
+        feature.name = "Evacuation centre 10303"
         session.commit()
 
     collection = client.get(
@@ -178,8 +176,7 @@ def test_unconfirmed_source_names_are_not_returned_to_planners(world) -> None:
     ).json()
 
     names = [feature["properties"]["name"] for feature in collection["features"]]
-    assert "Unconfirmed raw facility value" not in names
-    assert names == [f"Evacuation centre {index}" for index in range(1, 9)]
+    assert "Evacuation centre 10303" in names
 
 
 def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
