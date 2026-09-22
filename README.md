@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** Increment 0 is complete and the first access-control slice is implemented early. GRP now discovers the OAuth server from the SIG MCP resource, supports authorization-code/PKCE sign-in for existing SIG accounts, records denied sign-ins in the security log, and enforces GRP-owned Hub membership. A localhost public client can be registered with the supplied command; staging still needs its own callback-specific client ID. Assessment, GIS, downloads, AI execution, and SIG evidence screens remain unimplemented.
+> **Current status:** The local Docker Desktop build includes access and Admin controls, the metered AI gateway, Planner chat/map, receipt-bound SIG hazard/risk embeds, and the managed Thailand baseline. Under ADR-0015's explicit Product Owner approval assumption, Platform Admins can record the versioned SIG risk recipe and activate the imported boundaries, evacuation centres and RP100 hazard. ADR-0016 makes Planning display those available layers immediately; a queued assessment is optional rather than a prerequisite for seeing data. Local assessment proofs succeeded for Mueang Nan and Bang Bua Thong. Staging has not been deployed; see [`handovers.md`](handovers.md) for the exact revision, validation record and remaining production gates.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -28,7 +28,7 @@ api/              FastAPI entry point and bounded API modules
 worker/           Background job and GIS-worker boundary
 core/             Shared models, validation, result rules, and storage protocol
 migrations/       Alembic environment and versioned database migrations
-grp/              Server-side access administration commands
+grpcli/           Server-side access administration commands
 web/              Existing-SIG registration, sign-in, and protected workspace screens
 deploy/           Ubuntu Compose, Caddy, and deployment guidance
 tests/            Fast, contract, golden, live, and load test layers
@@ -60,13 +60,13 @@ Replace the sample with the administrator's verified SIG email. The admin then o
 
 ## LLM token preparation
 
-AI remains disabled, but both environment templates contain provider, model, base URL, output limit, and `AI_KEY_FILE_ADPC`. Store a local token through hidden input:
+AI is enabled only in the local Docker Desktop configuration and still defaults off for server deployments. Both environment templates contain provider, model, base URL, output limit, and `AI_KEY_FILE_ADPC`. Store a local token through hidden input:
 
 ```powershell
-python -m grp.configure set-ai-key
+python -m grpcli.configure set-ai-key
 ```
 
-This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Enabling `AI_FEATURE_ENABLED` does not yet add LLM behavior.
+This writes `.local/secrets/ai_key_adpc`, which Git ignores. On staging, place the token at `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`. Never put the raw token in `.env`; `.env` contains only the file path. Do not enable AI outside the approved local configuration until its deployment and budget controls are accepted.
 
 ## Run in Docker Desktop
 
@@ -77,6 +77,17 @@ The local stack runs PostGIS, Alembic migrations, the API (with the web screens)
 ```
 
 Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scripts\run-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
+
+## Run on a shared Ubuntu host
+
+When another application already owns ports 80/443, run the local demo stack on the Ubuntu loopback address and reach it through an SSH tunnel:
+
+```bash
+./scripts/docker-ubuntu.sh --register-sig-client --configure-ai --configure-langfuse \
+  --admin-email you@adpc.net --hub-admin-email you@adpc.net
+```
+
+This binds only to `127.0.0.1:8000` and does not install or change Caddy. Keep port 8000 closed in the AWS security group; configure a PuTTY local tunnel from port 8000 to `127.0.0.1:8000`, then browse to `http://127.0.0.1:8000`. See [`deploy/UBUNTU_SHARED_HOST.md`](deploy/UBUNTU_SHARED_HOST.md) for prerequisites, reruns, status, shutdown, OAuth, and secret handling.
 
 ## Sign-in and membership mapping
 
@@ -113,7 +124,7 @@ make compose-config  # validate the staging Compose model
 
 Development follows the approved increments: server foundation; signed Chiang Yuen RP100 golden assessment; access and Admin; SIG sharing and evidence; review/downloads; additional data; vulnerability and AI; pilot hardening. The access foundation was brought forward to support the requested SIG account test. No fallback geography, dataset, or provider is permitted.
 
-The next assessment work is Increment 1: add its remaining architecture-defined tables and build the queued assessment workflow against a scientifically approved Chiang Yuen RP100 golden fixture. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
+The queued assessment workflow is proved by the locked synthetic fixture and by local real-data execution against the imported six-tile RP100 baseline. Formal production acceptance still needs the authority-signed Chiang Yuen golden artifact; expected values must never be invented to make a test pass. The activation and recipe decision are recorded in [`ADR-0015`](docs/adr/0015-approved-sig-risk-recipe-and-baseline-activation.md).
 
 ## Security
 

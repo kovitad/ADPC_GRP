@@ -29,11 +29,11 @@ from api.settings import Settings  # noqa: E402
 from core.access_models import AppUser, Base  # noqa: E402
 from core.ai_allowance import update_setting  # noqa: E402
 from core.assessment_jobs import claim_next_job, process_job  # noqa: E402
-from core.assessment_models import DatasetVersion  # noqa: E402
+from core.assessment_models import DatasetVersion, Feature  # noqa: E402
 from core.identity import IdentityLinkResult  # noqa: E402
 from core.storage import LocalStorage  # noqa: E402
-from grp.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
-from grp.seed import seed_synthetic_rp100  # noqa: E402
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
+from grpcli.seed import seed_synthetic_rp100  # noqa: E402
 
 
 @pytest.fixture
@@ -97,11 +97,40 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
 
     flood = layers["flood"][0]
     assert flood["return_period_years"] == 100 and flood["available"] is True
+    assert flood["synthetic"] is True
     south_west, north_east = flood["bounds"]
     assert south_west == pytest.approx([14.99, 100.0])
     assert north_east == pytest.approx([15.11, 100.12])
     assert len(layers["flood_legend"]["classes"]) == 5
+    assert all(
+        item["rgba"][0] > item["rgba"][2]
+        for item in layers["flood_legend"]["classes"]
+    )
+    assert layers["flood_scenarios"] == [
+        {
+            "return_period_years": 20,
+            "label": "RP20",
+            "available": False,
+            "layer_id": None,
+            "message": "Not imported into the managed data library yet.",
+        },
+        {
+            "return_period_years": 50,
+            "label": "RP50",
+            "available": False,
+            "layer_id": None,
+            "message": "Not imported into the managed data library yet.",
+        },
+        {
+            "return_period_years": 100,
+            "label": "RP100",
+            "available": True,
+            "layer_id": flood["id"],
+            "message": None,
+        },
+    ]
     assert layers["evacuation_centers"][0]["title"] == "Synthetic evacuation centers"
+    assert layers["evacuation_centers"][0]["synthetic"] is True
     assert layers["vulnerability"]["available"] is False
     assert "Increment 6" in layers["vulnerability"]["message"]
 
@@ -130,6 +159,26 @@ def test_center_points_are_geojson(world) -> None:
     assert collection["type"] == "FeatureCollection"
     assert len(collection["features"]) == 8
     assert collection["features"][0]["geometry"]["type"] == "Point"
+    names = {feature["properties"]["name"] for feature in collection["features"]}
+    assert "Synthetic Clinic E" in names
+
+
+def test_center_api_keeps_the_importers_stable_generated_name(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        version_id = UUID(world["seed"].centers_version_id)
+        feature = session.scalar(
+            select(Feature).where(Feature.dataset_version_id == version_id).order_by(Feature.id)
+        )
+        feature.name = "Evacuation centre 10303"
+        session.commit()
+
+    collection = client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
+    ).json()
+
+    names = [feature["properties"]["name"] for feature in collection["features"]]
+    assert "Evacuation centre 10303" in names
 
 
 def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
@@ -142,6 +191,46 @@ def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
     assert planner.get(
         f"/api/v1/maps/hazard/{world['seed'].centers_version_id}/overlay.png"
     ).status_code == 404
+
+
+def test_map_bytes_hide_non_current_versions_without_preview_permission(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        for version_id in (world["seed"].hazard_version_id, world["seed"].centers_version_id):
+            version = session.get(DatasetVersion, UUID(version_id))
+            version.is_current = False
+            version.meta = {
+                key: value for key, value in version.meta.items() if key != "map_preview"
+            }
+        session.commit()
+
+    layers = client.get("/api/v1/maps/layers").json()
+
+    assert layers["flood"] == []
+    assert layers["evacuation_centers"] == []
+    assert client.get(
+        f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
+    ).status_code == 404
+
+
+def test_map_bytes_allow_explicit_non_current_previews(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        for version_id in (world["seed"].hazard_version_id, world["seed"].centers_version_id):
+            version = session.get(DatasetVersion, UUID(version_id))
+            version.is_current = False
+            version.meta = {**version.meta, "map_preview": True}
+        session.commit()
+
+    assert client.get(
+        f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
+    ).status_code == 200
+    assert client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
+    ).status_code == 200
 
 
 def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:

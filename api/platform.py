@@ -9,6 +9,7 @@ from api.dependencies import DatabaseSession
 from api.errors import GrpError, not_found, validation_failed
 from api.langfuse import langfuse_configured
 from api.permissions import PlatformAdmin
+from api.planning_cache import planning_answer_cache
 from api.settings import get_settings
 from core.access_models import AuditEvent, AuditResult
 from core.ai_allowance import (
@@ -19,7 +20,9 @@ from core.ai_allowance import (
     reset_person_usage,
     update_setting,
 )
-from grp.admin import (
+from core.baseline_activation import BaselineActivationError, activate_mvp1_baseline
+from core.risk_recipe import active_risk_recipe, approve_risk_recipe, recipe_payload
+from grpcli.admin import (
     HubAccessDenied,
     ItemNotFound,
     create_hub_as_actor,
@@ -44,6 +47,16 @@ class HubStatusUpdate(BaseModel):
     status: Literal["active", "closed"]
 
 
+class RiskRecipeUpdate(BaseModel):
+    version: str = Field(min_length=1, max_length=64)
+    population_weight: float = Field(ge=0, le=1)
+    building_density_weight: float = Field(ge=0, le=1)
+    road_distance_weight: float = Field(ge=0, le=1)
+    science_owner: str = Field(min_length=1, max_length=200)
+    source_ref: str = Field(min_length=1, max_length=300)
+    change_reason: str = Field(min_length=1, max_length=500)
+
+
 def _setting_payload(setting, feature_enabled: bool) -> dict[str, object]:
     return {
         "token_limit_per_person": setting.token_limit_per_person,
@@ -62,6 +75,73 @@ def _setting_payload(setting, feature_enabled: bool) -> dict[str, object]:
 def read_ai_setting(principal: PlatformAdmin, session: DatabaseSession) -> dict[str, object]:
     del principal
     return _setting_payload(load_setting(session), get_settings().ai_feature_enabled)
+
+
+@router.get(
+    "/risk-recipe",
+    summary="Read the active approved SIG risk recipe",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_risk_recipe(
+    principal: PlatformAdmin, session: DatabaseSession
+) -> dict[str, object]:
+    del principal
+    recipe = active_risk_recipe(session)
+    session.commit()
+    return recipe_payload(recipe)
+
+
+@router.put(
+    "/risk-recipe",
+    summary="Record a new approved SIG risk-recipe version",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def change_risk_recipe(
+    update: RiskRecipeUpdate, principal: PlatformAdmin, session: DatabaseSession
+) -> dict[str, object]:
+    try:
+        recipe = approve_risk_recipe(
+            session,
+            actor_user_id=principal.user_id,
+            version=update.version,
+            weights={
+                "population": update.population_weight,
+                "building_density": update.building_density_weight,
+                "road_distance": update.road_distance_weight,
+            },
+            science_owner=update.science_owner,
+            source_ref=update.source_ref,
+            change_reason=update.change_reason,
+        )
+        session.commit()
+    except ValueError as error:
+        session.rollback()
+        raise validation_failed(str(error)) from error
+    planning_answer_cache.clear()
+    return recipe_payload(recipe)
+
+
+@router.post(
+    "/mvp1/activate",
+    summary="Activate the approved Thailand MVP 1 baseline",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def activate_baseline(
+    principal: PlatformAdmin, session: DatabaseSession
+) -> dict[str, object]:
+    try:
+        active_risk_recipe(session)
+        result = activate_mvp1_baseline(
+            session,
+            actor_user_id=principal.user_id,
+            actor_email=principal.email,
+        )
+        session.commit()
+    except BaselineActivationError as error:
+        session.rollback()
+        raise GrpError(409, "VALIDATION_FAILED", str(error)) from error
+    planning_answer_cache.clear()
+    return {"changed": True, **result}
 
 
 @router.put(

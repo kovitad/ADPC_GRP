@@ -34,8 +34,8 @@ from core.assessment_jobs import claim_next_job, process_job  # noqa: E402
 from core.assessment_models import Assessment, AssessmentFeature, Feature  # noqa: E402
 from core.identity import IdentityLinkResult  # noqa: E402
 from core.storage import LocalStorage  # noqa: E402
-from grp.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
-from grp.seed import seed_synthetic_rp100  # noqa: E402
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
+from grpcli.seed import seed_synthetic_rp100  # noqa: E402
 
 CASE = Path(__file__).parent / "synthetic_rp100"
 
@@ -145,6 +145,10 @@ def test_synthetic_case_matches_hand_designed_expected_result_exactly(world) -> 
 
     expected_summary = json.loads((CASE / "expected_summary.json").read_text(encoding="utf-8"))
     assert result["summary"] == expected_summary
+    assert result["map"]["version_id"] == world["seed"].hazard_version_id
+    assert result["map"]["return_period_years"] == 100
+    assert result["map"]["palette"] == "red_depth_v1"
+    assert result["map"]["image_url"].endswith("/overlay.png")
 
     with (CASE / "expected_centers.csv").open(encoding="utf-8", newline="") as handle:
         expected = [
@@ -160,6 +164,8 @@ def test_synthetic_case_matches_hand_designed_expected_result_exactly(world) -> 
 
     # Trust facts are separate and honest about synthetic, unapproved inputs (principle 6).
     assert result["synthetic"] is True
+    assert result["input_compatible"] is True
+    assert result["input_warning"] is None
     assert result["trust"]["scientifically_approved"] is False
     assert any("SYNTHETIC" in gap for gap in result["gaps"])
     assert result["sharing_state"] == "private"

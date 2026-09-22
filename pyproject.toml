@@ -28,16 +28,18 @@ dev = [
 ]
 gis = [
   "rasterio>=1.4,<2",
+  "pyogrio>=0.10,<1",
   "shapely>=2.0,<3",
 ]
 
 [tool.setuptools.packages.find]
-include = ["api*", "core*", "grp*", "worker*"]
+include = ["api*", "core*", "grpcli*", "worker*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]
 markers = [
+  "fast: isolated rule checks that never touch the network",
   "contract: API and integration contract checks",
   "golden: signed scientific golden-case checks",
   "live: tests requiring approved staging services",
@@ -52,4 +54,4 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api", "core", "grp", "worker"]
+known-first-party = ["api", "core", "grpcli", "worker"]

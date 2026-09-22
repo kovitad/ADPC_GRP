@@ -12,6 +12,8 @@ from api import (
     audit,
     auth,
     catalog,
+    data_inspector,
+    data_library,
     health,
     maps,
     planning,
@@ -33,8 +35,21 @@ app = FastAPI(
 register_error_handlers(app)
 
 for module in (
-    health, auth, access, admin, platform, planning, maps, catalog,
-    uploads, assessments, ai, audit, sig,
+    health,
+    auth,
+    access,
+    admin,
+    platform,
+    planning,
+    maps,
+    catalog,
+    uploads,
+    assessments,
+    ai,
+    audit,
+    sig,
+    data_inspector,
+    data_library,
 ):
     app.include_router(module.router, prefix="/api/v1")
 
@@ -43,6 +58,7 @@ for module in (
 @app.get("/admin/", include_in_schema=False)
 def admin_login() -> RedirectResponse:
     return RedirectResponse(url="/admin-login.html", status_code=303)
+
 
 if settings.grp_env == "dev":
 

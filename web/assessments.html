@@ -7,10 +7,10 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Flood assessment | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="/styles.css?v=20260917m" />
+    <link rel="stylesheet" href="/styles.css?v=20260922a" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="/grp-common.js?v=20260917n" defer></script>
-    <script src="/assessments.js?v=20260917l" defer></script>
+    <script src="/grp-common.js?v=20260920a" defer></script>
+    <script src="/assessments.js?v=20260922a" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -53,6 +53,7 @@
             Run assessment
           </button>
         </form>
+        <p class="assignment-status" data-compatibility-note></p>
         <p class="assignment-status" data-submit-status aria-live="polite"></p>
       </section>
 
@@ -60,12 +61,16 @@
         <p class="synthetic-banner" data-synthetic hidden>
           SYNTHETIC TEST DATA — invented inputs for software testing. Not a scientific result.
         </p>
+        <p class="incompatible-banner" data-incompatible hidden></p>
         <div class="admin-card__heading">
           <div>
             <p class="eyebrow" data-result-eyebrow>Result</p>
             <h2 id="result-heading" data-result-title>Assessment</h2>
           </div>
-          <span class="status-pill" data-state-pill>…</span>
+          <div class="assessment-result-actions">
+            <a class="button button--secondary" data-open-planning href="/planning.html" hidden>Open in Planning</a>
+            <span class="status-pill" data-state-pill>…</span>
+          </div>
         </div>
         <p class="admin-card__intro" data-result-meta></p>
         <div class="metric-row" data-totals></div>

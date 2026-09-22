@@ -92,16 +92,16 @@ docker @Compose up -d --build --wait
 if ($LASTEXITCODE -ne 0) { throw "docker compose up failed; see: docker compose -f deploy/compose.desktop.yml logs" }
 
 # Synthetic RP100 test case for Increment 1 (idempotent).
-docker @Compose exec api python -m grp.seed synthetic-rp100
+docker @Compose exec api python -m grpcli.seed synthetic-rp100
 
 foreach ($email in $AdminEmail) {
-    docker @Compose exec api python -m grp.admin bootstrap-platform-admin --email $email
-    docker @Compose exec api python -m grp.admin ensure-hub --actor-email $email --code adpc --name "ADPC Hub"
+    docker @Compose exec api python -m grpcli.admin bootstrap-platform-admin --email $email
+    docker @Compose exec api python -m grpcli.admin ensure-hub --actor-email $email --code adpc --name "ADPC Hub"
 }
 
 foreach ($email in $HubAdminEmail) {
     $actor = if ($AdminEmail.Count -gt 0) { $AdminEmail[0] } else { $email }
-    docker @Compose exec api python -m grp.admin assign-member --actor-email $actor --email $email --hub-code adpc --role admin
+    docker @Compose exec api python -m grpcli.admin assign-member --actor-email $actor --email $email --hub-code adpc --role admin
 }
 
 Write-Host ""

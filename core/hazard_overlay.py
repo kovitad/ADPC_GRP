@@ -12,13 +12,14 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-# Depth classes follow the SIG hazard severity scale shown to planners.
+# Sequential red depth tones make the hazard visually distinct from SERVIR blue navigation and
+# from the green/orange/grey assessment-center statuses. Colour never changes classification.
 DEPTH_CLASSES = [
-    {"label": "0–0.5 m", "min": 0.0, "max": 0.5, "rgba": [198, 219, 239, 150]},
-    {"label": "0.5–1 m", "min": 0.5, "max": 1.0, "rgba": [107, 174, 214, 170]},
-    {"label": "1–1.5 m", "min": 1.0, "max": 1.5, "rgba": [49, 130, 189, 185]},
-    {"label": "1.5–2 m", "min": 1.5, "max": 2.0, "rgba": [8, 81, 156, 195]},
-    {"label": "> 2 m", "min": 2.0, "max": None, "rgba": [8, 48, 107, 205]},
+    {"label": "0–0.5 m", "min": 0.0, "max": 0.5, "rgba": [254, 224, 210, 150]},
+    {"label": "0.5–1 m", "min": 0.5, "max": 1.0, "rgba": [252, 146, 114, 170]},
+    {"label": "1–1.5 m", "min": 1.0, "max": 1.5, "rgba": [251, 106, 74, 185]},
+    {"label": "1.5–2 m", "min": 1.5, "max": 2.0, "rgba": [203, 24, 29, 195]},
+    {"label": "> 2 m", "min": 2.0, "max": None, "rgba": [103, 0, 13, 215]},
 ]
 NO_DATA_RGBA = [120, 120, 120, 110]
 

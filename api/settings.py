@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     ai_feature_enabled: bool = False
     # Planner chat box and map using SIG generic evidence (ADR-0004). Docker Desktop only.
     planning_chat_enabled: bool = False
+    # Admin data inspector over a read-only source folder (ADR-0006). Docker Desktop only.
+    data_inspector_enabled: bool = False
+    data_in_root: Path = Path(".local/data-in")
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None
@@ -77,3 +80,13 @@ def planning_chat_available(settings: Settings) -> bool:
     """ADR-0004: the interim planning chat runs only in local development."""
 
     return settings.planning_chat_enabled and settings.grp_env == "dev"
+
+
+def data_inspector_available(settings: Settings) -> bool:
+    """ADR-0006: the Admin data inspector runs only in local development.
+
+    The source folder is mounted read-only by `deploy/compose.desktop.yml`. A server with the
+    flag on and no folder is handled by the routes, which report that none is configured.
+    """
+
+    return settings.data_inspector_enabled and settings.grp_env == "dev"

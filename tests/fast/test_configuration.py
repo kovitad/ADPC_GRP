@@ -1,6 +1,6 @@
 import pytest
 
-from grp.configure import write_secret_file
+from grpcli.configure import write_secret_file
 
 
 def test_secret_writer_does_not_overwrite_without_rotation_flag(tmp_path) -> None:

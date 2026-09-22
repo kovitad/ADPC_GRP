@@ -10,7 +10,7 @@
 
 `GRP-ARC-001` v2.2 Section 9.1 and dependency DEP-01 require SIG to register GRP as its own application in SIG's WorkOS login, with logins addressed to GRP only. Section 9.6 says a login addressed to SIG's MCP service must never be accepted by GRP, and Section 9.1 says login tokens are not stored.
 
-DEP-01 is not signed yet. To make progress, the current code (`api/oidc.py`, `grp/oauth.py`) discovers the authorization server from the SIG MCP resource metadata, registers a PKCE public client through dynamic client registration, and sends `resource=<SIG MCP URL>` in the authorization and token requests. The ID token audience is the registered client, and GRP verifies issuer, audience, signature, expiry, nonce and verified email. The access token that comes back is addressed to SIG's MCP service. On `main` it is discarded; on the `experiment/planning-chat` branch it is kept in process memory for the planning demo.
+DEP-01 is not signed yet. To make progress, the current code (`api/oidc.py`, `grpcli/oauth.py`) discovers the authorization server from the SIG MCP resource metadata, registers a PKCE public client through dynamic client registration, and sends `resource=<SIG MCP URL>` in the authorization and token requests. The ID token audience is the registered client, and GRP verifies issuer, audience, signature, expiry, nonce and verified email. The access token that comes back is addressed to SIG's MCP service. On `main` it is discarded; on the `experiment/planning-chat` branch it is kept in process memory for the planning demo.
 
 ## Decision
 
@@ -37,6 +37,6 @@ Accept this flow only as a temporary exception, for the Developer and Sandbox en
 ## Action items
 
 - [ ] Send the DEP-01 request to the SIG platform owner (GRP app for Sandbox, staging, production)
-- [ ] Replace `resource=` MCP discovery with the SIG-registered GRP client once available; delete `grp/oauth.py` registration command
+- [ ] Replace `resource=` MCP discovery with the SIG-registered GRP client once available; delete `grpcli/oauth.py` registration command
 - [ ] Add a callback test that rejects an ID token addressed to another client
 - [ ] Security owner approval of this interim exception

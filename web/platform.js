@@ -51,6 +51,22 @@
       }
     });
 
+  const loadRiskRecipe = () =>
+    GRP.request("/api/v1/platform/risk-recipe").then((recipe) => {
+      $("[data-risk-population]").value = recipe.weights.population * 100;
+      $("[data-risk-buildings]").value = recipe.weights.building_density * 100;
+      $("[data-risk-roads]").value = recipe.weights.road_distance * 100;
+      $("[data-risk-version]").value = recipe.version;
+      $("[data-risk-owner]").value = recipe.science_owner;
+      $("[data-risk-source]").value = recipe.source_ref;
+      $("[data-risk-reason]").value = recipe.change_reason;
+      const pill = $("[data-risk-recipe-state]");
+      pill.textContent = "Approved";
+      pill.dataset.state = "active";
+      $("[data-risk-recipe-status]").textContent =
+        `Active ${recipe.version} · approved ${GRP.formatTime(recipe.approved_at)} (Bangkok).`;
+    });
+
   const loadPeople = () =>
     GRP.request("/api/v1/platform/ai-usage/people").then((payload) => {
       const body = $("[data-people]");
@@ -172,6 +188,52 @@
     }
   });
 
+  $("[data-risk-recipe-form]").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const status = $("[data-risk-recipe-status]");
+    const button = event.submitter;
+    if (button) button.disabled = true;
+    status.textContent = "Saving approved recipe…";
+    try {
+      await GRP.request("/api/v1/platform/risk-recipe", {
+        method: "PUT",
+        body: {
+          version: $("[data-risk-version]").value.trim(),
+          population_weight: Number($("[data-risk-population]").value) / 100,
+          building_density_weight: Number($("[data-risk-buildings]").value) / 100,
+          road_distance_weight: Number($("[data-risk-roads]").value) / 100,
+          science_owner: $("[data-risk-owner]").value.trim(),
+          source_ref: $("[data-risk-source]").value.trim(),
+          change_reason: $("[data-risk-reason]").value.trim(),
+        },
+      });
+      await Promise.all([loadRiskRecipe(), loadLog()]);
+      status.textContent += " New SIG evidence requests will pin this version.";
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+
+  $("[data-activate-mvp1]").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const status = $("[data-activation-status]");
+    button.disabled = true;
+    status.textContent = "Activating the approved baseline…";
+    try {
+      const result = await GRP.request("/api/v1/platform/mvp1/activate", { method: "POST" });
+      status.textContent =
+        `Activated RP100 for ${result.supported_districts.toLocaleString()} districts. ` +
+        "No-data cells remain Unable to assess.";
+      await loadLog();
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   $("[data-test-form]").addEventListener("submit", async (event) => {
     event.preventDefault();
     const status = $("[data-test-status]");
@@ -225,7 +287,9 @@
       }
       statusText.textContent = `Signed in as ${identity.email}. Changes here are written to the security log.`;
       $("[data-platform-content]").hidden = false;
-      return Promise.all([loadHealth(), loadSetting(), loadPeople(), loadHubs(), loadLog()]);
+      return Promise.all([
+        loadHealth(), loadRiskRecipe(), loadSetting(), loadPeople(), loadHubs(), loadLog(),
+      ]);
     })
     .catch((error) => {
       if (error.status === 401 || error.status === 403) {

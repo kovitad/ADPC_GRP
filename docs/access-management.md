@@ -17,7 +17,7 @@ This first slice exposes the notification in the protected Platform Admin worksp
 A SIG account is necessary but not sufficient. GRP discovers the authorization server from `SIG_MCP_BASE_URL` and requests the MCP resource audience. Register a callback-specific public PKCE client once:
 
 ```bash
-python -m grp.oauth register-client \
+python -m grpcli.oauth register-client \
   --redirect-uri https://staging-risk-servir.adpc.net/api/v1/auth/callback \
   --client-name "ADPC GRP staging" \
   --output-file .local/staging_servir_client_id
@@ -51,19 +51,19 @@ Run these from the VM after deployment. Enter emails in the shell; never write t
 cd /srv/grp/app
 read -r -p "Platform Admin email: " GRP_ADMIN_EMAIL
 sudo docker compose --env-file .env -f deploy/compose.yml run --rm --no-deps api \
-  python -m grp.admin bootstrap-platform-admin --email "$GRP_ADMIN_EMAIL"
+  python -m grpcli.admin bootstrap-platform-admin --email "$GRP_ADMIN_EMAIL"
 sudo docker compose --env-file .env -f deploy/compose.yml run --rm --no-deps api \
-  python -m grp.admin ensure-hub --actor-email "$GRP_ADMIN_EMAIL" --code adpc --name "ADPC Hub"
+  python -m grpcli.admin ensure-hub --actor-email "$GRP_ADMIN_EMAIL" --code adpc --name "ADPC Hub"
 ```
 
 After the user attempts sign-in, the Platform Admin can assign the request from the workspace. These commands provide a server-side fallback:
 
 ```bash
 sudo docker compose --env-file .env -f deploy/compose.yml run --rm --no-deps api \
-  python -m grp.admin list-access-requests
+  python -m grpcli.admin list-access-requests
 read -r -p "Member email: " GRP_MEMBER_EMAIL
 sudo docker compose --env-file .env -f deploy/compose.yml run --rm --no-deps api \
-  python -m grp.admin assign-member --actor-email "$GRP_ADMIN_EMAIL" \
+  python -m grpcli.admin assign-member --actor-email "$GRP_ADMIN_EMAIL" \
   --email "$GRP_MEMBER_EMAIL" --hub-code adpc --role hub_expert
 unset GRP_ADMIN_EMAIL GRP_MEMBER_EMAIL
 ```

@@ -40,9 +40,11 @@ window.GRP = (() => {
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-          Object.keys(sessionStorage)
-            .filter((key) => key.startsWith("grp."))
-            .forEach((key) => sessionStorage.removeItem(key));
+          [sessionStorage, localStorage].forEach((store) =>
+            Object.keys(store)
+              .filter((key) => key.startsWith("grp."))
+              .forEach((key) => store.removeItem(key)),
+          );
         } catch (_error) {
           // Nothing stored or storage blocked.
         }
@@ -105,6 +107,8 @@ window.GRP = (() => {
     { key: "assessments", label: "Assessments", href: "/assessments.html" },
     { key: "access", label: "My access", href: "/workspace.html" },
     { key: "admin", label: "Administration", href: "/workspace.html#admin-panel", attr: "data-admin-menu", hidden: true },
+    { key: "data", label: "Source data", href: "/data-inspector.html", attr: "data-data-menu", hidden: true },
+    { key: "library", label: "Data library", href: "/data-library.html", attr: "data-library-menu", hidden: true },
     { key: "platform", label: "Platform", href: "/platform.html", attr: "data-platform-menu", hidden: true },
   ];
   const PAGE_KEYS = {
@@ -112,6 +116,9 @@ window.GRP = (() => {
     "/assessments.html": "assessments",
     "/workspace.html": "access",
     "/platform.html": "platform",
+    "/data-inspector.html": "data",
+    "/data-preview.html": "data",
+    "/data-library.html": "library",
   };
 
   let mePromise = null;
@@ -169,7 +176,11 @@ window.GRP = (() => {
     signOut.className = "grp-topbar__signout";
     signOut.dataset.signOut = "";
     signOut.textContent = "Sign out";
-    user.append(who, signOut);
+    const running = document.createElement("a");
+    running.className = "grp-topbar__jobs";
+    running.dataset.topbarJobs = "";
+    running.hidden = true;
+    user.append(running, who, signOut);
 
     slot.append(brand, nav, user);
 
@@ -179,14 +190,138 @@ window.GRP = (() => {
         who.title = identity.email;
         const isHubAdmin = identity.memberships.some((m) => m.role === "admin");
         nav.querySelector('[data-nav="admin"]').hidden = !(isHubAdmin || identity.is_platform_admin);
+        nav.querySelector('[data-nav="data"]').hidden = !(isHubAdmin || identity.is_platform_admin);
+        nav.querySelector('[data-nav="library"]').hidden = !(isHubAdmin || identity.is_platform_admin);
         nav.querySelector('[data-nav="platform"]').hidden = !identity.is_platform_admin;
       })
       .catch(() => {});
   };
 
+  // Background jobs the person started (assessments, source data checks). The server keeps
+  // running them whatever page or tab is open; this remembers them across tabs so any page can say
+  // "still running" and announce when one finishes. The page that owns a job shows the result
+  // itself, so it is not announced there.
+  const JOBS_KEY = "grp.jobs.v1";
+  const JOB_POLL_MS = 5000;
+  let jobTimer = null;
+
+  const readJobs = () => {
+    try {
+      return JSON.parse(localStorage.getItem(JOBS_KEY) || "[]");
+    } catch (_error) {
+      return [];
+    }
+  };
+
+  const writeJobs = (jobs) => {
+    try {
+      localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
+    } catch (_error) {
+      // Storage blocked: the job still runs, there is just no reminder on other pages.
+    }
+  };
+
+  const showJobCount = () => {
+    const pill = document.querySelector("[data-topbar-jobs]");
+    if (!pill) return;
+    const jobs = readJobs();
+    pill.hidden = jobs.length === 0;
+    if (!jobs.length) return;
+    pill.textContent = jobs.length === 1 ? `Running: ${jobs[0].label}` : `${jobs.length} jobs running`;
+    pill.href = jobs[0].href;
+    pill.title = "Still running in the background. You can keep working; you will be told when it finishes.";
+  };
+
+  const toastRegion = () => {
+    let region = document.querySelector("[data-grp-toasts]");
+    if (!region) {
+      region = document.createElement("div");
+      region.className = "grp-toasts";
+      region.dataset.grpToasts = "";
+      region.setAttribute("role", "status");
+      region.setAttribute("aria-live", "polite");
+      document.body.append(region);
+    }
+    return region;
+  };
+
+  const notify = (job, ok, detail) => {
+    const toast = document.createElement("div");
+    toast.className = `grp-toast${ok ? "" : " is-failed"}`;
+    const text = document.createElement("p");
+    text.textContent = ok ? `${job.label} is ready.` : `${job.label} stopped${detail ? `: ${detail}` : ""}.`;
+    const open = document.createElement("a");
+    open.href = job.href;
+    open.textContent = ok ? "Open" : "See details";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.setAttribute("aria-label", "Dismiss");
+    close.textContent = "×";
+    close.addEventListener("click", () => toast.remove());
+    toast.append(text, open, close);
+    toastRegion().append(toast);
+    if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+      try {
+        new Notification("Global Risk Platform", { body: text.textContent });
+      } catch (_error) {
+        // Some browsers allow notifications only from a service worker; the toast is enough.
+      }
+    }
+  };
+
+  const checkJobs = async () => {
+    window.clearTimeout(jobTimer);
+    const jobs = readJobs();
+    if (!jobs.length) {
+      showJobCount();
+      return;
+    }
+    const finished = new Set();
+    await Promise.all(
+      jobs.map(async (job) => {
+        try {
+          const status = await request(job.statusPath);
+          if (status.state === "succeeded" || status.state === "failed" || status.state === "cancelled") {
+            finished.add(job.id);
+            if (window.location.pathname !== job.ownerPath) {
+              notify(job, status.state === "succeeded", status.error_code);
+            }
+          }
+        } catch (error) {
+          // Gone (404) or no longer allowed: stop watching it. Anything else, try again later.
+          if (error.status === 404 || error.status === 403) finished.add(job.id);
+        }
+      }),
+    );
+    if (finished.size) writeJobs(readJobs().filter((job) => !finished.has(job.id)));
+    showJobCount();
+    if (readJobs().length) jobTimer = window.setTimeout(checkJobs, JOB_POLL_MS);
+  };
+
+  const jobs = {
+    // job: { id, label, statusPath, href, ownerPath }
+    track(job) {
+      writeJobs([...readJobs().filter((item) => item.id !== job.id), job]);
+      showJobCount();
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+      jobTimer = window.setTimeout(checkJobs, JOB_POLL_MS);
+    },
+    done(id) {
+      writeJobs(readJobs().filter((item) => item.id !== id));
+      showJobCount();
+    },
+    list() {
+      return readJobs();
+    },
+  };
+
   renderTopbar();
+  if (document.querySelector("[data-grp-topbar]")) checkJobs();
 
   return {
+    jobs,
     me,
     request,
     bindSignOut,

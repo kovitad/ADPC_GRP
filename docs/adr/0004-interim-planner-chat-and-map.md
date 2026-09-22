@@ -19,7 +19,7 @@ Add `POST /api/v1/planning/chat`, `GET /api/v1/planning/status` and `/planning.h
 - **SIG MCP:** a fixed sequence of `assemble_pack(risk, place, flood)`, then a gateway draft, then (only if the Planner ticks **Publish**) `publish_answer` and `ui_embed(hazard_map)`. It uses the person's SERVIR access token, held in process memory under ADR-0002.
 - **Area check (stop safely):** an AI-proposed place alone cannot start a GRP assessment or SIG request. The Planner must explicitly name a supported GRP boundary, select it on the map, or confirm the proposed place in chat; automatic map highlighting is not selection. Full boundary names, including province when recorded, must match uniquely. An explicitly confirmed place overrides a conflicting model proposal. Evidence is shown only if the pack's `trace` states `aoi[...] via admin boundary` and the AOI name matches that confirmed place. Otherwise no numbers, draft or receipt are shown.
 - **Receipts:** off by default. Without Publish the answer is labelled "Unverified draft". If SIG's gate blocks a published draft, the draft is withheld.
-- **Map:** an OpenStreetMap basemap, plus an OSM search outline for orientation only. A voluntary **Use my location** action asks the browser for location permission, then sends the coordinates to OpenStreetMap Nominatim to identify a Thailand district. Only Nominatim's administrative district fields (`city_district` or `county`) are accepted; a city-wide, neighbourhood or approximate result stops safely with no SIG request. It never creates a GRP assessment or persists coordinates; the person explicitly starts an SIG lookup from the returned district. SIG's receipt-bound hazard map iframe appears only after Publish. The analysis area stated by SIG is shown as text.
+- **Map:** an OpenStreetMap basemap, plus an OSM search outline for orientation only. A voluntary **Use my location** action asks the browser for location permission, then sends the coordinates to OpenStreetMap Nominatim to identify a Thailand district. Only a field that identifies a Thai district is accepted: the lookup checks the administrative zoom levels and fields used in Thailand (`county`, `suburb`, `city_district`, `state_district` and `district`) and rejects sub-district, city-wide, neighbourhood or approximate results with no SIG request. It never creates a GRP assessment or persists coordinates; the person explicitly starts an SIG lookup from the returned district. SIG's receipt-bound hazard map iframe appears only after Publish. The analysis area stated by SIG is shown as text.
 - **Records:** `planning_sig_evidence`, `planning_sig_area_rejected`, `sig_receipt_published` and `sig_receipt_blocked` in the security log. Chat text is not stored.
 
 ## Options considered
@@ -35,6 +35,9 @@ Add `POST /api/v1/planning/chat`, `GET /api/v1/planning/status` and `/planning.h
 - Not for Sandbox, staging or production. Moving it needs DEP-01, a security review, a spec update and a new decision.
 - The browser calls `nominatim.openstreetmap.org` and `unpkg.com` for the map. That is acceptable for a local test only.
 - The OSM outline is not the analysis area. The page says so.
+- The receipt-bound SIG component is described as **flood hazard and asset exposure**, not a
+  vulnerability-weighted risk map. Implementation and training guidance is in
+  `docs/flood-hazard-exposure-embed-design.md`.
 - When Increment 1 lands, the chat should explain stored GRP results instead of SIG generic packs.
 
 ## Action items

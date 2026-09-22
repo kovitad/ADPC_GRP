@@ -21,6 +21,7 @@
   const thread = $("[data-thread]");
   const input = $("[data-input]");
   const sendButton = $("[data-send]");
+  const requestedAssessmentId = new URLSearchParams(window.location.search).get("assessment_id");
 
   const state = {
     hubCode: null,
@@ -30,8 +31,10 @@
     explicitSelection: false,
     currentPlace: null,
     floodLayers: [],
+    floodScenarios: [],
     centersVersion: null,
     assessmentId: null,
+    sigConnected: false,
     pollTimer: null,
     busy: false,
     history: [],
@@ -39,9 +42,9 @@
 
   // ---------- keep the conversation when moving between menu pages ----------
   // Stored only in this browser tab (sessionStorage): gone when the tab closes or on sign-out.
-  // v2 deliberately starts a fresh local session: v1 restored the synthetic demo as the
-  // default map context, which is misleading for real-district SIG lookup.
-  const STORE_KEY = "grp.planning.v2";
+  // v4 discards local state created before assessment compatibility was enforced. Source records
+  // remain in the database; only this tab's stale selection/result state is cleared.
+  const STORE_KEY = "grp.planning.v4";
   const transcript = [];
   let restoring = false;
   let ownerEmail = null;
@@ -77,6 +80,7 @@
   }).addTo(map);
   const districtLayer = window.L.featureGroup().addTo(map);
   const centersLayer = window.L.featureGroup().addTo(map);
+  const centerRenderer = window.L.canvas({ padding: 0.35 });
   const placeLayer = window.L.featureGroup().addTo(map);
   let floodOverlay = null;
 
@@ -137,28 +141,54 @@
 
   // SIG answers: a compact status card, the brief folded underneath, details on the right.
   const addEvidenceMessage = (payload, question) => {
+    const packId = String((payload.evidence && payload.evidence.pack_id) || "");
+    if (payload.receipt && packId) {
+      const prior = Array.from(thread.children).find(
+        (node) => node.dataset.packId === packId && node.dataset.receipt === "no",
+      );
+      if (prior) prior.remove();
+    }
     if (!restoring) {
+      const priorIndex = payload.receipt && packId
+        ? transcript.findIndex((entry) => entry.kind === "evidence"
+          && entry.payload.evidence.pack_id === packId && !entry.payload.receipt)
+        : -1;
+      if (priorIndex >= 0) transcript.splice(priorIndex, 1);
       transcript.push({ kind: "evidence", payload, question });
       saveState();
     }
     const row = addMessage("assistant", "", {
       label: payload.label,
       record: false,
-      actions: [chipButton("Open map & evidence", () => renderEvidence(payload, question))],
+      actions: [chipButton(payload.map_url ? "Open summary, map & evidence" : "Open planning summary", () => renderEvidence(payload, question))],
     });
     const bubble = row.querySelector(".pw-bubble");
+    row.dataset.packId = packId;
+    row.dataset.receipt = payload.receipt ? "yes" : "no";
     bubble.classList.add("pw-bubble--evidence");
     bubble.prepend(statusCard(payload, question));
-    const brief = document.createElement("details");
-    brief.className = "pw-brief";
-    const summary = document.createElement("summary");
-    summary.textContent = "Read the brief";
-    const text = renderBrief(payload.answer, (n) => {
-      renderEvidence(payload, question);
-      focusCitation(n);
-    });
-    brief.append(summary, text);
-    bubble.querySelector(".pw-bubble__label").before(brief);
+    if (payload.answer && payload.answer.trim()) {
+      const brief = document.createElement("details");
+      brief.className = "pw-brief";
+      brief.open = payload.answer_source === "deterministic_fallback";
+      const summary = document.createElement("summary");
+      summary.textContent = payload.answer_source === "deterministic_fallback"
+        ? "Key findings from SIG evidence"
+        : "Read the brief";
+      const text = renderBrief(payload.answer, (n) => {
+        renderEvidence(payload, question);
+        focusCitation(n);
+      });
+      brief.append(summary, text);
+      bubble.querySelector(".pw-bubble__label").before(brief);
+    }
+    if (restoring && !state.sigConnected) {
+      const restored = document.createElement("p");
+      restored.className = "pw-draft-warning";
+      restored.textContent =
+        "Restored evidence from this browser tab. SIG is currently disconnected; sign in again before refreshing it.";
+      bubble.querySelector(".pw-bubble__label").before(restored);
+    }
     scrollDown();
   };
 
@@ -180,13 +210,18 @@
   // on typical timings and are replaced by the real step durations when the answer arrives.
   const addProgress = ({ publish = false } = {}) => {
     hideWelcome();
-    const steps = [
-      { label: "Understanding your question", after: 0 },
-      { label: "Finding the district and flood evidence on SIG (usually 20–90 s)", after: 4000 },
-      { label: "Checking SIG used the real district boundary", after: 30000 },
-      { label: "Writing the brief from the evidence", after: 45000 },
-    ];
-    if (publish) steps.push({ label: "SIG source check, receipt and flood map", after: 60000 });
+    const steps = publish
+      ? [
+          { label: "Checking the exact brief you reviewed", after: 0 },
+          { label: "Creating the public receipt if SIG accepts it", after: 5000 },
+          { label: "Loading SIG's receipt-bound hazard map", after: 12000 },
+        ]
+      : [
+          { label: "Understanding your question", after: 0 },
+          { label: "Finding the district and flood evidence on SIG (usually 20–90 s)", after: 4000 },
+          { label: "Checking SIG used the real district boundary", after: 30000 },
+          { label: "Writing the brief from the evidence", after: 45000 },
+        ];
     const row = document.createElement("div");
     row.className = "pw-msg pw-msg--assistant";
     const avatar = document.createElement("span");
@@ -247,7 +282,7 @@
     let list = null;
     text.split(/\n+/).forEach((raw) => {
       const line = raw.trim();
-      if (!line) return;
+      if (!line || /^#{1,6}\s*$/.test(line)) return;
       const heading = line.match(/^#{1,4}\s+(.*)$/);
       const bullet = line.match(/^[-*]\s+(.*)$/);
       let node;
@@ -271,6 +306,11 @@
       }
       box.append(node);
     });
+    if (!box.childNodes.length) {
+      const fallback = document.createElement("p");
+      fallback.textContent = "No formatted brief was returned. Review the evidence cards instead.";
+      box.append(fallback);
+    }
     return box;
   };
 
@@ -343,23 +383,21 @@
     const welcome = $("[data-welcome]");
     if (!welcome) return;
     const area = state.selected ? state.selected.name : null;
-    welcome.querySelector("h2").textContent = "What decision are you preparing for?";
+    welcome.querySelector("h2").textContent = "Explore the available flood information";
     const intro = welcome.querySelector("p");
     intro.textContent =
-      "For a Thailand district or sub-district and an agreed flood scenario, I can help you " +
-      "answer two linked questions: Where could people move? and Which vulnerable people need " +
-      "support? Then I can prepare a traceable preparedness investment brief. A red/yellow/green " +
-      "risk map is available as further information.";
+      "District boundaries, the available RP100 flood layer and evacuation-centre locations are " +
+      "shown immediately. Ask in your own words for SIG flood, risk or population information.";
     const box = $("[data-suggestions]");
     box.replaceChildren();
     [
       area
-        ? ["Where could people move?", `Run a 100-year flood assessment for ${area}`,
-          `Where could people move if a 100-year flood hits ${area}?`]
+        ? ["Show information for this district", `Flood, centres and SIG evidence for ${area}`,
+          `Show the available flood and population information for ${area}.`]
         : ["Use my current district", "Find your Thailand district before asking SIG",
           null],
-      ["Explain what the map shows", "After a result appears",
-        "Explain the result: which evacuation centers may be exposed and why?"],
+      ["Explain what the map shows", "Use the visible layers and their sources",
+        "Explain the flood and evacuation-centre data shown on the map."],
       ["Check SIG flood exposure", "Schools, hospitals and roads for a Thailand district",
         "Which schools and hospitals in Mueang Nan District, Nan are exposed to flooding?"],
     ].forEach(([title, detail, prompt]) => {
@@ -383,14 +421,14 @@
       coming.className = "pw-coming";
       welcome.append(coming);
     }
-    coming.innerHTML = "";
+    coming.replaceChildren();
     const strong = document.createElement("strong");
-    strong.textContent = "Coming next: ";
+    strong.textContent = "Available data: ";
     coming.append(
       strong,
       document.createTextNode(
-        "vulnerable people who need support (Increment 6), the preparedness investment brief, " +
-          "and the red/yellow/green risk map. Today the map shows flood depth and evacuation centers.",
+        "Thailand district boundaries, RP100 flood depth, evacuation-centre locations, and SIG " +
+          "hazard, risk and population values when SIG returns them.",
       ),
     );
   };
@@ -410,7 +448,10 @@
       const layer = window.L.geoJSON(boundary.geometry, { style: boundaryStyle(false) });
       layer.boundaryId = boundary.id;
       layer.bindTooltip(`${boundary.name}${boundary.synthetic ? " · synthetic" : ""}`, { sticky: true });
-      layer.on("click", () => selectBoundary(boundary, { announce: true }));
+      layer.on("click", (event) => {
+        window.L.DomEvent.stop(event);
+        selectBoundary(boundary, { announce: true });
+      });
       districtLayer.addLayer(layer);
     });
   };
@@ -420,12 +461,10 @@
     state.explicitSelection = explicit;
     if (explicit) {
       const districtToggle = $('[data-layer="districts"]');
-      const floodToggle = $('[data-layer="flood"]');
       const centersToggle = $('[data-layer="centers"]');
-      districtToggle.checked = floodToggle.checked = centersToggle.checked = true;
+      districtToggle.checked = centersToggle.checked = true;
       districtLayer.addTo(map);
       centersLayer.addTo(map);
-      if (floodOverlay) floodOverlay.addTo(map);
     }
     placeLayer.clearLayers();
     $("[data-place-chip]").hidden = true;
@@ -436,16 +475,41 @@
     renderWelcome();
     saveState();
     if (announce && !state.busy) {
-      addMessage("assistant", `${boundary.name} is selected. Ask me to run a flood assessment for it, or ask anything else.`, {
-        actions: [chipButton("Run 100-year flood assessment", () => send(`Run a 100-year flood assessment for ${boundary.name}`))],
+      addMessage("assistant", `${boundary.name} is selected. The available flood and evacuation-centre layers are shown on the map.`, {
+        actions: [chipButton("Show SIG information", () => send(`Show the available flood, risk and population information for ${boundary.name}.`))],
       });
     }
+  };
+
+  const selectedFloodLayer = () => {
+    const selectedId = $("[data-flood-scenario]").value;
+    return state.floodLayers.find((layer) => layer.id === selectedId) || null;
+  };
+
+  const configureFloodScenarios = (scenarios) => {
+    state.floodScenarios = scenarios || [];
+    const select = $("[data-flood-scenario]");
+    select.replaceChildren();
+    state.floodScenarios.forEach((scenario) => {
+      const option = document.createElement("option");
+      option.value = scenario.layer_id || `rp-${scenario.return_period_years}`;
+      option.textContent = `${scenario.label} · ${scenario.available ? "available" : "not imported"}`;
+      option.disabled = !scenario.available;
+      select.append(option);
+    });
+    const preferred = state.floodScenarios.find((scenario) => scenario.return_period_years === 100 && scenario.available)
+      || state.floodScenarios.find((scenario) => scenario.available);
+    select.disabled = !preferred;
+    if (preferred) select.value = preferred.layer_id;
+    $("[data-flood-scenario-note]").textContent = preferred
+      ? "Choose a return period, then check Flood depth to draw it. RP20 and RP50 stay disabled until their source versions are imported."
+      : "No flood-depth scenario has been imported.";
   };
 
   const loadFloodOverlay = async (layer) => {
     if (floodOverlay) floodOverlay.remove();
     floodOverlay = null;
-    if (!layer || !layer.available || !layer.bounds) return;
+    if (!layer || layer.available === false || !layer.bounds) return;
     const response = await fetch(layer.image_url, { credentials: "same-origin" });
     if (!response.ok) return;
     const url = URL.createObjectURL(await response.blob());
@@ -484,8 +548,8 @@
     centersLayer.clearLayers();
     collection.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
-      window.L.circleMarker([lat, lon], { radius: 6, color: "#374151", weight: 2, fillColor: "#fff", fillOpacity: 1 })
-        .bindPopup(popup(feature.properties.name, ["Evacuation center · not assessed yet"]))
+      window.L.circleMarker([lat, lon], { renderer: centerRenderer, radius: 4, color: "#374151", weight: 1, fillColor: "#fff", fillOpacity: 0.9 })
+        .bindPopup(popup(feature.properties.name, [state.centersVersion.title, state.centersVersion.provider]))
         .addTo(centersLayer);
     });
   };
@@ -504,6 +568,10 @@
         .addTo(centersLayer);
     });
   };
+
+  $("[data-flood-scenario]").addEventListener("change", async () => {
+    await loadFloodOverlay(selectedFloodLayer());
+  });
 
   document.querySelectorAll("[data-layer]").forEach((toggle) => {
     toggle.addEventListener("change", () => {
@@ -529,22 +597,69 @@
   const showProgress = (title) => {
     resultCard.hidden = false;
     $("[data-synthetic]").hidden = true;
+    $("[data-incompatible-result]").hidden = true;
     $("[data-result-title]").textContent = title;
     $("[data-result-meta]").textContent = "Screening evacuation centers in the background…";
     $("[data-progress]").hidden = false;
     $("[data-stats]").replaceChildren();
+    $("[data-result-summary]").hidden = true;
     $("[data-result-link]").hidden = true;
+  };
+
+  const loadAssessmentCenters = async (id) => {
+    const first = await GRP.request(`/api/v1/assessments/${id}/centers?size=1000`);
+    const centers = [...first.centers];
+    const pages = Math.ceil(first.total / first.size);
+    for (let page = 2; page <= pages; page += 1) {
+      const next = await GRP.request(
+        `/api/v1/assessments/${id}/centers?size=1000&page=${page}`,
+      );
+      centers.push(...next.centers);
+    }
+    return { ...first, centers };
   };
 
   const showResult = async (id, { quiet = false } = {}) => {
     const [result, centers] = await Promise.all([
       GRP.request(`/api/v1/assessments/${id}/result`),
-      GRP.request(`/api/v1/assessments/${id}/centers?size=200`),
+      loadAssessmentCenters(id),
     ]);
     drawResultCenters(centers.centers, result.reason_codes);
+    $("[data-assessment-legend]").hidden = false;
+    const centersToggle = $('[data-layer="centers"]');
+    centersToggle.checked = true;
+    centersLayer.addTo(map);
+    if (result.map) {
+      let matchingLayer = state.floodLayers.find(
+        (layer) => layer.version_id === result.map.version_id,
+      );
+      if (!matchingLayer) {
+        matchingLayer = {
+          ...result.map,
+          id: `assessment-${result.map.version_id}`,
+          title: `Flood depth RP${result.map.return_period_years} · assessment input`,
+          available: true,
+        };
+        state.floodLayers.push(matchingLayer);
+      }
+      const scenarioSelect = $("[data-flood-scenario]");
+      if (![...scenarioSelect.options].some((option) => option.value === matchingLayer.id)) {
+        const pinnedOption = document.createElement("option");
+        pinnedOption.value = matchingLayer.id;
+        pinnedOption.textContent = `RP${result.map.return_period_years} · pinned assessment input`;
+        scenarioSelect.append(pinnedOption);
+      }
+      scenarioSelect.value = matchingLayer.id;
+      const floodToggle = $('[data-layer="flood"]');
+      floodToggle.checked = true;
+      await loadFloodOverlay({ ...result.map, available: true });
+    }
     resultCard.hidden = false;
     $("[data-progress]").hidden = true;
     $("[data-synthetic]").hidden = !result.synthetic;
+    const incompatible = $("[data-incompatible-result]");
+    incompatible.hidden = result.input_compatible !== false;
+    incompatible.textContent = result.input_warning || "";
     $("[data-result-title]").textContent = `${result.area} · ${result.scenario.return_period_years}-year flood`;
     $("[data-result-meta]").textContent =
       `Method ${result.method.key} ${result.method.version}${result.method.status === "approved" ? "" : " (draft)"} · ref ${result.support_ref}`;
@@ -565,14 +680,23 @@
       tile.append(strong, span);
       stats.append(tile);
     });
-    $("[data-result-link]").hidden = false;
+    const summaryButton = $("[data-result-summary]");
+    summaryButton.hidden = false;
+    summaryButton.onclick = () => renderAssessmentSummary(result, centers.centers);
+    const resultLink = $("[data-result-link]");
+    resultLink.href = `/assessments.html?assessment_id=${encodeURIComponent(id)}`;
+    resultLink.hidden = false;
     state.assessmentId = id;
     state.pendingAssessmentId = null;
+    const url = new URL(window.location.href);
+    url.searchParams.set("assessment_id", id);
+    window.history.replaceState({}, "", url);
     renderContext();
     const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
     if (boundary) selectBoundary(boundary, { explicit: true });
     saveState();
     if (quiet) return;
+    renderAssessmentSummary(result, centers.centers);
     addMessage(
       "assistant",
       `The ${result.scenario.return_period_years}-year flood screening for ${result.area} is on the map. ` +
@@ -593,9 +717,12 @@
     window.clearTimeout(state.pollTimer);
     try {
       const job = await GRP.request(`/api/v1/assessments/${id}`);
+      if (job.state !== "queued" && job.state !== "running") GRP.jobs.done(id);
       if (job.state === "succeeded") {
         await showResult(id);
       } else if (job.state === "queued" || job.state === "running") {
+        $("[data-result-title]").textContent = `${job.area} · ${job.scenario.return_period_years}-year flood`;
+        $("[data-result-meta]").textContent = `Working in the background… ref ${job.support_ref}`;
         state.pollTimer = window.setTimeout(() => watch(id), 5000);
       } else {
         state.pendingAssessmentId = null;
@@ -605,19 +732,45 @@
         addMessage("assistant", `The assessment ${job.state}${job.error_code ? ` (${job.error_code})` : ""}. Reference ${job.support_ref}.`, { error: true });
       }
     } catch (error) {
+      state.pendingAssessmentId = null;
+      $("[data-progress]").hidden = true;
+      $("[data-result-meta]").textContent = error.message;
+      saveState();
       addMessage("assistant", error.message, { error: true });
     }
   };
 
   // ---------- SIG evidence ----------
   const sigPanel = $("[data-sig]");
+  const sigFrame = $("[data-sig-frame]");
+  const showSigMap = (mapUrl, evidence, mapKind) => {
+    sigFrame.src = mapUrl;
+    const place = (evidence.area && evidence.area.sig_place) || evidence.place || "Confirmed area";
+    const receiptId = evidence.receipt && evidence.receipt.receipt_id;
+    $("[data-sig-meta]").textContent = `${place}${receiptId ? ` · receipt ${receiptId}` : ""}`;
+    const risk = mapKind === "sig_vulnerability_weighted_flood_risk";
+    $("[data-sig-title]").textContent = risk
+      ? "SIG vulnerability-weighted flood risk"
+      : "Flood hazard and asset exposure";
+    $("[data-sig-help]").textContent = risk
+      ? "Shows SIG risk classes calculated with the approved recipe recorded below. It supports screening and does not certify that a location is safe."
+      : "Shows assets intersecting mapped flood-hazard classes. It is not a vulnerability-weighted risk score and does not certify that a location is safe.";
+    sigPanel.hidden = false;
+  };
   $("[data-sig-close]").addEventListener("click", () => {
     sigPanel.hidden = true;
-    $("[data-sig-frame]").removeAttribute("src");
+    sigFrame.removeAttribute("src");
   });
 
   // Evidence panel: what SIG returned, what is missing, how it was produced, downloads.
   const evidencePanel = $("[data-evidence]");
+  const publishConfirm = $("[data-publish-confirm]");
+  const publishConfirmButton = $("[data-publish-confirm-button]");
+  const hidePublishConfirm = () => {
+    publishConfirm.hidden = true;
+    publishConfirmButton.disabled = false;
+  };
+  $("[data-publish-cancel]").addEventListener("click", hidePublishConfirm);
   const sigAreaLayer = window.L.featureGroup().addTo(map);
   let currentEvidence = null;
 
@@ -648,6 +801,227 @@
     });
   });
 
+  const setPanelMode = (mode) => {
+    evidencePanel.dataset.mode = mode;
+    $("[data-ev-actions]").hidden = mode !== "sig";
+    $("[data-ev-foot]").hidden = mode !== "sig";
+    document.querySelectorAll("[data-ev-tab]").forEach((tab) => {
+      tab.hidden = mode !== "sig" && tab.dataset.evTab !== "summary";
+    });
+    document.querySelector('[data-ev-tab="summary"]').click();
+  };
+
+  const summaryNotice = (title, text, modifier = "") => {
+    const card = document.createElement("article");
+    card.className = `pw-decision-notice ${modifier}`.trim();
+    const strong = document.createElement("strong");
+    const body = document.createElement("p");
+    strong.textContent = title;
+    body.textContent = text;
+    card.append(strong, body);
+    return card;
+  };
+
+  const renderCoverage = (items) => {
+    const box = $("[data-summary-coverage]");
+    box.replaceChildren(...items.map(({ label, status, detail }) => {
+      const row = document.createElement("div");
+      row.className = `pw-coverage__row is-${status}`;
+      const dot = document.createElement("span");
+      dot.className = "pw-coverage__dot";
+      const text = document.createElement("div");
+      const strong = document.createElement("strong");
+      const small = document.createElement("span");
+      strong.textContent = label;
+      small.textContent = detail;
+      text.append(strong, small);
+      row.append(dot, text);
+      return row;
+    }));
+  };
+
+  const renderAssessmentSummary = (result, centers) => {
+    setPanelMode("assessment");
+    const hero = $("[data-summary-hero]");
+    const movementSection = $("[data-summary-movement-section]");
+    const fundingSection = $("[data-summary-funding-section]");
+    const briefSection = $("[data-summary-brief-section]");
+    hero.after(movementSection);
+    movementSection.after(fundingSection);
+    fundingSection.after(briefSection);
+    briefSection.querySelector("h3").textContent = "Plain-language brief";
+    $("[data-summary-movement-title]").textContent = "Where people could move";
+    $("[data-summary-caveat]").hidden = false;
+    $("[data-summary-coverage-title]").textContent = "Preparedness funding case";
+    $("[data-summary-coverage-intro]").textContent =
+      "Use available evidence now and treat missing checks as preparation or funding gaps.";
+    currentEvidence = null;
+    openEvidencePayload = null;
+    $("[data-ev-eyebrow]").textContent = "GRP decision summary";
+    $("[data-ev-title]").textContent = result.area;
+    $("[data-ev-counts]").textContent =
+      `${result.summary.in_scope} centres · RP${result.scenario.return_period_years} · locked result`;
+    $("[data-ev-area]").textContent =
+      `${result.synthetic ? "Synthetic demonstration" : "Assessment"} · ${result.method.key} ${result.method.version}`;
+    $("[data-summary-status]").textContent = result.synthetic
+      ? "Synthetic demonstration — not a scientific result"
+      : "Locked assessment result";
+    $("[data-summary-title]").textContent = "Movement options under this flood scenario";
+    $("[data-summary-lead]").textContent =
+      `${result.summary.potentially_exposed} centre(s) may be exposed, ` +
+      `${result.summary.not_exposed_under_scenario} have lower mapped exposure, and ` +
+      `${result.summary.unable_to_assess} could not be assessed. Red shading on the map shows ` +
+      "flood depth from lighter to deeper red; it is not a risk or safety rating.";
+
+    const candidates = centers.filter(
+      (center) => center.status === "not_exposed_under_scenario",
+    );
+    const exposed = centers.filter((center) => center.status === "potentially_exposed");
+    const unable = centers.filter((center) => center.status === "unable_to_assess");
+    const movement = $("[data-summary-movement]");
+    movement.replaceChildren();
+    if (!candidates.length) {
+      movement.append(summaryNotice(
+        "No candidate movement options from this result",
+        "Do not infer a destination from the map. Review exposed and unable-to-assess centres and resolve the missing evidence.",
+        "is-blocked",
+      ));
+    } else {
+      const list = document.createElement("div");
+      list.className = "pw-candidates";
+      candidates.slice(0, 6).forEach((center) => {
+        const item = document.createElement("article");
+        item.className = "pw-candidate";
+        const marker = document.createElement("span");
+        marker.className = "pw-candidate__marker";
+        marker.style.background = STATUS_COLOR.not_exposed_under_scenario;
+        const text = document.createElement("div");
+        const name = document.createElement("strong");
+        const detail = document.createElement("span");
+        name.textContent = center.name;
+        detail.textContent = center.flood_depth_m === null
+          ? "Not exposed under this scenario"
+          : `Flood depth ${center.flood_depth_m} m · not exposed under this scenario`;
+        text.append(name, detail);
+        item.append(marker, text);
+        list.append(item);
+      });
+      movement.append(list);
+      if (candidates.length > 6) {
+        const more = document.createElement("p");
+        more.className = "pw-decision-intro";
+        more.textContent = `Plus ${candidates.length - 6} more candidate centre(s) in the full table.`;
+        movement.append(more);
+      }
+    }
+    const centerNames = (items) => {
+      const visible = items.slice(0, 3).map((center) => center.name).join(", ");
+      return items.length > 3 ? `${visible}, and ${items.length - 3} more` : visible;
+    };
+    const cautions = document.createElement("div");
+    cautions.className = "pw-status-breakdown";
+    if (exposed.length) {
+      cautions.append(summaryNotice(
+        `${exposed.length} potentially exposed centre(s)`,
+        centerNames(exposed),
+        "is-exposed",
+      ));
+    }
+    if (unable.length) {
+      cautions.append(summaryNotice(
+        `${unable.length} centre(s) unable to assess`,
+        centerNames(unable),
+        "is-unable",
+      ));
+    }
+    if (cautions.childElementCount) movement.append(cautions);
+
+    renderCoverage([
+      { label: "Flood hazard", status: "available", detail: `RP${result.scenario.return_period_years} locked input` },
+      { label: "Evacuation-centre locations", status: "available", detail: `${result.summary.in_scope} centres screened` },
+      { label: "Movement screening", status: candidates.length ? "available" : "blocked", detail: candidates.length ? `${candidates.length} lower-exposure candidate(s)` : "No candidate from this result" },
+      { label: "Capacity and essential services", status: "missing", detail: "No approved source in this result" },
+      { label: "Accessibility and routes", status: "missing", detail: "Travel safety has not been assessed" },
+      { label: "Vulnerable groups", status: "missing", detail: "Waits on DEP-07" },
+      { label: "Interventions and costs", status: "missing", detail: "Waits on approved DEP-12 template" },
+    ]);
+    $("[data-summary-brief]").replaceChildren(summaryNotice(
+      "What a planner can say now",
+      candidates.length
+        ? `${candidates.length} centre(s) are candidate movement options because they have lower mapped exposure in this scenario. Check capacity, accessibility, services, routes and other hazards before making a movement decision.`
+        : "This screening does not identify a lower-exposure candidate. Resolve the unable-to-assess and missing-evidence items before making a movement decision.",
+    ));
+    openEvidence();
+  };
+
+  const renderSigSummary = (payload) => {
+    const evidence = payload.evidence;
+    const hasRisk = Boolean(evidence.risk_recipe);
+    setPanelMode("sig");
+    const hero = $("[data-summary-hero]");
+    const movementSection = $("[data-summary-movement-section]");
+    const fundingSection = $("[data-summary-funding-section]");
+    const briefSection = $("[data-summary-brief-section]");
+    hero.after(briefSection);
+    briefSection.after(movementSection);
+    movementSection.after(fundingSection);
+    briefSection.querySelector("h3").textContent = payload.answer_source === "deterministic_fallback"
+      ? "Key findings from the evidence"
+      : "Evidence-based brief";
+    $("[data-summary-movement-title]").textContent = "Available map layers";
+    $("[data-summary-caveat]").hidden = true;
+    $("[data-summary-coverage-title]").textContent = "Available information";
+    $("[data-summary-coverage-intro]").textContent =
+      "The map and evidence panel show each available source directly.";
+    $("[data-ev-eyebrow]").textContent = "Planning summary · SIG screening";
+    $("[data-summary-status]").textContent = evidence.receipt
+      ? `Source-checked · receipt ${evidence.receipt.receipt_id}`
+      : payload.answer_source === "deterministic_fallback"
+        ? "Deterministic evidence summary · not publishable"
+        : "Unverified screening draft";
+    $("[data-summary-title]").textContent = hasRisk
+      ? "SIG flood-risk information"
+      : "SIG flood information";
+    $("[data-summary-lead]").textContent = payload.answer_source === "deterministic_fallback"
+      ? "The AI brief failed formatting checks, so GRP is showing only numbered findings copied from the structured evidence pack."
+      : hasRisk
+        ? `SIG returned hazard, exposure and vulnerability-weighted risk using recipe ${evidence.risk_recipe.version}.`
+        : "SIG returned flood-hazard and asset-exposure information for the confirmed district.";
+    $("[data-summary-movement]").replaceChildren(summaryNotice(
+      "Flood and evacuation-centre layers are visible",
+      "Use Layers to turn the national RP100 flood layer, district boundaries and evacuation-centre locations on or off.",
+    ));
+    renderCoverage([
+      { label: "Flood hazard and exposure", status: "available", detail: `${evidence.summary.computed} computed evidence item(s)` },
+      { label: "Evacuation-centre locations", status: state.centersVersion ? "available" : "missing", detail: state.centersVersion ? state.centersVersion.title : "No managed layer available" },
+      {
+        label: "Vulnerability-weighted risk",
+        status: hasRisk ? "available" : "partial",
+        detail: hasRisk
+          ? `SIG recipe ${evidence.risk_recipe.version}; exact source values remain in Evidence`
+          : "SIG generic screening may be present; no approved recipe is recorded",
+      },
+      ...(Object.keys((evidence.stats && evidence.stats.population_by_age) || {}).length
+        ? [{ label: "Population by age", status: "available", detail: "Values are shown in the Evidence tab" }]
+        : []),
+      ...(evidence.warnings || []).map((warning) => ({
+        label: "SIG metadata consistency",
+        status: "blocked",
+        detail: warning,
+      })),
+    ]);
+    const brief = $("[data-summary-brief]");
+    brief.replaceChildren();
+    if (payload.answer && payload.answer.trim()) {
+      brief.append(renderBrief(payload.answer, (n) => focusCitation(n)));
+    } else {
+      brief.append(summaryNotice(
+        "Brief unavailable",
+        "The structured source cards and values remain available in the Evidence tab.",
+      ));
+    }
+  };
+
   const downloadFile = (name, content, type) => {
     const url = URL.createObjectURL(new Blob([content], { type }));
     const link = document.createElement("a");
@@ -676,6 +1050,9 @@
       "GRP steps:",
       ...evidence.grp_trace.map((step, i) => `  ${i + 1}. ${step.step}: ${step.detail}`),
       "",
+      "Evidence contract warnings:",
+      ...(evidence.warnings || []).map((warning) => `  - ${warning}`),
+      "",
       "Declared gaps:",
       ...evidence.gaps.map((gap) => `  - ${gap}`),
     ];
@@ -695,8 +1072,13 @@
       const { evidence, answer } = currentEvidence;
       const base = `grp-${slug(evidence.place)}-${(evidence.pack_id || "pack").slice(0, 8)}`;
       if (button.dataset.download === "brief") {
+        const answerStatus = evidence.receipt
+          ? `receipt ${evidence.receipt.receipt_id}`
+          : openEvidencePayload?.answer_source === "deterministic_fallback"
+            ? "deterministic evidence summary (not publishable)"
+            : "unverified draft (no receipt)";
         const header = `# ${evidence.question}\n\nArea: ${evidence.place}\nSIG pack: ${evidence.pack_id}\n` +
-          `Status: ${evidence.receipt ? `receipt ${evidence.receipt.receipt_id}` : "unverified draft (no receipt)"}\n\n` +
+          `Status: ${answerStatus}\n\n` +
           "_SIG generic evidence. Not a GRP assessment and not a decision that any place is safe._\n\n";
         downloadFile(`${base}-brief.md`, header + answer, "text/markdown");
       } else if (button.dataset.download === "evidence") {
@@ -776,6 +1158,7 @@
     currentEvidence = { evidence, answer: payload.answer, message };
     openEvidencePayload = payload;
     saveState();
+    renderSigSummary(payload);
     const counts = evidence.summary;
     $("[data-ev-title]").textContent = (evidence.area && evidence.area.sig_place) || evidence.place;
     $("[data-ev-counts]").textContent =
@@ -795,16 +1178,42 @@
       strong.textContent = typeof value.exposed === "number"
         ? `${value.exposed} / ${value.total}`
         : `${value.exposed_km ?? 0} / ${value.total_km ?? 0} km`;
-      span.textContent = `${name.replaceAll("_", " ")} in flood area`;
+      span.textContent = `${name.replaceAll("_", " ")} exposed to mapped flood hazard`;
       tile.append(strong, span);
       numbers.append(tile);
     });
+    Object.entries((evidence.stats && evidence.stats.population_by_age) || {}).forEach(([name, value]) => {
+      if (typeof value !== "number") return;
+      const tile = document.createElement("div");
+      tile.className = "pw-number";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      strong.textContent = value.toLocaleString();
+      span.textContent = `${name.replaceAll("_", " ")} · SIG demographic evidence`;
+      tile.append(strong, span);
+      numbers.append(tile);
+    });
+    if (evidence.risk_recipe) {
+      const tile = document.createElement("div");
+      tile.className = "pw-number";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      const weights = evidence.risk_recipe.weights;
+      strong.textContent = evidence.risk_recipe.version;
+      span.textContent = `Approved SIG recipe · population ${Math.round(weights.population * 100)}% · buildings ${Math.round(weights.building_density * 100)}% · roads ${Math.round(weights.road_distance * 100)}%`;
+      tile.append(strong, span);
+      numbers.append(tile);
+    }
 
     const cards = $("[data-ev-cards]");
     cards.replaceChildren(...evidence.citations.map(evidenceCard));
 
     const gaps = $("[data-ev-gaps]");
-    gaps.replaceChildren(...evidence.gaps.map((gap) => {
+    const gapItems = [
+      ...(evidence.warnings || []).map((warning) => `Evidence contract warning: ${warning}`),
+      ...evidence.gaps,
+    ];
+    gaps.replaceChildren(...gapItems.map((gap) => {
       const item = document.createElement("li");
       item.textContent = gap;
       return item;
@@ -830,16 +1239,18 @@
 
     const mapButton = $("[data-ev-map]");
     const mapUrl = safeHttps(payload.map_url);
+    hidePublishConfirm();
     mapButton.disabled = false;
     mapButton.classList.remove("is-warning");
     delete mapButton.dataset.confirm;
     if (evidence.receipt) {
-      mapButton.textContent = "Show SIG flood map";
-      mapButton.onclick = () => {
-        if (!mapUrl) return;
-        $("[data-sig-frame]").src = mapUrl;
-        sigPanel.hidden = false;
-      };
+      mapButton.textContent = mapUrl
+        ? payload.map_kind === "sig_vulnerability_weighted_flood_risk"
+          ? "Show SIG risk map"
+          : "Show hazard & exposure map"
+        : "SIG embedded map unavailable";
+      mapButton.disabled = !mapUrl;
+      mapButton.onclick = () => mapUrl && showSigMap(mapUrl, evidence, payload.map_kind);
       const receiptUrl = safeHttps(evidence.receipt.public_url);
       $("[data-ev-foot]").textContent = "";
       if (receiptUrl) {
@@ -850,26 +1261,40 @@
         link.textContent = `Public receipt ${evidence.receipt.receipt_id}`;
         $("[data-ev-foot]").append("Passed SIG's source check · ", link);
       }
+      if (!mapUrl) {
+        $("[data-ev-foot]").append(
+          `${receiptUrl ? " · " : ""}${payload.map_note || "The answer is available, but SIG did not return a verified flood-hazard map."}`,
+        );
+      }
     } else {
-      mapButton.textContent = "Publish receipt & show SIG flood map";
-      mapButton.onclick = () => {
-        if (mapButton.dataset.confirm !== "yes") {
-          mapButton.dataset.confirm = "yes";
-          mapButton.textContent = "Confirm: this creates a public record";
-          mapButton.classList.add("is-warning");
-          return;
-        }
-        mapButton.disabled = true;
-        send(message, { publish: true, echo: false, confirmedPlace: evidence.place });
-      };
-      $("[data-ev-foot]").textContent =
-        "Unverified draft: not yet checked by SIG's source check, no receipt. Evidence only — not a decision that any place is safe.";
+      if (payload.publish_token) {
+        mapButton.textContent = "Verify & create public receipt";
+        mapButton.onclick = () => { publishConfirm.hidden = false; };
+        publishConfirmButton.onclick = () => {
+          publishConfirmButton.disabled = true;
+          send(message, {
+            publish: true,
+            publishToken: payload.publish_token,
+            echo: false,
+            confirmedPlace: evidence.place,
+          });
+        };
+        $("[data-ev-foot]").textContent =
+          "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
+      } else {
+        mapButton.textContent = "Retry AI brief";
+        mapButton.onclick = () => send(message, {
+          echo: false, confirmedPlace: evidence.place, refresh: true,
+        });
+        $("[data-ev-foot]").textContent = payload.answer_source === "deterministic_fallback"
+          ? "The evidence lookup succeeded. GRP generated the visible summary deterministically because the AI brief failed formatting checks. It cannot be published; retry asks for a fresh AI brief."
+          : "The evidence lookup succeeded, but no publishable brief is available. Retry asks for a fresh AI brief.";
+      }
     }
     outlineSigArea(evidence);
     openEvidence();
     if (evidence.receipt && mapUrl) {
-      $("[data-sig-frame]").src = mapUrl;
-      sigPanel.hidden = false;
+      showSigMap(mapUrl, evidence, payload.map_kind);
     }
   };
 
@@ -885,7 +1310,11 @@
       `${counts.sources} sources · ${counts.pulled_live} pulled live · ${counts.computed} computed · ${counts.declared_gaps} declared gap(s)`;
     const badge = document.createElement("span");
     badge.className = `pw-status__badge${evidence.receipt ? " is-ok" : ""}`;
-    badge.textContent = evidence.receipt ? `Receipt ${evidence.receipt.receipt_id}` : "Unverified draft";
+    badge.textContent = evidence.receipt
+      ? `Receipt ${evidence.receipt.receipt_id}`
+      : payload.answer_source === "deterministic_fallback"
+        ? "Deterministic summary · not publishable"
+        : payload.publish_token ? "Unverified draft" : "Evidence only";
     card.append(title);
     if (payload.note) {
       const note = document.createElement("span");
@@ -894,8 +1323,20 @@
       card.append(note);
     }
     card.append(line);
+    if (counts.pulled_live === 0) {
+      const sourceNote = document.createElement("span");
+      sourceNote.className = "pw-status__source-note";
+      sourceNote.textContent =
+        "No source was pulled live in this run; computed exposure is not a report of current flooding.";
+      card.append(sourceNote);
+    }
     const steps = (evidence.grp_trace || []).filter((step) => typeof step.duration_ms === "number");
-    if (evidence.total_ms || steps.length) {
+    if (payload.cached) {
+      const timing = document.createElement("span");
+      timing.className = "pw-status__timing";
+      timing.textContent = "Loaded immediately from this login’s 10-minute cache.";
+      card.append(timing);
+    } else if (evidence.total_ms || steps.length) {
       const timing = document.createElement("span");
       timing.className = "pw-status__timing";
       const parts = steps.map((step) => `${STEP_LABELS[step.step] || step.step} ${seconds(step.duration_ms)}`);
@@ -907,7 +1348,7 @@
   };
 
   const sigActions = (payload, message) => [
-    chipButton("Open map & evidence", () => renderEvidence(payload, message)),
+    chipButton(payload.map_url ? "Open map & evidence" : "Open evidence", () => renderEvidence(payload, message)),
   ];
 
   const confirmAreaAction = (confirmation) => {
@@ -942,7 +1383,9 @@
     }
   };
 
-  const send = async (text, { publish = false, echo = true, confirmedPlace = null } = {}) => {
+  const send = async (text, {
+    publish = false, publishToken = null, echo = true, confirmedPlace = null, refresh = false,
+  } = {}) => {
     const message = (text ?? input.value).trim();
     if (!message || state.busy || !state.hubCode) return;
     if (!state.chatAvailable) {
@@ -954,8 +1397,17 @@
         if (echo) addMessage("user", message);
         addMessage(
           "assistant",
-          "I do not know your current district yet. Use the location button or search for a Thailand district first.",
-          { label: "Location needed.", actions: [chipButton("Use my location", useCurrentLocation)] },
+          "I do not know your district yet. Use my location, click your district on the map, or name it in your message (for example \"Bang Bua Thong, Nonthaburi\").",
+          {
+            label: "Location needed.",
+            actions: [
+              chipButton("Use my location", useCurrentLocation),
+              chipButton("Show me the map", () => {
+                document.body.dataset.view = "map";
+                window.setTimeout(() => map.invalidateSize(), 0);
+              }),
+            ],
+          },
         );
         return false;
       }
@@ -1002,6 +1454,8 @@
           boundary_id: state.explicitSelection && state.selected ? state.selected.id : null,
           assessment_id: state.assessmentId,
           publish_receipt: publish,
+          publish_token: publishToken,
+          refresh,
           history: state.history.slice(-8),
         },
       });
@@ -1016,6 +1470,13 @@
         showProgress(boundary ? boundary.name : "Assessment");
         state.pendingAssessmentId = payload.assessment_id;
         saveState();
+        GRP.jobs.track({
+          id: payload.assessment_id,
+          label: `Assessment for ${boundary ? boundary.name : "the chosen area"}`,
+          statusPath: `/api/v1/assessments/${payload.assessment_id}`,
+          href: "/planning.html",
+          ownerPath: "/planning.html",
+        });
         document.body.dataset.view = window.matchMedia("(max-width: 860px)").matches ? "map" : document.body.dataset.view;
         watch(payload.assessment_id);
       } else if (payload.mode === "sig_evidence") {
@@ -1033,14 +1494,27 @@
         addEvidenceMessage(payload, message);
         renderEvidence(payload, message);
       } else {
+        if (payload.mode === "gate_blocked") {
+          hidePublishConfirm();
+          const mapButton = $("[data-ev-map]");
+          mapButton.textContent = "Retry brief generation";
+          mapButton.onclick = () => send(message, { echo: false, confirmedPlace: payload.area?.requested });
+          $("[data-ev-foot]").textContent =
+            "SIG refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
+        }
         addMessage("assistant", payload.answer, {
           label: payload.label,
           actions,
           error: payload.mode === "area_rejected" || payload.mode === "gate_blocked",
         });
       }
-      state.history.push({ role: "user", text: message }, { role: "assistant", text: payload.answer.slice(0, 1200) });
-      saveState();
+      if (!publish) {
+        state.history.push({ role: "user", text: message });
+        if (payload.answer?.trim()) {
+          state.history.push({ role: "assistant", text: payload.answer.slice(0, 1200) });
+        }
+        saveState();
+      }
       return true;
     } catch (error) {
       typing.remove();
@@ -1105,10 +1579,39 @@
     // SIG needs an administrative district, not a city-wide or neighbourhood
     // label. In Bangkok, `city_district` is the khet (for example Bang Sue);
     // elsewhere in Thailand Nominatim normally uses `county` for the amphoe.
-    const district = address.city_district || address.county;
-    const province = address.state || address.province;
+    // OpenStreetMap keeps the Thai district (amphoe, or khet in Bangkok) in different
+    // fields: `county` outside Bangkok, `suburb` inside it. `city_district` is often the
+    // sub-district (tambon), so accept a value only when it reads as a district.
+    const isDistrict = (value) =>
+      typeof value === "string"
+      && !/sub-?district/i.test(value)
+      && !/^ตำบล|^แขวง/.test(value)
+      && (/district$/i.test(value.trim()) || /^อำเภอ|^เขต/.test(value));
+    const district = [
+      address.county,
+      address.suburb,
+      address.city_district,
+      address.state_district,
+      address.district,
+    ].find(isDistrict);
+    const province = address.province || address.state || (district ? address.city : null);
     if (district) return [...new Set([district, province, "Thailand"].filter(Boolean))].join(", ");
     return null;
+  };
+
+  const normalizeAreaName = (value) => String(value || "")
+    .toLowerCase()
+    .replace(/\b(?:district|amphoe|khet|thailand)\b/g, "")
+    .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, " ")
+    .trim();
+
+  const localBoundaryForPlace = (name) => {
+    const [district, province] = String(name || "").split(",").map(normalizeAreaName);
+    const matches = state.boundaries.filter((boundary) =>
+      normalizeAreaName(boundary.name) === district
+      && (!province || !boundary.province_name
+        || normalizeAreaName(boundary.province_name) === province));
+    return matches.length === 1 ? matches[0] : null;
   };
 
   const pickPlace = (place, { currentLocation = false } = {}) => {
@@ -1134,8 +1637,10 @@
       chip.hidden = false;
       return;
     }
+    const localBoundary = localBoundaryForPlace(name);
+    if (localBoundary) selectBoundary(localBoundary, { explicit: true });
     chip.append(document.createTextNode(
-      `${currentLocation ? "Your current district" : name} is not a supported GRP assessment area yet. `
+      `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
     ));
     chip.append(chipButton("Check SIG flood exposure", () => send(
       `Check flood exposure for schools, hospitals and roads in ${name}.`,
@@ -1143,6 +1648,62 @@
     )));
     chip.hidden = false;
   };
+
+  // Nominatim returns the district field at different zooms depending on the address,
+  // so try the administrative levels from district outwards before giving up.
+  const reverseDistrict = async (lat, lon) => {
+    for (const zoom of [10, 12, 14, 8]) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=${zoom}&addressdetails=1&accept-language=en&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+        const response = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!response.ok) continue;
+        const place = await response.json();
+        if (!place || place.error) continue;
+        if (place.address?.country_code?.toLowerCase() !== "th") {
+          return { outsideThailand: true };
+        }
+        if (externalPlaceName(place)) return { place: { ...place, lat, lon } };
+      } catch (_error) {
+        // Try the next zoom level; the caller reports a single clear failure.
+      }
+    }
+    return {};
+  };
+
+  // Clicking bare map (not a supported area outline) offers that district for SIG evidence.
+  const useMapPoint = async (lat, lon) => {
+    const chip = $("[data-place-chip]");
+    chip.replaceChildren();
+    chip.textContent = "Finding the district for that point…";
+    chip.hidden = false;
+    const { place, outsideThailand } = await reverseDistrict(lat, lon);
+    if (place) {
+      pickPlace(place);
+      const name = externalPlaceName(place);
+      addMessage("assistant", `${name} is selected from the map for SIG flood evidence.`, {
+        label: "Map location selected.",
+        actions: [chipButton("Check SIG flood exposure", () => send(
+          `Check flood exposure for schools, hospitals and roads in ${name}.`,
+          { confirmedPlace: name },
+        ))],
+      });
+      return;
+    }
+    chip.textContent = outsideThailand
+      ? "GRP's SIG lookup covers Thailand districts only. Click inside Thailand or search for a district."
+      : "No administrative district was found for that point. Click nearer a town, or search for a district by name.";
+  };
+
+  let mapClickBusy = false;
+  map.on("click", async (event) => {
+    if (mapClickBusy) return;
+    mapClickBusy = true;
+    try {
+      await useMapPoint(event.latlng.lat, event.latlng.lng);
+    } finally {
+      mapClickBusy = false;
+    }
+  });
 
   const useCurrentLocation = async () => {
     const button = $("[data-use-location]");
@@ -1159,23 +1720,25 @@
         { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 },
       ));
       const { latitude, longitude } = position.coords;
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&addressdetails=1&accept-language=en&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`;
-      const response = await fetch(url, { headers: { Accept: "application/json" } });
-      const place = await response.json();
-      if (!response.ok || !place || place.address?.country_code?.toLowerCase() !== "th") {
-        throw new Error("CURRENT_LOCATION_NOT_THAILAND");
-      }
-      if (!externalPlaceName(place)) {
-        throw new Error("CURRENT_LOCATION_NO_DISTRICT");
-      }
-      pickPlace({ ...place, lat: latitude, lon: longitude }, { currentLocation: true });
+      const { place, outsideThailand } = await reverseDistrict(latitude, longitude);
+      if (outsideThailand) throw new Error("CURRENT_LOCATION_NOT_THAILAND");
+      if (!place) throw new Error("CURRENT_LOCATION_NO_DISTRICT");
+      pickPlace(place, { currentLocation: true });
+      const name = externalPlaceName(place);
+      addMessage("assistant", `Your district is ${name}. Available local map layers are shown, and SIG information can be added.`, {
+        label: "Current district confirmed.",
+        actions: [chipButton("Check SIG flood exposure", () => send(
+          `Check flood exposure for schools, hospitals and roads in ${name}.`,
+          { confirmedPlace: name },
+        ))],
+      });
     } catch (error) {
       const message = error.code === 1
         ? "Location permission was not granted. Search for a Thailand district instead."
         : error.message === "CURRENT_LOCATION_NOT_THAILAND"
         ? "GRP’s current SIG lookup is limited to Thailand districts."
         : error.message === "CURRENT_LOCATION_NO_DISTRICT"
-        ? "I found your approximate location but not its administrative district. Search for a Thailand district before using SIG evidence."
+        ? "I found your position but no administrative district there. Click your district on the map, or search for it by name."
         : "I could not identify a district from your location. Search for a Thailand district instead.";
       addMessage("assistant", message, { error: true });
     } finally {
@@ -1192,10 +1755,14 @@
     if (local.length) {
       const group = document.createElement("div");
       group.className = "pw-search__group";
-      group.textContent = "Supported assessment areas";
+      group.textContent = "Thailand districts";
       searchResults.append(group);
       local.slice(0, 5).forEach((boundary) =>
-        searchResults.append(searchItem(boundary.name, `${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`, () => selectBoundary(boundary, { announce: true }))),
+        searchResults.append(searchItem(
+          boundary.name,
+          `${boundary.province_name ? `${boundary.province_name} · ` : ""}${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`,
+          () => selectBoundary(boundary, { announce: true }),
+        )),
       );
     }
     searchResults.hidden = false;
@@ -1251,7 +1818,7 @@
     });
   });
 
-  const restoreState = async () => {
+  const restoreState = async ({ skipAssessment = false } = {}) => {
     let saved = null;
     try {
       saved = JSON.parse(sessionStorage.getItem(STORE_KEY) || "null");
@@ -1279,10 +1846,10 @@
       state.history = saved.history || [];
       const boundary = state.boundaries.find((b) => b.id === saved.selectedId);
       if (boundary) selectBoundary(boundary, { explicit: Boolean(saved.explicitSelection) });
-      if (saved.assessmentId) {
+      if (saved.assessmentId && !skipAssessment) {
         await showResult(saved.assessmentId, { quiet: true }).catch(() => {});
       }
-      if (saved.pendingAssessmentId) {
+      if (saved.pendingAssessmentId && !skipAssessment) {
         state.pendingAssessmentId = saved.pendingAssessmentId;
         showProgress(boundary ? boundary.name : "Assessment");
         watch(saved.pendingAssessmentId);
@@ -1296,6 +1863,31 @@
   };
 
   // ---------- start ----------
+  const refreshSigConnection = async () => {
+    if (!state.hubCode || !state.chatAvailable) return;
+    try {
+      const planning = await GRP.request("/api/v1/planning/status");
+      state.sigConnected = Boolean(planning.sig_connected);
+      const banner = $("[data-banner]");
+      if (state.sigConnected && banner.dataset.notice === "sig-connection") {
+        banner.hidden = true;
+        delete banner.dataset.notice;
+      } else if (!state.sigConnected) {
+        banner.textContent =
+          "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run.";
+        banner.dataset.notice = "sig-connection";
+        banner.hidden = false;
+      }
+    } catch (_error) {
+      // The next request will show the normal API error; do not replace another banner here.
+    }
+  };
+
+  window.addEventListener("focus", refreshSigConnection);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshSigConnection();
+  });
+
   GRP.bindSignOut();
 
   GRP.me()
@@ -1317,29 +1909,58 @@
         GRP.request(`/api/v1/maps/layers${query}`),
       ]);
       state.chatAvailable = Boolean(planning.available);
+      state.sigConnected = Boolean(planning.sig_connected);
       if (planning.usage) showAllowance(planning.usage);
       else GRP.request("/api/v1/me/ai-usage").then(showAllowance).catch(() => {});
       if (!planning.available) {
         banner.textContent = "The chat assistant runs only in the local Docker Desktop test right now.";
+        banner.dataset.notice = "planning-unavailable";
         banner.hidden = false;
       } else if (!planning.sig_connected) {
-        banner.textContent = "SIG evidence needs a fresh sign-in (the server restarted). Assessments and explanations still work.";
+        banner.textContent =
+          "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run.";
+        banner.dataset.notice = "sig-connection";
         banner.hidden = false;
       }
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;
-      state.centersVersion = layers.evacuation_centers[0] || null;
+      configureFloodScenarios(layers.flood_scenarios);
+      state.centersVersion = layers.evacuation_centers.find((layer) => !layer.synthetic)
+        || layers.evacuation_centers[0]
+        || null;
+      if (state.centersVersion) {
+        $("[data-centers-title]").textContent = "Evacuation centers";
+      }
+      const mapPreview = state.floodLayers[0]?.preview_only || state.centersVersion?.preview_only;
+      const floodToggle = $('[data-layer="flood"]');
+      const centersToggle = $('[data-layer="centers"]');
+      const districtToggle = $('[data-layer="districts"]');
+      // Display-first MVP 1: show every available baseline layer before any optional assessment.
+      floodToggle.checked = Boolean(selectedFloodLayer());
+      centersToggle.checked = Boolean(state.centersVersion);
+      districtToggle.checked = state.boundaries.length > 0;
+      const previewNote = $("[data-map-preview-note]");
+      previewNote.hidden = !mapPreview;
+      previewNote.textContent = mapPreview
+        ? "Source preview — the available flood and evacuation-centre data is shown directly."
+        : "";
       $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
       drawLegend(layers.flood_legend);
       drawDistricts();
-      await Promise.all([loadFloodOverlay(state.floodLayers[0]), drawPendingCenters()]);
-      // Synthetic fixtures remain available from Layers for demonstration, but never define
-      // the default map or analysis area for a real person.
-      districtLayer.remove();
-      centersLayer.remove();
+      await Promise.all([loadFloodOverlay(selectedFloodLayer()), drawPendingCenters()]);
+      if (districtToggle.checked) districtLayer.addTo(map);
+      if (centersToggle.checked) centersLayer.addTo(map);
+      if (floodOverlay && floodToggle.checked) floodOverlay.addTo(map);
       renderWelcome();
       ownerEmail = identity.email;
-      await restoreState();
+      await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
+      if (requestedAssessmentId) {
+        state.assessmentId = null;
+        state.pendingAssessmentId = requestedAssessmentId;
+        showProgress("Loading assessment");
+        saveState();
+        watch(requestedAssessmentId);
+      }
       updateSend();
       input.focus();
     })

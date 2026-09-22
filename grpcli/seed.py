@@ -2,7 +2,7 @@
 
 Everything here is invented test data, labelled "synthetic" in every name and source.
 It is NOT the Chiang Yuen golden case and must never be shown as a real result.
-Run: python -m grp.seed synthetic-rp100
+Run: python -m grpcli.seed synthetic-rp100
 """
 
 from __future__ import annotations
@@ -104,12 +104,18 @@ def ensure_overlay(session: Session, storage: LocalStorage, version: DatasetVers
     """Add the display-only flood overlay. It is a picture of the input, not an input, so
     adding it to metadata does not change the pinned fingerprint."""
 
-    if version.meta.get("overlay_key") and storage.exists(str(version.meta["overlay_key"])):
+    if (
+        version.meta.get("palette") == "red_depth_v1"
+        and version.meta.get("overlay_key")
+        and storage.exists(str(version.meta["overlay_key"]))
+    ):
         return
     overlay = render_overlay(
-        storage, str(version.storage_key), f"overlays/{version.sha256[:16]}/flood.png"
+        storage,
+        str(version.storage_key),
+        f"overlays/{version.sha256[:16]}/flood-red-v1.png",
     )
-    version.meta = {**version.meta, **overlay}
+    version.meta = {**version.meta, **overlay, "palette": "red_depth_v1"}
     session.flush()
 
 
@@ -177,7 +183,12 @@ def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
         dataset_id=centers_dataset.id,
         storage_key=None,
         sha256=centers_sha256(feature_rows),
-        meta={"edition": "synthetic-v0", "crs": "EPSG:4326", "licence": "synthetic test data"},
+        meta={
+            "edition": "synthetic-v0",
+            "crs": "EPSG:4326",
+            "licence": "synthetic test data",
+            "shelter_names_confirmed": True,
+        },
     )
     method = Method(
         key=METHOD_KEY,
@@ -202,7 +213,7 @@ def seed_synthetic_rp100(session: Session, storage: LocalStorage) -> SeedResult:
             target_id=str(hazard_version.id),
             new_value={"seed": "synthetic-rp100", "sha256": file_sha},
             result=AuditResult.SUCCESS,
-            support_ref="grp.seed synthetic-rp100",
+            support_ref="grpcli.seed synthetic-rp100",
         )
     )
     return SeedResult(True, str(boundary.id), str(hazard_version.id), str(centers_version.id),

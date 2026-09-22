@@ -17,6 +17,8 @@ from core.storage import LocalStorage
 
 router = APIRouter(prefix="/maps", tags=["maps"])
 
+MAP_RETURN_PERIODS = (20, 50, 100)
+
 VULNERABILITY_PLACEHOLDER = {
     "id": "vulnerable-people",
     "title": "Vulnerable people",
@@ -39,6 +41,9 @@ def _visible_version(session, version_id: UUID, hub_id: UUID) -> tuple[DatasetVe
     ).first()
     if row is None:
         raise not_found()
+    version, _ = row
+    if not (version.is_current or version.meta.get("map_preview") is True):
+        raise not_found()
     return row
 
 
@@ -56,12 +61,18 @@ def map_layers(
     rows = session.execute(
         select(DatasetVersion, Dataset)
         .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
-        .where(
-            DatasetVersion.is_current,
-            or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id),
-        )
+        .where(or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id))
         .order_by(Dataset.type, DatasetVersion.return_period_years)
     ).all()
+    # Technically validated baseline imports may be drawn for orientation before scientific
+    # activation. They stay non-current, so catalog/assessment input selection cannot use them.
+    rows = [
+        row for row in rows if row[0].is_current or row[0].meta.get("map_preview") is True
+    ]
+    rows.sort(
+        key=lambda row: (row[0].meta.get("map_preview") is True, row[0].created_at),
+        reverse=True,
+    )
     flood = [
         {
             "id": f"flood-{version.id}",
@@ -69,12 +80,34 @@ def map_layers(
             "title": f"Flood depth RP{version.return_period_years} · {dataset.title}",
             "return_period_years": version.return_period_years,
             "provider": dataset.provider,
+            "synthetic": dataset.provider.casefold() == "grp synthetic test data",
             "image_url": f"/api/v1/maps/hazard/{version.id}/overlay.png",
             "bounds": version.meta.get("overlay_bounds"),
             "available": bool(version.meta.get("overlay_key")),
+            "preview_only": version.meta.get("map_preview") is True and not version.is_current,
+            "readiness": version.readiness,
+            "palette": version.meta.get("palette"),
         }
         for version, dataset in rows
         if dataset.type == "hazard"
+    ]
+    scenario_layers: dict[int, dict[str, object]] = {}
+    scenario_candidates = [layer for layer in flood if not layer["synthetic"]] or flood
+    for layer in scenario_candidates:
+        years = layer["return_period_years"]
+        if years in MAP_RETURN_PERIODS and years not in scenario_layers:
+            scenario_layers[int(years)] = layer
+    flood_scenarios = [
+        {
+            "return_period_years": years,
+            "label": f"RP{years}",
+            "available": years in scenario_layers and bool(scenario_layers[years]["available"]),
+            "layer_id": scenario_layers[years]["id"] if years in scenario_layers else None,
+            "message": None
+            if years in scenario_layers and scenario_layers[years]["available"]
+            else "Not imported into the managed data library yet.",
+        }
+        for years in MAP_RETURN_PERIODS
     ]
     centers = [
         {
@@ -83,17 +116,21 @@ def map_layers(
             "title": dataset.title,
             "owner_kind": dataset.owner_kind,
             "provider": dataset.provider,
+            "synthetic": dataset.provider.casefold() == "grp synthetic test data",
             "features_url": f"/api/v1/maps/datasets/{version.id}/features",
+            "preview_only": version.meta.get("map_preview") is True and not version.is_current,
+            "readiness": version.readiness,
         }
         for version, dataset in rows
         if dataset.type == "evacuation_centers"
     ]
     return {
         "flood": flood,
+        "flood_scenarios": flood_scenarios,
         "flood_legend": legend(),
         "evacuation_centers": centers,
         "vulnerability": VULNERABILITY_PLACEHOLDER,
-        "note": "Map pictures are for orientation. Assessment numbers come from the locked result.",
+        "note": "Available source layers are displayed directly; an assessment is optional.",
     }
 
 
@@ -138,7 +175,7 @@ def dataset_features(
     if dataset.type != "evacuation_centers":
         raise not_found()
     features = session.scalars(
-        select(Feature).where(Feature.dataset_version_id == version.id).order_by(Feature.name)
+        select(Feature).where(Feature.dataset_version_id == version.id).order_by(Feature.id)
     ).all()
     return {
         "type": "FeatureCollection",

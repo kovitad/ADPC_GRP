@@ -30,6 +30,7 @@ RETURN_PERIODS = (10, 20, 50, 75, 100, 200, 500)
 
 
 class DatasetType(StrEnum):
+    BOUNDARY = "boundary"
     HAZARD = "hazard"
     EVACUATION_CENTERS = "evacuation_centers"
     VULNERABILITY = "vulnerability"
@@ -51,15 +52,26 @@ def _created() -> Mapped[datetime]:
 
 class Boundary(Base):
     __tablename__ = "boundary"
+    __table_args__ = (
+        UniqueConstraint(
+            "collection_version_id", "admin_code", name="uq_boundary_collection_admin_code"
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
     admin_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     admin_level: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    name_th: Mapped[str | None] = mapped_column(String(200))
+    province_name: Mapped[str | None] = mapped_column(String(200))
+    province_name_th: Mapped[str | None] = mapped_column(String(200))
     geom: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
     source: Mapped[str] = mapped_column(String(200), nullable=False)
     edition: Mapped[str] = mapped_column(String(100), nullable=False)
     geometry_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    collection_version_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     is_supported: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = _created()
 
@@ -68,7 +80,8 @@ class Dataset(Base):
     __tablename__ = "dataset"
     __table_args__ = (
         CheckConstraint(
-            "type IN ('hazard', 'evacuation_centers', 'vulnerability')", name="ck_dataset_type"
+            "type IN ('boundary', 'hazard', 'evacuation_centers', 'vulnerability')",
+            name="ck_dataset_type",
         ),
         CheckConstraint("owner_kind IN ('platform', 'hub_local')", name="ck_dataset_owner"),
     )
@@ -91,6 +104,12 @@ class DatasetVersion(Base):
             "return_period_years IS NULL OR return_period_years IN (10, 20, 50, 75, 100, 200, 500)",
             name="ck_dataset_version_return_period",
         ),
+        CheckConstraint(
+            "readiness IN ('received', 'validating', 'needs_correction', "
+            "'technically_valid', 'waiting_for_method', 'ready_for_acceptance', "
+            "'assessment_ready', 'retired')",
+            name="ck_dataset_version_readiness",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
@@ -104,7 +123,12 @@ class DatasetVersion(Base):
         "metadata", JSON_VALUE, default=dict, nullable=False
     )
     is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    readiness: Mapped[str] = mapped_column(
+        String(32), default="assessment_ready", server_default="assessment_ready", nullable=False
+    )
+    importer_version: Mapped[str | None] = mapped_column(String(64))
     accepted_by: Mapped[UUID | None] = mapped_column(ForeignKey("app_user.id", ondelete="RESTRICT"))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
 
 
@@ -114,6 +138,9 @@ class Feature(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
     dataset_version_id: Mapped[UUID] = mapped_column(
         ForeignKey("dataset_version.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    boundary_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("boundary.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     lon: Mapped[float] = mapped_column(Float, nullable=False)
