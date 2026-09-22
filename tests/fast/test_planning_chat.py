@@ -771,7 +771,10 @@ def test_status_reports_sig_connection(planning) -> None:
     ).json()
 
     assert connected["available"] and connected["can_plan"] and connected["sig_connected"]
+    # The page shows the time left so a planner can finish before the connection ends.
+    assert 3000 < connected["sig_expires_in_seconds"] <= 3600
     assert disconnected["sig_connected"] is False
+    assert disconnected["sig_expires_in_seconds"] is None
 
 
 def test_router_is_told_to_return_english_place_names() -> None:

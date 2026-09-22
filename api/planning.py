@@ -31,8 +31,8 @@ from api.planning_publish import decode_publish_token, encode_publish_token
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
+from api.sig_connection import sig_access_token, sig_connection
 from api.sig_evidence import check_area, tool_payload, verified_hazard_embed
-from api.token_store import session_token_store
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
@@ -477,7 +477,7 @@ async def _publish_reviewed_draft(
         session_id=principal.session_id,
         hub_id=str(hub.hub_id),
     )
-    access_token = session_token_store.get(principal.session_id)
+    access_token = await sig_access_token(settings, principal.session_id)
     if not access_token:
         raise GrpError(
             401,
@@ -831,7 +831,7 @@ async def planning_chat(
             "label": "More detail needed.",
             "usage": _usage(session, settings, principal),
         }
-    access_token = session_token_store.get(principal.session_id)
+    access_token = await sig_access_token(settings, principal.session_id)
     if not access_token:
         raise GrpError(
             401,
@@ -1208,8 +1208,11 @@ def _current_assessment_input(
     summary="Whether the planning chat is available and SIG is connected for this session",
     openapi_extra={"x-grp-access": "protected"},
 )
-def planning_status(principal: SignedInMember, session: DatabaseSession) -> dict[str, Any]:
+async def planning_status(
+    principal: SignedInMember, session: DatabaseSession
+) -> dict[str, Any]:
     settings = get_settings()
+    connection = await sig_connection(settings, principal.session_id)
     hubs = [
         {"hub_code": m.hub_code, "hub_name": m.hub_name, "role": m.role}
         for m in principal.memberships
@@ -1219,6 +1222,7 @@ def planning_status(principal: SignedInMember, session: DatabaseSession) -> dict
         "available": planning_chat_available(settings),
         "can_plan": bool(hubs),
         "hubs": hubs,
-        "sig_connected": session_token_store.get(principal.session_id) is not None,
+        "sig_connected": connection.connected,
+        "sig_expires_in_seconds": connection.expires_in_seconds,
         "usage": _usage(session, settings, principal),
     }
