@@ -4,6 +4,7 @@ import asyncio
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -30,6 +31,7 @@ from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import update_setting
 from core.ai_models import LlmUsage
 from core.identity import IdentityLinkResult
+from core.risk_recipe import RiskRecipe
 from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
 
 PACK = {
@@ -49,6 +51,17 @@ PACK = {
 
 def test_area_check_accepts_matching_admin_boundary() -> None:
     assert check_area("Mueang Nan District, Nan, Thailand", PACK).verified
+
+
+def test_real_boundary_match_includes_the_province_name() -> None:
+    boundary = SimpleNamespace(name="MUEANG NAN", province_name="NAN")
+
+    assert (
+        api.planning._match_boundary(
+            [boundary], "Mueang Nan District, Nan, Thailand"
+        )
+        is boundary
+    )
 
 
 @pytest.mark.parametrize(
@@ -136,7 +149,23 @@ def test_verified_hazard_embed_stops_on_missing_or_risk_layer(structured: dict) 
     assert checked.url is None
 
 
-def test_mvp1_screen_hides_unapproved_risk_sources_and_stats() -> None:
+def test_verified_embed_accepts_declared_risk_layer_only_after_recipe_approval() -> None:
+    result = McpToolResult(
+        content=[
+            {"type": "text", "text": '<iframe src="https://sig.example/embed/hazard_map/r1">'},
+        ],
+        structured_content={"displayed_layer": "risk_flood_l2"},
+        is_error=False,
+    )
+
+    checked = verified_hazard_embed(result, "sig.example", allow_risk=True)
+
+    assert checked.verified
+    assert checked.layer_kind == "risk"
+    assert checked.url == "https://sig.example/embed/hazard_map/r1"
+
+
+def test_mvp1_screen_hides_risk_sources_and_stats_without_an_approved_recipe() -> None:
     pack = {
         **PACK,
         "stats": {
@@ -165,6 +194,39 @@ def test_mvp1_screen_hides_unapproved_risk_sources_and_stats() -> None:
         "population_by_age": {"age_65_plus": 120},
     }
     assert "G-16" in api.planning._evidence_contract_warnings(screened)[0]
+
+
+def test_approved_recipe_preserves_sig_risk_and_demographic_evidence() -> None:
+    pack = {
+        **PACK,
+        "stats": {
+            "population_by_age": {"age_65_plus": 120},
+            "risk_levels": {"schools": {"high": 2}},
+        },
+        "citations": [
+            *PACK["citations"],
+            {"n": 2, "title": "schools by risk level", "text": "2 schools at high risk"},
+        ],
+    }
+    recipe = RiskRecipe(
+        key="thailand-flood-risk",
+        version="approved-v1",
+        weights={"population": 0.4, "building_density": 0.35, "road_distance": 0.25},
+        missing_data_policy="unable_to_assess",
+        science_owner="Science owner",
+        source_ref="SIG recipe receipt",
+        change_reason="Approved for test",
+        status="approved",
+        is_active=True,
+        approved_at=datetime.now(UTC),
+    )
+
+    screened = api.planning._screen_pack_for_mvp1(pack, recipe)
+
+    assert [item["n"] for item in screened["citations"]] == [1, 2]
+    assert screened["stats"]["risk_levels"]["schools"]["high"] == 2
+    assert screened["stats"]["population_by_age"]["age_65_plus"] == 120
+    assert screened["_grp_risk_recipe"]["version"] == "approved-v1"
 
 
 def test_draft_preflight_rejects_unapproved_risk_classification() -> None:
@@ -513,7 +575,7 @@ def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
         assert "sig_receipt_published" in set(session.scalars(select(AuditEvent.action)))
 
 
-def test_publish_withholds_embed_when_sig_switches_to_risk_layer(planning) -> None:
+def test_publish_accepts_explicit_risk_layer_under_approved_recipe(planning) -> None:
     planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
     FakeMcp.embed_layer = "risk_flood_l2"
     client = _client(planning, "planner@example.test")
@@ -531,10 +593,11 @@ def test_publish_withholds_embed_when_sig_switches_to_risk_layer(planning) -> No
     ).json()
 
     assert body["receipt"]["receipt_id"] == "receipt-1"
-    assert body["map_url"] is None
-    assert body["map_kind"] is None
-    assert "risk map" in body["map_note"]
-    assert body["trace"][-1]["detail"] == "withheld: displayed layer not verified"
+    assert body["map_url"] == "https://sig.example/embed/hazard_map/r1"
+    assert body["map_kind"] == "sig_vulnerability_weighted_flood_risk"
+    assert "risk layer verified" in body["map_note"]
+    assert body["evidence"]["risk_recipe"]["version"] == "sig-current-2026-09-22"
+    assert body["trace"][-1]["detail"] == "embedded risk_flood_l2"
 
 
 def test_gate_blocked_draft_is_not_shown(planning) -> None:

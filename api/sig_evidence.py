@@ -32,6 +32,7 @@ class AreaCheck:
 class EmbedCheck:
     url: str | None
     displayed_layer: str | None
+    layer_kind: str | None
     verified: bool
     reason: str
 
@@ -141,6 +142,9 @@ DISPLAYED_LAYER_KEYS = frozenset(
     }
 )
 FLOOD_HAZARD_LAYER = re.compile(r"^(?:hazard_flood|flood_rp(?:10|20|50|100|200|500))(?:\.tif)?$")
+FLOOD_RISK_LAYER = re.compile(
+    r"^(?:risk_flood_l2|risk_l2|flood_risk_l2|layer_2_risk)(?:\.tif)?$"
+)
 
 
 def _strings(value: object) -> list[str]:
@@ -168,7 +172,7 @@ def _displayed_layers(value: object) -> list[str]:
 
 
 def verified_hazard_embed(
-    result: McpToolResult, allowed_host: str | None
+    result: McpToolResult, allowed_host: str | None, *, allow_risk: bool = False
 ) -> EmbedCheck:
     """Accept an embed only when SIG explicitly identifies the displayed hazard layer.
 
@@ -180,21 +184,32 @@ def verified_hazard_embed(
 
     url = embed_url(result, allowed_host)
     if url is None:
-        return EmbedCheck(None, None, False, "SIG did not return an allowed hazard-map URL.")
+        return EmbedCheck(None, None, None, False, "SIG did not return an allowed hazard-map URL.")
     layers = _displayed_layers(result.structured_content)
     if not layers:
         return EmbedCheck(
+            None,
             None,
             None,
             False,
             "SIG did not identify the layer displayed by the embedded map.",
         )
     normalized = [layer.casefold().strip() for layer in layers]
-    risk_layers = [layer for layer in normalized if "risk" in layer or "layer_2" in layer]
+    risk_layers = [layer for layer in normalized if FLOOD_RISK_LAYER.fullmatch(layer)]
     if risk_layers:
+        displayed = layers[normalized.index(risk_layers[0])]
+        if allow_risk and len(risk_layers) == 1 and len(normalized) == 1:
+            return EmbedCheck(
+                url,
+                displayed,
+                "risk",
+                True,
+                "Displayed SIG vulnerability-weighted flood-risk layer verified.",
+            )
         return EmbedCheck(
             None,
-            layers[normalized.index(risk_layers[0])],
+            displayed,
+            "risk",
             False,
             "SIG returned a vulnerability-weighted risk map; MVP 1 shows flood hazard only.",
         )
@@ -203,7 +218,8 @@ def verified_hazard_embed(
         return EmbedCheck(
             None,
             ", ".join(layers),
+            None,
             False,
             "SIG did not return one recognized flood-hazard layer for the embedded map.",
         )
-    return EmbedCheck(url, layers[0], True, "Displayed flood-hazard layer verified.")
+    return EmbedCheck(url, layers[0], "hazard", True, "Displayed flood-hazard layer verified.")

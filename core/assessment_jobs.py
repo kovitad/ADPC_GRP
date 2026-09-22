@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
@@ -32,6 +34,7 @@ from core.assessment_models import (
     Feature,
     Method,
 )
+from core.data_library_models import DatasetFile
 from core.models import AssessmentState
 from core.result_rules import count_results, validate_center_results
 from core.storage import LocalStorage
@@ -65,6 +68,20 @@ class SubmitRequest:
 def features_sha256(session: Session, version_id: UUID) -> str:
     rows = session.scalars(select(Feature).where(Feature.dataset_version_id == version_id)).all()
     return centers_sha256([{"name": f.name, "lon": f.lon, "lat": f.lat} for f in rows])
+
+
+def boundary_sha256(geometry: dict[str, Any], expected: str) -> str:
+    """Reproduce either the synthetic JSON or imported WKB boundary fingerprint."""
+
+    json_digest = canonical_sha256(geometry)
+    if json_digest == expected:
+        return json_digest
+    from shapely import to_wkb
+    from shapely.geometry import shape
+
+    return sha256(
+        to_wkb(shape(geometry), byte_order=1, output_dimension=2, include_srid=False)
+    ).hexdigest()
 
 
 def _usable_version(
@@ -110,6 +127,14 @@ def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods:
         raise SubmitError("VALIDATION_FAILED", "The method is not available.")
     if method.status != "approved" and not allow_draft_methods:
         raise SubmitError("VALIDATION_FAILED", "The method is not approved.")
+    hazard_files = session.scalars(
+        select(DatasetFile)
+        .where(
+            DatasetFile.dataset_version_id == hazard.id,
+            DatasetFile.role.like("working_cog_%"),
+        )
+        .order_by(DatasetFile.role)
+    ).all()
     return {
         "boundary": {
             "id": str(boundary.id),
@@ -127,6 +152,14 @@ def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods:
             "provider": hazard_dataset.provider,
             "title": hazard_dataset.title,
             "edition": hazard.meta.get("edition"),
+            "files": [
+                {
+                    "role": item.role,
+                    "storage_key": item.storage_key,
+                    "sha256": item.sha256,
+                }
+                for item in hazard_files
+            ],
         },
         "evacuation_centers": {
             "version_id": str(centers.id),
@@ -134,6 +167,7 @@ def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods:
             "provider": centers_dataset.provider,
             "title": centers_dataset.title,
             "owner_kind": centers_dataset.owner_kind,
+            "features_sha256": features_sha256(session, centers.id),
         },
         "vulnerability": None,
         "method": {
@@ -219,7 +253,12 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
     """Run one claimed job to a final state. Returns the resulting state."""
 
     # GIS libraries load only in the worker; the API never imports them (AD-03).
-    from core.gis import CenterInput, MethodInputError, run_center_flood_overlay
+    from core.gis import (
+        CenterInput,
+        MethodInputError,
+        run_center_flood_overlay,
+        run_center_flood_overlay_tiles,
+    )
 
     assessment = session.get(Assessment, assessment_id)
     if assessment is None or assessment.state != AssessmentState.RUNNING:
@@ -249,13 +288,27 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
         if not storage.exists(hazard.storage_key):
             _fail(session, assessment, "INPUT_VERSION_MISSING", "hazard file missing")
             return assessment.state
+        pinned_hazard_files = pins["hazard"].get("files", [])
         checks = {
-            "boundary": canonical_sha256(boundary.geom) == pins["boundary"]["geometry_sha256"],
+            "boundary": boundary_sha256(
+                boundary.geom, pins["boundary"]["geometry_sha256"]
+            )
+            == pins["boundary"]["geometry_sha256"],
             "hazard_record": hazard.sha256 == pins["hazard"]["sha256"],
-            "hazard_file": storage.sha256(hazard.storage_key) == pins["hazard"]["sha256"],
             "centers": features_sha256(session, centers_version.id)
-            == pins["evacuation_centers"]["sha256"],
+            == pins["evacuation_centers"].get(
+                "features_sha256", pins["evacuation_centers"]["sha256"]
+            ),
         }
+        if not pinned_hazard_files:
+            checks["hazard_file"] = (
+                storage.sha256(hazard.storage_key) == pins["hazard"]["sha256"]
+            )
+        for item in pinned_hazard_files:
+            key = str(item["storage_key"])
+            checks[f"hazard_tile_{item['role']}"] = (
+                storage.exists(key) and storage.sha256(key) == item["sha256"]
+            )
         if not all(checks.values()):
             failed = sorted(name for name, ok in checks.items() if not ok)
             _fail(session, assessment, "INPUT_FINGERPRINT_MISMATCH", ",".join(failed))
@@ -265,8 +318,18 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
             select(Feature).where(Feature.dataset_version_id == centers_version.id)
         ).all()
         centers = [CenterInput(f.id, f.name, f.lon, f.lat) for f in features]
-        with storage.open_window(hazard.storage_key) as raster:
-            in_scope, results = run_center_flood_overlay(boundary.geom, centers, raster)
+        if pinned_hazard_files:
+            with ExitStack() as stack:
+                rasters = [
+                    stack.enter_context(storage.open_window(str(item["storage_key"])))
+                    for item in pinned_hazard_files
+                ]
+                in_scope, results = run_center_flood_overlay_tiles(
+                    boundary.geom, centers, rasters
+                )
+        else:
+            with storage.open_window(hazard.storage_key) as raster:
+                in_scope, results = run_center_flood_overlay(boundary.geom, centers, raster)
     except MethodInputError as error:
         _fail(session, assessment, "RESULT_RULE_FAILED", str(error))
         return assessment.state

@@ -146,3 +146,52 @@ def test_security_log_scoped_to_hub_admin(platform) -> None:
     assert {"platform_admin_bootstrapped", "member_added"} <= {e["action"] for e in all_events}
     assert {e["action"] for e in hub_events} <= {"hub_created", "member_added"}
     assert planner.get("/api/v1/admin/audit-events").status_code == 403
+
+
+def test_platform_admin_records_a_versioned_sig_risk_recipe(platform) -> None:
+    owner = _client(platform, "owner@example.test")
+
+    initial = owner.get("/api/v1/platform/risk-recipe").json()
+    changed = owner.put(
+        "/api/v1/platform/risk-recipe",
+        json={
+            "version": "sig-thailand-1.0.1",
+            "population_weight": 0.4,
+            "building_density_weight": 0.35,
+            "road_distance_weight": 0.25,
+            "science_owner": "Thailand flood science owner",
+            "source_ref": "SIG contribution receipt recipe-101",
+            "change_reason": "Approved for MVP 1 acceptance testing",
+        },
+    )
+    invalid = owner.put(
+        "/api/v1/platform/risk-recipe",
+        json={
+            "version": "bad-total",
+            "population_weight": 0.5,
+            "building_density_weight": 0.35,
+            "road_distance_weight": 0.25,
+            "science_owner": "Thailand flood science owner",
+            "source_ref": "SIG contribution receipt recipe-bad",
+            "change_reason": "Should fail",
+        },
+    )
+
+    assert initial["weights"] == {
+        "population": 0.4,
+        "building_density": 0.35,
+        "road_distance": 0.25,
+    }
+    assert changed.status_code == 200
+    assert changed.json()["version"] == "sig-thailand-1.0.1"
+    assert invalid.status_code == 422
+    with Session(platform["engine"]) as session:
+        actions = set(session.scalars(select(AuditEvent.action)))
+    assert "risk_recipe_approved" in actions
+
+
+def test_baseline_activation_stops_when_imports_are_missing(platform) -> None:
+    response = _client(platform, "owner@example.test").post("/api/v1/platform/mvp1/activate")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "VALIDATION_FAILED"

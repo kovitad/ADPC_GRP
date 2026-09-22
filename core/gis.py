@@ -92,3 +92,45 @@ def run_center_flood_overlay(
         raise MethodInputError("Flood layer has no bands")
     in_scope = centers_in_boundary(boundary_geojson, centers)
     return in_scope, [classify_center(raster, center) for center in in_scope]
+
+
+def run_center_flood_overlay_tiles(
+    boundary_geojson: dict[str, Any], centers: list[CenterInput], rasters: list[Any]
+) -> tuple[list[CenterInput], list[CenterResult]]:
+    """Classify centres against one non-overlapping logical raster made of COG tiles.
+
+    The delivered Thailand RP100 baseline is six immutable tiles. A centre is read from the
+    first tile whose bounds contain it; a centre outside every tile stays unable to assess.
+    """
+
+    if not rasters:
+        raise MethodInputError("Flood layer has no raster tiles")
+    for raster in rasters:
+        if raster.crs is None or raster.crs.to_epsg() != 4326:
+            raise MethodInputError("Flood layer must be in EPSG:4326 for method 1.0.0")
+        if raster.count < 1:
+            raise MethodInputError("Flood layer has no bands")
+    in_scope = centers_in_boundary(boundary_geojson, centers)
+    results: list[CenterResult] = []
+    for center in in_scope:
+        raster = next(
+            (
+                item
+                for item in rasters
+                if item.bounds.left <= center.lon < item.bounds.right
+                and item.bounds.bottom < center.lat <= item.bounds.top
+            ),
+            None,
+        )
+        if raster is None:
+            results.append(
+                CenterResult(
+                    center.feature_id,
+                    CenterStatus.UNABLE_TO_ASSESS,
+                    "OUTSIDE_HAZARD_COVERAGE",
+                    None,
+                )
+            )
+        else:
+            results.append(classify_center(raster, center))
+    return in_scope, results

@@ -38,6 +38,7 @@ from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
 from core.identity import MembershipView
 from core.models import AssessmentState
+from core.risk_recipe import RiskRecipe, active_risk_recipe, recipe_payload
 
 router = APIRouter(prefix="/planning", tags=["planning"])
 
@@ -90,10 +91,32 @@ DRAFT_INSTRUCTIONS = (
     "is not a declaration that a place is safe. If the question asks where people could move "
     "or evacuate and the evidence has no evacuation centers or shelters, say that plainly in "
     "the first section and describe only what the evidence does show. Do not add a Sources "
-    "section. MVP 1 has no approved vulnerability-weighted risk recipe: do not repeat risk "
-    "levels, risk scores, weights or counts by risk class even if the source pack contains them. "
-    "Use water-depth or flood-hazard classes only. Return Markdown."
+    "section. Return Markdown."
 )
+
+
+def _draft_instructions(recipe: RiskRecipe | None) -> str:
+    if recipe is None:
+        return DRAFT_INSTRUCTIONS + (
+            " MVP 1 has no approved vulnerability-weighted risk recipe: do not repeat risk "
+            "levels, risk scores, weights or counts by risk class even if the source pack "
+            "contains them. Use water-depth or flood-hazard classes only."
+        )
+    return DRAFT_INSTRUCTIONS + (
+        " The supplied SIG vulnerability-weighted risk evidence may be reported exactly when "
+        "cited. Identify it as SIG risk screening under the approved recipe version supplied in "
+        "the prompt; do not recompute or reinterpret a risk class."
+    )
+
+
+def _evidence_label(recipe: dict[str, object] | None) -> str:
+    if recipe:
+        return (
+            "SIG flood hazard, exposure and vulnerability-weighted risk evidence under approved "
+            f"recipe {recipe['version']}. Not a GRP assessment or a decision that any place is "
+            "safe."
+        )
+    return EVIDENCE_LABEL
 
 
 class ChatTurn(BaseModel):
@@ -178,7 +201,13 @@ def _match_boundary(boundaries: list[Boundary], place: str | None) -> Boundary |
     wanted = _place_parts(place)
     if not wanted:
         return None
-    matches = [boundary for boundary in boundaries if _place_parts(boundary.name) == wanted]
+    matches = []
+    for boundary in boundaries:
+        names = {_place_parts(boundary.name)}
+        if boundary.province_name:
+            names.add(_place_parts(f"{boundary.name}, {boundary.province_name}, Thailand"))
+        if wanted in names:
+            matches.append(boundary)
     return matches[0] if len(matches) == 1 else None
 
 
@@ -256,7 +285,11 @@ def _screen_stats_for_mvp1(value: object) -> object:
     return value
 
 
-def _screen_pack_for_mvp1(pack: dict[str, Any]) -> dict[str, Any]:
+def _screen_pack_for_mvp1(
+    pack: dict[str, Any], recipe: RiskRecipe | None = None
+) -> dict[str, Any]:
+    if recipe is not None:
+        return {**pack, "_grp_risk_recipe": recipe_payload(recipe)}
     citations = [item for item in pack.get("citations", []) if isinstance(item, dict)]
     visible = [item for item in citations if not _is_unapproved_risk_citation(item)]
     screened = {
@@ -361,7 +394,11 @@ def _deterministic_evidence_summary(
 
 
 def _draft_issues(
-    text: str, required_sections: list[object], citations: list[object]
+    text: str,
+    required_sections: list[object],
+    citations: list[object],
+    *,
+    risk_recipe_approved: bool = False,
 ) -> list[str]:
     """Cheap local preflight for failures the SIG groundedness gate will reject."""
 
@@ -381,7 +418,7 @@ def _draft_issues(
             issues.append(f"No content under heading: {heading.removeprefix('## ').strip()}")
     if any(line.lower() == "## sources" for line in lines):
         issues.append("The brief must not add its own Sources section")
-    if re.search(
+    if not risk_recipe_approved and re.search(
         r"\b(?:very high|high|moderate|low|very low) risk\b|\brisk (?:level|class|score)\s*[1-5]\b",
         text,
         re.IGNORECASE,
@@ -457,6 +494,16 @@ async def _publish_reviewed_draft(
 
     request_started = perf_counter()
     evidence = dict(claims["evidence"])
+    recipe = active_risk_recipe(session, create_default=False)
+    pinned_recipe = evidence.get("risk_recipe")
+    if pinned_recipe and (
+        recipe is None or recipe.version != str(pinned_recipe.get("version", ""))
+    ):
+        raise GrpError(
+            409,
+            "VALIDATION_FAILED",
+            "The approved SIG risk recipe changed. Generate and review a new evidence brief.",
+        )
     trace = list(evidence.get("grp_trace", []))
     try:
         async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
@@ -517,7 +564,9 @@ async def _publish_reviewed_draft(
                 None
                 if embed.is_error
                 else verified_hazard_embed(
-                    embed, urlparse(settings.sig_mcp_base_url).hostname
+                    embed,
+                    urlparse(settings.sig_mcp_base_url).hostname,
+                    allow_risk=bool(pinned_recipe),
                 )
             )
             map_url = embed_check.url if embed_check and embed_check.verified else None
@@ -573,7 +622,7 @@ async def _publish_reviewed_draft(
         "hub_code": hub.hub_code,
         "mode": "sig_evidence",
         "answer": claims["draft"],
-        "label": EVIDENCE_LABEL,
+        "label": _evidence_label(pinned_recipe),
         "note": claims.get("note"),
         "area": claims["area"],
         "stats": evidence.get("stats", {}),
@@ -581,7 +630,11 @@ async def _publish_reviewed_draft(
         "citations": evidence.get("citations", []),
         "receipt": receipt,
         "map_url": map_url,
-        "map_kind": "flood_hazard_and_asset_exposure" if map_url else None,
+        "map_kind": (
+            "sig_vulnerability_weighted_flood_risk"
+            if map_url and embed_check and embed_check.layer_kind == "risk"
+            else "flood_hazard_and_asset_exposure" if map_url else None
+        ),
         "map_note": map_note,
         "trace": trace,
         "evidence": evidence,
@@ -797,6 +850,7 @@ async def planning_chat(
         {"step": "understand_question", "detail": ROUTER_VERSION,
          "duration_ms": elapsed_ms(request_started)}
     ]
+    risk_recipe = active_risk_recipe(session)
     step_started = perf_counter()
     try:
         async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
@@ -842,7 +896,7 @@ async def planning_chat(
                     "usage": _usage(session, settings, principal),
                 }
 
-            pack = _screen_pack_for_mvp1(pack)
+            pack = _screen_pack_for_mvp1(pack, risk_recipe)
 
             draft = await run_ai_call(
                 session,
@@ -850,7 +904,7 @@ async def planning_chat(
                 user_id=principal.user_id,
                 hub_id=hub.hub_id,
                 hub_code=hub.hub_code,
-                instructions=DRAFT_INSTRUCTIONS,
+                instructions=_draft_instructions(risk_recipe),
                 prompt=json.dumps(
                     {
                         "question": payload.message,
@@ -862,6 +916,9 @@ async def planning_chat(
                             if isinstance(item, dict)
                         ],
                         "declared_gaps": pack.get("gaps", []),
+                        "approved_risk_recipe": (
+                            recipe_payload(risk_recipe) if risk_recipe is not None else None
+                        ),
                     },
                     ensure_ascii=False,
                 ),
@@ -894,7 +951,10 @@ async def planning_chat(
         },
     )
     issues = _draft_issues(
-        draft.text, pack.get("required_sections", []), pack.get("citations", [])
+        draft.text,
+        pack.get("required_sections", []),
+        pack.get("citations", []),
+        risk_recipe_approved=risk_recipe is not None,
     )
     answer_source = "ai_draft"
     if issues:
@@ -935,7 +995,7 @@ async def planning_chat(
         "mode": "sig_evidence",
         "answer": answer,
         "answer_source": answer_source,
-        "label": EVIDENCE_LABEL
+        "label": _evidence_label(evidence.get("risk_recipe"))
         + (
             " The AI brief was incomplete; a deterministic evidence summary is shown instead "
             "and cannot be published."
@@ -1018,6 +1078,7 @@ def evidence_bundle(
         "assembled_at": execution.get("assembled_at"),
         "gather_ms": execution.get("gather_ms"),
         "receipt": receipt,
+        "risk_recipe": pack.get("_grp_risk_recipe"),
     }
 
 

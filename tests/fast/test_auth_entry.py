@@ -196,5 +196,5 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260922a" in page
+    assert "/planning.js?v=20260922b" in page
     assert "innerHTML" not in script

@@ -728,11 +728,18 @@
   // ---------- SIG evidence ----------
   const sigPanel = $("[data-sig]");
   const sigFrame = $("[data-sig-frame]");
-  const showSigMap = (mapUrl, evidence) => {
+  const showSigMap = (mapUrl, evidence, mapKind) => {
     sigFrame.src = mapUrl;
     const place = (evidence.area && evidence.area.sig_place) || evidence.place || "Confirmed area";
     const receiptId = evidence.receipt && evidence.receipt.receipt_id;
     $("[data-sig-meta]").textContent = `${place}${receiptId ? ` · receipt ${receiptId}` : ""}`;
+    const risk = mapKind === "sig_vulnerability_weighted_flood_risk";
+    $("[data-sig-title]").textContent = risk
+      ? "SIG vulnerability-weighted flood risk"
+      : "Flood hazard and asset exposure";
+    $("[data-sig-help]").textContent = risk
+      ? "Shows SIG risk classes calculated with the approved recipe recorded below. It supports screening and does not certify that a location is safe."
+      : "Shows assets intersecting mapped flood-hazard classes. It is not a vulnerability-weighted risk score and does not certify that a location is safe.";
     sigPanel.hidden = false;
   };
   $("[data-sig-close]").addEventListener("click", () => {
@@ -929,6 +936,7 @@
 
   const renderSigSummary = (payload) => {
     const evidence = payload.evidence;
+    const hasRisk = Boolean(evidence.risk_recipe);
     setPanelMode("sig");
     const hero = $("[data-summary-hero]");
     const movementSection = $("[data-summary-movement-section]");
@@ -946,10 +954,14 @@
       : payload.answer_source === "deterministic_fallback"
         ? "Deterministic evidence summary · not publishable"
         : "Unverified screening draft";
-    $("[data-summary-title]").textContent = "What SIG found — and what it cannot decide";
+    $("[data-summary-title]").textContent = hasRisk
+      ? "Approved SIG flood-risk screening"
+      : "What SIG found — and what it cannot decide";
     $("[data-summary-lead]").textContent = payload.answer_source === "deterministic_fallback"
       ? "The AI brief failed formatting checks, so GRP is showing only numbered findings copied from the structured evidence pack."
-      : "SIG provides hazard and asset-exposure context. Red flood shading shows depth or hazard, not a risk or safety rating.";
+      : hasRisk
+        ? `SIG provides hazard, exposure and vulnerability-weighted risk using approved recipe ${evidence.risk_recipe.version}. Risk classes support screening; they do not certify safety.`
+        : "SIG provides hazard and asset-exposure context. Red flood shading shows depth or hazard, not a risk or safety rating.";
     $("[data-summary-movement]").replaceChildren(summaryNotice(
       "No GRP movement recommendation for this area",
       "Evacuation-centre points on the local map are display-only and have not been assessed for this district. Use them for orientation, not as safe destinations.",
@@ -960,7 +972,13 @@
       { label: "Evacuation-centre locations", status: state.centersVersion ? "partial" : "missing", detail: state.centersVersion ? "Display-only national baseline; not assessed" : "No managed layer available" },
       { label: "Centre capacity and services", status: "missing", detail: "Not returned in this evidence pack" },
       { label: "Accessibility and safe routes", status: "missing", detail: "No route suitability evidence" },
-      { label: "Vulnerability", status: "partial", detail: "SIG generic screening may be present; no GRP-approved vulnerability input" },
+      {
+        label: "Vulnerability-weighted risk",
+        status: hasRisk ? "available" : "partial",
+        detail: hasRisk
+          ? `SIG recipe ${evidence.risk_recipe.version}; exact source values remain in Evidence`
+          : "SIG generic screening may be present; no approved recipe is recorded",
+      },
       { label: "Interventions and costs", status: "missing", detail: "No approved cost template or figures" },
       ...(evidence.warnings || []).map((warning) => ({
         label: "SIG metadata consistency",
@@ -1141,6 +1159,28 @@
       tile.append(strong, span);
       numbers.append(tile);
     });
+    Object.entries((evidence.stats && evidence.stats.population_by_age) || {}).forEach(([name, value]) => {
+      if (typeof value !== "number") return;
+      const tile = document.createElement("div");
+      tile.className = "pw-number";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      strong.textContent = value.toLocaleString();
+      span.textContent = `${name.replaceAll("_", " ")} · SIG demographic evidence`;
+      tile.append(strong, span);
+      numbers.append(tile);
+    });
+    if (evidence.risk_recipe) {
+      const tile = document.createElement("div");
+      tile.className = "pw-number";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      const weights = evidence.risk_recipe.weights;
+      strong.textContent = evidence.risk_recipe.version;
+      span.textContent = `Approved SIG recipe · population ${Math.round(weights.population * 100)}% · buildings ${Math.round(weights.building_density * 100)}% · roads ${Math.round(weights.road_distance * 100)}%`;
+      tile.append(strong, span);
+      numbers.append(tile);
+    }
 
     const cards = $("[data-ev-cards]");
     cards.replaceChildren(...evidence.citations.map(evidenceCard));
@@ -1181,9 +1221,13 @@
     mapButton.classList.remove("is-warning");
     delete mapButton.dataset.confirm;
     if (evidence.receipt) {
-      mapButton.textContent = mapUrl ? "Show hazard & exposure map" : "SIG embedded map unavailable";
+      mapButton.textContent = mapUrl
+        ? payload.map_kind === "sig_vulnerability_weighted_flood_risk"
+          ? "Show SIG risk map"
+          : "Show hazard & exposure map"
+        : "SIG embedded map unavailable";
       mapButton.disabled = !mapUrl;
-      mapButton.onclick = () => mapUrl && showSigMap(mapUrl, evidence);
+      mapButton.onclick = () => mapUrl && showSigMap(mapUrl, evidence, payload.map_kind);
       const receiptUrl = safeHttps(evidence.receipt.public_url);
       $("[data-ev-foot]").textContent = "";
       if (receiptUrl) {
@@ -1227,7 +1271,7 @@
     outlineSigArea(evidence);
     openEvidence();
     if (evidence.receipt && mapUrl) {
-      showSigMap(mapUrl, evidence);
+      showSigMap(mapUrl, evidence, payload.map_kind);
     }
   };
 

@@ -1,6 +1,6 @@
 # ADR-0014: Gate SIG risk levels and verify the embedded map layer
 
-**Status:** Accepted for the MVP 1 fail-closed implementation; science ownership remains a team decision
+**Status:** Superseded for approved recipes by ADR-0015; remains the fail-closed fallback
 **Date:** 22 September 2026
 
 ## Context

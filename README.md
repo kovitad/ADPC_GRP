@@ -2,7 +2,7 @@
 
 This repository is the implementation foundation for the ADPC Hub of the SERVIR Global Risk Platform (GRP) MVP 1. It follows solution architecture `GRP-ARC-001` version 2.2: ADPC owns access, data, GIS processing, and immutable assessment results; SIG reads only Admin-approved results to build traceable evidence and receipts.
 
-> **Current status:** The local Docker Desktop build includes access and Admin controls, a synthetic queued assessment with a locked result, the metered AI gateway, the Planner chat/map, receipt-bound SIG hazard-and-exposure embeds, and Admin-only inspection and district preview of the delivered Thailand files. These additions remain on `codex/sig-embedded-flood-map`; real Thailand assessment inputs are not approved or loaded, and staging has not been deployed. See [`handovers.md`](handovers.md) for the exact revision, validation record, limitations and next work.
+> **Current status:** The local Docker Desktop build includes access and Admin controls, the metered AI gateway, Planner chat/map, receipt-bound SIG hazard/risk embeds, and the managed Thailand baseline. Under ADR-0015's explicit Product Owner approval assumption, Platform Admins can record the versioned SIG risk recipe and activate the imported boundaries, evacuation centres and RP100 hazard for real queued district assessments. Local proofs succeeded for Mueang Nan and Bang Bua Thong. Staging has not been deployed; see [`handovers.md`](handovers.md) for the exact revision, validation record and remaining production gates.
 
 For the current implementation inventory, known limitations, validation record, and exact next slice, read [`handovers.md`](handovers.md).
 
@@ -124,7 +124,7 @@ make compose-config  # validate the staging Compose model
 
 Development follows the approved increments: server foundation; signed Chiang Yuen RP100 golden assessment; access and Admin; SIG sharing and evidence; review/downloads; additional data; vulnerability and AI; pilot hardening. The access foundation was brought forward to support the requested SIG account test. No fallback geography, dataset, or provider is permitted.
 
-The queued assessment workflow is proved with a synthetic fixture. The next assessment-data work is to add the scientifically approved Chiang Yuen RP100 golden fixture and load approved Thailand boundaries, shelters and flood data under the rules in `docs/thailand-dataset-ingestion-plan.md`. Scientific expected values must come from the designated authority and must never be invented to make a test pass.
+The queued assessment workflow is proved by the locked synthetic fixture and by local real-data execution against the imported six-tile RP100 baseline. Formal production acceptance still needs the authority-signed Chiang Yuen golden artifact; expected values must never be invented to make a test pass. The activation and recipe decision are recorded in [`ADR-0015`](docs/adr/0015-approved-sig-risk-recipe-and-baseline-activation.md).
 
 ## Security
 

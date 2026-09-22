@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/planning.css?v=20260921e" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260922a" defer></script>
+    <script src="/planning.js?v=20260922b" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -219,12 +219,12 @@
           <div class="pw-sig__bar">
             <div>
               <span class="pw-sig__eyebrow">SIG live component · public receipt</span>
-              <strong>Flood hazard and asset exposure</strong>
+              <strong data-sig-title>Flood hazard and asset exposure</strong>
               <span class="pw-sig__meta" data-sig-meta></span>
             </div>
             <button class="pw-icon-button" type="button" data-sig-close aria-label="Close SIG map">×</button>
           </div>
-          <p class="pw-sig__help" id="sig-map-help">
+          <p class="pw-sig__help" id="sig-map-help" data-sig-help>
             Shows assets intersecting mapped flood-hazard classes. It is not a vulnerability-weighted
             risk score and does not certify that a location is safe.
           </p>

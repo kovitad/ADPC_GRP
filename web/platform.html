@@ -8,7 +8,7 @@
     <title>Platform administration | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="/styles.css?v=20260920e" />
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/platform.js" defer></script>
+    <script src="/platform.js?v=20260922a" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -30,6 +30,66 @@
             </button>
           </div>
           <dl class="health-grid" data-health></dl>
+        </section>
+
+        <section class="admin-card" aria-labelledby="risk-recipe-heading">
+          <div class="admin-card__heading">
+            <div>
+              <p class="eyebrow">MVP 1 science configuration</p>
+              <h2 id="risk-recipe-heading">Approved SIG risk recipe</h2>
+            </div>
+            <span class="status-pill" data-risk-recipe-state>Loading…</span>
+          </div>
+          <p class="admin-card__intro">
+            GRP does not calculate or change these weights. It records the exact approved SIG
+            recipe that Planning may display. The three weights must total 100%. Missing coverage
+            remains <strong>Unable to assess</strong>; weights are never redistributed silently.
+          </p>
+          <form class="assignment-form" data-risk-recipe-form>
+            <label>
+              Population (%)
+              <input data-risk-population type="number" min="0" max="100" step="0.01" required />
+            </label>
+            <label>
+              Building density (%)
+              <input data-risk-buildings type="number" min="0" max="100" step="0.01" required />
+            </label>
+            <label>
+              Road distance (%)
+              <input data-risk-roads type="number" min="0" max="100" step="0.01" required />
+            </label>
+            <label>
+              Recipe version
+              <input data-risk-version maxlength="64" required />
+            </label>
+            <label class="assignment-form__wide">
+              Science owner
+              <input data-risk-owner maxlength="200" required />
+            </label>
+            <label class="assignment-form__wide">
+              SIG source reference
+              <input data-risk-source maxlength="300" required />
+            </label>
+            <label class="assignment-form__wide">
+              Approval or change reason
+              <input data-risk-reason maxlength="500" required />
+            </label>
+            <button class="button button--primary" type="submit">Record approved recipe</button>
+          </form>
+          <p class="assignment-status" data-risk-recipe-status aria-live="polite"></p>
+          <div class="admin-card__heading">
+            <div>
+              <h3>Approved Thailand baseline</h3>
+              <p class="admin-card__intro">
+                Activates the latest imported boundaries, evacuation centres and RP100 hazard,
+                approves the fixed centre-overlay method, and enables real district assessments.
+              </p>
+            </div>
+            <button class="button button--secondary" type="button" data-activate-mvp1>
+              Activate approved baseline
+            </button>
+          </div>
+          <p class="assignment-status" data-activation-status aria-live="polite"></p>
         </section>
 
         <section class="admin-card" aria-labelledby="ai-setting-heading">

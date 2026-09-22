@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 22 September 2026 (`codex/ubuntu-shared-host-runner`; SIG risk and embedded-map contract gate added)
+**Updated:** 22 September 2026 (`codex/ubuntu-shared-host-runner`; approved-recipe and real-baseline MVP 1 path implemented)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. The current branch adds the Ubuntu shared-host launcher plus the ADR-0014 SIG contract gate: unapproved risk-level evidence is withheld, ambiguous `severity` is removed, and `ui_embed` is displayed only for an explicitly declared flood-hazard layer. **372 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript and Bash syntax, and Compose configuration checks are clean.
+**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. The current branch adds the Ubuntu shared-host launcher and ADR-0015's approved-data MVP 1 path: a versioned SIG risk recipe, Platform Admin baseline activation, approved risk evidence and embeds, demographic evidence cards, six-tile RP100 worker execution, and real district matching. **394 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Compose configuration and whitespace checks are clean.
 
-**Handing over:** the launcher and SIG safety gate are implemented and locally validated. The launcher has not yet been exercised on the user's Ubuntu host. Live `ui_embed` displayed-layer metadata is not recorded, so the map deliberately stays hidden if SIG does not declare a recognized hazard layer. Push/merge this branch, run the Ubuntu setup, then capture and review one sanitized live embed response before broadening the layer contract.
+**Handing over:** the imported local baseline is active under the Product Owner's explicit assumption that the supplied data and current SIG recipe are approved. Mueang Nan completed with 46/46 centres correctly marked **Unable to assess** on NoData; Bang Bua Thong completed with 1/1 centre **Potentially exposed**. The launcher has not yet been exercised on the user's Ubuntu host. Sign in again after the rebuild, review the new Platform recipe/activation card and run the real-district Planning flow; then capture one sanitized live SIG risk embed response before staging.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -20,18 +20,18 @@
 |---|---|
 | Increment 0, servers ready | Done |
 | Increment 2, access and admin | **Complete in code**: NDMO Planner, Hub Expert / GIS Specialist, Hub Admin and Platform Admin; security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
-| Increment 1, golden assessment | **Built on a synthetic case**: job, worker, locked result, API, screen, golden test. Real acceptance needs DEP-04, DEP-06 and method approval |
+| Increment 1, golden assessment | **Real baseline enabled under ADR-0015's approval assumption**: six-tile worker, 928 supported districts and 10,303 centres. Mueang Nan and Bang Bua Thong completed locally; the formal authority-signed Chiang Yuen artifact remains a production gate |
 | Planner assistant and map (ADR-0004) | **Built, Docker Desktop only**: chat bot plus OSM map, SIG MCP evidence, evidence panel, downloads, progress, Thai input; browser location accepts a confirmed district only |
-| SIG live hazard-map embed | **Implemented on `main`**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path, sandboxed iframe and explicit hazard/exposure—not full risk—education |
+| SIG live map embed | **Implemented**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path and sandboxed iframe. Hazard layers remain hazard-only; an active ADR-0015 recipe additionally permits one exact declared SIG risk layer |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
-| Baseline map preview (ADR-0009) | **Built and imported locally**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. Planning can draw both without making them assessment inputs; DEP-05 still blocks classification |
+| Thailand baseline (ADR-0009/0015) | **Built, imported and locally activated**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. The same pinned versions now support queued real-district screening; NoData is Unable to assess |
 | Ubuntu shared-host demo | **Built on current branch**: idempotent `scripts/docker-ubuntu.sh`, loopback port 8000, hidden AI-key prompt, ignored mode-0600 secret files, SIG localhost client registration and PuTTY tunnel runbook; needs first execution on Ubuntu |
-| SIG risk/map contract gate (ADR-0014) | **Built on current branch**: risk-level citations and ambiguous summary values stay off the MVP 1 screen; embedded maps fail closed unless SIG declares one known flood-hazard layer |
+| SIG risk/map contract (ADR-0014/0015) | **Built on current branch**: risk remains withheld without an approved recipe; the active versioned recipe enables cited SIG risk values and one explicitly declared risk layer, while missing/multiple/unknown layers still fail closed |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
 | Increment 5, seven scenarios and uploads | Not started |
-| Increment 6, vulnerability and AI explain | AI explain exists early; vulnerability is a placeholder (DEP-07) |
+| Increment 6, vulnerability and AI explain | AI explain exists; SIG population-by-age and approved recipe risk can be shown as labelled evidence. A local GRP vulnerability raster/result remains separate |
 | Increment 7, pilot hardening | Not started |
 
 **Product-owner browser testing is in progress.** The owner has seen and steered the Planning page (chat, SIG evidence, menu and professional theme) and authorized the stabilization plan. The stacked feature branch was merged to `main` after the 18 September validation pass.
@@ -71,7 +71,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 ```
 
 **Important facts about the local stack:**
-- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; `grp-common.js`, `planning.js` and `planning.css` now carry `?v=20260917n`. **Bump asset versions when changing shared CSS or JS.**
+- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; asset query strings are bumped when their files change (`planning.js` is currently `?v=20260922b`). **Bump asset versions when changing shared CSS or JS.**
 - **Python changes need an image rebuild.** The local `grp-api:desktop` image was successfully rebuilt on 18 September from the committed source, including `api/errors.py` and `api/rate_limits.py`; the API and worker were recreated from that image. No copied-file workaround remains.
 - Local rate limit: `deploy/compose.desktop.yml` sets `RATE_LIMITS` with 300 API requests per person per minute, so quick menu switching does not hit 429. Servers keep the Section 13.1 value of 60.
 - After any API restart, **sign in again**. The SIG MCP token lives only in process memory (ADR-0002).
@@ -85,17 +85,17 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 1. `http://127.0.0.1:8000/admin`: sign in with SERVIR (`kovitad.janlakhon@adpc.net` is Platform Admin and Hub Admin of `adpc`)
 2. `/platform.html`: set a token limit (for example 50,000), AI **On**, Save; **Send test call**; **Reset now**; create, close and reopen a Hub; security log
 3. `/planning.html`:
-   - The page opens on Thailand, with no assessment area selected. **Evacuation centers** are shown from the real display-only baseline. Open **Layers**, select RP100 and check **Flood depth** to draw it; RP20 and RP50 are visible but disabled as **not imported**. Selecting a district must not silently check Flood depth. **Use my current district** / **Use my location** identifies a real Thailand district for SIG-only evidence. The synthetic fixture remains available only as the demo assessment area; selecting it explicitly runs the 7 / 3 / 2 / 2 test assessment. When that result finishes, flood and centres are checked automatically, the pinned red-tone flood picture opens, and only assessed centres inside the selected boundary are drawn.
+   - The page opens on Thailand, with no assessment area selected. **Evacuation centers** are shown from the real national baseline. Open **Layers**, select RP100 and check **Flood depth** to draw it; RP20 and RP50 are visible but disabled as **not imported**. Search for a supported real district and run the RP100 screen; **Use my location** accepts only a confirmed Thailand district. The synthetic fixture remains available as the 7 / 3 / 2 / 2 regression case. When a result finishes, flood and centres are checked automatically, the pinned red-tone flood picture opens, and only assessed centres inside the selected boundary are drawn.
    - "Which centers could not be assessed, and why?" explains the stored result
-   - `where could people move if flood happen in บางบัวทอง นนทบุรี`: confirm the AI-proposed district before any SIG request; then the progress card, status card with a note that this is not a GRP area, evidence panel and Bang Bua Thong outline appear
+   - `where could people move if flood happen in บางบัวทอง นนทบุรี`: confirm Bang Bua Thong, run the real queued RP100 assessment and verify the one in-scope centre is Potentially exposed; this is not a statement that the centre is safe
    - **Use my location**: allow the browser prompt; the map accepts only a real Thailand district returned by OpenStreetMap (not a city-wide or approximate result), labels it as SIG-only and offers **Check SIG flood exposure**. Location coordinates are not stored and cannot start a GRP assessment.
-   - **Publish receipt & show SIG flood map** (two-step confirm, creates a public record): SIG hazard map over the map
+   - **Publish receipt & show SIG map** (two-step confirm, creates a public record): a declared hazard layer is shown; a declared recognized risk layer is shown only while an approved recipe is pinned
    - switch to Assessments and back: the conversation is kept
 4. `/data-inspector.html` (**Source data** in the menu, Admins only): pick **All source data**. Expect a numbered set of evidence-led points asking the data team to confirm the interpretation, plus a map of shelters coloured by whether they sit in the district they name. The page and consultation exports do not label points as blockers, problems or known issues and do not approve or reject the accepted static delivery. A second visit to the same folder returns instantly from the cache. While it runs, switch to another menu: the top bar shows **Running: Source data check …** and a notice appears bottom-right when it is ready. Coming back to Source data picks up the same job (it does not start again). A finished report is shown straight away; pick the folder again to re-check for changed files.
 5. `/data-preview.html` (**Preview one district** link on Source data, Admins only): press **Pua**. Expect the district outline, the flood picture hatched purple almost everywhere (99% no value), 29 purple shelters (on a no-value pixel), 1 orange shelter far away that names Pua, and a warnings panel led by the no-value blocker. **Mueang Nan** asks you to pick between districts only if the name is shared; **Bang Bua Thong** shows one shelter on a flooded pixel. A made-up name says it is not in the boundary file.
 6. `/assessments.html`, `/workspace.html`: same top bar, same order
 7. Langfuse Cloud: traces `planning-router-v1`, `planning-draft-v1`, `result-explain-v1`, `platform-test-v1`
-8. After a SIG receipt: if `ui_embed` declares `hazard_flood` or `flood_rp10`–`flood_rp500`, the map opens and the trace names that layer. If it declares a risk layer or omits/changes the layer field, the receipt remains visible but the map is withheld with the contract reason. A risk-level answer must show the G-16 warning and no risk classification.
+8. After a SIG receipt: `hazard_flood` or `flood_rp10`–`flood_rp500` opens as hazard. With an active pinned recipe, exactly one recognized risk layer such as `risk_flood_l2` opens as SIG risk. Missing, multiple or unknown layer identifiers keep the receipt visible but withhold the iframe.
 
 ### Shared Ubuntu host (another application already uses port 80)
 
@@ -181,7 +181,7 @@ when national raster browsing is measured as necessary.
 Design notes to read before large changes:
 
 - [`docs/architecture-scaling-design.md`](docs/architecture-scaling-design.md) — why GRP is a modular monolith with background jobs, what keeps it ready to split into services later, and the measured triggers for doing so.
-- [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force, including the blocking no-data rule.
+- [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force. ADR-0015 now resolves MVP 1 flood NoData as Unable to assess under an explicit approval assumption.
 - [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
 - [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) — proposed SIG screening, GRP detailed assessment, versioned platform baseline, Hub-level category overrides, import/upload lifecycle, technical stack and scaling triggers.
 - [`docs/data-library-solution-review.md`](docs/data-library-solution-review.md) — senior review, mandatory safeguards and scale gates. Its P0 policy/model choices are closed in ADR-0008 for local baseline work; browser upload and server rollout remain gated.
@@ -190,9 +190,9 @@ Design notes to read before large changes:
 - [`docs/demo-mock-feature-implementation-plan.md`](docs/demo-mock-feature-implementation-plan.md) — feature-by-feature review of the seven mock-up/architecture images in the local ignored file `example/The_Demo_Mock_Version.docx`, mapped to current capability, data/scientific gaps and ordered increments M0–M8. Start with M1 plus the synthetic part of M3; do not implement the illustrative comparison, population or risk values.
 - [`docs/evacuation-decision-agent-data-architecture.md`](docs/evacuation-decision-agent-data-architecture.md) — developer blueprint for ADR-0013, with system context, bounded-agent control flow, tool allow-list, evidence-envelope contract, logical data model, lineage, runtime sequence, proposed APIs/tables/modules, reliability requirements and phased delivery. Its editable five-page source is [`docs/GRP_Evacuation_Decision_Agent_and_Data_Architecture.drawio`](docs/GRP_Evacuation_Decision_Agent_and_Data_Architecture.drawio), regenerated by `python tools/build_agent_architecture_drawio.py`.
 - [`docs/adr/0006-admin-data-inspector.md`](docs/adr/0006-admin-data-inspector.md) — the Admin **Source data** page: a read-only look at `.local/data-in`, run as a worker job, cached on a file fingerprint, and presented as neutral evidence and questions for data-team confirmation. Dev only; nothing it reports is a GRP result or approval decision.
-- [`docs/adr/0007-delivered-data-acceptance.md`](docs/adr/0007-delivered-data-acceptance.md) — the Data Science delivery is accepted source data; ingestion registers its provenance and checksums, while method decisions such as flood no-value remain separate blockers.
+- [`docs/adr/0007-delivered-data-acceptance.md`](docs/adr/0007-delivered-data-acceptance.md) — the Data Science delivery is accepted source data; ingestion registers its provenance and checksums. ADR-0015 supplies the later MVP 1 method/activation assumption.
 - [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md) — what `tools/prove_dataset.py` found when run on real districts: the datasets line up, but in Pua every shelter sits on a no-value pixel, shelter district names cannot be joined, and at least one shelter is in the wrong province. Read this before writing any loader.
-- **District preview (backlog Epic P)** — `core/district_preview.py` (worker only) builds one district's outline, shelters and RP100 flood picture from `.local/data-in`, with warnings. It reuses the `dataset_inspection` job table: the `district` column (migration 0007) is part of the cache key, so a folder report and a preview are never confused. It never classifies a shelter as "not exposed": shelters are reported on a flood pixel / on a no-value pixel / outside tiles, because what no-value means is DEP-05. Admin-only, behind `DATA_INSPECTOR_ENABLED`, with no export and no SIG path. The picture is stored under `previews/<id>/flood.png` and served by `GET /api/v1/data-inspector/previews/{id}/flood.png`.
+- **District preview (backlog Epic P)** — `core/district_preview.py` (worker only) builds one district's outline, shelters and RP100 flood picture from `.local/data-in`, with warnings. It reuses the `dataset_inspection` job table: the `district` column (migration 0007) is part of the cache key, so a folder report and a preview are never confused. The preview remains descriptive: flood pixel / no-value pixel / outside tiles. The queued assessment applies ADR-0015's rule that no-value is Unable to assess. Admin-only, behind `DATA_INSPECTOR_ENABLED`, with no export and no SIG path.
 - [`docs/development-plan.md`](docs/development-plan.md) — how we work: definition of done, test layers, CI gates to add, observability, security and documentation habits, eight phases with finish lines, and the technical-debt register.
 - [`docs/backlog.md`](docs/backlog.md) — the ordered work items for the dev team (epics A to H, sized, with what blocks each), and a suggested first sprint that is blocked on nobody.
 - [`docs/flood-hazard-exposure-embed-design.md`](docs/flood-hazard-exposure-embed-design.md) — the SIG receipt-bound hazard map embed.
@@ -316,7 +316,8 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   rather than polling forever in the foreground.
 - The product owner confirmed that the Data Science delivery is accepted source data (ADR-0007).
   The UI no longer calls the files unapproved or treats acceptance as a blocker. Registration of
-  provenance/checksums is ingestion setup; DEP-05 no-value meaning still blocks classification.
+  provenance/checksums is ingestion setup; at that date DEP-05 no-value meaning still blocked
+  classification. ADR-0015 later resolved MVP 1 NoData as Unable to assess under the approval assumption.
   A direct worker preview of Pua confirms the remaining findings are the no-value blocker, one
   misplaced-shelter problem and the two unconfirmed shelter columns as a known issue.
 - Designed the next data-library increment before coding it: SIG screening, GRP assessment,
@@ -355,7 +356,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 ### 20 Sep — real baseline flood and evacuation-centre map layers
 
 - Added migration `0010`, the DDPM shelter worker loader and geometry-based district membership. The real local import materialized 10,303 points, all with PostGIS geometry and a boundary ID; 1,139 source-name conflicts are reported and no point falls outside all districts. At import time `สถา` and `รอง` were excluded; the 21 September review below also identified `สถ_1` as unconfirmed.
-- Added the six-tile RP100 worker loader. It validates CRS, resolution, manifest order, gaps and overlaps; preserves six originals; creates six COGs sequentially with a 256 MB GDAL cache; and creates one 1,200 px national map PNG. The version remains `waiting_for_method` for DEP-05.
+- Added the six-tile RP100 worker loader. It validates CRS, resolution, manifest order, gaps and overlaps; preserves six originals; creates six COGs sequentially with a 256 MB GDAL cache; and creates one 1,200 px national map PNG. It remained `waiting_for_method` at that date and was activated later by ADR-0015.
 - ADR-0009 separates `map_preview` from assessment activation. Planning shows **Flood depth · 100-year** and **Evacuation centers**, with explicit preview/not-assessed language, while Catalog continues to exclude the non-current versions.
 - Expanded the Data library UI/API with shelter and hazard imports, counts, findings, progress and shared notices. The Planning point layer uses Leaflet canvas for the 10,303 points. Evacuation centres remain visible by default; ADR-0011 makes flood depth explicitly checkbox-controlled and exposes RP20/RP50 as disabled until real versions are imported.
 - Added ADR-0010's ten-minute exact-question cache, bounded by user, login, Hub and place. A repeat avoids SIG and AI calls; login/logout evict it, API restart clears it, and **Retry brief generation** bypasses it. The incomplete-brief message now explains that SIG's receipt-bound map cannot open and that no school/hospital/road geometry was returned.
@@ -410,6 +411,31 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - Vector reads now use explicit text encoding. A same-name `.cpg` (including delivered `.dbf.cpg` variants) is honoured first; otherwise the worker tries UTF-8, TIS-620 and CP874. An assumed encoding produces a visible confirmation point. Exhausted decoding and truncated/corrupt files produce different observations and requests for advice. Real shelter and district Shapefiles were confirmed readable as declared UTF-8.
 - Updated ADR-0006. Migration `0011` is applied locally; API, worker and database are healthy, and SERVIR remains configured. Validation: 359 tests pass with two PostgreSQL-only skips; Ruff, both JavaScript checks and whitespace checks are clean. Mocked browser acceptance confirmed the neutral page wording and downloaded both consultation formats; the HTML contains numbered observations/evidence/advice and neither export contains internal grades.
 
+### 22 Sep — approved SIG recipe and real Thailand assessment path
+
+- Added ADR-0015 and migration `20260922_0012`. The database stores an active versioned SIG
+  Thailand flood-risk recipe. The MVP 1 seed records population 0.40, building density 0.35 and
+  road distance 0.25 under the Product Owner's explicit approval assumption. Platform Admin can
+  record a replacement only with a science owner, SIG source reference and change reason; weights
+  must total 100%, every change is audited and the Planning cache is cleared.
+- The Platform page now has one science-configuration card and an explicit **Activate approved
+  baseline** action. Activation advances the latest imported boundaries, shelters and RP100 to
+  `assessment_ready`, makes them current, supports all 928 districts, approves
+  `center-flood-overlay` 1.0.0 and preserves NoData as **Unable to assess**.
+- The worker now validates and reads the imported RP100 version's six immutable COGs as one pinned
+  logical input. Imported WKB boundary fingerprints and feature-content fingerprints are checked
+  without weakening the original synthetic-file checks.
+- Planning retains SIG risk citations/statistics when an active recipe exists, pins that recipe in
+  the evidence/download/publish token, rejects stale publication after a recipe change, accepts
+  only an explicitly declared recognized SIG risk layer, and labels population-by-age values as
+  demographic evidence. Safety certification remains prohibited.
+- Docker Desktop migration/rebuild succeeded. Real worker proofs succeeded: Mueang Nan had 46
+  in-scope centres, all Unable to assess on NoData; Bang Bua Thong had one in-scope centre and it
+  was Potentially exposed. These prove the software path, not the unsigned external golden case.
+- Validation: 394 tests pass with two PostgreSQL-only skips; Ruff, JavaScript syntax, Compose
+  configuration and whitespace checks are clean. The protected browser needs a fresh SERVIR sign-in
+  after the rebuild for the final visual acceptance pass.
+
 ---
 
 ## 6. Decisions and ADRs
@@ -421,14 +447,15 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0004 | Interim Planner chat and map on SIG generic evidence, Docker Desktop only | Accepted for local testing; Technical Lead review pending |
 | ADR-0005 | Explicit NDMO Planner and Hub Expert / GIS Specialist roles | Accepted by product owner; local migration `20260917_0005` applied |
 | ADR-0006 | Admin data inspector over a read-only source folder | Accepted for local Docker Desktop testing; browser acceptance pending |
-| ADR-0007 | Data Science delivery is accepted source data; provenance is registered during ingestion | Accepted by product owner; DEP-05 method decision still blocks real results |
+| ADR-0007 | Data Science delivery is accepted source data; provenance is registered during ingestion | Accepted by Product Owner; ADR-0015 adds the explicit MVP 1 method/activation assumption |
 | ADR-0008 | Immutable platform baseline plus Hub-level, category-by-category accepted overrides | Accepted for bounded local baseline implementation; browser upload, scientific activation and server rollout remain gated |
 | ADR-0009 | Technically validated, non-current baseline versions may be display-only Planning map previews | Accepted for local validation; does not activate assessment inputs |
 | ADR-0010 | Cache repeated SIG evidence answers for ten minutes within one user/login/Hub | Accepted for local validation; login, logout and API restart evict it; refresh bypasses it |
 | ADR-0011 | Flood map is checkbox-controlled; RP20/RP50/RP100 availability is explicit; compact menu wraps on small screens | Accepted for local validation; unavailable scenarios never get illustrative fallback data |
 | ADR-0012 | Completed assessment opens its pinned hazard picture and all in-scope assessed centres; flood depth uses sequential red tones | Accepted for local validation; red is depth, not vulnerability-weighted risk |
 | ADR-0013 | Primary output is an Evacuation Preparedness Decision Package: candidate movement options plus a traceable investment case | Accepted by Product Owner; candidate never means certified safe and missing figures are not inferred |
-| ADR-0014 | Withhold unapproved SIG risk levels and verify the exact `ui_embed` displayed layer | Accepted as an MVP 1 fail-closed control; science owner and live embed schema still need confirmation |
+| ADR-0014 | Withhold unapproved SIG risk levels and verify the exact `ui_embed` displayed layer | Superseded for an active approved recipe by ADR-0015; retained as the fail-closed fallback |
+| ADR-0015 | Version the approved SIG recipe and explicitly activate the imported Thailand baseline | Accepted under the Product Owner instruction to presume the supplied data and current SIG recipe are approved for MVP 1 |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
@@ -450,21 +477,20 @@ Owner decisions (16–17 Sep):
 
 - **Staging is not deployed yet:** the validated build is running locally. Use the release/bootstrap workflow and staging secrets on the Ubuntu VM; do not copy the local `.env` or token files.
 - **Shared-host launcher is not yet host-tested:** its Bash syntax, Compose model and offline tests pass on Windows, but the user must still run it on Ubuntu and report the first failing command/log if Docker, SIG registration or host permissions differ.
-- **Live SIG embed metadata is not captured:** ADR-0014 now requires a typed displayed-layer identifier. If the current live `ui_embed` response omits it or uses a different key, the public receipt works but the iframe is intentionally withheld. Record a sanitized response before extending the accepted contract.
-- **G-16 (risk recipe needs a named science owner) is unresolved:** the 22 September discussion paper proposes an owner and a reviewed `contribute_submit(kind="weights")` path, but its team-decision field is blank. Risk classifications stay off the MVP 1 screen until that governance decision and a versioned method are signed.
+- **Live SIG embed metadata is not captured:** ADR-0014/0015 requires a typed displayed-layer identifier. Approved exact identifiers include `risk_flood_l2`; if the live response omits or changes the field, the public receipt works but the iframe is intentionally withheld. Record a sanitized response before extending the contract.
+- **G-16 (risk recipe configuration) is implemented under an explicit assumption:** the active seed is population 0.40, building density 0.35 and road distance 0.25, with missing coverage kept Unable to assess. Platform Admin changes create a new version and audit event. Replace the placeholder science-owner/source wording with the formal SIG approval reference before production acceptance.
 - **Rate limit is per process and per person:** a page load makes about 5–7 API calls. The 60/min spec value may be tight for real use; review it with the product owner before staging.
 - **Live end-to-end not formally confirmed:** OpenAI, Langfuse and SIG MCP work was observed by the owner in the browser but is not captured in tests; there is no recorded SIG fixture for the chat.
 - **Area check** relies on SIG trace wording `via admin boundary` (from the 14 Sep capture).
 - **Area confirmation** blocks model-only locations before SIG/GRP work. It requires a browser pass with a real SERVIR account after rebuilding the API image; the Python tests use fake SIG and model responses.
 - **First SIG requests can still be slow.** A Chiang Yuen request spent 138 of 151 seconds in external SIG MCP. ADR-0010 makes the same question in the same login immediate, but a new question still waits; true streaming (SSE) is not built and progress steps remain estimated.
 - **SIG flood cells** appear only after publishing a receipt (the pack has no geometry). The outline before that comes from Nominatim, for orientation only.
-- **This is not yet a vulnerability-weighted risk map.** SIG Risk v0 declares hazard/exposure only;
-  full risk wording and red/yellow/green decision classes wait for DEP-07 and an approved method.
+- **SIG risk is screening evidence, not a GRP safety result.** With ADR-0015 active, GRP may show SIG's vulnerability-weighted classes and population-by-age values with the pinned recipe. GRP still does not locally calculate that risk or certify destinations.
 - The embed URL shape is currently based on SIG's advertised `ui_embed` contract and the prototype
   fixture. Capture a sanitized live response before staging and adjust the allow-list only through a
   reviewed contract change.
 - **External browser calls:** `unpkg.com` (Leaflet) and `openstreetmap.org` (tiles, Nominatim). Acceptable for local use only; vendor Leaflet and use a contracted tile and geocoder before staging.
-- **Real assessment still blocked:** real boundaries, shelters and RP100 are imported with PostGIS geometry, but no real district is supported, the imported versions are not assessment-current and DEP-05/method approval remain open. The only runnable GRP assessment is synthetic.
+- **Real assessment now runs under the approval assumption:** the latest imported boundary, shelter and RP100 versions are current; 928 districts are supported and the six COG tiles are one pinned input. Local proof: Mueang Nan `46 / 0 / 0 / 46` and Bang Bua Thong `1 / 1 / 0 / 0` for in-scope / potentially exposed / not exposed / unable. A signed external golden artifact is still required before production acceptance.
 - **Single-process memory** holds rate limits and the SIG token store; there is no lease renewal for long jobs.
 - `web/planning.js` (~1,200 lines) and `api/planning.py` (~650 lines) are large. Split them before adding much more.
 - **Spec text** needs updating for ADR-0003, ADR-0004 and the Increment 2 scope change.
@@ -477,9 +503,9 @@ Owner decisions (16–17 Sep):
 | ID | Needed | Owner | Blocks |
 |---|---|---|---|
 | DEP-01 | GRP registered as its own app in SIG WorkOS | SIG platform owner | Removing ADR-0002; Beta |
-| DEP-04, DEP-06 | Chiang Yuen boundary, center dataset, signed golden result | Scientific and Data Authority | Increment 1 acceptance |
-| DEP-05 | JRC flood layers for seven return periods, licence | Scientific and Data Authority | Increment 5, real flood map |
-| DEP-07 | Vulnerability layer and meaning | Scientific and Data Authority | Vulnerable people layer |
+| DEP-04, DEP-06 | Formal Chiang Yuen signed golden artifact and final facility-field dictionary | Scientific and Data Authority | Production acceptance; MVP 1 implementation proceeds under ADR-0015's approval assumption |
+| DEP-05 | Formal JRC licence/method record and any RP10–RP500 layers beyond imported RP100 | Scientific and Data Authority | Production evidence and additional scenarios; RP100 currently treats NoData as Unable to assess |
+| DEP-07 | Formal local vulnerability-raster method/source record | Scientific and Data Authority | Local GRP vulnerability result; SIG risk/demographic evidence is already labelled separately |
 | DEP-08, DEP-09, DEP-13 | Risk pack `assessment_ref`, SIG machine login | SIG platform owner | Increment 3 |
 | DEP-11 | AI key per Hub, starting token limit | Product Owner, Technical Lead | AI outside local |
 | DEP-12 | Summary and map download templates | Product Owner with planners | Increment 4 |
@@ -501,13 +527,13 @@ Execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data
 3. ~~Managed staging, checksums and atomic promotion.~~ **Built and tested.**
 4. ~~Versioned district-boundary collection and PostGIS loader.~~ **Built and imported: all 928 real features are now visible in the Data library UI.**
 5. ~~DDPM shelter loader with geometric membership and mismatch reporting.~~ **Built and imported:** 10,303 points, 1,139 reported name conflicts, zero outside all districts.
-6. ~~One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.~~ **Built and imported:** six originals, six COGs, one national preview; `waiting_for_method`.
+6. ~~One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.~~ **Built, imported and activated under ADR-0015:** six originals, six COGs, one national preview; NoData remains Unable to assess.
 7. ~~Extend Data library API/UI to shelters and hazard.~~ **Built:** import cards, status, counts, audit and notices for all baseline categories.
-8. **Next:** signed-in browser acceptance of the Planning layers and Data library, including measured browser rendering time for 10,303 points. See [`docs/baseline-map-implementation-report.md`](docs/baseline-map-implementation-report.md).
+8. **Next:** signed-in browser acceptance of the new Platform recipe/activation card and a real district run from Planning, including measured rendering time for 10,303 points. See [`docs/baseline-map-implementation-report.md`](docs/baseline-map-implementation-report.md).
 
-Do not import the vulnerability rasters in this slice. Do not enable a real flood assessment until
-DEP-05 is resolved. Do not add browser upload or deploy this feature to a server before its security
-gates pass.
+Do not import the local vulnerability rasters merely to duplicate SIG risk. Real RP100 assessment
+is enabled under ADR-0015 and must keep NoData as Unable to assess. Do not add browser raster upload
+or deploy this feature to a server before its security gates pass.
 
 ### Existing product acceptance and release queue
 
@@ -531,12 +557,11 @@ gates pass.
    - Job trace screen for Admin (`GET /admin/assessments/{id}/trace`).
    - One-page summary PDF and evacuation map PDF/PNG as export jobs (`assessment_export` table, `POST/GET /assessments/{id}/exports`).
    - *Done when* the synthetic case downloads match the locked result exactly (templates need DEP-12).
-5. **Real Thailand data and data library** (medium to large; ADR-0008 is accepted for the bounded local scope; execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data-library-implementation-plan.md), then follow [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) and [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md))
+5. **Real Thailand data and data library — implemented locally under ADR-0015** (production acceptance still needs the formal authority records)
    - The files are inspected and proved already: see [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) and [`docs/dataset-proof-results.md`](docs/dataset-proof-results.md). Re-run the check any time with `python -m tools.prove_dataset --district "<name>"`.
-   - Decide Option A (per-district flood picture, recommended) or Option B (tile service).
+   - Current choice: the worker reads six pinned COGs as one logical RP100 input; the national preview image remains the browser display layer.
    - **Shelter membership must be decided by geometry, not by the district name field** — the proof shows the name join loses almost every point.
-   - PostGIS geometry columns and a boundary loader (admin level, source, edition, fingerprint); load only approved districts.
-   - Evacuation-center loader; flood raster converted to COG and registered with its provenance.
+   - PostGIS geometry, boundary and evacuation-centre loaders, COG conversion and provenance are complete; 928 districts are supported under the approval assumption.
    - Vulnerability raster deferred to a separate deployment-VM command and kept out of assessments until DEP-07.
    - Two workers claiming at once; lease renewal and idempotent import promotion.
    - *Done when* a real Thailand district is assessed end to end and the map shows real flood depth for it; full acceptance still needs the signed result (DEP-04).
@@ -555,8 +580,8 @@ gates pass.
 
 ### After the local baseline is finished
 
-1. Get DEP-05's NoData, modelled-area and permanent-water decisions.
-2. Approve a compatible method version and run one real district against the proof tool and signed golden case.
+1. Replace ADR-0015's approval assumption with formal science-owner, source/licence and method records.
+2. Run the authority-signed Chiang Yuen case; never alter its expected values to match the implementation.
 3. Prove one Hub shelter override without changing any old result.
 4. Add quarantined browser upload using the same import pipeline after security review.
 5. Build the deployment-VM vulnerability conversion command; activate it only after DEP-07.
@@ -591,6 +616,6 @@ git fetch; git switch codex/ubuntu-shared-host-runner
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 362 passed, 2 PostgreSQL-only skips
+python -m pytest            # expect 394 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```
