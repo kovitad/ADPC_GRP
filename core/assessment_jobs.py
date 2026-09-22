@@ -100,6 +100,10 @@ def _usable_version(
     return version, dataset
 
 
+def _is_synthetic_dataset(dataset: Dataset) -> bool:
+    return dataset.provider.casefold() == "grp synthetic test data"
+
+
 def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods: bool) -> dict:
     """Section 8.2 steps 3 to 5, in order. Raises SubmitError; creates nothing."""
 
@@ -116,6 +120,17 @@ def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods:
     centers, centers_dataset = _usable_version(
         session, request.centers_version_id, "evacuation_centers", request.hub_id
     )
+    synthetic_area = "synthetic" in boundary.source.casefold()
+    if (
+        _is_synthetic_dataset(hazard_dataset) != synthetic_area
+        or _is_synthetic_dataset(centers_dataset) != synthetic_area
+    ):
+        detail = (
+            "Synthetic Test District requires synthetic flood and evacuation-centre inputs."
+            if synthetic_area
+            else "Real districts cannot use synthetic flood or evacuation-centre inputs."
+        )
+        raise SubmitError("VALIDATION_FAILED", detail)
     if request.vulnerability_version_id is not None:
         raise SubmitError("VALIDATION_FAILED", "Vulnerability is not available until method 2.")
     method = session.scalar(

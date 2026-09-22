@@ -19,6 +19,7 @@
 
   let hubCode = null;
   let boundaries = [];
+  let datasets = [];
   let pollTimer = null;
   let map = null;
   let layers = null;
@@ -28,6 +29,50 @@
     item.value = value;
     item.textContent = text;
     select.append(item);
+  };
+
+  const setAssessmentUrl = (id) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("assessment_id", id);
+    window.history.replaceState({}, "", url);
+  };
+
+  const showCompatibleDatasets = () => {
+    const boundary = boundaries.find((item) => item.id === $("[data-boundary]").value);
+    const hazard = $("[data-hazard]");
+    const centers = $("[data-centers]");
+    hazard.replaceChildren();
+    centers.replaceChildren();
+    if (!boundary) return;
+    const compatible = datasets.filter(
+      (dataset) => Boolean(dataset.synthetic) === Boolean(boundary.synthetic),
+    );
+    compatible
+      .filter((dataset) => dataset.type === "hazard")
+      .forEach((dataset) => option(
+        hazard,
+        dataset.version_id,
+        `RP${dataset.return_period_years} · ${dataset.title} (${dataset.provider})`,
+      ));
+    ["platform", "hub_local"].forEach((owner) => {
+      const group = document.createElement("optgroup");
+      group.label = owner === "platform" ? "Platform data" : "Saved local data";
+      compatible
+        .filter((dataset) => dataset.type === "evacuation_centers" && dataset.owner_kind === owner)
+        .forEach((dataset) => option(
+          group,
+          dataset.version_id,
+          `${dataset.title} (${dataset.provider})`,
+        ));
+      if (group.children.length) centers.append(group);
+    });
+    const ready = Boolean(hazard.options.length && centers.options.length);
+    $("[data-submit-button]").disabled = !ready;
+    $("[data-compatibility-note]").textContent = ready
+      ? boundary.synthetic
+        ? "Synthetic test area: only synthetic test inputs are available."
+        : "Real district: synthetic test inputs are excluded."
+      : "No compatible flood and evacuation-centre data is available for this area.";
   };
 
   const ensureMap = () => {
@@ -42,29 +87,19 @@
 
   const loadCatalog = async () => {
     const query = `?hub_code=${encodeURIComponent(hubCode)}`;
-    const [areas, datasets, methods] = await Promise.all([
+    const [areas, datasetPayload, methods] = await Promise.all([
       GRP.request(`/api/v1/catalog/boundaries${query}`),
       GRP.request(`/api/v1/catalog/datasets${query}`),
       GRP.request(`/api/v1/catalog/methods${query}`),
     ]);
     boundaries = areas.boundaries;
+    datasets = datasetPayload.datasets;
     const boundarySelect = $("[data-boundary]");
     boundaries.forEach((b) =>
       option(boundarySelect, b.id, `${b.name} (${b.admin_level}${b.synthetic ? ", synthetic" : ""})`),
     );
-    datasets.datasets
-      .filter((d) => d.type === "hazard")
-      .forEach((d) => option($("[data-hazard]"), d.version_id,
-        `RP${d.return_period_years} · ${d.title} (${d.provider})`));
-    const centers = $("[data-centers]");
-    ["platform", "hub_local"].forEach((owner) => {
-      const group = document.createElement("optgroup");
-      group.label = owner === "platform" ? "Platform data" : "Saved local data";
-      datasets.datasets
-        .filter((d) => d.type === "evacuation_centers" && d.owner_kind === owner)
-        .forEach((d) => option(group, d.version_id, `${d.title} (${d.provider})`));
-      if (group.children.length) centers.append(group);
-    });
+    boundarySelect.addEventListener("change", showCompatibleDatasets);
+    showCompatibleDatasets();
     methods.methods.forEach((m) => option($("[data-method]"), `${m.key}@${m.version}`,
       `${m.key} ${m.version}${m.status === "approved" ? "" : " (draft, not approved)"}`));
     $("[data-new-card]").hidden = false;
@@ -91,8 +126,16 @@
       view.type = "button";
       view.className = "button button--secondary";
       view.textContent = "Open";
-      view.addEventListener("click", () => watch(a.assessment_id));
+      view.addEventListener("click", () => {
+        setAssessmentUrl(a.assessment_id);
+        watch(a.assessment_id);
+      });
       action.append(view);
+      const planning = document.createElement("a");
+      planning.className = "button button--secondary";
+      planning.textContent = "Open in Planning";
+      planning.href = `/planning.html?assessment_id=${encodeURIComponent(a.assessment_id)}`;
+      action.append(planning);
       if (a.state === "queued" || a.state === "running") {
         const cancel = document.createElement("button");
         cancel.type = "button";
@@ -126,7 +169,11 @@
 
   const showStatus = (status) => {
     $("[data-result-card]").hidden = false;
+    if (status.state !== "succeeded") $("[data-open-planning]").hidden = true;
     $("[data-synthetic]").hidden = !status.synthetic;
+    const incompatible = $("[data-incompatible]");
+    incompatible.hidden = status.input_compatible !== false;
+    incompatible.textContent = status.input_warning || "";
     $("[data-result-title]").textContent = `${status.area} · ${status.scenario.return_period_years}-year flood`;
     const pill = $("[data-state-pill]");
     pill.textContent = status.state;
@@ -148,6 +195,10 @@
       GRP.request(`/api/v1/assessments/${id}/centers?size=200`),
     ]);
     showStatus(result);
+    setAssessmentUrl(id);
+    const planningLink = $("[data-open-planning]");
+    planningLink.href = `/planning.html?assessment_id=${encodeURIComponent(id)}`;
+    planningLink.hidden = false;
     const totals = $("[data-totals]");
     totals.replaceChildren();
     [
@@ -294,6 +345,11 @@
         "Pick an area, scenario and data, then run. The result shows which centers may be exposed and why.";
       await loadCatalog();
       await showRecent();
+      const requestedAssessmentId = new URLSearchParams(window.location.search).get("assessment_id");
+      if (requestedAssessmentId) {
+        watch(requestedAssessmentId);
+        return;
+      }
       // A job started here before switching pages: keep following it.
       const pending = GRP.jobs.list().find((job) => job.ownerPath === "/assessments.html");
       if (pending) watch(pending.id);

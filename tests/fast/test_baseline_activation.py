@@ -3,11 +3,13 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 import api.planning
 from core.access_models import AppUser, AuditEvent, Base
+from core.assessment_jobs import SubmitError, SubmitRequest, pin_inputs
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Method
 from core.baseline_activation import activate_mvp1_baseline
 from core.boundary_import import PLATFORM_BOUNDARY_DATASET_ID
@@ -154,3 +156,37 @@ def test_activate_latest_imported_baseline() -> None:
             dataset_type="hazard",
             return_period_years=100,
         ).id == synthetic_hazard_version.id
+
+        with pytest.raises(SubmitError, match="VALIDATION_FAILED") as mixed_hazard:
+            pin_inputs(
+                session,
+                SubmitRequest(
+                    hub_id=uuid4(),
+                    boundary_id=boundary.id,
+                    return_period_years=100,
+                    hazard_version_id=synthetic_hazard_version.id,
+                    centers_version_id=center_version.id,
+                    vulnerability_version_id=None,
+                    method_key=method.key,
+                    method_version=method.version,
+                ),
+                allow_draft_methods=False,
+            )
+        assert "Real districts cannot use synthetic" in mixed_hazard.value.detail
+
+        with pytest.raises(SubmitError, match="VALIDATION_FAILED") as mixed_centers:
+            pin_inputs(
+                session,
+                SubmitRequest(
+                    hub_id=uuid4(),
+                    boundary_id=boundary.id,
+                    return_period_years=100,
+                    hazard_version_id=hazard_version.id,
+                    centers_version_id=synthetic_center_version.id,
+                    vulnerability_version_id=None,
+                    method_key=method.key,
+                    method_version=method.version,
+                ),
+                allow_draft_methods=False,
+            )
+        assert "Real districts cannot use synthetic" in mixed_centers.value.detail

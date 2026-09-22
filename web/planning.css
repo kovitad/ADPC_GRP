@@ -442,6 +442,16 @@
 .pw-stat--not { background: #e9f6f3; }
 .pw-stat--not strong { color: #0f766e; }
 .pw-stat--unable strong { color: #4b5563; }
+.pw-result-warning {
+  margin: 0.7rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #991b1b;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
 .pw-result__actions { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; }
 .pw-result__summary {
   padding: 0.42rem 0.7rem;

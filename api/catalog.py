@@ -34,7 +34,7 @@ def boundaries(
                 "province_name": row.province_name,
                 "source": row.source,
                 "edition": row.edition,
-                "synthetic": "synthetic" in row.source,
+                "synthetic": "synthetic" in row.source.casefold(),
                 "geometry": row.geom,
             }
             for row in rows
@@ -70,6 +70,7 @@ def datasets(
                 "owner_kind": dataset.owner_kind,
                 "title": dataset.title,
                 "provider": dataset.provider,
+                "synthetic": dataset.provider.casefold() == "grp synthetic test data",
                 "return_period_years": version.return_period_years,
                 "edition": version.meta.get("edition"),
                 "sha256": version.sha256,

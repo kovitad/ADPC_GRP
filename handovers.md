@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 22 September 2026 (`codex/ubuntu-shared-host-runner`; display-first MVP 1 map implemented)
+**Updated:** 22 September 2026 (`main`; assessment and Planning data flows connected)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. The current branch adds the Ubuntu shared-host launcher, ADR-0015's approved-data path and ADR-0016's display-first Planning map. Available districts, RP100 flood and evacuation-centre layers now appear before any assessment; SIG risk and population values lead the evidence view when returned. **394 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Compose configuration and whitespace checks are clean.
+**Delivery status:** The validated baseline, Ubuntu launcher, ADR-0015 approved-data path and ADR-0016 display-first Planning map are on `main`. Available districts, RP100 flood and evacuation-centre layers appear before an assessment; SIG risk and population values lead the evidence view when returned. Assessment submission now prevents real/synthetic input mixing and both result pages exchange the same assessment UUID. **395 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Compose configuration and whitespace checks are clean.
 
-**Handing over:** the imported local baseline is active under the Product Owner's approval assumption. Planning now opens with boundaries, RP100 flood and evacuation centres visible and does not require or promote an assessment just to display data. The optional worker path remains proved by Mueang Nan and Bang Bua Thong. Sign in after the rebuild and visually accept the display-first map, current-location district focus and one live SIG risk/population response. The Ubuntu launcher still needs its first host execution.
+**Handing over:** the imported local baseline is active under the Product Owner's approval assumption. Planning and Assessments now open the same locked result through `assessment_id`; the manual form filters compatible datasets and the API refuses any synthetic/real mismatch. Historical mismatched results remain immutable but show a red warning. Sign in after the rebuild and visually accept one new real AO Luek assessment, the two-way page links, current-location district focus and one live SIG response. The Ubuntu launcher still needs its first host execution.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -452,6 +452,11 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   synthetic provider. Display requests cannot start a job unless the user explicitly says to run,
   calculate, assess, classify or screen. Browser state moved to `grp.planning.v3` so the bad result
   is not restored into the new UI.
+- Connected the formerly separate Assessments and Planning flows after `GRP-2TLD-V4` exposed the
+  remaining manual-selection gap (real AO Luek + synthetic hazard + real DDPM centres). Dataset
+  options now filter with the selected area's real/synthetic class, and `pin_inputs` enforces the
+  same rule before a job exists. Both pages accept and link `?assessment_id=<uuid>`, while legacy
+  mismatched results display a red do-not-use warning. Planning state moved to `grp.planning.v4`.
 
 ---
 
@@ -630,10 +635,10 @@ or deploy this feature to a server before its security gates pass.
 ## Resume commands
 
 ```powershell
-git fetch; git switch codex/ubuntu-shared-host-runner
+git fetch; git switch main; git pull --ff-only
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 394 passed, 2 PostgreSQL-only skips
+python -m pytest            # expect 395 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

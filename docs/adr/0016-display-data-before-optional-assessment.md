@@ -22,6 +22,13 @@ the first outcome is to let a person see the available data.
    legend and result language after a person explicitly requests an assessment.
 5. Continue prohibiting invented values and safety claims internally; this control does not need to
    dominate the normal data-browsing interface.
+6. Treat synthetic and real inputs as separate compatibility groups. A real district cannot be
+   submitted with a synthetic flood or centre dataset, and the synthetic test district cannot be
+   submitted with real inputs. Enforce this in the API as well as the browser.
+7. Use the assessment UUID as the handoff between Assessments and Planning. Either page may open
+   the same protected result with `?assessment_id=<uuid>`; neither page copies result data.
+8. Preserve old locked results for audit. If a historical result predates the compatibility rule,
+   label it as incompatible and direct the person to run a new assessment.
 
 ## Consequences
 
@@ -29,10 +36,14 @@ the first outcome is to let a person see the available data.
 - Assessment readiness cannot make an otherwise available source layer disappear.
 - “Show” and “assess” are separate actions: display preserves source data, while assessment creates
   a version-pinned derived result.
+- Assessments and Planning are two views of the same protected result, not independent result stores.
+- Invalid real/synthetic combinations stop before a worker job exists.
 
 ## Verification
 
 - Frontend contract tests assert that flood, district and centre layers default on.
 - Chat tests assert display-first SIG and deterministic-summary wording.
 - Dataset-resolution tests prove a real district cannot pin synthetic hazard or centre fixtures.
+- Submission tests prove manual requests cannot bypass the compatibility rule.
+- Frontend tests prove both pages exchange the exact assessment UUID.
 - Existing assessment and golden-result tests continue to cover the optional derived workflow.

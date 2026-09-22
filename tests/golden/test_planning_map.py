@@ -97,6 +97,7 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
 
     flood = layers["flood"][0]
     assert flood["return_period_years"] == 100 and flood["available"] is True
+    assert flood["synthetic"] is True
     south_west, north_east = flood["bounds"]
     assert south_west == pytest.approx([14.99, 100.0])
     assert north_east == pytest.approx([15.11, 100.12])
@@ -129,6 +130,7 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
         },
     ]
     assert layers["evacuation_centers"][0]["title"] == "Synthetic evacuation centers"
+    assert layers["evacuation_centers"][0]["synthetic"] is True
     assert layers["vulnerability"]["available"] is False
     assert "Increment 6" in layers["vulnerability"]["message"]
 

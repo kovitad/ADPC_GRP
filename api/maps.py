@@ -80,6 +80,7 @@ def map_layers(
             "title": f"Flood depth RP{version.return_period_years} · {dataset.title}",
             "return_period_years": version.return_period_years,
             "provider": dataset.provider,
+            "synthetic": dataset.provider.casefold() == "grp synthetic test data",
             "image_url": f"/api/v1/maps/hazard/{version.id}/overlay.png",
             "bounds": version.meta.get("overlay_bounds"),
             "available": bool(version.meta.get("overlay_key")),
@@ -91,7 +92,8 @@ def map_layers(
         if dataset.type == "hazard"
     ]
     scenario_layers: dict[int, dict[str, object]] = {}
-    for layer in flood:
+    scenario_candidates = [layer for layer in flood if not layer["synthetic"]] or flood
+    for layer in scenario_candidates:
         years = layer["return_period_years"]
         if years in MAP_RETURN_PERIODS and years not in scenario_layers:
             scenario_layers[int(years)] = layer
@@ -114,6 +116,7 @@ def map_layers(
             "title": dataset.title,
             "owner_kind": dataset.owner_kind,
             "provider": dataset.provider,
+            "synthetic": dataset.provider.casefold() == "grp synthetic test data",
             "features_url": f"/api/v1/maps/datasets/{version.id}/features",
             "preview_only": version.meta.get("map_preview") is True and not version.is_current,
             "readiness": version.readiness,

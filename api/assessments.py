@@ -79,8 +79,30 @@ def _synthetic(assessment: Assessment) -> bool:
     return "synthetic" in str(boundary.get("source", "")).lower()
 
 
+def _input_compatibility(assessment: Assessment) -> tuple[bool, str | None]:
+    pins = assessment.inputs
+    synthetic_area = _synthetic(assessment)
+    synthetic_hazard = (
+        str(pins.get("hazard", {}).get("provider", "")).casefold()
+        == "grp synthetic test data"
+    )
+    synthetic_centers = (
+        str(pins.get("evacuation_centers", {}).get("provider", "")).casefold()
+        == "grp synthetic test data"
+    )
+    compatible = synthetic_area == synthetic_hazard == synthetic_centers
+    if compatible:
+        return True, None
+    return (
+        False,
+        "This locked legacy result mixed synthetic test data with a real area or real data. "
+        "Do not use its classifications; run a new assessment with compatible inputs.",
+    )
+
+
 def _status_payload(assessment: Assessment) -> dict[str, object]:
     pins = assessment.inputs
+    input_compatible, input_warning = _input_compatibility(assessment)
     return {
         "assessment_id": str(assessment.id),
         "state": assessment.state,
@@ -90,6 +112,8 @@ def _status_payload(assessment: Assessment) -> dict[str, object]:
         "scenario": pins["scenario"],
         "method": {k: pins["method"][k] for k in ("key", "version", "status")},
         "synthetic": _synthetic(assessment),
+        "input_compatible": input_compatible,
+        "input_warning": input_warning,
         "summary": assessment.summary,
         "sharing_state": assessment.sharing_state,
         "attempt": assessment.attempt,

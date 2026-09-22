@@ -1484,7 +1484,17 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
   font-size: 0.78rem;
   font-weight: 800;
 }
+.incompatible-banner {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #dc2626;
+  border-radius: 0.65rem;
+  background: #fff1f2;
+  color: #991b1b;
+  font-weight: 700;
+}
 .assessment-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.assessment-result-actions { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
 .metric-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));

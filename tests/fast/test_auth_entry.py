@@ -197,6 +197,23 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260922d" in page
-    assert 'const STORE_KEY = "grp.planning.v3"' in script
+    assert "/planning.js?v=20260922e" in page
+    assert "/planning.css?v=20260922a" in page
+    assert 'const STORE_KEY = "grp.planning.v4"' in script
     assert "innerHTML" not in script
+
+
+def test_assessments_and_planning_share_compatible_result_context() -> None:
+    assessment_page = (WEB_ROOT / "assessments.html").read_text(encoding="utf-8")
+    assessment_script = (WEB_ROOT / "assessments.js").read_text(encoding="utf-8")
+    planning_script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+
+    assert 'data-open-planning' in assessment_page
+    assert 'data-incompatible' in assessment_page
+    assert "/assessments.js?v=20260922a" in assessment_page
+    assert "Boolean(dataset.synthetic) === Boolean(boundary.synthetic)" in assessment_script
+    assert "Real district: synthetic test inputs are excluded." in assessment_script
+    assert "/planning.html?assessment_id=" in assessment_script
+    assert 'get("assessment_id")' in planning_script
+    assert "/assessments.html?assessment_id=" in planning_script
+    assert "data-incompatible-result" in (WEB_ROOT / "planning.html").read_text(encoding="utf-8")

@@ -21,6 +21,7 @@
   const thread = $("[data-thread]");
   const input = $("[data-input]");
   const sendButton = $("[data-send]");
+  const requestedAssessmentId = new URLSearchParams(window.location.search).get("assessment_id");
 
   const state = {
     hubCode: null,
@@ -41,9 +42,9 @@
 
   // ---------- keep the conversation when moving between menu pages ----------
   // Stored only in this browser tab (sessionStorage): gone when the tab closes or on sign-out.
-  // v3 discards pre-display-first results that may have mixed synthetic fixtures with a real
-  // district. Source records remain in the database; only this tab's stale UI state is cleared.
-  const STORE_KEY = "grp.planning.v3";
+  // v4 discards local state created before assessment compatibility was enforced. Source records
+  // remain in the database; only this tab's stale selection/result state is cleared.
+  const STORE_KEY = "grp.planning.v4";
   const transcript = [];
   let restoring = false;
   let ownerEmail = null;
@@ -596,6 +597,7 @@
   const showProgress = (title) => {
     resultCard.hidden = false;
     $("[data-synthetic]").hidden = true;
+    $("[data-incompatible-result]").hidden = true;
     $("[data-result-title]").textContent = title;
     $("[data-result-meta]").textContent = "Screening evacuation centers in the background…";
     $("[data-progress]").hidden = false;
@@ -655,6 +657,9 @@
     resultCard.hidden = false;
     $("[data-progress]").hidden = true;
     $("[data-synthetic]").hidden = !result.synthetic;
+    const incompatible = $("[data-incompatible-result]");
+    incompatible.hidden = result.input_compatible !== false;
+    incompatible.textContent = result.input_warning || "";
     $("[data-result-title]").textContent = `${result.area} · ${result.scenario.return_period_years}-year flood`;
     $("[data-result-meta]").textContent =
       `Method ${result.method.key} ${result.method.version}${result.method.status === "approved" ? "" : " (draft)"} · ref ${result.support_ref}`;
@@ -678,9 +683,14 @@
     const summaryButton = $("[data-result-summary]");
     summaryButton.hidden = false;
     summaryButton.onclick = () => renderAssessmentSummary(result, centers.centers);
-    $("[data-result-link]").hidden = false;
+    const resultLink = $("[data-result-link]");
+    resultLink.href = `/assessments.html?assessment_id=${encodeURIComponent(id)}`;
+    resultLink.hidden = false;
     state.assessmentId = id;
     state.pendingAssessmentId = null;
+    const url = new URL(window.location.href);
+    url.searchParams.set("assessment_id", id);
+    window.history.replaceState({}, "", url);
     renderContext();
     const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
     if (boundary) selectBoundary(boundary, { explicit: true });
@@ -711,6 +721,8 @@
       if (job.state === "succeeded") {
         await showResult(id);
       } else if (job.state === "queued" || job.state === "running") {
+        $("[data-result-title]").textContent = `${job.area} · ${job.scenario.return_period_years}-year flood`;
+        $("[data-result-meta]").textContent = `Working in the background… ref ${job.support_ref}`;
         state.pollTimer = window.setTimeout(() => watch(id), 5000);
       } else {
         state.pendingAssessmentId = null;
@@ -720,6 +732,10 @@
         addMessage("assistant", `The assessment ${job.state}${job.error_code ? ` (${job.error_code})` : ""}. Reference ${job.support_ref}.`, { error: true });
       }
     } catch (error) {
+      state.pendingAssessmentId = null;
+      $("[data-progress]").hidden = true;
+      $("[data-result-meta]").textContent = error.message;
+      saveState();
       addMessage("assistant", error.message, { error: true });
     }
   };
@@ -1802,7 +1818,7 @@
     });
   });
 
-  const restoreState = async () => {
+  const restoreState = async ({ skipAssessment = false } = {}) => {
     let saved = null;
     try {
       saved = JSON.parse(sessionStorage.getItem(STORE_KEY) || "null");
@@ -1830,10 +1846,10 @@
       state.history = saved.history || [];
       const boundary = state.boundaries.find((b) => b.id === saved.selectedId);
       if (boundary) selectBoundary(boundary, { explicit: Boolean(saved.explicitSelection) });
-      if (saved.assessmentId) {
+      if (saved.assessmentId && !skipAssessment) {
         await showResult(saved.assessmentId, { quiet: true }).catch(() => {});
       }
-      if (saved.pendingAssessmentId) {
+      if (saved.pendingAssessmentId && !skipAssessment) {
         state.pendingAssessmentId = saved.pendingAssessmentId;
         showProgress(boundary ? boundary.name : "Assessment");
         watch(saved.pendingAssessmentId);
@@ -1909,7 +1925,9 @@
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;
       configureFloodScenarios(layers.flood_scenarios);
-      state.centersVersion = layers.evacuation_centers[0] || null;
+      state.centersVersion = layers.evacuation_centers.find((layer) => !layer.synthetic)
+        || layers.evacuation_centers[0]
+        || null;
       if (state.centersVersion) {
         $("[data-centers-title]").textContent = "Evacuation centers";
       }
@@ -1935,7 +1953,14 @@
       if (floodOverlay && floodToggle.checked) floodOverlay.addTo(map);
       renderWelcome();
       ownerEmail = identity.email;
-      await restoreState();
+      await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
+      if (requestedAssessmentId) {
+        state.assessmentId = null;
+        state.pendingAssessmentId = requestedAssessmentId;
+        showProgress("Loading assessment");
+        saveState();
+        watch(requestedAssessmentId);
+      }
       updateSend();
       input.focus();
     })

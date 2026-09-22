@@ -164,6 +164,8 @@ def test_synthetic_case_matches_hand_designed_expected_result_exactly(world) -> 
 
     # Trust facts are separate and honest about synthetic, unapproved inputs (principle 6).
     assert result["synthetic"] is True
+    assert result["input_compatible"] is True
+    assert result["input_warning"] is None
     assert result["trust"]["scientifically_approved"] is False
     assert any("SYNTHETIC" in gap for gap in result["gaps"])
     assert result["sharing_state"] == "private"
