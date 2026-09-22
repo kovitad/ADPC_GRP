@@ -24,7 +24,7 @@ from api.planning_cache import planning_answer_cache
 from api.rate_limits import limiter
 from api.sessions import CSRF_COOKIE, set_session_cookie
 from api.settings import Settings
-from api.sig_evidence import check_area, embed_url
+from api.sig_evidence import check_area, embed_url, verified_hazard_embed
 from api.token_store import session_token_store
 from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import update_setting
@@ -92,6 +92,89 @@ def test_embed_url_rejects_non_hazard_component_on_sig_host() -> None:
     )
 
     assert embed_url(result, "sig.example") is None
+
+
+@pytest.mark.parametrize("layer", ["hazard_flood", "flood_rp10", "flood_rp100.tif"])
+def test_verified_hazard_embed_accepts_declared_flood_layer(layer: str) -> None:
+    result = McpToolResult(
+        content=[
+            {"type": "text", "text": '<iframe src="https://sig.example/embed/hazard_map/r1">'},
+        ],
+        structured_content={"displayed_layer": layer},
+        is_error=False,
+    )
+
+    checked = verified_hazard_embed(result, "sig.example")
+
+    assert checked.verified
+    assert checked.url == "https://sig.example/embed/hazard_map/r1"
+    assert checked.displayed_layer == layer
+
+
+@pytest.mark.parametrize(
+    "structured",
+    [
+        {},
+        {"displayed_layer": "risk_flood_l2"},
+        {"displayed_layer": "flood_unknown"},
+        {"displayed_layer": ["hazard_flood", "flood_rp100"]},
+    ],
+    ids=["missing", "risk", "unknown", "multiple"],
+)
+def test_verified_hazard_embed_stops_on_missing_or_risk_layer(structured: dict) -> None:
+    result = McpToolResult(
+        content=[
+            {"type": "text", "text": '<iframe src="https://sig.example/embed/hazard_map/r1">'},
+        ],
+        structured_content=structured,
+        is_error=False,
+    )
+
+    checked = verified_hazard_embed(result, "sig.example")
+
+    assert not checked.verified
+    assert checked.url is None
+
+
+def test_mvp1_screen_hides_unapproved_risk_sources_and_stats() -> None:
+    pack = {
+        **PACK,
+        "stats": {
+            "counts": {"schools": {"exposed": 3}},
+            "population_by_age": {"age_65_plus": 120},
+            "risk_levels": {"schools": {"high": 0}},
+            "severity": 2,
+            "vulnerability_score": 0.72,
+        },
+        "citations": [
+            PACK["citations"][0],
+            {
+                "n": 5,
+                "title": "buildings by risk level (flood)",
+                "source": "platform Layer-2 engine (conf/risk_l2.yml)",
+                "text": "0 buildings at high risk",
+            },
+        ],
+    }
+
+    screened = api.planning._screen_pack_for_mvp1(pack)
+
+    assert [item["n"] for item in screened["citations"]] == [1]
+    assert screened["stats"] == {
+        "counts": {"schools": {"exposed": 3}},
+        "population_by_age": {"age_65_plus": 120},
+    }
+    assert "G-16" in api.planning._evidence_contract_warnings(screened)[0]
+
+
+def test_draft_preflight_rejects_unapproved_risk_classification() -> None:
+    issues = api.planning._draft_issues(
+        "## What the numbers show\n0 buildings are at high risk [1]",
+        ["## What the numbers show"],
+        [{"n": 1}],
+    )
+
+    assert any("unapproved vulnerability-weighted risk level" in issue for issue in issues)
 
 
 def test_deterministic_summary_marks_truncation_and_preserves_cross_references() -> None:
@@ -163,6 +246,7 @@ class FakeMcp:
     pack: dict = PACK
     publish: dict = {"status": "ok", "receipt_id": "receipt-1",
                      "public_resolver": "https://sig.example/r/receipt-1"}
+    embed_layer: str | None = "hazard_flood"
 
     def __init__(self, base_url: str, access_token: str) -> None:
         assert access_token == "sig-token"
@@ -181,7 +265,7 @@ class FakeMcp:
             return McpToolResult([], FakeMcp.publish, False)
         return McpToolResult(
             [{"type": "text", "text": '<iframe src="https://sig.example/embed/hazard_map/r1">'}],
-            {},
+            {"displayed_layer": FakeMcp.embed_layer} if FakeMcp.embed_layer else {},
             False,
         )
 
@@ -211,6 +295,7 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
     monkeypatch.setattr(api.planning, "SigMcpClient", FakeMcp)
     FakeMcp.calls = []
     FakeMcp.pack = PACK
+    FakeMcp.embed_layer = "hazard_flood"
 
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -423,8 +508,33 @@ def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
     assert body["receipt"]["receipt_id"] == "receipt-1"
     assert body["map_url"] == "https://sig.example/embed/hazard_map/r1"
     assert body["map_kind"] == "flood_hazard_and_asset_exposure"
+    assert body["map_note"] == "Displayed flood-hazard layer verified."
     with Session(planning["engine"]) as session:
         assert "sig_receipt_published" in set(session.scalars(select(AuditEvent.action)))
+
+
+def test_publish_withholds_embed_when_sig_switches_to_risk_layer(planning) -> None:
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+    FakeMcp.embed_layer = "risk_flood_l2"
+    client = _client(planning, "planner@example.test")
+    draft = _ask(
+        client,
+        message="Which schools are exposed?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    body = _ask(
+        client,
+        message="Which schools are exposed?",
+        publish_receipt=True,
+        publish_token=draft["publish_token"],
+    ).json()
+
+    assert body["receipt"]["receipt_id"] == "receipt-1"
+    assert body["map_url"] is None
+    assert body["map_kind"] is None
+    assert "risk map" in body["map_note"]
+    assert body["trace"][-1]["detail"] == "withheld: displayed layer not verified"
 
 
 def test_gate_blocked_draft_is_not_shown(planning) -> None:

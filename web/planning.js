@@ -1196,7 +1196,7 @@
       }
       if (!mapUrl) {
         $("[data-ev-foot]").append(
-          `${receiptUrl ? " · " : ""}The answer is available, but SIG did not return a valid hazard-map embed.`,
+          `${receiptUrl ? " · " : ""}${payload.map_note || "The answer is available, but SIG did not return a verified flood-hazard map."}`,
         );
       }
     } else {

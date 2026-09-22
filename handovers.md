@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 22 September 2026 (`codex/ubuntu-shared-host-runner`; shared Ubuntu demo launcher added)
+**Updated:** 22 September 2026 (`codex/ubuntu-shared-host-runner`; SIG risk and embedded-map contract gate added)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. The current branch adds an Ubuntu shared-host launcher that uses the local demo stack on loopback port 8000 without touching an existing port-80/443 application. **362 tests pass and 2 PostgreSQL-only tests skip**; Ruff, Bash syntax and Compose configuration checks are clean.
+**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. The current branch adds the Ubuntu shared-host launcher plus the ADR-0014 SIG contract gate: unapproved risk-level evidence is withheld, ambiguous `severity` is removed, and `ui_embed` is displayed only for an explicitly declared flood-hazard layer. **372 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript and Bash syntax, and Compose configuration checks are clean.
 
-**Handing over:** the launcher is implemented and locally validated but has not yet been exercised on the user's Ubuntu host. Push/merge `codex/ubuntu-shared-host-runner`, then follow the Ubuntu commands in Section 3. The browser acceptance pass against live SIG and OpenAI is still outstanding.
+**Handing over:** the launcher and SIG safety gate are implemented and locally validated. The launcher has not yet been exercised on the user's Ubuntu host. Live `ui_embed` displayed-layer metadata is not recorded, so the map deliberately stays hidden if SIG does not declare a recognized hazard layer. Push/merge this branch, run the Ubuntu setup, then capture and review one sanitized live embed response before broadening the layer contract.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -26,6 +26,7 @@
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
 | Baseline map preview (ADR-0009) | **Built and imported locally**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. Planning can draw both without making them assessment inputs; DEP-05 still blocks classification |
 | Ubuntu shared-host demo | **Built on current branch**: idempotent `scripts/docker-ubuntu.sh`, loopback port 8000, hidden AI-key prompt, ignored mode-0600 secret files, SIG localhost client registration and PuTTY tunnel runbook; needs first execution on Ubuntu |
+| SIG risk/map contract gate (ADR-0014) | **Built on current branch**: risk-level citations and ambiguous summary values stay off the MVP 1 screen; embedded maps fail closed unless SIG declares one known flood-hazard layer |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
@@ -94,6 +95,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 5. `/data-preview.html` (**Preview one district** link on Source data, Admins only): press **Pua**. Expect the district outline, the flood picture hatched purple almost everywhere (99% no value), 29 purple shelters (on a no-value pixel), 1 orange shelter far away that names Pua, and a warnings panel led by the no-value blocker. **Mueang Nan** asks you to pick between districts only if the name is shared; **Bang Bua Thong** shows one shelter on a flooded pixel. A made-up name says it is not in the boundary file.
 6. `/assessments.html`, `/workspace.html`: same top bar, same order
 7. Langfuse Cloud: traces `planning-router-v1`, `planning-draft-v1`, `result-explain-v1`, `platform-test-v1`
+8. After a SIG receipt: if `ui_embed` declares `hazard_flood` or `flood_rp10`–`flood_rp500`, the map opens and the trace names that layer. If it declares a risk layer or omits/changes the layer field, the receipt remains visible but the map is withheld with the contract reason. A risk-level answer must show the G-16 warning and no risk classification.
 
 ### Shared Ubuntu host (another application already uses port 80)
 
@@ -426,6 +428,7 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 | ADR-0011 | Flood map is checkbox-controlled; RP20/RP50/RP100 availability is explicit; compact menu wraps on small screens | Accepted for local validation; unavailable scenarios never get illustrative fallback data |
 | ADR-0012 | Completed assessment opens its pinned hazard picture and all in-scope assessed centres; flood depth uses sequential red tones | Accepted for local validation; red is depth, not vulnerability-weighted risk |
 | ADR-0013 | Primary output is an Evacuation Preparedness Decision Package: candidate movement options plus a traceable investment case | Accepted by Product Owner; candidate never means certified safe and missing figures are not inferred |
+| ADR-0014 | Withhold unapproved SIG risk levels and verify the exact `ui_embed` displayed layer | Accepted as an MVP 1 fail-closed control; science owner and live embed schema still need confirmation |
 
 Owner decisions (16–17 Sep):
 - remove the pending access list;
@@ -447,6 +450,8 @@ Owner decisions (16–17 Sep):
 
 - **Staging is not deployed yet:** the validated build is running locally. Use the release/bootstrap workflow and staging secrets on the Ubuntu VM; do not copy the local `.env` or token files.
 - **Shared-host launcher is not yet host-tested:** its Bash syntax, Compose model and offline tests pass on Windows, but the user must still run it on Ubuntu and report the first failing command/log if Docker, SIG registration or host permissions differ.
+- **Live SIG embed metadata is not captured:** ADR-0014 now requires a typed displayed-layer identifier. If the current live `ui_embed` response omits it or uses a different key, the public receipt works but the iframe is intentionally withheld. Record a sanitized response before extending the accepted contract.
+- **G-16 (risk recipe needs a named science owner) is unresolved:** the 22 September discussion paper proposes an owner and a reviewed `contribute_submit(kind="weights")` path, but its team-decision field is blank. Risk classifications stay off the MVP 1 screen until that governance decision and a versioned method are signed.
 - **Rate limit is per process and per person:** a page load makes about 5–7 API calls. The 60/min spec value may be tight for real use; review it with the product owner before staging.
 - **Live end-to-end not formally confirmed:** OpenAI, Langfuse and SIG MCP work was observed by the owner in the browser but is not captured in tests; there is no recorded SIG fixture for the chat.
 - **Area check** relies on SIG trace wording `via admin boundary` (from the 14 Sep capture).

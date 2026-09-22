@@ -31,7 +31,7 @@ from api.planning_publish import decode_publish_token, encode_publish_token
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
-from api.sig_evidence import check_area, embed_url, tool_payload
+from api.sig_evidence import check_area, tool_payload, verified_hazard_embed
 from api.token_store import session_token_store
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
@@ -90,7 +90,9 @@ DRAFT_INSTRUCTIONS = (
     "is not a declaration that a place is safe. If the question asks where people could move "
     "or evacuate and the evidence has no evacuation centers or shelters, say that plainly in "
     "the first section and describe only what the evidence does show. Do not add a Sources "
-    "section. Return Markdown."
+    "section. MVP 1 has no approved vulnerability-weighted risk recipe: do not repeat risk "
+    "levels, risk scores, weights or counts by risk class even if the source pack contains them. "
+    "Use water-depth or flood-hazard classes only. Return Markdown."
 )
 
 
@@ -215,7 +217,56 @@ def _evidence_contract_warnings(pack: dict[str, Any]) -> list[str]:
             "SIG labels the hazard with a return period but also declares that no return-period "
             "metadata is available. Treat the scenario label as unresolved."
         )
+    withheld = pack.get("_grp_withheld_risk_citations")
+    if isinstance(withheld, int) and withheld > 0:
+        warnings.append(
+            f"SIG returned {withheld} vulnerability-weighted risk-level source(s). GRP withheld "
+            "them because G-16 (risk recipe needs a named science owner) is unresolved; MVP 1 "
+            "shows flood-hazard or water-depth evidence only."
+        )
     return warnings
+
+
+def _is_unapproved_risk_citation(item: dict[str, Any]) -> bool:
+    value = " ".join(
+        str(item.get(key, "")) for key in ("kind", "title", "source", "method", "text")
+    ).casefold()
+    return bool(
+        re.search(r"\brisk[- _]?(?:level|class|score)s?\b", value)
+        or "layer-2 risk" in value
+        or "risk_l2" in value
+    )
+
+
+def _screen_stats_for_mvp1(value: object) -> object:
+    """Remove ambiguous risk/severity values while the flood recipe is unapproved."""
+
+    if isinstance(value, dict):
+        return {
+            key: _screen_stats_for_mvp1(child)
+            for key, child in value.items()
+            if not re.search(
+                r"risk|severity|vulnerab.*(?:class|level|score|weight)",
+                str(key),
+                re.IGNORECASE,
+            )
+        }
+    if isinstance(value, list):
+        return [_screen_stats_for_mvp1(child) for child in value]
+    return value
+
+
+def _screen_pack_for_mvp1(pack: dict[str, Any]) -> dict[str, Any]:
+    citations = [item for item in pack.get("citations", []) if isinstance(item, dict)]
+    visible = [item for item in citations if not _is_unapproved_risk_citation(item)]
+    screened = {
+        **pack,
+        "citations": visible,
+        "_grp_withheld_risk_citations": len(citations) - len(visible),
+    }
+    if isinstance(pack.get("stats"), dict):
+        screened["stats"] = _screen_stats_for_mvp1(pack["stats"])
+    return screened
 
 
 def _truncate_evidence_text(text: str, max_chars: int = 1200) -> str:
@@ -330,6 +381,12 @@ def _draft_issues(
             issues.append(f"No content under heading: {heading.removeprefix('## ').strip()}")
     if any(line.lower() == "## sources" for line in lines):
         issues.append("The brief must not add its own Sources section")
+    if re.search(
+        r"\b(?:very high|high|moderate|low|very low) risk\b|\brisk (?:level|class|score)\s*[1-5]\b",
+        text,
+        re.IGNORECASE,
+    ):
+        issues.append("The brief includes an unapproved vulnerability-weighted risk level")
     valid_citations = {
         str(item["n"])
         for item in citations
@@ -456,15 +513,27 @@ async def _publish_reviewed_draft(
                 "ui_embed",
                 {"component": "hazard_map", "receipt_id": str(published["receipt_id"])},
             )
-            map_url = (
+            embed_check = (
                 None
                 if embed.is_error
-                else embed_url(embed, urlparse(settings.sig_mcp_base_url).hostname)
+                else verified_hazard_embed(
+                    embed, urlparse(settings.sig_mcp_base_url).hostname
+                )
+            )
+            map_url = embed_check.url if embed_check and embed_check.verified else None
+            map_note = (
+                "SIG could not provide the embedded map."
+                if embed.is_error
+                else embed_check.reason if embed_check else "SIG map verification failed."
             )
             trace.append(
                 {
                     "step": "hazard_map",
-                    "detail": "embedded" if map_url else "none",
+                    "detail": (
+                        f"embedded {embed_check.displayed_layer}"
+                        if map_url and embed_check
+                        else "withheld: displayed layer not verified"
+                    ),
                     "duration_ms": round((perf_counter() - step_started) * 1000),
                 }
             )
@@ -513,6 +582,7 @@ async def _publish_reviewed_draft(
         "receipt": receipt,
         "map_url": map_url,
         "map_kind": "flood_hazard_and_asset_exposure" if map_url else None,
+        "map_note": map_note,
         "trace": trace,
         "evidence": evidence,
         "usage": _usage(session, settings, principal),
@@ -772,6 +842,8 @@ async def planning_chat(
                     "usage": _usage(session, settings, principal),
                 }
 
+            pack = _screen_pack_for_mvp1(pack)
+
             draft = await run_ai_call(
                 session,
                 settings,
@@ -882,6 +954,7 @@ async def planning_chat(
         "receipt": None,
         "map_url": None,
         "map_kind": None,
+        "map_note": None,
         "publish_token": publish_token,
         "draft_issues": issues,
         "trace": trace,
