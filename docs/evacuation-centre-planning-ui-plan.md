@@ -1,7 +1,7 @@
 # Evacuation-centre planning UI plan
 
-**Status:** Ready for implementation planning; no product code changed by this document.  
-**Date:** 22 September 2026  
+**Status:** Ready for implementation planning; no product code changed by this document.
+**Date:** 22 September 2026
 **Scope:** Connect the existing centre records to a useful Planning panel without inventing missing evidence.
 
 ## Outcome
@@ -101,4 +101,3 @@ for known names, then publish a new immutable dataset version. Never overwrite o
 - No routing, travel-time or road-safety claim.
 - No risk ranking across centres.
 - No change to approved assessment calculations or historical results.
-
