@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 22 September 2026 (`main`; assessment and Planning data flows connected)
+**Updated:** 22 September 2026 (`main`; evacuation-centre Planning UI implementation plan recorded)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
 **Delivery status:** The validated baseline, Ubuntu launcher, ADR-0015 approved-data path and ADR-0016 display-first Planning map are on `main`. Available districts, RP100 flood and evacuation-centre layers appear before an assessment; SIG risk and population values lead the evidence view when returned. Assessment submission now prevents real/synthetic input mixing and both result pages exchange the same assessment UUID. **395 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Compose configuration and whitespace checks are clean.
 
-**Handing over:** the imported local baseline is active under the Product Owner's approval assumption. Planning and Assessments now open the same locked result through `assessment_id`; the manual form filters compatible datasets and the API refuses any synthetic/real mismatch. Historical mismatched results remain immutable but show a red warning. Sign in after the rebuild and visually accept one new real AO Luek assessment, the two-way page links, current-location district focus and one live SIG response. The Ubuntu launcher still needs its first host execution.
+**Handing over:** implement [`docs/evacuation-centre-planning-ui-plan.md`](docs/evacuation-centre-planning-ui-plan.md) next. The active database already contains real Thai centre names, coordinates and assessment classifications; Planning needs a district-scoped, map-synchronized complete list rather than new sample data. Preserve duplicate-name records by feature ID. Do not re-import the centre source until DEP-06 resolves the `grp-shelters/1` real-name versus `grp-shelters/2` generated-label mismatch. Planning and Assessments already share locked results through `assessment_id`, and real/synthetic input mixing is blocked. The Ubuntu launcher still needs its first host execution.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -457,6 +457,25 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   options now filter with the selected area's real/synthetic class, and `pin_inputs` enforces the
   same rule before a job exists. Both pages accept and link `?assessment_id=<uuid>`, while legacy
   mismatched results display a red do-not-use warning. Planning state moved to `grp.planning.v4`.
+
+### 22 Sep — next UI increment: complete evacuation-centre list
+
+- Product Owner asked to use the real centre names already present and make Planning useful like the
+  supplied reference UI. Investigation confirmed the active DDPM dataset has 10,303 named points;
+  the assessment-centres API already returns name, feature ID, coordinates, classification, reason
+  and flood depth. AO Luek has 38 in-scope records in the historical result, including legitimate
+  repeated names at different coordinates—never deduplicate by name.
+- The next implementation is specified in
+  [`docs/evacuation-centre-planning-ui-plan.md`](docs/evacuation-centre-planning-ui-plan.md): a
+  district-scoped source endpoint, one reusable map-synchronized list before/after assessment,
+  useful evidence/gap details, and cited SIG population aggregates kept separate from centres.
+- Critical data safeguard: the active `grp-shelters/1` version contains real Thai names, while the
+  current `grp-shelters/2` importer deliberately emits generic labels pending DEP-06 confirmation of
+  `สถา`, `สถ_1` and `รอง`. Do not replace the active version merely to build this UI. Resolve and
+  record the source-field mapping first.
+- The reference screenshots are layout inspiration only. Capacity, vulnerability zones, shelter
+  proximity, services, route safety and ranked candidates are not present in the current locked
+  data and must not be fabricated.
 
 ---
 
