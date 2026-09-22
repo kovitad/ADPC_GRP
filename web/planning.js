@@ -2108,21 +2108,44 @@
   };
 
   // ---------- start ----------
+  // The server renews the SIG token on its own while a refresh token lasts, so this only
+  // reports what is left and offers the one action that helps: sign in again.
+  const SIG_EXPIRY_WARNING_SECONDS = 15 * 60;
+
+  const signInAgainLink = () => {
+    const link = document.createElement("a");
+    link.href = "/api/v1/auth/login";
+    link.textContent = "Sign in again";
+    return link;
+  };
+
+  const showSigConnectionNotice = (planning) => {
+    const banner = $("[data-banner]");
+    const connected = Boolean(planning.sig_connected);
+    const remaining = Number(planning.sig_expires_in_seconds);
+    const expiringSoon =
+      connected && Number.isFinite(remaining) && remaining <= SIG_EXPIRY_WARNING_SECONDS;
+    if (connected && !expiringSoon) {
+      if (banner.dataset.notice === "sig-connection") {
+        banner.hidden = true;
+        delete banner.dataset.notice;
+      }
+      return;
+    }
+    banner.textContent = expiringSoon
+      ? `SIG evidence stays connected for about ${Math.max(1, Math.round(remaining / 60))} more minutes. `
+      : "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run. ";
+    banner.append(signInAgainLink());
+    banner.dataset.notice = "sig-connection";
+    banner.hidden = false;
+  };
+
   const refreshSigConnection = async () => {
     if (!state.hubCode || !state.chatAvailable) return;
     try {
       const planning = await GRP.request("/api/v1/planning/status");
       state.sigConnected = Boolean(planning.sig_connected);
-      const banner = $("[data-banner]");
-      if (state.sigConnected && banner.dataset.notice === "sig-connection") {
-        banner.hidden = true;
-        delete banner.dataset.notice;
-      } else if (!state.sigConnected) {
-        banner.textContent =
-          "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run.";
-        banner.dataset.notice = "sig-connection";
-        banner.hidden = false;
-      }
+      showSigConnectionNotice(planning);
     } catch (_error) {
       // The next request will show the normal API error; do not replace another banner here.
     }
@@ -2161,11 +2184,8 @@
         banner.textContent = "The chat assistant runs only in the local Docker Desktop test right now.";
         banner.dataset.notice = "planning-unavailable";
         banner.hidden = false;
-      } else if (!planning.sig_connected) {
-        banner.textContent =
-          "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run.";
-        banner.dataset.notice = "sig-connection";
-        banner.hidden = false;
+      } else {
+        showSigConnectionNotice(planning);
       }
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;

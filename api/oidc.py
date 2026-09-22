@@ -18,6 +18,12 @@ from core.identity import VerifiedIdentity
 
 ALLOWED_SIGNING_ALGORITHMS = {"RS256", "ES256"}
 
+# Sign-in asks for the identity scopes plus a refresh token, so a SIG lookup started an hour
+# into a GRP session does not need a new sign-in (ADR-0017). `offline_access` is dropped when
+# the authorization server publishes a scope list that does not include it.
+BASE_SCOPES = ("openid", "profile", "email")
+OFFLINE_ACCESS_SCOPE = "offline_access"
+
 
 class IdentityProviderError(RuntimeError):
     """A safe, detail-free identity-provider failure."""
@@ -33,6 +39,7 @@ class OidcMetadata:
     registration_endpoint: str | None
     signing_algorithms: tuple[str, ...]
     token_auth_method: str
+    supported_scopes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -42,10 +49,20 @@ class PublicClientRegistration:
 
 
 @dataclass(frozen=True)
+class RenewedAccessToken:
+    """A refreshed upstream token. `refresh_token` is the rotated one when the server sends it."""
+
+    access_token: str
+    expires_in: int
+    refresh_token: str | None
+
+
+@dataclass(frozen=True)
 class AuthenticatedIdentity:
     identity: VerifiedIdentity
     access_token: str
     expires_in: int
+    refresh_token: str | None = None
 
 
 class HumanIdentityProvider(Protocol):
@@ -61,6 +78,11 @@ def generate_pkce_pair() -> tuple[str, str]:
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return verifier, challenge
+
+
+def _optional_token(value: object) -> str | None:
+    text = str(value).strip() if value else ""
+    return text or None
 
 
 def _validate_endpoint(value: str, *, allow_insecure_localhost: bool = False) -> str:
@@ -210,6 +232,9 @@ class ServirSigIdentityProvider:
                 raise IdentityProviderError("No approved token endpoint authentication method")
             userinfo_endpoint = document.get("userinfo_endpoint")
             registration_endpoint = document.get("registration_endpoint")
+            supported_scopes = tuple(
+                str(scope) for scope in document.get("scopes_supported", []) or []
+            )
             return OidcMetadata(
                 issuer=issuer,
                 authorization_endpoint=_validate_endpoint(str(document["authorization_endpoint"])),
@@ -225,9 +250,35 @@ class ServirSigIdentityProvider:
                 ),
                 signing_algorithms=algorithms,
                 token_auth_method=token_auth_method,
+                supported_scopes=supported_scopes,
             )
         except (KeyError, TypeError, ValueError) as error:
             raise IdentityProviderError("SERVIR sign-in metadata is unavailable") from error
+
+    def _apply_client_auth(
+        self, metadata: OidcMetadata, token_data: dict[str, str]
+    ) -> tuple[str, str] | None:
+        """Add the client credentials the server asked for; return HTTP Basic auth when used."""
+
+        if metadata.token_auth_method == "client_secret_basic":
+            if self.client_secret is None:
+                raise IdentityProviderError("SERVIR client secret is unavailable")
+            return (self.client_id, self.client_secret)
+        if metadata.token_auth_method == "client_secret_post":
+            if self.client_secret is None:
+                raise IdentityProviderError("SERVIR client secret is unavailable")
+            token_data.update({"client_id": self.client_id, "client_secret": self.client_secret})
+            return None
+        token_data["client_id"] = self.client_id
+        return None
+
+    def _requested_scope(self, metadata: OidcMetadata) -> str:
+        """Ask for a refresh token unless the server publishes a scope list without it."""
+
+        scopes = list(BASE_SCOPES)
+        if not metadata.supported_scopes or OFFLINE_ACCESS_SCOPE in metadata.supported_scopes:
+            scopes.append(OFFLINE_ACCESS_SCOPE)
+        return " ".join(scopes)
 
     async def authorization_url(self, state: str, nonce: str, code_challenge: str) -> str:
         metadata = await self._metadata()
@@ -236,7 +287,7 @@ class ServirSigIdentityProvider:
                 "client_id": self.client_id,
                 "redirect_uri": self.redirect_uri,
                 "response_type": "code",
-                "scope": "openid profile email",
+                "scope": self._requested_scope(metadata),
                 "resource": self.resource,
                 "state": state,
                 "nonce": nonce,
@@ -258,19 +309,7 @@ class ServirSigIdentityProvider:
                 "code_verifier": code_verifier,
                 "resource": self.resource,
             }
-            token_auth: tuple[str, str] | None = None
-            if metadata.token_auth_method == "client_secret_basic":
-                if self.client_secret is None:
-                    raise IdentityProviderError("SERVIR client secret is unavailable")
-                token_auth = (self.client_id, self.client_secret)
-            elif metadata.token_auth_method == "client_secret_post":
-                if self.client_secret is None:
-                    raise IdentityProviderError("SERVIR client secret is unavailable")
-                token_data.update(
-                    {"client_id": self.client_id, "client_secret": self.client_secret}
-                )
-            else:
-                token_data["client_id"] = self.client_id
+            token_auth = self._apply_client_auth(metadata, token_data)
             token_response = await self.client.post(
                 metadata.token_endpoint,
                 data=token_data,
@@ -339,9 +378,42 @@ class ServirSigIdentityProvider:
                 ),
                 access_token=access_token,
                 expires_in=int(token_document.get("expires_in", 3600)),
+                refresh_token=_optional_token(token_document.get("refresh_token")),
             )
         except (httpx.HTTPError, jwt.PyJWTError, KeyError, TypeError, ValueError) as error:
             raise IdentityProviderError("SERVIR sign-in could not be verified") from error
+
+    async def renew_access_token(self, refresh_token: str) -> RenewedAccessToken:
+        """Exchange a refresh token for a new access token for the same SIG MCP resource."""
+
+        metadata = await self._metadata()
+        try:
+            token_data = {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "resource": self.resource,
+            }
+            token_auth = self._apply_client_auth(metadata, token_data)
+            response = await self.client.post(
+                metadata.token_endpoint,
+                data=token_data,
+                auth=token_auth,
+                headers={"Accept": "application/json"},
+            )
+            response.raise_for_status()
+            document = response.json()
+            access_token = str(document["access_token"])
+            if not access_token:
+                raise IdentityProviderError("SERVIR returned an empty access token")
+            # Servers that rotate refresh tokens send a new one; keep the old one when they do not.
+            rotated = _optional_token(document.get("refresh_token"))
+            return RenewedAccessToken(
+                access_token=access_token,
+                expires_in=int(document.get("expires_in", 3600)),
+                refresh_token=rotated or refresh_token,
+            )
+        except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
+            raise IdentityProviderError("SERVIR access token could not be renewed") from error
 
     async def close(self) -> None:
         if self._owns_client:
@@ -380,8 +452,9 @@ async def register_public_client(
                 "client_name": client_name,
                 "redirect_uris": [validated_redirect],
                 "token_endpoint_auth_method": "none",
-                "grant_types": ["authorization_code"],
+                "grant_types": ["authorization_code", "refresh_token"],
                 "response_types": ["code"],
+                "scope": " ".join((*BASE_SCOPES, OFFLINE_ACCESS_SCOPE)),
             },
             headers={"Accept": "application/json"},
         )

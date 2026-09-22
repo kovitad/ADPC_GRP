@@ -203,6 +203,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Deterministic evidence summary · not publishable" in script
     assert "Key findings from SIG evidence" in script
     assert "Existing evidence may be restored from this browser tab" in script
+    # The connection banner offers the one action that helps, and warns before expiry.
+    assert "Sign in again" in script
+    assert "SIG_EXPIRY_WARNING_SECONDS" in script
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script

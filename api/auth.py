@@ -30,6 +30,7 @@ from api.sessions import (
     set_session_cookie,
 )
 from api.settings import Settings, get_settings, planning_chat_available
+from api.sig_connection import forget as forget_sig_connection
 from api.token_store import session_token_store
 from core.access_models import AppUser, AuditEvent, AuditResult
 from core.identity import link_verified_identity
@@ -160,9 +161,14 @@ async def complete_login(
         planning_answer_cache.delete_user(str(result.user_id))
         set_session_cookie(response, settings, result, session_id=session_id)
         if planning_chat_available(settings):
-            # Interim exception (ADR-0002, ADR-0004): SIG MCP token kept in memory, dev only.
+            # Interim exception (ADR-0002, ADR-0004, ADR-0017): SIG MCP token and its refresh
+            # token kept in memory, dev only. Renewal never outlives the GRP session.
             session_token_store.put(
-                session_id, authenticated.access_token, authenticated.expires_in
+                session_id,
+                authenticated.access_token,
+                authenticated.expires_in,
+                refresh_token=authenticated.refresh_token,
+                renewable_for=settings.session_max_hours * 3600,
             )
     response.delete_cookie(AUTH_TRANSACTION_COOKIE, path="/api/v1/auth")
     return response
@@ -187,7 +193,7 @@ def logout(request: Request, session: DatabaseSession) -> JSONResponse:
             supplied = request.headers.get(CSRF_HEADER, "")
             if not hmac.compare_digest(supplied, csrf_token(settings, decoded["session_id"])):
                 raise GrpError(403, "ACCESS_NOT_AUTHORIZED", "Access not authorized.")
-            session_token_store.delete(decoded["session_id"])
+            forget_sig_connection(decoded["session_id"])
             planning_answer_cache.delete_session(decoded["session_id"])
             user = session.get(AppUser, UUID(decoded["user_id"]))
             if user is not None:
