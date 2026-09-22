@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260920e" />
-    <link rel="stylesheet" href="/planning.css?v=20260922a" />
+    <link rel="stylesheet" href="/planning.css?v=20260922b" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260922e" defer></script>
+    <script src="/planning.js?v=20260922f" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -169,8 +169,12 @@
             </div>
           </section>
           <div class="pw-tabs" role="tablist">
-            <button type="button" role="tab" data-ev-tab="summary" aria-selected="true">Summary</button>
-            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="false">Evidence</button>
+            <button type="button" role="tab" data-ev-tab="summary" aria-selected="true">Overview</button>
+            <button type="button" role="tab" data-ev-tab="centres" aria-selected="false">
+              Centres <span data-centre-count></span>
+            </button>
+            <button type="button" role="tab" data-ev-tab="vulnerable" aria-selected="false">People</button>
+            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="false">SIG evidence</button>
             <button type="button" role="tab" data-ev-tab="missing" aria-selected="false">Gaps</button>
             <button type="button" role="tab" data-ev-tab="trace" aria-selected="false">Technical trace</button>
           </div>
@@ -200,6 +204,34 @@
                 <h3>Plain-language brief</h3>
                 <div data-summary-brief></div>
               </section>
+            </div>
+            <div data-ev-panel="centres" hidden>
+              <div class="pw-centres__head">
+                <div>
+                  <h3>Evacuation centres in this district</h3>
+                  <p data-centre-intro>Select a district to list its available centre records.</p>
+                </div>
+                <label class="pw-centre-search">
+                  <span class="sr-only">Search evacuation centres</span>
+                  <input type="search" data-centre-search placeholder="Search centre name" autocomplete="off">
+                </label>
+              </div>
+              <div class="pw-centre-filters" data-centre-filters aria-label="Filter evacuation centres">
+                <button type="button" data-centre-filter="all" aria-pressed="true">All</button>
+                <button type="button" data-centre-filter="not_assessed">Not assessed</button>
+                <button type="button" data-centre-filter="not_exposed_under_scenario">Lower exposure</button>
+                <button type="button" data-centre-filter="potentially_exposed">Potentially exposed</button>
+                <button type="button" data-centre-filter="unable_to_assess">Unable to assess</button>
+              </div>
+              <p class="pw-centre-list__count" data-centre-list-count></p>
+              <div class="pw-centre-list" data-centre-list></div>
+              <p class="pw-muted-block" data-centre-source></p>
+            </div>
+            <div data-ev-panel="vulnerable" hidden>
+              <div class="pw-people" data-vulnerable-content>
+                <h3>Vulnerable people</h3>
+                <p>No approved population evidence is loaded for this district yet.</p>
+              </div>
             </div>
             <div data-ev-panel="evidence" hidden>
               <div class="pw-numbers" data-ev-numbers></div>

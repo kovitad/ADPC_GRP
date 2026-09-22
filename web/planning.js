@@ -1,11 +1,13 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const STATUS_TEXT = {
+    not_assessed: "Not assessed yet",
     potentially_exposed: "Potentially exposed under this scenario",
-    not_exposed_under_scenario: "Not exposed under this scenario",
+    not_exposed_under_scenario: "Lower mapped flood exposure",
     unable_to_assess: "Unable to assess",
   };
   const STATUS_COLOR = {
+    not_assessed: "#64748b",
     potentially_exposed: "#c2410c",
     not_exposed_under_scenario: "#0f766e",
     unable_to_assess: "#6b7280",
@@ -33,7 +35,11 @@
     floodLayers: [],
     floodScenarios: [],
     centersVersion: null,
+    centerRows: [],
+    centerSource: null,
+    activeCenterId: null,
     assessmentId: null,
+    assessmentBoundaryId: null,
     sigConnected: false,
     pollTimer: null,
     busy: false,
@@ -42,9 +48,8 @@
 
   // ---------- keep the conversation when moving between menu pages ----------
   // Stored only in this browser tab (sessionStorage): gone when the tab closes or on sign-out.
-  // v4 discards local state created before assessment compatibility was enforced. Source records
-  // remain in the database; only this tab's stale selection/result state is cleared.
-  const STORE_KEY = "grp.planning.v4";
+  // v5 discards tab state created before centre sources and assessment rows shared one district scope.
+  const STORE_KEY = "grp.planning.v5";
   const transcript = [];
   let restoring = false;
   let ownerEmail = null;
@@ -81,6 +86,9 @@
   const districtLayer = window.L.featureGroup().addTo(map);
   const centersLayer = window.L.featureGroup().addTo(map);
   const centerRenderer = window.L.canvas({ padding: 0.35 });
+  const centerMarkers = new Map();
+  let centerFilter = "all";
+  let centerLoadRevision = 0;
   const placeLayer = window.L.featureGroup().addTo(map);
   let floodOverlay = null;
 
@@ -456,7 +464,19 @@
     });
   };
 
-  const selectBoundary = (boundary, { announce = false, explicit = announce } = {}) => {
+  const selectBoundary = (
+    boundary,
+    { announce = false, explicit = announce, preserveAssessment = false } = {},
+  ) => {
+    const changed = Boolean(state.selected && state.selected.id !== boundary.id);
+    if (changed && !preserveAssessment) {
+      state.assessmentId = null;
+      state.assessmentBoundaryId = null;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("assessment_id");
+      window.history.replaceState({}, "", url);
+      resultCard.hidden = true;
+    }
     state.selected = boundary;
     state.explicitSelection = explicit;
     if (explicit) {
@@ -474,6 +494,11 @@
     renderContext();
     renderWelcome();
     saveState();
+    if (!preserveAssessment && (!state.assessmentId || changed)) {
+      drawPendingCenters({ openPanel: announce }).catch((error) => {
+        addMessage("assistant", error.message, { error: true });
+      });
+    }
     if (announce && !state.busy) {
       addMessage("assistant", `${boundary.name} is selected. The available flood and evacuation-centre layers are shown on the map.`, {
         actions: [chipButton("Show SIG information", () => send(`Show the available flood, risk and population information for ${boundary.name}.`))],
@@ -542,32 +567,142 @@
     return node;
   };
 
-  const drawPendingCenters = async () => {
-    if (!state.centersVersion) return;
-    const collection = await GRP.request(state.centersVersion.features_url);
+  const statusDetail = (center) => {
+    const lines = [STATUS_TEXT[center.status] || center.status];
+    if (center.flood_depth_m !== null && center.flood_depth_m !== undefined) {
+      lines.push(`Mapped flood depth ${center.flood_depth_m} m`);
+    }
+    if (center.reason_meaning) lines.push(center.reason_meaning);
+    return lines;
+  };
+
+  const activateCenter = (featureId, { moveMap = true } = {}) => {
+    state.activeCenterId = featureId;
+    const center = state.centerRows.find((item) => item.feature_id === featureId);
+    const marker = centerMarkers.get(featureId);
+    if (moveMap && center && marker) {
+      map.flyTo([center.lat, center.lon], Math.max(map.getZoom(), 15), { duration: 0.45 });
+      marker.openPopup();
+    }
+    const rows = Array.from($("[data-centre-list]").children);
+    rows.forEach((row) => row.classList.toggle("is-active", row.dataset.featureId === featureId));
+    const active = rows.find((row) => row.dataset.featureId === featureId);
+    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const renderCenterList = () => {
+    const query = $("[data-centre-search]").value.trim().toLocaleLowerCase();
+    const visible = state.centerRows.filter((center) =>
+      (centerFilter === "all" || center.status === centerFilter)
+      && (!query || center.name.toLocaleLowerCase().includes(query)),
+    );
+    $("[data-centre-count]").textContent = state.centerRows.length
+      ? `(${state.centerRows.length.toLocaleString()})`
+      : "";
+    $("[data-centre-list-count]").textContent = state.centerRows.length
+      ? `Showing ${visible.length.toLocaleString()} of ${state.centerRows.length.toLocaleString()} centre records.`
+      : "No centre records are available for this district.";
+    const list = $("[data-centre-list]");
+    list.replaceChildren(...visible.map((center) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "pw-centre-row";
+      row.dataset.featureId = center.feature_id;
+      row.classList.toggle("is-active", state.activeCenterId === center.feature_id);
+      const dot = document.createElement("span");
+      dot.className = "pw-centre-row__dot";
+      dot.style.background = STATUS_COLOR[center.status] || STATUS_COLOR.not_assessed;
+      const text = document.createElement("span");
+      text.className = "pw-centre-row__text";
+      const name = document.createElement("strong");
+      const detail = document.createElement("span");
+      name.textContent = center.name;
+      detail.textContent = statusDetail(center).join(" · ");
+      text.append(name, detail);
+      const view = document.createElement("span");
+      view.className = "pw-centre-row__view";
+      view.textContent = "View";
+      row.append(dot, text, view);
+      row.addEventListener("click", () => activateCenter(center.feature_id));
+      return row;
+    }));
+  };
+
+  const setCenterRows = (rows, source) => {
+    state.centerRows = rows;
+    state.centerSource = source;
+    state.activeCenterId = null;
+    $("[data-centre-intro]").textContent = rows.length
+      ? "Select a row to locate the same centre on the map. Repeated names are kept as separate source records."
+      : "No evacuation-centre records were returned for this district.";
+    $("[data-centre-source]").textContent = source || "";
+    renderCenterList();
+  };
+
+  const drawCenterMarkers = (centers) => {
     centersLayer.clearLayers();
-    collection.features.forEach((feature) => {
-      const [lon, lat] = feature.geometry.coordinates;
-      window.L.circleMarker([lat, lon], { renderer: centerRenderer, radius: 4, color: "#374151", weight: 1, fillColor: "#fff", fillOpacity: 0.9 })
-        .bindPopup(popup(feature.properties.name, [state.centersVersion.title, state.centersVersion.provider]))
+    centerMarkers.clear();
+    centers.forEach((center) => {
+      const assessed = center.status !== "not_assessed";
+      const marker = window.L.circleMarker([center.lat, center.lon], {
+        renderer: assessed ? undefined : centerRenderer,
+        radius: assessed ? 8 : 5,
+        color: assessed ? "#fff" : "#374151",
+        weight: assessed ? 2 : 1,
+        fillColor: assessed ? STATUS_COLOR[center.status] : "#fff",
+        fillOpacity: 0.95,
+      })
+        .bindPopup(popup(center.name, statusDetail(center)))
+        .on("click", () => activateCenter(center.feature_id, { moveMap: false }))
         .addTo(centersLayer);
+      centerMarkers.set(center.feature_id, marker);
     });
   };
 
-  const drawResultCenters = (centers, reasons) => {
-    centersLayer.clearLayers();
-    centers.forEach((center) => {
-      const meaning = (reasons[center.reason_code] || {}).meaning || center.reason_code;
-      const lines = [STATUS_TEXT[center.status]];
-      if (center.flood_depth_m !== null) lines.push(`Flood depth ${center.flood_depth_m} m`);
-      lines.push(meaning);
-      window.L.circleMarker([center.lat, center.lon], {
-        radius: 8, color: "#fff", weight: 2, fillColor: STATUS_COLOR[center.status], fillOpacity: 0.95,
-      })
-        .bindPopup(popup(center.name, lines))
-        .addTo(centersLayer);
+  const drawPendingCenters = async ({ openPanel = false } = {}) => {
+    const revision = ++centerLoadRevision;
+    if (!state.centersVersion || !state.selected) {
+      drawCenterMarkers([]);
+      setCenterRows([], "Select a supported district to load its managed source records.");
+      return;
+    }
+    const url = new URL(state.centersVersion.features_url, window.location.origin);
+    url.searchParams.set("boundary_id", state.selected.id);
+    if (state.hubCode) url.searchParams.set("hub_code", state.hubCode);
+    const collection = await GRP.request(`${url.pathname}${url.search}`);
+    if (revision !== centerLoadRevision || state.selected?.id !== collection.boundary?.id) return;
+    const centers = collection.features.map((feature) => {
+      const [lon, lat] = feature.geometry.coordinates;
+      return {
+        feature_id: feature.properties.feature_id || feature.id,
+        name: feature.properties.name,
+        lon,
+        lat,
+        status: "not_assessed",
+        reason_code: null,
+        reason_meaning: null,
+        flood_depth_m: null,
+      };
     });
+    setCenterRows(
+      centers,
+      `${collection.source.title} · ${collection.source.provider} · ${collection.boundary.name}`,
+    );
+    drawCenterMarkers(centers);
+    renderSourceSummary(collection);
+    if (openPanel) document.querySelector('[data-ev-tab="centres"]').click();
   };
+
+  $("[data-centre-search]").addEventListener("input", renderCenterList);
+  document.querySelectorAll("[data-centre-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      centerFilter = button.dataset.centreFilter;
+      document.querySelectorAll("[data-centre-filter]").forEach((item) => {
+        item.setAttribute("aria-pressed", String(item === button));
+      });
+      renderCenterList();
+    });
+  });
 
   $("[data-flood-scenario]").addEventListener("change", async () => {
     await loadFloodOverlay(selectedFloodLayer());
@@ -620,11 +755,21 @@
   };
 
   const showResult = async (id, { quiet = false } = {}) => {
+    centerLoadRevision += 1;
     const [result, centers] = await Promise.all([
       GRP.request(`/api/v1/assessments/${id}/result`),
       loadAssessmentCenters(id),
     ]);
-    drawResultCenters(centers.centers, result.reason_codes);
+    const assessedCenters = centers.centers.map((center) => ({
+      ...center,
+      reason_meaning:
+        (result.reason_codes[center.reason_code] || {}).meaning || center.reason_code || null,
+    }));
+    setCenterRows(
+      assessedCenters,
+      `Locked assessment ${result.support_ref} · ${result.area} · RP${result.scenario.return_period_years}`,
+    );
+    drawCenterMarkers(assessedCenters);
     $("[data-assessment-legend]").hidden = false;
     const centersToggle = $('[data-layer="centers"]');
     centersToggle.checked = true;
@@ -682,21 +827,22 @@
     });
     const summaryButton = $("[data-result-summary]");
     summaryButton.hidden = false;
-    summaryButton.onclick = () => renderAssessmentSummary(result, centers.centers);
+    summaryButton.onclick = () => renderAssessmentSummary(result, assessedCenters);
     const resultLink = $("[data-result-link]");
     resultLink.href = `/assessments.html?assessment_id=${encodeURIComponent(id)}`;
     resultLink.hidden = false;
     state.assessmentId = id;
+    state.assessmentBoundaryId = result.area_detail.id;
     state.pendingAssessmentId = null;
     const url = new URL(window.location.href);
     url.searchParams.set("assessment_id", id);
     window.history.replaceState({}, "", url);
     renderContext();
     const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
-    if (boundary) selectBoundary(boundary, { explicit: true });
+    if (boundary) selectBoundary(boundary, { explicit: true, preserveAssessment: true });
     saveState();
     if (quiet) return;
-    renderAssessmentSummary(result, centers.centers);
+    renderAssessmentSummary(result, assessedCenters);
     addMessage(
       "assistant",
       `The ${result.scenario.return_period_years}-year flood screening for ${result.area} is on the map. ` +
@@ -806,7 +952,8 @@
     $("[data-ev-actions]").hidden = mode !== "sig";
     $("[data-ev-foot]").hidden = mode !== "sig";
     document.querySelectorAll("[data-ev-tab]").forEach((tab) => {
-      tab.hidden = mode !== "sig" && tab.dataset.evTab !== "summary";
+      tab.hidden = (tab.dataset.evTab === "evidence" || tab.dataset.evTab === "trace")
+        && mode !== "sig";
     });
     document.querySelector('[data-ev-tab="summary"]').click();
   };
@@ -840,8 +987,107 @@
     }));
   };
 
+  const renderGaps = (items) => {
+    $("[data-ev-gaps]").replaceChildren(...items.map((gap) => {
+      const item = document.createElement("li");
+      item.textContent = gap;
+      return item;
+    }));
+  };
+
+  const renderVulnerablePeople = (population = {}, source = "") => {
+    const box = $("[data-vulnerable-content]");
+    box.replaceChildren();
+    const heading = document.createElement("h3");
+    heading.textContent = "Vulnerable people";
+    const values = Object.entries(population).filter(([, value]) => typeof value === "number");
+    if (!values.length) {
+      const empty = document.createElement("p");
+      empty.textContent =
+        "No approved district population breakdown is included here. Centre capacity and individual or household needs are not inferred.";
+      box.append(heading, empty);
+      return;
+    }
+    const intro = document.createElement("p");
+    intro.textContent = source;
+    const grid = document.createElement("div");
+    grid.className = "pw-people-grid";
+    values.forEach(([name, value]) => {
+      const card = document.createElement("article");
+      card.className = "pw-people-stat";
+      const strong = document.createElement("strong");
+      const label = document.createElement("span");
+      strong.textContent = value.toLocaleString();
+      label.textContent = name.replaceAll("_", " ");
+      card.append(strong, label);
+      grid.append(card);
+    });
+    const note = document.createElement("p");
+    note.className = "pw-people-note";
+    note.textContent =
+      "These are cited district-level aggregates from SIG. They are not linked to a specific evacuation centre, household or map point, and categories may overlap.";
+    box.append(heading, intro, grid, note);
+  };
+
+  const renderSourceSummary = (collection) => {
+    setPanelMode("source");
+    const hero = $("[data-summary-hero]");
+    const movementSection = $("[data-summary-movement-section]");
+    const fundingSection = $("[data-summary-funding-section]");
+    const briefSection = $("[data-summary-brief-section]");
+    hero.after(movementSection);
+    movementSection.after(fundingSection);
+    fundingSection.after(briefSection);
+    briefSection.querySelector("h3").textContent = "Important limitation";
+    currentEvidence = null;
+    openEvidencePayload = null;
+    $("[data-ev-eyebrow]").textContent = "Available district source data";
+    $("[data-ev-title]").textContent = collection.boundary.name;
+    $("[data-ev-counts]").textContent =
+      `${collection.total.toLocaleString()} evacuation-centre record(s) · not assessed`;
+    $("[data-ev-area]").textContent =
+      `${collection.source.title} · ${collection.source.provider}`;
+    $("[data-summary-status]").textContent = "Source records — no assessment run";
+    $("[data-summary-title]").textContent = "Available evacuation-centre locations";
+    $("[data-summary-lead]").textContent =
+      "The complete district-scoped source list is on the Centres tab and uses the same records as the map markers. No flood status, capacity, route or safety conclusion has been added.";
+    $("[data-summary-movement-title]").textContent = "What a planner can do now";
+    $("[data-summary-movement]").replaceChildren(summaryNotice(
+      "Review named centre records",
+      "Open the Centres tab, search by name, and select a row to locate that exact source record on the map.",
+    ));
+    $("[data-summary-caveat]").hidden = true;
+    $("[data-summary-coverage-title]").textContent = "Available information";
+    $("[data-summary-coverage-intro]").textContent =
+      "Only managed source facts are shown before an assessment.";
+    renderCoverage([
+      { label: "District boundary", status: "available", detail: collection.boundary.name },
+      { label: "Evacuation-centre locations", status: "available", detail: `${collection.total} source record(s)` },
+      { label: "Flood status by centre", status: "missing", detail: "Run an assessment to classify these same records" },
+      { label: "Capacity, services and routes", status: "missing", detail: "No approved centre-level source is linked" },
+      { label: "Vulnerable groups", status: "missing", detail: "No centre-linked population evidence is available" },
+    ]);
+    $("[data-summary-brief]").replaceChildren(summaryNotice(
+      "No safety claim",
+      "A point on the map is an available source record. It is not evidence that the centre is suitable, accessible, open or safe.",
+    ));
+    renderGaps([
+      "Centre capacity and essential services are not included in this source.",
+      "Route accessibility and travel safety have not been assessed.",
+      "District population evidence, when available from SIG, is not tied to individual centres.",
+    ]);
+    renderVulnerablePeople();
+    openEvidence();
+  };
+
   const renderAssessmentSummary = (result, centers) => {
     setPanelMode("assessment");
+    setCenterRows(
+      centers,
+      `Locked assessment ${result.support_ref} · ${result.area} · RP${result.scenario.return_period_years}`,
+    );
+    renderGaps([...(result.gaps || []), ...(result.limits || [])]);
+    renderVulnerablePeople();
     const hero = $("[data-summary-hero]");
     const movementSection = $("[data-summary-movement-section]");
     const fundingSection = $("[data-summary-funding-section]");
@@ -910,7 +1156,7 @@
       if (candidates.length > 6) {
         const more = document.createElement("p");
         more.className = "pw-decision-intro";
-        more.textContent = `Plus ${candidates.length - 6} more candidate centre(s) in the full table.`;
+        more.textContent = `Plus ${candidates.length - 6} more candidate centre(s) in the complete Centres tab.`;
         movement.append(more);
       }
     }
@@ -1193,6 +1439,10 @@
       tile.append(strong, span);
       numbers.append(tile);
     });
+    renderVulnerablePeople(
+      (evidence.stats && evidence.stats.population_by_age) || {},
+      "Population values returned by the current SIG district evidence pack.",
+    );
     if (evidence.risk_recipe) {
       const tile = document.createElement("div");
       tile.className = "pw-number";
@@ -1208,16 +1458,11 @@
     const cards = $("[data-ev-cards]");
     cards.replaceChildren(...evidence.citations.map(evidenceCard));
 
-    const gaps = $("[data-ev-gaps]");
     const gapItems = [
       ...(evidence.warnings || []).map((warning) => `Evidence contract warning: ${warning}`),
       ...evidence.gaps,
     ];
-    gaps.replaceChildren(...gapItems.map((gap) => {
-      const item = document.createElement("li");
-      item.textContent = gap;
-      return item;
-    }));
+    renderGaps(gapItems);
 
     const trace = $("[data-ev-trace]");
     trace.replaceChildren(
@@ -1935,9 +2180,10 @@
       const floodToggle = $('[data-layer="flood"]');
       const centersToggle = $('[data-layer="centers"]');
       const districtToggle = $('[data-layer="districts"]');
-      // Display-first MVP 1: show every available baseline layer before any optional assessment.
+      // Display-first MVP 1: flood and boundaries can load immediately. Evacuation centres
+      // load only after a district is selected so the browser never downloads the national set.
       floodToggle.checked = Boolean(selectedFloodLayer());
-      centersToggle.checked = Boolean(state.centersVersion);
+      centersToggle.checked = false;
       districtToggle.checked = state.boundaries.length > 0;
       const previewNote = $("[data-map-preview-note]");
       previewNote.hidden = !mapPreview;
@@ -1947,7 +2193,7 @@
       $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
       drawLegend(layers.flood_legend);
       drawDistricts();
-      await Promise.all([loadFloodOverlay(selectedFloodLayer()), drawPendingCenters()]);
+      await loadFloodOverlay(selectedFloodLayer());
       if (districtToggle.checked) districtLayer.addTo(map);
       if (centersToggle.checked) centersLayer.addTo(map);
       if (floodOverlay && floodToggle.checked) floodOverlay.addTo(map);

@@ -29,7 +29,7 @@ from api.settings import Settings  # noqa: E402
 from core.access_models import AppUser, Base  # noqa: E402
 from core.ai_allowance import update_setting  # noqa: E402
 from core.assessment_jobs import claim_next_job, process_job  # noqa: E402
-from core.assessment_models import DatasetVersion, Feature  # noqa: E402
+from core.assessment_models import Boundary, DatasetVersion, Feature  # noqa: E402
 from core.identity import IdentityLinkResult  # noqa: E402
 from core.storage import LocalStorage  # noqa: E402
 from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub  # noqa: E402
@@ -157,10 +157,61 @@ def test_center_points_are_geojson(world) -> None:
     ).json()
 
     assert collection["type"] == "FeatureCollection"
+    assert collection["total"] == 8
+    assert collection["source"]["title"] == "Synthetic evacuation centers"
     assert len(collection["features"]) == 8
     assert collection["features"][0]["geometry"]["type"] == "Point"
+    assert collection["features"][0]["properties"]["status"] == "not_assessed"
+    assert collection["features"][0]["properties"]["feature_id"]
     names = {feature["properties"]["name"] for feature in collection["features"]}
     assert "Synthetic Clinic E" in names
+
+
+def test_center_points_can_be_scoped_to_current_boundary_by_stable_admin_code(world) -> None:
+    client = _client(world, "planner@example.test")
+    with Session(world["engine"]) as session:
+        version_id = UUID(world["seed"].centers_version_id)
+        current = session.get(Boundary, UUID(world["seed"].boundary_id))
+        admin_code = current.admin_code
+        replacement = Boundary(
+            admin_code=admin_code,
+            admin_level=current.admin_level,
+            name="Current catalogue boundary",
+            geom=current.geom,
+            source="replacement catalogue",
+            edition="v2",
+            geometry_sha256="b" * 64,
+            is_supported=True,
+        )
+        session.add(replacement)
+        session.flush()
+        # Reproduce the production case: source features retain an older boundary UUID,
+        # but their imported stable admin code still identifies the same district.
+        for feature in session.scalars(
+            select(Feature).where(Feature.dataset_version_id == version_id)
+        ):
+            feature.attributes = {**feature.attributes, "admin_code": admin_code}
+        session.commit()
+        replacement_id = replacement.id
+
+    response = client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features",
+        params={"boundary_id": str(replacement_id)},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 8
+    assert body["boundary"]["admin_code"] == admin_code
+
+
+def test_center_points_reject_unknown_or_unsupported_boundary(world) -> None:
+    client = _client(world, "planner@example.test")
+
+    assert client.get(
+        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features",
+        params={"boundary_id": str(uuid4())},
+    ).status_code == 404
 
 
 def test_center_api_keeps_the_importers_stable_generated_name(world) -> None:

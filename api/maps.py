@@ -11,7 +11,7 @@ from api.errors import not_found
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
 from api.settings import get_settings
-from core.assessment_models import Dataset, DatasetVersion, Feature
+from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.hazard_overlay import legend
 from core.storage import LocalStorage
 
@@ -169,22 +169,55 @@ def dataset_features(
     principal: SignedInMember,
     session: DatabaseSession,
     hub_code: str | None = Query(default=None, max_length=64),
+    boundary_id: UUID | None = Query(default=None),  # noqa: B008
 ) -> dict[str, object]:
     hub = planner_membership(principal, hub_code)
     version, dataset = _visible_version(session, version_id, hub.hub_id)
     if dataset.type != "evacuation_centers":
         raise not_found()
-    features = session.scalars(
-        select(Feature).where(Feature.dataset_version_id == version.id).order_by(Feature.id)
-    ).all()
+    query = select(Feature).where(Feature.dataset_version_id == version.id)
+    boundary = None
+    if boundary_id is not None:
+        boundary = session.get(Boundary, boundary_id)
+        if boundary is None or not boundary.is_supported:
+            raise not_found()
+        # Imported source points and the current boundary catalogue can have different
+        # version-specific UUIDs. Match the stable administrative code as well as the
+        # UUID so a catalogue refresh does not disconnect otherwise valid points.
+        query = query.where(
+            or_(
+                Feature.boundary_id == boundary.id,
+                Feature.attributes["admin_code"].as_string() == boundary.admin_code,
+            )
+        )
+    features = session.scalars(query.order_by(Feature.name, Feature.id)).all()
     return {
         "type": "FeatureCollection",
+        "total": len(features),
+        "boundary": None
+        if boundary is None
+        else {
+            "id": str(boundary.id),
+            "admin_code": boundary.admin_code,
+            "name": boundary.name,
+        },
+        "source": {
+            "version_id": str(version.id),
+            "title": dataset.title,
+            "provider": dataset.provider,
+        },
         "features": [
             {
                 "type": "Feature",
                 "id": str(feature.id),
                 "geometry": {"type": "Point", "coordinates": [feature.lon, feature.lat]},
-                "properties": {"name": feature.name},
+                "properties": {
+                    "feature_id": str(feature.id),
+                    "name": feature.name,
+                    "status": "not_assessed",
+                    "source_title": dataset.title,
+                    "source_provider": dataset.provider,
+                },
             }
             for feature in features
         ],

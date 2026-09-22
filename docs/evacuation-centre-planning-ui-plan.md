@@ -1,6 +1,6 @@
 # Evacuation-centre planning UI plan
 
-**Status:** Ready for implementation planning; no product code changed by this document.
+**Status:** Implemented locally on 22 September 2026; production acceptance remains subject to the dependencies below.
 **Date:** 22 September 2026
 **Scope:** Connect the existing centre records to a useful Planning panel without inventing missing evidence.
 
@@ -101,3 +101,17 @@ for known names, then publish a new immutable dataset version. Never overwrite o
 - No routing, travel-time or road-safety claim.
 - No risk ranking across centres.
 - No change to approved assessment calculations or historical results.
+
+## Implementation result
+
+- `GET /api/v1/maps/datasets/{version_id}/features?boundary_id=...` now scopes source
+  points by stable `admin_code`, with the version-specific boundary UUID retained as a fallback.
+- Planning no longer downloads the 10,303-point national centre collection on startup. Selecting a
+  district loads its complete source list and uses `feature_id` to synchronize rows and markers.
+- The same list is upgraded with the locked status, reason and flood depth when an assessment is
+  loaded. Search and status filters retain duplicate-name records as distinct rows.
+- The panel now separates Overview, Centres, People, SIG evidence and gaps. SIG population-by-age
+  values are labelled as district aggregates and are never linked to a centre or household.
+- Local AO Luek verification found 38 source records with 9 distinct stored names; the duplicate
+  records remain separate. Automated validation completed with 397 tests passing and two
+  PostgreSQL-only tests skipped because their test URL was not configured.

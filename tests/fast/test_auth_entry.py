@@ -175,7 +175,12 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "configureFloodScenarios(layers.flood_scenarios)" in script
     assert 'data-flood-scenario' in page
     assert "RP20 and RP50 stay disabled until their source versions are imported" in script
-    assert "centersToggle.checked = Boolean(state.centersVersion)" in script
+    assert "centersToggle.checked = false" in script
+    assert 'url.searchParams.set("boundary_id", state.selected.id)' in script
+    assert (
+        "Promise.all([loadFloodOverlay(selectedFloodLayer()), drawPendingCenters()])"
+        not in script
+    )
     assert "districtToggle.checked = state.boundaries.length > 0" in script
     assert "Loaded immediately from this login’s 10-minute cache." in script
     assert "Explore the available flood information" in script
@@ -188,7 +193,11 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert 'data-ev-tab="summary"' in page
     assert "Where people could move" in page
     assert "Preparedness funding case" in page
-    assert "renderAssessmentSummary(result, centers.centers)" in script
+    assert "renderAssessmentSummary(result, assessedCenters)" in script
+    assert 'data-ev-tab="centres"' in page
+    assert 'data-centre-search' in page
+    assert 'data-ev-tab="vulnerable"' in page
+    assert "Repeated names are kept as separate source records" in script
     assert "Flood and evacuation-centre layers are visible" in script
     assert "Candidate means lower mapped flood exposure" in page
     assert "Deterministic evidence summary · not publishable" in script
@@ -197,9 +206,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260922e" in page
-    assert "/planning.css?v=20260922a" in page
-    assert 'const STORE_KEY = "grp.planning.v4"' in script
+    assert "/planning.js?v=20260922f" in page
+    assert "/planning.css?v=20260922b" in page
+    assert 'const STORE_KEY = "grp.planning.v5"' in script
     assert "innerHTML" not in script
 
 

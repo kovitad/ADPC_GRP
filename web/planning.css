@@ -536,14 +536,14 @@
   bottom: 0;
   display: flex;
   flex-direction: column;
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   background: #fff;
   border-left: 1px solid var(--pw-line);
   box-shadow: -10px 0 30px rgba(16, 40, 36, 0.12);
   animation: pw-slide-in 0.2s ease-out;
 }
-.has-evidence .pw-fab, .has-evidence .pw-layers { right: calc(min(420px, 100%) + 14px); }
-.has-evidence .pw-result { left: calc((100% - min(420px, 100%)) / 2); }
+.has-evidence .pw-fab, .has-evidence .pw-layers { right: calc(min(460px, 100%) + 14px); }
+.has-evidence .pw-result { left: calc((100% - min(460px, 100%)) / 2); }
 .pw-evidence__head {
   display: flex;
   justify-content: space-between;
@@ -598,9 +598,9 @@
   cursor: pointer;
 }
 .pw-download__menu button:hover { background: #f1f7f5; }
-.pw-tabs { display: flex; gap: 0.2rem; margin: 0.6rem 1.1rem 0; border-bottom: 1px solid var(--pw-line); }
+.pw-tabs { display: flex; gap: 0.2rem; margin: 0.6rem 1.1rem 0; overflow-x: auto; border-bottom: 1px solid var(--pw-line); }
 .pw-tabs button {
-  flex: 1;
+  flex: 0 0 auto;
   padding: 0.55rem 0.35rem;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -714,6 +714,71 @@
 .pw-trace { display: grid; gap: 0.35rem; margin: 0; padding-left: 1.2rem; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.74rem; color: #2f4541; }
 .pw-trace li.is-grp { color: #1d4ed8; }
 .pw-muted-block { margin: 0.8rem 0 0; color: var(--pw-muted); font-size: 0.74rem; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.pw-centres__head h3, .pw-people h3 { margin: 0; color: var(--pw-ink); font-size: 0.95rem; }
+.pw-centres__head p, .pw-people > p { margin: 0.25rem 0 0.7rem; color: var(--pw-muted); font-size: 0.76rem; line-height: 1.45; }
+.pw-centre-search { display: block; }
+.pw-centre-search input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cbdad6;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pw-ink);
+  font: inherit;
+  font-size: 0.8rem;
+}
+.pw-centre-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.65rem 0; }
+.pw-centre-filters button {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid #bfd5cf;
+  border-radius: 999px;
+  background: #fff;
+  color: #425854;
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.pw-centre-filters button[aria-pressed="true"] { border-color: var(--pw-forest); background: #e9f5f1; color: var(--pw-forest); font-weight: 700; }
+.pw-centre-list__count { margin: 0 0 0.45rem; color: var(--pw-muted); font-size: 0.72rem; }
+.pw-centre-list { display: grid; gap: 0.4rem; }
+.pw-centre-row {
+  display: grid;
+  grid-template-columns: 13px 1fr auto;
+  gap: 0.6rem;
+  align-items: start;
+  width: 100%;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--pw-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pw-ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.pw-centre-row:hover, .pw-centre-row.is-active { border-color: #4c9ab8; background: #f0f8fb; }
+.pw-centre-row__dot { width: 11px; height: 11px; margin-top: 0.2rem; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #8da7a1; }
+.pw-centre-row__text { display: grid; gap: 0.1rem; min-width: 0; }
+.pw-centre-row__text strong { overflow-wrap: anywhere; font-size: 0.79rem; }
+.pw-centre-row__text span { color: var(--pw-muted); font-size: 0.69rem; line-height: 1.35; }
+.pw-centre-row__view { color: var(--pw-forest); font-size: 0.68rem; font-weight: 700; }
+.pw-people-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+.pw-people-stat { padding: 0.7rem; border-radius: 10px; background: #f5f3ff; }
+.pw-people-stat strong { display: block; color: #5b2c83; font-size: 1.05rem; }
+.pw-people-stat span { color: #65566f; font-size: 0.7rem; text-transform: capitalize; }
+.pw-people-note { margin-top: 0.75rem; padding: 0.65rem; border-left: 3px solid #7c3aed; border-radius: 8px; background: #faf5ff; color: #5b4567; font-size: 0.74rem; line-height: 1.45; }
 .pw-evidence__foot {
   margin: 0;
   padding: 0.7rem 1.1rem;
