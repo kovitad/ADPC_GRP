@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 21 September 2026 (`main`; decision-first Planning and flexible source-data reporting added)
+**Updated:** 22 September 2026 (`codex/ubuntu-shared-host-runner`; shared Ubuntu demo launcher added)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. `main` includes the Source data inspector, persistent background-job notices, one-district data preview, display-only national RP100 and evacuation-centre layers, and a login-bound SIG answer cache. **359 tests pass**; Ruff and JavaScript syntax checks are clean. Two additional PostgreSQL-only data-library tests remain available through the Docker database job.
+**Delivery status:** The validated baseline, decision-first Planning summary, deterministic SIG fallback and flexible Source data reporting are on `main`. The current branch adds an Ubuntu shared-host launcher that uses the local demo stack on loopback port 8000 without touching an existing port-80/443 application. **362 tests pass and 2 PostgreSQL-only tests skip**; Ruff, Bash syntax and Compose configuration checks are clean.
 
-**Handing over:** nothing is half-finished in the tree. Continue from `main`, start at Section 9, and first do the browser acceptance pass in Section 3 (the merged baseline work has not been confirmed against live SIG and OpenAI yet).
+**Handing over:** the launcher is implemented and locally validated but has not yet been exercised on the user's Ubuntu host. Push/merge `codex/ubuntu-shared-host-runner`, then follow the Ubuntu commands in Section 3. The browser acceptance pass against live SIG and OpenAI is still outstanding.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -25,6 +25,7 @@
 | SIG live hazard-map embed | **Implemented on `main`**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path, sandboxed iframe and explicit hazard/exposure—not full risk—education |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
 | Baseline map preview (ADR-0009) | **Built and imported locally**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. Planning can draw both without making them assessment inputs; DEP-05 still blocks classification |
+| Ubuntu shared-host demo | **Built on current branch**: idempotent `scripts/docker-ubuntu.sh`, loopback port 8000, hidden AI-key prompt, ignored mode-0600 secret files, SIG localhost client registration and PuTTY tunnel runbook; needs first execution on Ubuntu |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
@@ -93,6 +94,18 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 5. `/data-preview.html` (**Preview one district** link on Source data, Admins only): press **Pua**. Expect the district outline, the flood picture hatched purple almost everywhere (99% no value), 29 purple shelters (on a no-value pixel), 1 orange shelter far away that names Pua, and a warnings panel led by the no-value blocker. **Mueang Nan** asks you to pick between districts only if the name is shared; **Bang Bua Thong** shows one shelter on a flooded pixel. A made-up name says it is not in the boundary file.
 6. `/assessments.html`, `/workspace.html`: same top bar, same order
 7. Langfuse Cloud: traces `planning-router-v1`, `planning-draft-v1`, `result-explain-v1`, `platform-test-v1`
+
+### Shared Ubuntu host (another application already uses port 80)
+
+Use the demo launcher, not `deploy/bootstrap-ubuntu.sh`, when this is a test build sharing a host. It reuses `deploy/compose.desktop.yml`, binds only to `127.0.0.1:8000`, and does not install or modify Caddy:
+
+```bash
+chmod +x scripts/docker-ubuntu.sh
+./scripts/docker-ubuntu.sh --register-sig-client --configure-ai \
+  --admin-email <you> --hub-admin-email <you>
+```
+
+Reach it with a PuTTY local SSH tunnel from local port `8000` to VM destination `127.0.0.1:8000`; keep AWS port 8000 closed. Raw keys go only into `.local/docker/secrets/` (mode `0600`), never `.env`. Use `--status` to check it and `--down` to stop only this Compose project while retaining volumes. Full instructions: [`deploy/UBUNTU_SHARED_HOST.md`](deploy/UBUNTU_SHARED_HOST.md).
 
 ---
 
@@ -433,6 +446,7 @@ Owner decisions (16–17 Sep):
 ## 7. Known gaps, risks and technical debt
 
 - **Staging is not deployed yet:** the validated build is running locally. Use the release/bootstrap workflow and staging secrets on the Ubuntu VM; do not copy the local `.env` or token files.
+- **Shared-host launcher is not yet host-tested:** its Bash syntax, Compose model and offline tests pass on Windows, but the user must still run it on Ubuntu and report the first failing command/log if Docker, SIG registration or host permissions differ.
 - **Rate limit is per process and per person:** a page load makes about 5–7 API calls. The 60/min spec value may be tight for real use; review it with the product owner before staging.
 - **Live end-to-end not formally confirmed:** OpenAI, Langfuse and SIG MCP work was observed by the owner in the browser but is not captured in tests; there is no recorded SIG fixture for the chat.
 - **Area check** relies on SIG trace wording `via admin boundary` (from the 14 Sep capture).
@@ -568,10 +582,10 @@ gates pass.
 ## Resume commands
 
 ```powershell
-git fetch; git switch codex/sig-embedded-flood-map
+git fetch; git switch codex/ubuntu-shared-host-runner
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 293 passed, 2 PostgreSQL-only skips
+python -m pytest            # expect 362 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

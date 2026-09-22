@@ -78,6 +78,17 @@ The local stack runs PostGIS, Alembic migrations, the API (with the web screens)
 
 Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scripts\run-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
 
+## Run on a shared Ubuntu host
+
+When another application already owns ports 80/443, run the local demo stack on the Ubuntu loopback address and reach it through an SSH tunnel:
+
+```bash
+./scripts/docker-ubuntu.sh --register-sig-client --configure-ai \
+  --admin-email you@adpc.net --hub-admin-email you@adpc.net
+```
+
+This binds only to `127.0.0.1:8000` and does not install or change Caddy. Keep port 8000 closed in the AWS security group; configure a PuTTY local tunnel from port 8000 to `127.0.0.1:8000`, then browse to `http://127.0.0.1:8000`. See [`deploy/UBUNTU_SHARED_HOST.md`](deploy/UBUNTU_SHARED_HOST.md) for prerequisites, reruns, status, shutdown, OAuth, and secret handling.
+
 ## Sign-in and membership mapping
 
 GRP registration is only for people who already have a SIG/SERVIR account. It collects no local password or unverified identity data: the applicant must complete SERVIR authentication before a pending request appears. An unknown verified identity creates an `identity_link_denied` audit event for administrator review, but no user, external identity, or membership record. After an administrator assigns a Hub role, the user returns to sign in and GRP links the external identity.
