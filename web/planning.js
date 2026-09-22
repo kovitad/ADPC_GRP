@@ -382,22 +382,21 @@
     const welcome = $("[data-welcome]");
     if (!welcome) return;
     const area = state.selected ? state.selected.name : null;
-    welcome.querySelector("h2").textContent = "Build an evacuation preparedness decision package";
+    welcome.querySelector("h2").textContent = "Explore the available flood information";
     const intro = welcome.querySelector("p");
     intro.textContent =
-      "For a confirmed Thailand area and flood scenario, I can help identify candidate evacuation " +
-      "centers with lower mapped exposure and show the evidence gaps that matter for vulnerable " +
-      "people and preparedness funding. A candidate is not a certification that a place is safe.";
+      "District boundaries, the available RP100 flood layer and evacuation-centre locations are " +
+      "shown immediately. Ask in your own words for SIG flood, risk or population information.";
     const box = $("[data-suggestions]");
     box.replaceChildren();
     [
       area
-        ? ["Find candidate places for movement", `Screen evacuation centers in ${area}`,
-          `Where could vulnerable people move if a 100-year flood hits ${area}?`]
+        ? ["Show information for this district", `Flood, centres and SIG evidence for ${area}`,
+          `Show the available flood and population information for ${area}.`]
         : ["Use my current district", "Find your Thailand district before asking SIG",
           null],
-      ["Explain what the map shows", "After a result appears",
-        "Explain the result: which evacuation centers may be exposed and why?"],
+      ["Explain what the map shows", "Use the visible layers and their sources",
+        "Explain the flood and evacuation-centre data shown on the map."],
       ["Check SIG flood exposure", "Schools, hospitals and roads for a Thailand district",
         "Which schools and hospitals in Mueang Nan District, Nan are exposed to flooding?"],
     ].forEach(([title, detail, prompt]) => {
@@ -423,13 +422,12 @@
     }
     coming.replaceChildren();
     const strong = document.createElement("strong");
-    strong.textContent = "Decision coverage today: ";
+    strong.textContent = "Available data: ";
     coming.append(
       strong,
       document.createTextNode(
-        "flood depth and evacuation-center locations. Vulnerable-group, capacity, accessibility, " +
-          "route and cost evidence will be added only from approved sources. Missing evidence is " +
-          "shown as a preparation or funding gap, never estimated by AI.",
+        "Thailand district boundaries, RP100 flood depth, evacuation-centre locations, and SIG " +
+          "hazard, risk and population values when SIG returns them.",
       ),
     );
   };
@@ -476,8 +474,8 @@
     renderWelcome();
     saveState();
     if (announce && !state.busy) {
-      addMessage("assistant", `${boundary.name} is selected. Ask me to run a flood assessment for it, or ask anything else.`, {
-        actions: [chipButton("Run 100-year flood assessment", () => send(`Run a 100-year flood assessment for ${boundary.name}`))],
+      addMessage("assistant", `${boundary.name} is selected. The available flood and evacuation-centre layers are shown on the map.`, {
+        actions: [chipButton("Show SIG information", () => send(`Show the available flood, risk and population information for ${boundary.name}.`))],
       });
     }
   };
@@ -550,7 +548,7 @@
     collection.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       window.L.circleMarker([lat, lon], { renderer: centerRenderer, radius: 4, color: "#374151", weight: 1, fillColor: "#fff", fillOpacity: 0.9 })
-        .bindPopup(popup(feature.properties.name, ["Evacuation center · not assessed yet"]))
+        .bindPopup(popup(feature.properties.name, [state.centersVersion.title, state.centersVersion.provider]))
         .addTo(centersLayer);
     });
   };
@@ -625,6 +623,7 @@
       loadAssessmentCenters(id),
     ]);
     drawResultCenters(centers.centers, result.reason_codes);
+    $("[data-assessment-legend]").hidden = false;
     const centersToggle = $('[data-layer="centers"]');
     centersToggle.checked = true;
     centersLayer.addTo(map);
@@ -835,6 +834,11 @@
     movementSection.after(fundingSection);
     fundingSection.after(briefSection);
     briefSection.querySelector("h3").textContent = "Plain-language brief";
+    $("[data-summary-movement-title]").textContent = "Where people could move";
+    $("[data-summary-caveat]").hidden = false;
+    $("[data-summary-coverage-title]").textContent = "Preparedness funding case";
+    $("[data-summary-coverage-intro]").textContent =
+      "Use available evidence now and treat missing checks as preparation or funding gaps.";
     currentEvidence = null;
     openEvidencePayload = null;
     $("[data-ev-eyebrow]").textContent = "GRP decision summary";
@@ -948,6 +952,11 @@
     briefSection.querySelector("h3").textContent = payload.answer_source === "deterministic_fallback"
       ? "Key findings from the evidence"
       : "Evidence-based brief";
+    $("[data-summary-movement-title]").textContent = "Available map layers";
+    $("[data-summary-caveat]").hidden = true;
+    $("[data-summary-coverage-title]").textContent = "Available information";
+    $("[data-summary-coverage-intro]").textContent =
+      "The map and evidence panel show each available source directly.";
     $("[data-ev-eyebrow]").textContent = "Planning summary · SIG screening";
     $("[data-summary-status]").textContent = evidence.receipt
       ? `Source-checked · receipt ${evidence.receipt.receipt_id}`
@@ -955,23 +964,20 @@
         ? "Deterministic evidence summary · not publishable"
         : "Unverified screening draft";
     $("[data-summary-title]").textContent = hasRisk
-      ? "Approved SIG flood-risk screening"
-      : "What SIG found — and what it cannot decide";
+      ? "SIG flood-risk information"
+      : "SIG flood information";
     $("[data-summary-lead]").textContent = payload.answer_source === "deterministic_fallback"
       ? "The AI brief failed formatting checks, so GRP is showing only numbered findings copied from the structured evidence pack."
       : hasRisk
-        ? `SIG provides hazard, exposure and vulnerability-weighted risk using approved recipe ${evidence.risk_recipe.version}. Risk classes support screening; they do not certify safety.`
-        : "SIG provides hazard and asset-exposure context. Red flood shading shows depth or hazard, not a risk or safety rating.";
+        ? `SIG returned hazard, exposure and vulnerability-weighted risk using recipe ${evidence.risk_recipe.version}.`
+        : "SIG returned flood-hazard and asset-exposure information for the confirmed district.";
     $("[data-summary-movement]").replaceChildren(summaryNotice(
-      "No GRP movement recommendation for this area",
-      "Evacuation-centre points on the local map are display-only and have not been assessed for this district. Use them for orientation, not as safe destinations.",
-      "is-blocked",
+      "Flood and evacuation-centre layers are visible",
+      "Use Layers to turn the national RP100 flood layer, district boundaries and evacuation-centre locations on or off.",
     ));
     renderCoverage([
       { label: "Flood hazard and exposure", status: "available", detail: `${evidence.summary.computed} computed evidence item(s)` },
-      { label: "Evacuation-centre locations", status: state.centersVersion ? "partial" : "missing", detail: state.centersVersion ? "Display-only national baseline; not assessed" : "No managed layer available" },
-      { label: "Centre capacity and services", status: "missing", detail: "Not returned in this evidence pack" },
-      { label: "Accessibility and safe routes", status: "missing", detail: "No route suitability evidence" },
+      { label: "Evacuation-centre locations", status: state.centersVersion ? "available" : "missing", detail: state.centersVersion ? state.centersVersion.title : "No managed layer available" },
       {
         label: "Vulnerability-weighted risk",
         status: hasRisk ? "available" : "partial",
@@ -979,7 +985,9 @@
           ? `SIG recipe ${evidence.risk_recipe.version}; exact source values remain in Evidence`
           : "SIG generic screening may be present; no approved recipe is recorded",
       },
-      { label: "Interventions and costs", status: "missing", detail: "No approved cost template or figures" },
+      ...(Object.keys((evidence.stats && evidence.stats.population_by_age) || {}).length
+        ? [{ label: "Population by age", status: "available", detail: "Values are shown in the Evidence tab" }]
+        : []),
       ...(evidence.warnings || []).map((warning) => ({
         label: "SIG metadata consistency",
         status: "blocked",
@@ -993,8 +1001,7 @@
     } else {
       brief.append(summaryNotice(
         "Brief unavailable",
-        "Review the evidence and gaps. Nothing should be published or used as a movement recommendation.",
-        "is-blocked",
+        "The structured source cards and values remain available in the Evidence tab.",
       ));
     }
   };
@@ -1576,6 +1583,21 @@
     return null;
   };
 
+  const normalizeAreaName = (value) => String(value || "")
+    .toLowerCase()
+    .replace(/\b(?:district|amphoe|khet|thailand)\b/g, "")
+    .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, " ")
+    .trim();
+
+  const localBoundaryForPlace = (name) => {
+    const [district, province] = String(name || "").split(",").map(normalizeAreaName);
+    const matches = state.boundaries.filter((boundary) =>
+      normalizeAreaName(boundary.name) === district
+      && (!province || !boundary.province_name
+        || normalizeAreaName(boundary.province_name) === province));
+    return matches.length === 1 ? matches[0] : null;
+  };
+
   const pickPlace = (place, { currentLocation = false } = {}) => {
     placeLayer.clearLayers();
     const lat = Number(place.lat);
@@ -1599,8 +1621,10 @@
       chip.hidden = false;
       return;
     }
+    const localBoundary = localBoundaryForPlace(name);
+    if (localBoundary) selectBoundary(localBoundary, { explicit: true });
     chip.append(document.createTextNode(
-      `${currentLocation ? "Your current district" : name} is not a supported GRP assessment area yet. `
+      `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
     ));
     chip.append(chipButton("Check SIG flood exposure", () => send(
       `Check flood exposure for schools, hospitals and roads in ${name}.`,
@@ -1685,7 +1709,7 @@
       if (!place) throw new Error("CURRENT_LOCATION_NO_DISTRICT");
       pickPlace(place, { currentLocation: true });
       const name = externalPlaceName(place);
-      addMessage("assistant", `Your district is ${name}. It is not a GRP assessment area, so I can look up SIG flood evidence for it.`, {
+      addMessage("assistant", `Your district is ${name}. Available local map layers are shown, and SIG information can be added.`, {
         label: "Current district confirmed.",
         actions: [chipButton("Check SIG flood exposure", () => send(
           `Check flood exposure for schools, hospitals and roads in ${name}.`,
@@ -1715,10 +1739,14 @@
     if (local.length) {
       const group = document.createElement("div");
       group.className = "pw-search__group";
-      group.textContent = "Supported assessment areas";
+      group.textContent = "Thailand districts";
       searchResults.append(group);
       local.slice(0, 5).forEach((boundary) =>
-        searchResults.append(searchItem(boundary.name, `${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`, () => selectBoundary(boundary, { announce: true }))),
+        searchResults.append(searchItem(
+          boundary.name,
+          `${boundary.province_name ? `${boundary.province_name} · ` : ""}${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`,
+          () => selectBoundary(boundary, { announce: true }),
+        )),
       );
     }
     searchResults.hidden = false;
@@ -1888,24 +1916,23 @@
       const mapPreview = state.floodLayers[0]?.preview_only || state.centersVersion?.preview_only;
       const floodToggle = $('[data-layer="flood"]');
       const centersToggle = $('[data-layer="centers"]');
-      // Flood depth is always opt-in: selecting a scenario does not draw it until checked.
-      floodToggle.checked = false;
-      centersToggle.checked = Boolean(state.centersVersion?.preview_only);
+      const districtToggle = $('[data-layer="districts"]');
+      // Display-first MVP 1: show every available baseline layer before any optional assessment.
+      floodToggle.checked = Boolean(selectedFloodLayer());
+      centersToggle.checked = Boolean(state.centersVersion);
+      districtToggle.checked = state.boundaries.length > 0;
       const previewNote = $("[data-map-preview-note]");
       previewNote.hidden = !mapPreview;
       previewNote.textContent = mapPreview
-        ? "Baseline preview only — source versions are pinned, but no assessment method has classified these centers. Flood NoData meaning is pending DEP-05."
+        ? "Source preview — the available flood and evacuation-centre data is shown directly."
         : "";
       $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
       drawLegend(layers.flood_legend);
       drawDistricts();
       await Promise.all([loadFloodOverlay(selectedFloodLayer()), drawPendingCenters()]);
-      // Synthetic assessment boundaries remain opt-in. Real imported preview layers are visible
-      // immediately, so the right-hand map is not blank after an evidence-only SIG response.
-      districtLayer.remove();
-      if (state.centersVersion?.preview_only) centersLayer.addTo(map);
-      else centersLayer.remove();
-      if (floodOverlay) floodOverlay.remove();
+      if (districtToggle.checked) districtLayer.addTo(map);
+      if (centersToggle.checked) centersLayer.addTo(map);
+      if (floodOverlay && floodToggle.checked) floodOverlay.addTo(map);
       renderWelcome();
       ownerEmail = identity.email;
       await restoreState();

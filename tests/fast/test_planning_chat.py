@@ -436,8 +436,7 @@ def test_unsupported_request_gets_server_message_not_model_text(planning) -> Non
     assert body["mode"] == "cannot"
     assert "admin" not in body["answer"].lower() or "GRP admin pages" in body["answer"]
     assert "made you admin" not in body["answer"]
-    assert "preparedness investment case" in body["answer"]
-    assert "invent missing figures" in body["answer"]
+    assert "available Thailand district" in body["answer"]
 
 
 def test_result_explanation_prompt_reports_missing_result_even_if_router_refuses(planning) -> None:
@@ -845,7 +844,7 @@ def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning)
     ).json()
 
     assert body["mode"] == "sig_evidence"
-    assert "not a GRP assessment area yet" in body["note"]
+    assert "Showing SIG flood information" in body["note"]
     assert body["evidence"]["summary"]["sources"] == 1
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
     assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
@@ -866,7 +865,7 @@ def test_movement_request_with_bad_draft_leads_with_unavailable_decision(plannin
 
     assert body["answer_source"] == "deterministic_fallback"
     assert body["answer"].startswith(
-        "## Decision availability\nNo evacuation-centre recommendation"
+        "## Available data\nSIG returned district flood information"
     )
     assert "3 of 9 schools [1]" in body["answer"]
     assert body["publish_token"] is None

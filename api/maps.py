@@ -127,7 +127,7 @@ def map_layers(
         "flood_legend": legend(),
         "evacuation_centers": centers,
         "vulnerability": VULNERABILITY_PLACEHOLDER,
-        "note": "Map pictures are for orientation. Assessment numbers come from the locked result.",
+        "note": "Available source layers are displayed directly; an assessment is optional.",
     }
 
 

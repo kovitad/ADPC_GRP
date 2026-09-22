@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/planning.css?v=20260921e" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260922b" defer></script>
+    <script src="/planning.js?v=20260922c" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -25,7 +25,7 @@
       <section class="pw-chat" aria-label="Planning assistant">
         <div class="pw-chat__top">
           <div>
-            <h1>Evacuation preparedness planning</h1>
+            <h1>Flood information and planning</h1>
             <p data-hub-name>Loading your Hub…</p>
           </div>
           <span class="pw-pill" data-allowance title="Your AI allowance this month">AI …</span>
@@ -36,7 +36,7 @@
           <div class="pw-welcome" data-welcome>
             <div class="pw-welcome__icon" aria-hidden="true">≈</div>
             <h2>How can I help with flood planning?</h2>
-            <p>Ask in your own words. I'll run the screening, show it on the map, and explain it.</p>
+            <p>Available district, flood and evacuation-centre data is already shown on the map.</p>
             <div class="pw-suggestions" data-suggestions></div>
           </div>
         </div>
@@ -48,7 +48,7 @@
               data-input
               rows="1"
               maxlength="1000"
-              placeholder="Ask where people could move or what evidence a funding case needs…"
+              placeholder="Ask about a district, flood layer, population or map data…"
               aria-label="Message"
             ></textarea>
             <button class="pw-send" type="submit" data-send aria-label="Send message" disabled>
@@ -89,7 +89,7 @@
           Layers
         </button>
         <div class="pw-layers" data-layers hidden>
-          <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span>Demo assessment area</span></label>
+          <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span>District boundaries</span></label>
           <div class="pw-layer-choice">
             <label class="pw-toggle"><input type="checkbox" data-layer="flood" /><span data-flood-title>Flood depth</span></label>
             <label class="pw-scenario-label" for="flood-scenario">Scenario</label>
@@ -97,8 +97,8 @@
             <p class="pw-muted" data-flood-scenario-note></p>
           </div>
           <div class="pw-legend" data-flood-legend></div>
-          <label class="pw-toggle"><input type="checkbox" data-layer="centers" /><span data-centers-title>Demo evacuation centers</span></label>
-          <div class="pw-legend">
+          <label class="pw-toggle"><input type="checkbox" data-layer="centers" /><span data-centers-title>Evacuation centres</span></label>
+          <div class="pw-legend" data-assessment-legend hidden>
             <span><i class="pw-dot" style="--c:#c2410c"></i>Potentially exposed</span>
             <span><i class="pw-dot" style="--c:#0f766e"></i>Not exposed under this scenario</span>
             <span><i class="pw-dot" style="--c:#6b7280"></i>Unable to assess</span>
@@ -181,16 +181,16 @@
                 <p data-summary-lead></p>
               </section>
               <section class="pw-decision-section" data-summary-movement-section>
-                <h3>Where people could move</h3>
+                <h3 data-summary-movement-title>Where people could move</h3>
                 <div data-summary-movement></div>
-                <p class="pw-candidate-caveat">
+                <p class="pw-candidate-caveat" data-summary-caveat>
                   Candidate means lower mapped flood exposure under this scenario. It does not
                   certify the centre, building or route as safe.
                 </p>
               </section>
               <section class="pw-decision-section" data-summary-funding-section>
-                <h3>Preparedness funding case</h3>
-                <p class="pw-decision-intro">
+                <h3 data-summary-coverage-title>Preparedness funding case</h3>
+                <p class="pw-decision-intro" data-summary-coverage-intro>
                   Use available evidence now and treat missing checks as preparation or funding gaps.
                 </p>
                 <div class="pw-coverage" data-summary-coverage></div>

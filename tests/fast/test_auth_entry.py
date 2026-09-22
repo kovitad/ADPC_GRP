@@ -171,15 +171,16 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "replayable public receipt" in page
 
     script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
-    assert "floodToggle.checked = false" in script
+    assert "floodToggle.checked = Boolean(selectedFloodLayer())" in script
     assert "configureFloodScenarios(layers.flood_scenarios)" in script
     assert 'data-flood-scenario' in page
     assert "RP20 and RP50 stay disabled until their source versions are imported" in script
-    assert "centersToggle.checked = Boolean(state.centersVersion?.preview_only)" in script
+    assert "centersToggle.checked = Boolean(state.centersVersion)" in script
+    assert "districtToggle.checked = state.boundaries.length > 0" in script
     assert "Loaded immediately from this login’s 10-minute cache." in script
-    assert "Build an evacuation preparedness decision package" in script
-    assert "not a certification that a place is safe" in script
-    assert "Missing evidence is" in script
+    assert "Explore the available flood information" in script
+    assert "Display-first MVP 1" in script
+    assert "Available data:" in script
     assert "refresh: true" in script
     assert "loadAssessmentCenters(id)" in script
     assert "floodToggle.checked = true" in script
@@ -188,7 +189,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Where people could move" in page
     assert "Preparedness funding case" in page
     assert "renderAssessmentSummary(result, centers.centers)" in script
-    assert "No GRP movement recommendation for this area" in script
+    assert "Flood and evacuation-centre layers are visible" in script
     assert "Candidate means lower mapped flood exposure" in page
     assert "Deterministic evidence summary · not publishable" in script
     assert "Key findings from SIG evidence" in script
@@ -196,5 +197,5 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260922b" in page
+    assert "/planning.js?v=20260922c" in page
     assert "innerHTML" not in script

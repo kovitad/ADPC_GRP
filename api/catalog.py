@@ -31,6 +31,7 @@ def boundaries(
                 "name": row.name,
                 "admin_code": row.admin_code,
                 "admin_level": row.admin_level,
+                "province_name": row.province_name,
                 "source": row.source,
                 "edition": row.edition,
                 "synthetic": "synthetic" in row.source,
