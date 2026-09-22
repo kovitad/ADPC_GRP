@@ -36,9 +36,11 @@ from api.token_store import session_token_store
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
+from core.hazard_import import PLATFORM_HAZARD_DATASET_ID
 from core.identity import MembershipView
 from core.models import AssessmentState
 from core.risk_recipe import RiskRecipe, active_risk_recipe, recipe_payload
+from core.shelter_import import PLATFORM_SHELTER_DATASET_ID
 
 router = APIRouter(prefix="/planning", tags=["planning"])
 
@@ -54,6 +56,10 @@ DRAFT_VERSION = "planning-draft-v1"
 RESULT_EXPLANATION_PATTERN = re.compile(
     r"\b(explain (?:the )?(?:result|map)|which (?:evacuation )?centers?.*"
     r"(?:exposed|assess)|what (?:the )?map shows)\b",
+    re.IGNORECASE,
+)
+EXPLICIT_ASSESSMENT_PATTERN = re.compile(
+    r"\b(?:run|start|calculate|assess|assessment|classify|classification|screen|screening)\b",
     re.IGNORECASE,
 )
 ROUTER_INSTRUCTIONS = (
@@ -702,6 +708,10 @@ async def planning_chat(
     )
     decision = _decision(routed.text)
     mode, reply = decision["mode"], decision["reply"]
+    # Display-first MVP 1: the model cannot turn a request to show data into a derived GRP job.
+    # Only explicit calculation/assessment wording authorizes the optional queued workflow.
+    if mode == "run_assessment" and not EXPLICIT_ASSESSMENT_PATTERN.search(payload.message):
+        mode = "sig_flood"
     if mode == "cannot" and _asks_to_explain_result(payload.message):
         mode = "explain_result"
     base = {"hub_code": hub.hub_code}
@@ -1096,25 +1106,18 @@ def _start_assessment(
             "usage": _usage(session, settings, principal),
         }
     years = decision["return_period_years"] or 100
-    hazard = session.scalar(
-        select(DatasetVersion)
-        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
-        .where(
-            Dataset.type == "hazard",
-            DatasetVersion.is_current,
-            DatasetVersion.return_period_years == years,
-            or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id),
-        )
+    hazard = _current_assessment_input(
+        session,
+        boundary=boundary,
+        hub_id=hub.hub_id,
+        dataset_type="hazard",
+        return_period_years=years,
     )
-    centers = session.scalar(
-        select(DatasetVersion)
-        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
-        .where(
-            Dataset.type == "evacuation_centers",
-            DatasetVersion.is_current,
-            or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id),
-        )
-        .order_by(Dataset.owner_kind)
+    centers = _current_assessment_input(
+        session,
+        boundary=boundary,
+        hub_id=hub.hub_id,
+        dataset_type="evacuation_centers",
     )
     method = session.scalar(
         select(Method).where(Method.status == "approved").order_by(Method.created_at.desc())
@@ -1161,6 +1164,43 @@ def _start_assessment(
         "support_ref": submitted.support_ref,
         "usage": _usage(session, settings, principal),
     }
+
+
+def _current_assessment_input(
+    session: Session,
+    *,
+    boundary: Boundary,
+    hub_id: UUID,
+    dataset_type: Literal["hazard", "evacuation_centers"],
+    return_period_years: int | None = None,
+) -> DatasetVersion | None:
+    """Keep synthetic fixtures out of real-district jobs, and vice versa."""
+
+    synthetic = "synthetic" in boundary.source.casefold()
+    platform_dataset_id = (
+        PLATFORM_HAZARD_DATASET_ID
+        if dataset_type == "hazard"
+        else PLATFORM_SHELTER_DATASET_ID
+    )
+    query = (
+        select(DatasetVersion)
+        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+        .where(
+            Dataset.type == dataset_type,
+            DatasetVersion.is_current,
+            or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub_id),
+            (
+                Dataset.provider == "GRP synthetic test data"
+                if synthetic
+                else Dataset.id == platform_dataset_id
+            ),
+        )
+    )
+    if return_period_years is not None:
+        query = query.where(
+            DatasetVersion.return_period_years == return_period_years,
+        )
+    return session.scalar(query.order_by(DatasetVersion.created_at.desc()))
 
 
 @router.get(

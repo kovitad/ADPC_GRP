@@ -41,9 +41,9 @@
 
   // ---------- keep the conversation when moving between menu pages ----------
   // Stored only in this browser tab (sessionStorage): gone when the tab closes or on sign-out.
-  // v2 deliberately starts a fresh local session: v1 restored the synthetic demo as the
-  // default map context, which is misleading for real-district SIG lookup.
-  const STORE_KEY = "grp.planning.v2";
+  // v3 discards pre-display-first results that may have mixed synthetic fixtures with a real
+  // district. Source records remain in the database; only this tab's stale UI state is cleared.
+  const STORE_KEY = "grp.planning.v3";
   const transcript = [];
   let restoring = false;
   let ownerEmail = null;

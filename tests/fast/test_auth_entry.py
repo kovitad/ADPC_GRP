@@ -154,7 +154,7 @@ def test_planning_location_lookup_requires_an_administrative_district() -> None:
     assert "reverse?format=jsonv2&zoom=${zoom}&addressdetails=1" in script
     assert "for (const zoom of [10, 12, 14, 8])" in script
     assert "polygon_geojson=1&addressdetails=1" in script
-    # Clicking the map offers that point's district for SIG evidence only.
+    # Clicking the map focuses that point's district and can add SIG evidence.
     assert 'map.on("click"' in script
     assert "const useMapPoint" in script
 
@@ -197,5 +197,6 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260922c" in page
+    assert "/planning.js?v=20260922d" in page
+    assert 'const STORE_KEY = "grp.planning.v3"' in script
     assert "innerHTML" not in script

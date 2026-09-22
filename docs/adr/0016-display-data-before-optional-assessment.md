@@ -34,4 +34,5 @@ the first outcome is to let a person see the available data.
 
 - Frontend contract tests assert that flood, district and centre layers default on.
 - Chat tests assert display-first SIG and deterministic-summary wording.
+- Dataset-resolution tests prove a real district cannot pin synthetic hazard or centre fixtures.
 - Existing assessment and golden-result tests continue to cover the optional derived workflow.

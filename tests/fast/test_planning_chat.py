@@ -844,13 +844,13 @@ def test_where_could_people_move_in_unsupported_area_falls_back_to_sig(planning)
     ).json()
 
     assert body["mode"] == "sig_evidence"
-    assert "Showing SIG flood information" in body["note"]
+    assert body["note"] is None
     assert body["evidence"]["summary"]["sources"] == 1
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
     assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
 
 
-def test_movement_request_with_bad_draft_leads_with_unavailable_decision(planning) -> None:
+def test_display_request_with_bad_draft_still_shows_structured_data(planning) -> None:
     planning["replies"] += [
         '{"mode": "run_assessment", "reply": "", "place": "Mueang Nan District, Nan, Thailand",'
         ' "return_period_years": null}',
@@ -865,7 +865,7 @@ def test_movement_request_with_bad_draft_leads_with_unavailable_decision(plannin
 
     assert body["answer_source"] == "deterministic_fallback"
     assert body["answer"].startswith(
-        "## Available data\nSIG returned district flood information"
+        "## Available data\nSIG returned the following cited flood information"
     )
     assert "3 of 9 schools [1]" in body["answer"]
     assert body["publish_token"] is None

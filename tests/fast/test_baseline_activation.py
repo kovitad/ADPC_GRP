@@ -1,8 +1,12 @@
 """Approved baseline activation enables real districts without changing source bytes."""
 
+from types import SimpleNamespace
+from uuid import uuid4
+
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+import api.planning
 from core.access_models import AppUser, AuditEvent, Base
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Method
 from core.baseline_activation import activate_mvp1_baseline
@@ -100,3 +104,53 @@ def test_activate_latest_imported_baseline() -> None:
             select(AuditEvent).where(AuditEvent.action == "mvp1_baseline_activated")
         )
         assert audit.new_value["no_data_policy"] == "unable_to_assess"
+
+        synthetic_hazard = Dataset(
+            type="hazard",
+            owner_kind="platform",
+            title="Synthetic flood depth",
+            provider="GRP synthetic test data",
+        )
+        synthetic_centers = Dataset(
+            type="evacuation_centers",
+            owner_kind="platform",
+            title="Synthetic evacuation centers",
+            provider="GRP synthetic test data",
+        )
+        session.add_all([synthetic_hazard, synthetic_centers])
+        session.flush()
+        synthetic_hazard_version = DatasetVersion(
+            dataset_id=synthetic_hazard.id,
+            storage_key="synthetic.tif",
+            sha256="d" * 64,
+            return_period_years=100,
+            is_current=True,
+        )
+        synthetic_center_version = DatasetVersion(
+            dataset_id=synthetic_centers.id,
+            sha256="e" * 64,
+            is_current=True,
+        )
+        session.add_all([synthetic_hazard_version, synthetic_center_version])
+        session.flush()
+
+        assert api.planning._current_assessment_input(
+            session,
+            boundary=boundary,
+            hub_id=uuid4(),
+            dataset_type="hazard",
+            return_period_years=100,
+        ).id == hazard_version.id
+        assert api.planning._current_assessment_input(
+            session,
+            boundary=boundary,
+            hub_id=uuid4(),
+            dataset_type="evacuation_centers",
+        ).id == center_version.id
+        assert api.planning._current_assessment_input(
+            session,
+            boundary=SimpleNamespace(source="synthetic test data"),
+            hub_id=uuid4(),
+            dataset_type="hazard",
+            return_period_years=100,
+        ).id == synthetic_hazard_version.id

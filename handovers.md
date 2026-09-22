@@ -446,6 +446,12 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
 - The initial centre popup shows source information; the exposed/not-exposed classification legend
   appears only after an optional explicit assessment. SIG summaries lead with returned hazard,
   exposure, risk and population data instead of an assessment or safety warning.
+- Fixed the zero-data regression observed in result `GRP-7KYD-CA`: a real Bang Bua Thong boundary
+  had pinned the simultaneously-current synthetic hazard and centre fixtures. Real districts now
+  resolve only the managed Thailand dataset IDs, while the synthetic boundary resolves only the
+  synthetic provider. Display requests cannot start a job unless the user explicitly says to run,
+  calculate, assess, classify or screen. Browser state moved to `grp.planning.v3` so the bad result
+  is not restored into the new UI.
 
 ---
 
