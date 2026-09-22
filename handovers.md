@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 22 September 2026 (`main`; evacuation-centre Planning UI implementation plan recorded)
+**Updated:** 22 September 2026 (`main`; district centre UI and SIG token renewal implemented)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, Ubuntu launcher, ADR-0015 approved-data path and ADR-0016 display-first Planning map are on `main`. Available districts, RP100 flood and evacuation-centre layers appear before an assessment; SIG risk and population values lead the evidence view when returned. Assessment submission now prevents real/synthetic input mixing and both result pages exchange the same assessment UUID. **395 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Compose configuration and whitespace checks are clean.
+**Delivery status:** The validated baseline, Ubuntu launcher, ADR-0015 approved-data path and ADR-0016 display-first Planning map are on `main`. Selecting a district now loads its complete named evacuation-centre list and synchronizes it with the map; a locked assessment upgrades those same rows with status, reason and flood depth. SIG risk and population values remain separate evidence, and ADR-0017 renews the in-memory SIG access token during a live GRP session. **411 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax and whitespace checks are clean.
 
-**Handing over:** implement [`docs/evacuation-centre-planning-ui-plan.md`](docs/evacuation-centre-planning-ui-plan.md) next. The active database already contains real Thai centre names, coordinates and assessment classifications; Planning needs a district-scoped, map-synchronized complete list rather than new sample data. Preserve duplicate-name records by feature ID. Do not re-import the centre source until DEP-06 resolves the `grp-shelters/1` real-name versus `grp-shelters/2` generated-label mismatch. Planning and Assessments already share locked results through `assessment_id`, and real/synthetic input mixing is blocked. The Ubuntu launcher still needs its first host execution.
+**Handing over:** perform signed-in owner acceptance of the completed centre panel and ADR-0017 renewal path. AO Luek has 38 source records with 9 distinct stored names; repeated names intentionally remain separate by `feature_id`. Do not re-import the centre source until DEP-06 resolves the `grp-shelters/1` real-name versus `grp-shelters/2` generated-label mismatch. The SIG refresh token remains process-memory only and is lost on an API restart, so restart acceptance begins with a fresh SERVIR sign-in. The Ubuntu launcher still needs its first host execution.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -21,7 +21,7 @@
 | Increment 0, servers ready | Done |
 | Increment 2, access and admin | **Complete in code**: NDMO Planner, Hub Expert / GIS Specialist, Hub Admin and Platform Admin; security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
 | Increment 1, golden assessment | **Real baseline enabled under ADR-0015's approval assumption**: six-tile worker, 928 supported districts and 10,303 centres. Mueang Nan and Bang Bua Thong completed locally; the formal authority-signed Chiang Yuen artifact remains a production gate |
-| Planner assistant and map (ADR-0004/0016) | **Built, Docker Desktop only**: display-first OSM map with available baseline layers already on, chat, SIG MCP evidence, evidence panel, downloads, progress, Thai input and current-district focus |
+| Planner assistant and map (ADR-0004/0016) | **Built, Docker Desktop only**: display-first OSM map, district-scoped complete centre list synchronized with markers and locked assessment rows, chat, SIG MCP evidence, evidence panel, downloads, progress, Thai input and current-district focus |
 | SIG live map embed | **Implemented**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path and sandboxed iframe. Hazard layers remain hazard-only; an active ADR-0015 recipe additionally permits one exact declared SIG risk layer |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
 | Thailand baseline (ADR-0009/0015) | **Built, imported and locally activated**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. The same pinned versions now support queued real-district screening; NoData is Unable to assess |
@@ -71,7 +71,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 ```
 
 **Important facts about the local stack:**
-- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; asset query strings are bumped when their files change (`planning.js` is currently `?v=20260922b`). **Bump asset versions when changing shared CSS or JS.**
+- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; asset query strings are bumped when their files change (`planning.js` is currently `?v=20260922f`). **Bump asset versions when changing shared CSS or JS.**
 - **Python changes need an image rebuild.** The local `grp-api:desktop` image was successfully rebuilt on 18 September from the committed source, including `api/errors.py` and `api/rate_limits.py`; the API and worker were recreated from that image. No copied-file workaround remains.
 - Local rate limit: `deploy/compose.desktop.yml` sets `RATE_LIMITS` with 300 API requests per person per minute, so quick menu switching does not hit 429. Servers keep the Section 13.1 value of 60.
 - After any API restart, **sign in again**. The SIG MCP token and its refresh token live only in process memory (ADR-0002, ADR-0017). Within a running API they now renew themselves, so a session no longer stops working after an hour; only a restart ends it.
@@ -85,7 +85,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 1. `http://127.0.0.1:8000/admin`: sign in with SERVIR (`kovitad.janlakhon@adpc.net` is Platform Admin and Hub Admin of `adpc`)
 2. `/platform.html`: set a token limit (for example 50,000), AI **On**, Save; **Send test call**; **Reset now**; create, close and reopen a Hub; security log
 3. `/planning.html`:
-   - The page opens on Thailand with district boundaries, the available RP100 flood layer and the real national evacuation-centre layer already visible. No assessment is required. RP20 and RP50 remain disabled because they are not imported. Search or **Use my location** to focus a district; when it matches the managed boundary collection, the exact local boundary is selected.
+   - The page opens on Thailand with district boundaries and the available RP100 flood layer. It does **not** download all 10,303 centres. Select a managed district to load only its source records; the **Centres** tab must show every record as **Not assessed yet**, keep repeated names separate and focus the same marker when a row is selected. No assessment is required. RP20 and RP50 remain disabled because they are not imported.
    - "Which centers could not be assessed, and why?" explains the stored result
    - `show flood and population information for บางบัวทอง นนทบุรี`: confirm Bang Bua Thong and verify the map stays visible while SIG hazard, risk and population information opens in the right panel.
    - **Use my location**: allow the browser prompt; the map accepts only a real Thailand district returned by OpenStreetMap (not a city-wide or approximate result), focuses the managed local boundary when matched and offers **Check SIG flood exposure**. Location coordinates are not stored.
@@ -458,17 +458,30 @@ Earlier on 16–17 Sep: Increment 2 completion, ADR-0004 chat, Increment 1, map 
   same rule before a job exists. Both pages accept and link `?assessment_id=<uuid>`, while legacy
   mismatched results display a red do-not-use warning. Planning state moved to `grp.planning.v4`.
 
-### 22 Sep — next UI increment: complete evacuation-centre list
+### 22 Sep — complete evacuation-centre list and SIG session renewal
 
 - Product Owner asked to use the real centre names already present and make Planning useful like the
   supplied reference UI. Investigation confirmed the active DDPM dataset has 10,303 named points;
   the assessment-centres API already returns name, feature ID, coordinates, classification, reason
   and flood depth. AO Luek has 38 in-scope records in the historical result, including legitimate
   repeated names at different coordinates—never deduplicate by name.
-- The next implementation is specified in
-  [`docs/evacuation-centre-planning-ui-plan.md`](docs/evacuation-centre-planning-ui-plan.md): a
-  district-scoped source endpoint, one reusable map-synchronized list before/after assessment,
-  useful evidence/gap details, and cited SIG population aggregates kept separate from centres.
+- Implemented [`docs/evacuation-centre-planning-ui-plan.md`](docs/evacuation-centre-planning-ui-plan.md).
+  The feature endpoint accepts `boundary_id` and resolves points by stable `admin_code` (with the
+  boundary UUID fallback), so Planning does not download the 10,303-point national collection.
+  One complete searchable/filterable list and one marker layer share `feature_id`; before an
+  assessment rows say **Not assessed yet**, and a locked result upgrades the same rows with its
+  exact status, reason and flood depth. Population-by-age remains a cited district aggregate in a
+  separate People view, never a centre or household map.
+- Local database verification: AO Luek admin code `8105` has 38 current source records and 9
+  distinct stored names. Mocked browser acceptance kept both repeated `Ban Klang School` rows,
+  synchronized row selection with a marker popup, and upgraded the same three sample rows to
+  exposed/lower-exposure/unable-to-assess statuses from a locked result.
+- Merged Claude's SIG connection repair and ADR-0017. Initial SERVIR sign-in now requests
+  `offline_access`; the refresh token is held only in the process-local session token store and
+  renews the access token under a per-session lock before expiry. Planning shows remaining time or
+  an actionable **Sign in again** link. An API restart still clears both tokens by design.
+- Combined validation: 411 tests pass with two PostgreSQL-only skips; Ruff, JavaScript syntax and
+  whitespace checks are clean. The focused Claude branch suite passed 79 tests before integration.
 - Critical data safeguard: the active `grp-shelters/1` version contains real Thai names, while the
   current `grp-shelters/2` importer deliberately emits generic labels pending DEP-06 confirmation of
   `สถา`, `สถ_1` and `รอง`. Do not replace the active version merely to build this UI. Resolve and
@@ -571,7 +584,10 @@ Execute [`docs/baseline-data-library-implementation-plan.md`](docs/baseline-data
 5. ~~DDPM shelter loader with geometric membership and mismatch reporting.~~ **Built and imported:** 10,303 points, 1,139 reported name conflicts, zero outside all districts.
 6. ~~One logical RP100 version containing the ordered six-tile manifest and bounded COG processing.~~ **Built, imported and activated under ADR-0015:** six originals, six COGs, one national preview; NoData remains Unable to assess.
 7. ~~Extend Data library API/UI to shelters and hazard.~~ **Built:** import cards, status, counts, audit and notices for all baseline categories.
-8. **Next:** signed-in browser acceptance of the new Platform recipe/activation card and a real district run from Planning, including measured rendering time for 10,303 points. See [`docs/baseline-map-implementation-report.md`](docs/baseline-map-implementation-report.md).
+8. ~~District-scoped Planning display.~~ **Built:** the browser no longer renders 10,303 points;
+   selection loads one district's complete named list and a locked result upgrades those rows.
+   **Next:** signed-in owner acceptance of the Platform recipe/activation card, AO Luek list and one
+   fresh real-district assessment. See [`docs/baseline-map-implementation-report.md`](docs/baseline-map-implementation-report.md).
 
 Do not import the local vulnerability rasters merely to duplicate SIG risk. Real RP100 assessment
 is enabled under ADR-0015 and must keep NoData as Unable to assess. Do not add browser raster upload
@@ -658,6 +674,6 @@ git fetch; git switch main; git pull --ff-only
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 395 passed, 2 PostgreSQL-only skips
+python -m pytest            # expect 411 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```
