@@ -54,7 +54,7 @@ services:
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY_FILE: /run/grp-secrets/langfuse_secret_key
-      LANGFUSE_ENVIRONMENT: local-desktop
+      LANGFUSE_ENVIRONMENT: ${LANGFUSE_ENVIRONMENT:-development}
       SIG_SERVICE_TOKEN_HASH_FILE: /run/grp-secrets/sig_service_token_hash
     volumes: &grp-secrets
       - ../.local/docker/secrets:/run/source-secrets:ro

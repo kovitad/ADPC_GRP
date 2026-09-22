@@ -83,7 +83,7 @@ Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The scr
 When another application already owns ports 80/443, run the local demo stack on the Ubuntu loopback address and reach it through an SSH tunnel:
 
 ```bash
-./scripts/docker-ubuntu.sh --register-sig-client --configure-ai \
+./scripts/docker-ubuntu.sh --register-sig-client --configure-ai --configure-langfuse \
   --admin-email you@adpc.net --hub-admin-email you@adpc.net
 ```
 

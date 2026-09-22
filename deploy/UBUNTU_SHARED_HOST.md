@@ -20,11 +20,12 @@ This command builds the images, registers a localhost SERVIR/SIG OAuth client, s
 ./scripts/docker-ubuntu.sh \
   --register-sig-client \
   --configure-ai \
+  --configure-langfuse \
   --admin-email you@adpc.net \
   --hub-admin-email you@adpc.net
 ```
 
-The script is safe to rerun. Existing generated secrets and Docker volumes are kept. For later rebuilds, use the same command without `--register-sig-client` and `--configure-ai`.
+The script prompts without echo for the OpenAI key, OpenAI model, Langfuse Cloud URL, public key, secret key and environment. Press Enter to accept the displayed defaults for the model (`gpt-5.2`), Langfuse URL (`https://cloud.langfuse.com`) and environment (`development`). The script is safe to rerun. Existing generated secrets and Docker volumes are kept. For later rebuilds, use the same command without the three setup flags.
 
 If SIG registration has already supplied a client ID, use `--servir-client-id CLIENT_ID` instead. The client is public and its ID is not a password, but it is still stored only in the ignored local configuration.
 
@@ -41,8 +42,8 @@ Keep AWS security groups closed for port 8000. In PuTTY, configure `Connection >
 
 ## Secret handling
 
-Do not put `OPENAI_API_KEY` or other raw secrets in `.env`. Although `.env` is Git-ignored, it can still be copied, backed up, or read by other accounts. `--configure-ai` writes the key without displaying it to `.local/docker/secrets/ai_key_adpc`, and the launcher applies mode `0600`; `.local/` is also Git-ignored. Non-secret interpolation values are stored in `.local/ubuntu-compose.env`.
+Do not put `OPENAI_API_KEY`, `LANGFUSE_SECRET_KEY` or other raw secrets in `.env`. Although `.env` is Git-ignored, it can still be copied, backed up, or read by other accounts. `--configure-ai` writes the OpenAI key to `.local/docker/secrets/ai_key_adpc`; `--configure-langfuse` writes its secret key to `.local/docker/secrets/langfuse_secret_key`. The launcher never displays either value and applies mode `0600`; `.local/` is also Git-ignored. The model, Langfuse URL, public key and environment are non-secret interpolation values stored in `.local/ubuntu-compose.env`.
 
-Restrict access to the Ubuntu account, protect the SSH key, and never paste secret values into Git, issue trackers, shell history, or chat. To rotate the AI key, rerun with `--configure-ai`.
+Restrict access to the Ubuntu account, protect the SSH key, and never paste secret values into Git, issue trackers, shell history, or chat. To rotate credentials, rerun the corresponding configure option.
 
 This shared-host mode is for testing. It enables development-only features and draft methods. Do not expose it directly to the internet or treat it as the production staging deployment.

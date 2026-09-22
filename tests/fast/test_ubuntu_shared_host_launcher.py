@@ -26,7 +26,9 @@ def test_ubuntu_launcher_uses_ignored_secret_files() -> None:
 
     assert 'SECRET_ROOT="$LOCAL_ROOT/docker/secrets"' in launcher
     assert 'chmod 600 "$SECRET_ROOT/ai_key_adpc"' in launcher
+    assert 'chmod 600 "$SECRET_ROOT/langfuse_secret_key"' in launcher
     assert "OPENAI_API_KEY=" not in launcher
+    assert "LANGFUSE_SECRET_KEY=" not in launcher
     assert 'REPOSITORY_ROOT/.env"' in launcher
     assert "does not read it" in launcher
     assert ".local/" in gitignore
@@ -41,4 +43,5 @@ def test_shared_host_runbook_documents_tunnel_and_rerun() -> None:
     assert "PuTTY" in runbook
     assert "safe to rerun" in runbook
     assert "--configure-ai" in runbook
+    assert "--configure-langfuse" in runbook
     assert "Do not put `OPENAI_API_KEY`" in runbook

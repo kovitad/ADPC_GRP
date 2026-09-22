@@ -16,6 +16,7 @@ declare -a HUB_ADMIN_EMAILS=()
 declare -a DOCKER_COMMAND=()
 ACTION="up"
 CONFIGURE_AI=false
+CONFIGURE_LANGFUSE=false
 REGISTER_SIG_CLIENT=false
 SERVIR_CLIENT_ID=""
 
@@ -31,8 +32,10 @@ Options:
                             May be supplied more than once.
   --hub-admin-email EMAIL   Make an email an ADPC Hub Admin. Requires at least
                             one --admin-email. May be supplied more than once.
-  --configure-ai            Prompt without echo for the OpenAI API key and save
-                            it in the ignored, mode-0600 local secret directory.
+  --configure-ai            Prompt for the OpenAI API key and model. The key is
+                            hidden and saved in a mode-0600 local secret file.
+  --configure-langfuse      Prompt for the Langfuse Cloud URL, public key,
+                            secret key and environment. Both keys are hidden.
   --register-sig-client     Register a localhost public PKCE client with SIG.
   --servir-client-id ID     Use an already registered non-secret SIG client ID.
   --status                  Show container and health status without rebuilding.
@@ -76,6 +79,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --configure-ai)
             CONFIGURE_AI=true
+            shift
+            ;;
+        --configure-langfuse)
+            CONFIGURE_LANGFUSE=true
             shift
             ;;
         --register-sig-client)
@@ -130,6 +137,7 @@ SERVIR_AUTH_CLIENT_ID=
 AI_MODEL=gpt-5.2
 LANGFUSE_HOST=
 LANGFUSE_PUBLIC_KEY=
+LANGFUSE_ENVIRONMENT=development
 EOF
 fi
 chmod 600 "$CONFIG_FILE"
@@ -157,6 +165,17 @@ set_config_value() {
     ' "$CONFIG_FILE" >"$temporary"
     chmod 600 "$temporary"
     mv -f "$temporary" "$CONFIG_FILE"
+}
+
+get_config_value() {
+    local key="$1"
+    awk -v key="$key" '
+        index($0, key "=") == 1 {
+            sub("^[^=]*=", "")
+            print
+            exit
+        }
+    ' "$CONFIG_FILE"
 }
 
 random_hex() {
@@ -203,9 +222,56 @@ if $CONFIGURE_AI; then
     printf '%s\n' "$AI_KEY" >"$SECRET_ROOT/ai_key_adpc"
     chmod 600 "$SECRET_ROOT/ai_key_adpc"
     unset AI_KEY
-    log "Saved the AI key in the ignored local secret directory (value not displayed)."
+
+    CURRENT_AI_MODEL="$(get_config_value AI_MODEL)"
+    CURRENT_AI_MODEL="${CURRENT_AI_MODEL:-gpt-5.2}"
+    read -r -p "OpenAI model [$CURRENT_AI_MODEL]: " AI_MODEL_INPUT
+    AI_MODEL_INPUT="${AI_MODEL_INPUT:-$CURRENT_AI_MODEL}"
+    [[ "$AI_MODEL_INPUT" =~ ^[A-Za-z0-9._:-]+$ ]] || die "The OpenAI model name contains unexpected characters"
+    set_config_value "AI_MODEL" "$AI_MODEL_INPUT"
+    unset AI_MODEL_INPUT CURRENT_AI_MODEL
+    log "Saved the AI key securely and configured the model (key value not displayed)."
 elif [ ! -s "$SECRET_ROOT/ai_key_adpc" ]; then
     warn "No AI key is configured. The application will run, but AI calls will report unavailable."
+fi
+
+if $CONFIGURE_LANGFUSE; then
+    [ -t 0 ] || die "--configure-langfuse needs an interactive terminal so keys can be entered securely"
+
+    CURRENT_LANGFUSE_HOST="$(get_config_value LANGFUSE_HOST)"
+    CURRENT_LANGFUSE_HOST="${CURRENT_LANGFUSE_HOST:-https://cloud.langfuse.com}"
+    read -r -p "Langfuse base URL [$CURRENT_LANGFUSE_HOST]: " LANGFUSE_HOST_INPUT
+    LANGFUSE_HOST_INPUT="${LANGFUSE_HOST_INPUT:-$CURRENT_LANGFUSE_HOST}"
+    [[ "$LANGFUSE_HOST_INPUT" =~ ^https?://[^[:space:]]+$ ]] \
+        || die "Langfuse base URL must start with http:// or https:// and contain no spaces"
+
+    read -r -s -p "Langfuse public key (input hidden): " LANGFUSE_PUBLIC_KEY_INPUT
+    printf '\n'
+    [ -n "$LANGFUSE_PUBLIC_KEY_INPUT" ] || die "No Langfuse public key was entered"
+
+    read -r -s -p "Langfuse secret key (input hidden): " LANGFUSE_SECRET_KEY_INPUT
+    printf '\n'
+    [ -n "$LANGFUSE_SECRET_KEY_INPUT" ] || die "No Langfuse secret key was entered"
+
+    CURRENT_LANGFUSE_ENVIRONMENT="$(get_config_value LANGFUSE_ENVIRONMENT)"
+    CURRENT_LANGFUSE_ENVIRONMENT="${CURRENT_LANGFUSE_ENVIRONMENT:-development}"
+    read -r -p "Langfuse environment [$CURRENT_LANGFUSE_ENVIRONMENT]: " LANGFUSE_ENVIRONMENT_INPUT
+    LANGFUSE_ENVIRONMENT_INPUT="${LANGFUSE_ENVIRONMENT_INPUT:-$CURRENT_LANGFUSE_ENVIRONMENT}"
+    [[ "$LANGFUSE_ENVIRONMENT_INPUT" =~ ^[A-Za-z0-9._-]+$ ]] \
+        || die "The Langfuse environment contains unexpected characters"
+
+    set_config_value "LANGFUSE_HOST" "$LANGFUSE_HOST_INPUT"
+    set_config_value "LANGFUSE_PUBLIC_KEY" "$LANGFUSE_PUBLIC_KEY_INPUT"
+    set_config_value "LANGFUSE_ENVIRONMENT" "$LANGFUSE_ENVIRONMENT_INPUT"
+    umask 077
+    printf '%s\n' "$LANGFUSE_SECRET_KEY_INPUT" >"$SECRET_ROOT/langfuse_secret_key"
+    chmod 600 "$SECRET_ROOT/langfuse_secret_key"
+    unset LANGFUSE_HOST_INPUT LANGFUSE_PUBLIC_KEY_INPUT LANGFUSE_SECRET_KEY_INPUT
+    unset LANGFUSE_ENVIRONMENT_INPUT CURRENT_LANGFUSE_HOST CURRENT_LANGFUSE_ENVIRONMENT
+    log "Saved the Langfuse settings (key values not displayed)."
+elif grep -Eq '^LANGFUSE_(HOST|PUBLIC_KEY)=.+$' "$CONFIG_FILE" \
+    && [ ! -s "$SECRET_ROOT/langfuse_secret_key" ]; then
+    warn "Langfuse is partly configured but its secret-key file is missing; tracing stays off."
 fi
 
 if [ -f "$REPOSITORY_ROOT/.env" ]; then

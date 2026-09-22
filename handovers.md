@@ -101,11 +101,11 @@ Use the demo launcher, not `deploy/bootstrap-ubuntu.sh`, when this is a test bui
 
 ```bash
 chmod +x scripts/docker-ubuntu.sh
-./scripts/docker-ubuntu.sh --register-sig-client --configure-ai \
+./scripts/docker-ubuntu.sh --register-sig-client --configure-ai --configure-langfuse \
   --admin-email <you> --hub-admin-email <you>
 ```
 
-Reach it with a PuTTY local SSH tunnel from local port `8000` to VM destination `127.0.0.1:8000`; keep AWS port 8000 closed. Raw keys go only into `.local/docker/secrets/` (mode `0600`), never `.env`. Use `--status` to check it and `--down` to stop only this Compose project while retaining volumes. Full instructions: [`deploy/UBUNTU_SHARED_HOST.md`](deploy/UBUNTU_SHARED_HOST.md).
+Reach it with a PuTTY local SSH tunnel from local port `8000` to VM destination `127.0.0.1:8000`; keep AWS port 8000 closed. The configure prompts collect the OpenAI model plus Langfuse URL, keys and environment. Raw keys go only into `.local/docker/secrets/` (mode `0600`), never `.env`; non-secret settings go into `.local/ubuntu-compose.env`. Use `--status` to check it and `--down` to stop only this Compose project while retaining volumes. Full instructions: [`deploy/UBUNTU_SHARED_HOST.md`](deploy/UBUNTU_SHARED_HOST.md).
 
 ---
 
