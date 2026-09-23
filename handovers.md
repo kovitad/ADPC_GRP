@@ -223,6 +223,7 @@ Design notes to read before large changes:
 | Assessment | `core/assessment_models.py`, `core/assessment_jobs.py`, `core/gis.py`, `core/result_rules.py`, `core/storage.py`, `core/validation.py`, `api/assessments.py`, `api/catalog.py`, `worker/main.py`, `grpcli/seed.py` | The API never imports GIS; the worker claims with `SKIP LOCKED` |
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py`, `api/sig_connection.py` | See 4.3; `sig_connection` renews the SIG access token before a lookup (ADR-0017) |
+| Shelter labels | `core/shelter_labels.py`, `core/shelter_import.py`, `tools/show_shelter_record.py` | ADR-0020: `สถ_1` is the name, `รอง` the capacity; labels composed and ambiguity counted |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
 | Migrations | `migrations/versions/20260916_0001`…`20260923_0013` | Forward-only; `0008` adds the data-library foundation; `0010` adds shelter district membership and indexed PostGIS points; `0013` adds persistent assessment run steps |
 
@@ -659,6 +660,47 @@ or deploy this feature to a server before its security gates pass.
 6. Build result exports, then the protected SIG `assessment_ref` evidence path for platform-input results only.
 7. Move to S3-compatible storage/direct multipart upload only when a second host or measured size requires it.
 8. Complete load, restore, security and alert rehearsals before pilot deployment.
+
+### Shelter names and capacity confirmed (23 September 2026, ADR-0020)
+
+- The product owner confirmed the truncated delivery columns: **`สถ_1` is the evacuation-centre
+  name and `รอง` is its capacity**. `core/shelter_import.py` no longer writes
+  `Evacuation centre 1..10303`; `IMPORTER_VERSION` is now `grp-shelters/3`.
+- A supporting-unit column was proposed as the name and rejected on measured evidence over all
+  10,303 records: the name is never blank and leaves 2,522 records ambiguous inside their
+  district, while the supporting unit is blank 792 times and leaves 8,344 ambiguous, because it
+  names the responsible organisation rather than the place. Eleven temples and schools in
+  นายายอาม all record `อบต.นายายอาม`.
+- `core/shelter_labels.py` composes the planner-facing label: the name where it is unique in the
+  district, plus the village where it repeats, plus the source number where that is still not
+  enough. On the delivery that is 2,447 villages and 942 numbers, and every label is unique
+  inside its district. Nothing is invented, and the import report counts what stayed ambiguous.
+- Capacity, supporting unit, subdistrict, village and the raw source name are kept as feature
+  attributes and returned by `/api/v1/maps/...` beside the label. Capacity is missing on 1,688
+  records and is reported as unknown, never as zero.
+- `tools/show_shelter_record.py` profiles any delivery or contribution candidate through the
+  importer's own reader, which is how the numbers above were measured.
+- **Next:** re-import the delivery (versions are immutable, so this is a new version to accept
+  and activate), then check the real names on the map.
+- **Owed by DDPM before any public contribution:** province is wrong on about 22 records
+  (`DDPM-SHELTER-119`–`-140` say จันทบุรี but sit in ชลบุรี districts); `#REF!` appears as a
+  centre name; `DDPM-SHELTER-164` is about 100 km east of its stated subdistrict; 1,599 records
+  share a coordinate with another record.
+
+### Shared SIG service, measured (23 September 2026)
+
+- `assemble_pack` for a Thai district did not return within 60 s on three attempts, while
+  `api/mcp_client.py:55` sets the client timeout to 45 s. Real Thai lookups may therefore be
+  unable to complete at all; the SIG gather belongs in the background job system.
+- SIG resolves Mueang Nan as an OpenStreetMap admin boundary of **1,095 km²**. GRP's own
+  district comes from the delivered file, so GRP and SIG counts must be reconciled, not assumed
+  equal. The synthetic fixture in `tests/fast/test_planning_chat.py` says 41 km².
+- The live flood recipe is `pop_all_total` 0.4, `blddensity` 0.35, `road` 0.25, crossing rule
+  `clip(round(hazard * V / class_max), 1, class_max)`. SIG already publishes age-disaggregated
+  vulnerability layers (`F/M_above60`, `F/M_infant`) that carry **no weight** today, so a
+  vulnerable-weighted flood risk needs only a `weights` contribution, not a raster upload.
+- The shared service carries no `evacuation_centres` layer; its assets are OSM via Overpass.
+- Recorded, secret-free fixtures are in `tests/fixtures/sig/`.
 
 ### SIG evacuation-centre contribution preparation (23 September 2026)
 

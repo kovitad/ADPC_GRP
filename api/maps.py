@@ -236,6 +236,12 @@ def dataset_features(
                     "feature_id": str(feature.id),
                     "name": feature.name,
                     "status": "not_assessed",
+                    # Source facts a planner needs beside the label. Capacity is absent for
+                    # part of the delivery and is shown as unknown rather than as zero.
+                    "capacity": feature.attributes.get("capacity"),
+                    "supporting_unit": feature.attributes.get("supporting_unit") or None,
+                    "subdistrict": feature.attributes.get("subdistrict") or None,
+                    "village": feature.attributes.get("village") or None,
                     "source_title": dataset.title,
                     "source_provider": dataset.provider,
                 },
