@@ -224,6 +224,7 @@ Design notes to read before large changes:
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py`, `api/sig_connection.py` | See 4.3; `sig_connection` renews the SIG access token before a lookup (ADR-0017) |
 | Shelter labels | `core/shelter_labels.py`, `core/shelter_import.py`, `tools/show_shelter_record.py` | ADR-0020: `สถ_1` is the name, `รอง` the capacity; labels composed and ambiguity counted |
+| Background SIG lookups | `api/sig_jobs.py`, `api/planning.py` | ADR-0021: a gather runs as a task in the API process and the browser polls it, because SIG exceeds the 45 s client timeout |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
 | Migrations | `migrations/versions/20260916_0001`…`20260923_0013` | Forward-only; `0008` adds the data-library foundation; `0010` adds shelter district membership and indexed PostGIS points; `0013` adds persistent assessment run steps |
 

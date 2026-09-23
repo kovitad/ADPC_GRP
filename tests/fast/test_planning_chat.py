@@ -5,6 +5,7 @@ import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -891,3 +892,62 @@ def test_publish_token_is_dropped_when_the_pack_is_too_large(planning, monkeypat
     assert body["mode"] == "sig_evidence"
     assert body["publish_token"] is None
     assert body["draft_issues"] == ["This evidence pack is too large to publish from this screen"]
+
+
+# --- background lookups (ADR-0021) -----------------------------------------------------
+
+
+def test_a_lookup_runs_in_the_background_and_returns_the_same_answer(planning) -> None:
+    """A slow SIG gather must not be held open by a web request."""
+
+    planning["replies"].append('{"mode": "chat", "reply": "Hazard is not risk."}')
+    client = _client(planning, "planner@example.test")
+
+    started = client.post(
+        "/api/v1/planning/lookups",
+        json={"message": "What is hazard?", "hub_code": "adpc"},
+    )
+    assert started.status_code == 200
+    job_id = started.json()["job_id"]
+    assert started.json()["state"] in {"queued", "running"}
+
+    polled = client.get(f"/api/v1/planning/lookups/{job_id}")
+    body = polled.json()
+    assert polled.status_code == 200
+    assert body["state"] == "succeeded"
+    assert body["answer"]["answer"] == "Hazard is not risk."
+    assert body["elapsed_seconds"] >= 0
+
+
+def test_a_lookup_belongs_to_the_session_that_started_it(planning) -> None:
+    planning["replies"].append('{"mode": "chat", "reply": "Hazard is not risk."}')
+    owner = _client(planning, "planner@example.test")
+    job_id = owner.post(
+        "/api/v1/planning/lookups",
+        json={"message": "What is hazard?", "hub_code": "adpc"},
+    ).json()["job_id"]
+
+    other = _client(planning, "owner@example.test")
+
+    # Not refused but not found: another session's lookup is not theirs to know exists.
+    assert other.get(f"/api/v1/planning/lookups/{job_id}").status_code == 404
+    assert owner.get(f"/api/v1/planning/lookups/{job_id}").status_code == 200
+
+
+def test_an_unknown_lookup_is_not_found(planning) -> None:
+    client = _client(planning, "planner@example.test")
+
+    assert client.get(f"/api/v1/planning/lookups/{uuid4()}").status_code == 404
+
+
+def test_a_lookup_refuses_a_hub_the_person_does_not_plan_for(planning) -> None:
+    """The membership check happens in the request, so a refusal is immediate."""
+
+    client = _client(planning, "planner@example.test")
+
+    response = client.post(
+        "/api/v1/planning/lookups",
+        json={"message": "What is hazard?", "hub_code": "other"},
+    )
+
+    assert response.status_code == 404
