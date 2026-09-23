@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 
 from api.dependencies import DatabaseSession
 from api.errors import not_found
@@ -57,10 +57,16 @@ def datasets(
         select(DatasetVersion, Dataset)
         .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
         .where(
-            DatasetVersion.is_current,
             or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id),
+            or_(
+                DatasetVersion.is_current,
+                and_(
+                    Dataset.type == "evacuation_centers",
+                    DatasetVersion.readiness == "assessment_ready",
+                ),
+            ),
         )
-        .order_by(Dataset.type, Dataset.title)
+        .order_by(Dataset.type, DatasetVersion.is_current.desc(), DatasetVersion.created_at.desc())
     ).all()
     return {
         "datasets": [
@@ -74,6 +80,9 @@ def datasets(
                 "return_period_years": version.return_period_years,
                 "edition": version.meta.get("edition"),
                 "sha256": version.sha256,
+                "readiness": version.readiness,
+                "is_current": version.is_current,
+                "created_at": version.created_at.isoformat(),
             }
             for version, dataset in rows
         ]

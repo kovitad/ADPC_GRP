@@ -41,8 +41,16 @@ def _visible_version(session, version_id: UUID, hub_id: UUID) -> tuple[DatasetVe
     ).first()
     if row is None:
         raise not_found()
-    version, _ = row
-    if not (version.is_current or version.meta.get("map_preview") is True):
+    version, dataset = row
+    assessment_ready_centers = (
+        dataset.type == "evacuation_centers"
+        and version.readiness == "assessment_ready"
+    )
+    if not (
+        version.is_current
+        or version.meta.get("map_preview") is True
+        or assessment_ready_centers
+    ):
         raise not_found()
     return row
 
@@ -67,7 +75,14 @@ def map_layers(
     # Technically validated baseline imports may be drawn for orientation before scientific
     # activation. They stay non-current, so catalog/assessment input selection cannot use them.
     rows = [
-        row for row in rows if row[0].is_current or row[0].meta.get("map_preview") is True
+        row
+        for row in rows
+        if row[0].is_current
+        or row[0].meta.get("map_preview") is True
+        or (
+            row[1].type == "evacuation_centers"
+            and row[0].readiness == "assessment_ready"
+        )
     ]
     rows.sort(
         key=lambda row: (row[0].meta.get("map_preview") is True, row[0].created_at),
@@ -120,6 +135,12 @@ def map_layers(
             "features_url": f"/api/v1/maps/datasets/{version.id}/features",
             "preview_only": version.meta.get("map_preview") is True and not version.is_current,
             "readiness": version.readiness,
+            "is_current": version.is_current,
+            "source_mode": version.meta.get("source_mode"),
+            "original_filename": version.meta.get("original_filename"),
+            "shelter_names_confirmed": version.meta.get("shelter_names_confirmed"),
+            "feature_count": version.meta.get("feature_count"),
+            "created_at": version.created_at.isoformat(),
         }
         for version, dataset in rows
         if dataset.type == "evacuation_centers"

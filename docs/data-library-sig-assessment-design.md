@@ -1,6 +1,7 @@
 # Data library, SIG screening and GRP assessment design
 
-**Status:** Approved for the bounded local baseline implementation in ADR-0008; browser upload, scientific activation and server rollout remain gated.
+**Status:** Approved for the bounded local baseline implementation in ADR-0008. ADR-0018 adds a
+Developer-only shelter ZIP pilot; production browser upload and server rollout remain gated.
 **Date:** 19 September 2026.
 **Decision record:** [`adr/0008-baseline-and-hub-data-overrides.md`](adr/0008-baseline-and-hub-data-overrides.md).
 
@@ -116,7 +117,7 @@ stateDiagram-v2
 ### 4.1 Intake modes
 
 1. **Import existing source data** — first release. An Admin selects known files already under the read-only `.local/data-in` delivery. The worker copies accepted inputs into managed immutable storage.
-2. **Upload new dataset** — second release. An Admin selects files in the browser; GRP streams them into quarantine, then the worker validates and registers them.
+2. **Upload new dataset** — second release. An Admin selects files in the browser; GRP streams them into quarantine, then the worker validates and registers them. ADR-0018 implements this only for a Platform Admin uploading the known shelter ZIP in the Developer environment; Hub overrides and server enablement remain later work.
 
 Starting with existing-source import avoids transferring the current 2.1 GB delivery a second time and proves the full validation/versioning path before arbitrary uploads are accepted.
 
@@ -237,7 +238,8 @@ Proposed protected routes, all covered by the permission matrix:
 - `GET /api/v1/data-library/categories` — required files and explanations.
 - `GET /api/v1/data-library/datasets` — visible baseline and own-Hub datasets.
 - `POST /api/v1/data-library/imports/source` — queue import from the existing source folder.
-- `POST /api/v1/data-library/uploads` — receive a candidate upload and queue validation.
+- `POST /api/v1/uploads/evacuation-centers` — Developer-only shelter ZIP pilot; receive into generated local quarantine and queue the existing validation worker.
+- `POST /api/v1/data-library/uploads` — future general Hub candidate upload after the security review.
 - `GET /api/v1/data-library/imports/{id}` — status and safe findings.
 - `POST /api/v1/data-library/versions/{id}/accept` — Hub Admin makes a validated version current.
 - `POST /api/v1/data-library/versions/{id}/retire` — stop offering it for new work.

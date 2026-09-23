@@ -6,7 +6,9 @@ membership lookup; nothing is overridden except the database and settings.
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from io import BytesIO
 from uuid import uuid4
+from zipfile import ZipFile
 
 import pytest
 from fastapi import Response
@@ -25,6 +27,7 @@ import api.integrations.sig
 import api.maps
 import api.permissions
 import api.platform
+import api.uploads
 from api.dependencies import database_session
 from api.main import app
 from api.rate_limits import limiter
@@ -71,6 +74,8 @@ MATRIX = {
     "import_boundaries": (401, 403, 403, 403, 200),
     "import_evacuation_centers": (401, 403, 403, 403, 200),
     "import_hazard_rp100": (401, 403, 403, 403, 200),
+    "upload_evacuation_centers": (401, 403, 403, 403, 200),
+    "accept_shelter_version": (401, 403, 403, 403, 404),
     # An unknown import is hidden after authorization, so allowed Admins receive 404.
     "read_import": (401, 403, 404, 404, 404),
     # Planning map layers require a Hub role; a Platform Admin has no implicit Hub access.
@@ -116,6 +121,12 @@ MATRIX_OPERATION_IDS = {
         "import_evacuation_centers_api_v1_data_library_imports_evacuation_centers_post"
     ),
     "import_hazard_rp100": "import_hazard_rp100_api_v1_data_library_imports_hazard_rp100_post",
+    "upload_evacuation_centers": (
+        "upload_evacuation_centers_api_v1_uploads_evacuation_centers_post"
+    ),
+    "accept_shelter_version": (
+        "accept_shelter_version_api_v1_data_library_versions__version_id__accept_post"
+    ),
     "read_import": "read_import_api_v1_data_library_imports__import_id__get",
     "map_layers": "map_layers_api_v1_maps_layers_get",
     "hazard_overlay": "hazard_overlay_api_v1_maps_hazard__version_id__overlay_png_get",
@@ -132,6 +143,8 @@ KNOWN_UNCOVERED = {
     "list_assessments_api_v1_assessments_get",
     # Golden tests cover job reads.
     "assessment_status_api_v1_assessments__assessment_id__get",
+    # Assessment worker tests cover the persistent user-facing progress trace.
+    "assessment_trace_api_v1_assessments__assessment_id__trace_get",
     # Golden tests cover cancellation.
     "cancel_assessment_api_v1_assessments__assessment_id__cancel_post",
     # Golden tests cover result points.
@@ -182,11 +195,13 @@ def world(tmp_path_factory) -> Iterator[dict]:
         session_secret_file=secret,
         data_inspector_enabled=True,
         data_in_root=data_in,
+        storage_root=tmp_path_factory.mktemp("managed-data"),
+        shelter_browser_upload_enabled=True,
     )
     patch = pytest.MonkeyPatch()
     for module in (
         api.access, api.admin, api.ai, api.auth, api.integrations.sig,
-        api.permissions, api.platform, api.data_inspector, api.data_library, api.maps,
+        api.permissions, api.platform, api.data_inspector, api.data_library, api.maps, api.uploads,
     ):
         patch.setattr(module, "get_settings", lambda: settings)
 
@@ -270,6 +285,14 @@ def _client(world: dict, actor: str) -> tuple[TestClient, dict[str, str]]:
     return client, {"X-CSRF-Token": client.cookies[CSRF_COOKIE]}
 
 
+def _shelter_archive() -> bytes:
+    archive = BytesIO()
+    with ZipFile(archive, "w") as bundle:
+        for suffix in (".shp", ".shx", ".dbf", ".prj"):
+            bundle.writestr(f"ddpm_shelters{suffix}", suffix.encode())
+    return archive.getvalue()
+
+
 def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, actor: str):
     member = world["planner_membership"]
     if route == "list_administered_hubs":
@@ -291,6 +314,18 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         )
     if route == "access_message":
         return client.get(f"/api/v1/admin/hubs/adpc/members/{member}/access-message")
+    if route == "upload_evacuation_centers":
+        upload_headers = {
+            **headers,
+            "Idempotency-Key": f"permission-{route}",
+            "X-Upload-Filename": "ddpm_shelters.zip",
+            "Content-Type": "application/zip",
+        }
+        return client.post(
+            "/api/v1/uploads/evacuation-centers",
+            content=_shelter_archive(),
+            headers=upload_headers,
+        )
     user_id = world["users"]["planner"]
     requests = {
         "my_ai_usage": ("GET", "/api/v1/me/ai-usage", None),
@@ -347,6 +382,11 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             "/api/v1/data-library/imports/hazard-rp100",
             None,
         ),
+        "accept_shelter_version": (
+            "POST",
+            f"/api/v1/data-library/versions/{user_id}/accept",
+            None,
+        ),
         "read_import": ("GET", f"/api/v1/data-library/imports/{user_id}", None),
         "map_layers": ("GET", "/api/v1/maps/layers", None),
         "hazard_overlay": ("GET", f"/api/v1/maps/hazard/{user_id}/overlay.png", None),
@@ -392,6 +432,33 @@ def test_every_protected_operation_is_matrixed_or_explicitly_deferred() -> None:
         f"Unaccounted protected operations: {sorted(protected - accounted_for)}; "
         f"stale entries: {sorted(accounted_for - protected)}"
     )
+
+
+@pytest.mark.contract
+def test_shelter_upload_retry_returns_the_same_complete_response(world) -> None:
+    limiter.reset()
+    client, headers = _client(world, "platform_admin")
+    upload_headers = {
+        **headers,
+        "Idempotency-Key": "stable-upload-retry",
+        "X-Upload-Filename": "ddpm_shelters.zip",
+        "Content-Type": "application/zip",
+    }
+    archive = _shelter_archive()
+
+    first = client.post(
+        "/api/v1/uploads/evacuation-centers", content=archive, headers=upload_headers
+    )
+    retry = client.post(
+        "/api/v1/uploads/evacuation-centers", content=archive, headers=upload_headers
+    )
+
+    assert first.status_code == 200, first.text
+    assert retry.status_code == 200, retry.text
+    assert first.json()["reused"] is False
+    assert retry.json()["reused"] is True
+    for field in ("import_id", "state", "received_bytes", "files", "support_ref"):
+        assert retry.json()[field] == first.json()[field]
 
 
 @pytest.mark.contract

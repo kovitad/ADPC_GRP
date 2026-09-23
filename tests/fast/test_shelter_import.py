@@ -156,3 +156,47 @@ def test_process_shelters_assigns_geometry_and_reports_name_mismatch(
         assert features[0].attributes["district_name_mismatch"] is False
         assert features[1].attributes["district_name_mismatch"] is True
         assert features[0].boundary_id != features[1].boundary_id
+
+
+@pytest.mark.fast
+def test_process_shelters_accepts_its_generated_browser_quarantine(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import_id = uuid4()
+    source_ref = (
+        f"quarantine/browser-uploads/{import_id}/source/{SHELTER_SOURCE_REF}"
+    )
+    _delivery(tmp_path / "managed" / Path(source_ref).parents[1])
+    monkeypatch.setattr("pyogrio.raw.read", _fake_read)
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    storage = LocalStorage(tmp_path / "managed")
+    with Session(engine) as session:
+        user = AppUser(id=uuid4(), email="admin@example.test", is_platform_admin=True)
+        session.add(user)
+        session.commit()
+        _boundary_version(session)
+        request_import(
+            session,
+            hub_id=None,
+            requested_by=user.id,
+            idempotency_key="shelter-browser-upload",
+            category="evacuation_centers",
+            source_ref=source_ref,
+            support_ref="GRP-UPLOAD",
+            source_mode="browser_upload",
+            manifest={"original_filename": "ddpm-shelters-september.zip"},
+            import_id=import_id,
+        )
+        claim = claim_next_import(session, lease_minutes=15)
+
+        version_id = process_shelter_import(
+            session, storage, storage.root, claim, lease_minutes=15
+        )
+
+        version = session.get(DatasetVersion, version_id)
+        assert version.meta["source_mode"] == "browser_upload"
+        assert version.meta["original_filename"] == "ddpm-shelters-september.zip"
+        assert version.meta["feature_count"] == 2

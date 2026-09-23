@@ -1,12 +1,12 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 22 September 2026 (`main`; district centre UI and SIG token renewal implemented)
+**Updated:** 23 September 2026 (`main`; shared SIG contribution proof and planner-parity plan added)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The validated baseline, Ubuntu launcher, ADR-0015 approved-data path and ADR-0016 display-first Planning map are on `main`. Selecting a district now loads its complete named evacuation-centre list and synchronizes it with the map; a locked assessment upgrades those same rows with status, reason and flood depth. SIG risk and population values remain separate evidence, and ADR-0017 renews the in-memory SIG access token during a live GRP session. **411 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax and whitespace checks are clean.
+**Delivery status:** The developer-only shelter flow is complete in the working tree: upload a Shapefile ZIP once, validate it in the worker, explicitly accept its immutable Platform version, select it in Planning's **Data & run** drawer, follow six persisted background steps, and open the named-centre map/table/recommendation result. The Data Library and Planning selector now identify **Local upload**, **Platform baseline** and **Synthetic demo** sources in plain language, including which source is used for real districts. SIG context remains optional and separate. **428 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax and whitespace checks are clean. Migration `20260923_0013` is applied to the local Docker database. Static web assets are live-mounted; the API/worker image needs one rebuild for the latest source-label fields because the Docker Desktop engine CLI stopped responding during the final visual pass, although the existing app still answers `/api/v1/healthz`.
 
-**Handing over:** perform signed-in owner acceptance of the completed centre panel and ADR-0017 renewal path. AO Luek has 38 source records with 9 distinct stored names; repeated names intentionally remain separate by `feature_id`. Do not re-import the centre source until DEP-06 resolves the `grp-shelters/1` real-name versus `grp-shelters/2` generated-label mismatch. The SIG refresh token remains process-memory only and is lost on an API restart, so restart acceptance begins with a fresh SERVIR sign-in. The Ubuntu launcher still needs its first host execution.
+**Handing over:** first execute the reviewed shared-SIG proof in [`docs/shared-sig-contribution-e2e-plan.md`](docs/shared-sig-contribution-e2e-plan.md). The local preview proved file compatibility only; it did not write to the shared service. Before the external write, replace the placeholder direct URL and confirm the licence, vintage, source-name mapping and repeated-coordinate decision. Then record one real contribution ID, test its contributor-only preview, obtain SIG review, prove `live=true`, and repeat `assemble_pack` as a fresh user. Do not retry a timed-out submit blindly and do not send the raw Shapefile or contact fields. In parallel, restart Docker Desktop only if its CLI is still unresponsive, rebuild API/worker, sign in again, then run the local Data library → Planning browser acceptance. Production Hub-local ownership/approval is still deferred. The Ubuntu launcher still needs its first host execution.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
@@ -21,7 +21,7 @@
 | Increment 0, servers ready | Done |
 | Increment 2, access and admin | **Complete in code**: NDMO Planner, Hub Expert / GIS Specialist, Hub Admin and Platform Admin; security log, CSRF, session revocation, rate limits, AI usage limit, AI gateway, Langfuse |
 | Increment 1, golden assessment | **Real baseline enabled under ADR-0015's approval assumption**: six-tile worker, 928 supported districts and 10,303 centres. Mueang Nan and Bang Bua Thong completed locally; the formal authority-signed Chiang Yuen artifact remains a production gate |
-| Planner assistant and map (ADR-0004/0016) | **Built, Docker Desktop only**: display-first OSM map, district-scoped complete centre list synchronized with markers and locked assessment rows, chat, SIG MCP evidence, evidence panel, downloads, progress, Thai input and current-district focus |
+| Planner assistant and map (ADR-0004/0016/0019) | **Built, Docker Desktop only**: display-first OSM map, explicit accepted shelter-source selection, asynchronous assessment trace, district-scoped complete centre list synchronized with markers and locked assessment rows, deterministic planning summary, chat and optional SIG evidence |
 | SIG live map embed | **Implemented**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path and sandboxed iframe. Hazard layers remain hazard-only; an active ADR-0015 recipe additionally permits one exact declared SIG risk layer |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
 | Thailand baseline (ADR-0009/0015) | **Built, imported and locally activated**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. The same pinned versions now support queued real-district screening; NoData is Unable to assess |
@@ -30,7 +30,7 @@
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |
 | Increment 4, review and downloads | Not started (the evidence downloads in chat are not the Increment 4 PDFs) |
-| Increment 5, seven scenarios and uploads | Not started |
+| Increment 5, seven scenarios and uploads | Developer-only shelter ZIP upload/reuse slice built; seven scenarios and production Hub uploads are not started |
 | Increment 6, vulnerability and AI explain | AI explain exists; SIG population-by-age and approved recipe risk can be shown as labelled evidence. A local GRP vulnerability raster/result remains separate |
 | Increment 7, pilot hardening | Not started |
 
@@ -71,7 +71,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 ```
 
 **Important facts about the local stack:**
-- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; asset query strings are bumped when their files change (`planning.js` is currently `?v=20260922f`). **Bump asset versions when changing shared CSS or JS.**
+- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; asset query strings are bumped when their files change (`planning.js` and `planning.css` are currently `?v=20260923b`; Data Library JS is `?v=20260923c`). **Bump asset versions when changing shared CSS or JS.**
 - **Python changes need an image rebuild.** The local `grp-api:desktop` image was successfully rebuilt on 18 September from the committed source, including `api/errors.py` and `api/rate_limits.py`; the API and worker were recreated from that image. No copied-file workaround remains.
 - Local rate limit: `deploy/compose.desktop.yml` sets `RATE_LIMITS` with 300 API requests per person per minute, so quick menu switching does not hit 429. Servers keep the Section 13.1 value of 60.
 - After any API restart, **sign in again**. The SIG MCP token and its refresh token live only in process memory (ADR-0002, ADR-0017). Within a running API they now renew themselves, so a session no longer stops working after an hour; only a restart ends it.
@@ -85,6 +85,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 1. `http://127.0.0.1:8000/admin`: sign in with SERVIR (`kovitad.janlakhon@adpc.net` is Platform Admin and Hub Admin of `adpc`)
 2. `/platform.html`: set a token limit (for example 50,000), AI **On**, Save; **Send test call**; **Reset now**; create, close and reopen a Hub; security log
 3. `/planning.html`:
+   - Select a district and open **Data & run**. Confirm the exact RP100, accepted shelter version and method, then start the job. The dark trace panel must advance through six persisted steps. On completion, the result opens the map, complete named-centre list and deterministic candidate/gap summary. **Add SIG context** is optional and must not affect the locked GRP result.
    - The page opens on Thailand with district boundaries and the available RP100 flood layer. It does **not** download all 10,303 centres. Select a managed district to load only its source records; the **Centres** tab must show every record as **Not assessed yet**, keep repeated names separate and focus the same marker when a row is selected. No assessment is required. RP20 and RP50 remain disabled because they are not imported.
    - "Which centers could not be assessed, and why?" explains the stored result
    - `show flood and population information for บางบัวทอง นนทบุรี`: confirm Bang Bua Thong and verify the map stays visible while SIG hazard, risk and population information opens in the right panel.
@@ -113,41 +114,51 @@ Reach it with a PuTTY local SSH tunnel from local port `8000` to VM destination 
 
 ## 4. Architecture map (what lives where)
 
-### 4.0 Proposed data-library and SIG flow
+### 4.0 Current shelter upload-to-assessment flow
 
-This is the retained target design. Its import foundation, managed storage publication, boundaries,
-shelters, RP100 hazard and local API/UI are implemented. Real assessment execution is available but
-optional; display does not depend on it (ADR-0016). ADR-0008 is accepted for the bounded local
-baseline scope; browser upload and server rollout remain gated. SIG screening is optional; a SIG
-outage must never block a valid GRP assessment. Hub data overrides are visible Hub-level choices
-accepted by a Hub Admin, not hidden per-user defaults.
+The diagram below is the developer slice that works now. A Platform Admin uploads one shelter ZIP,
+the API streams it to quarantine, the import worker validates and promotes it, and an explicit
+acceptance makes that immutable version selectable. Planning pins the exact version into a queued
+assessment and renders the locked worker result. The API never performs GIS work. SIG is optional
+context and never receives the raw upload. See
+[`docs/shelter-upload-assessment-architecture.md`](docs/shelter-upload-assessment-architecture.md)
+for runtime boundaries, the six-step sequence, invariants and implementation file map.
+
+```mermaid
+flowchart LR
+    ADMIN[Platform Admin uploads ZIP] --> API[API streams to quarantine]
+    API --> IMPORT[Queued import worker]
+    IMPORT --> DATA[Immutable shelter version and features]
+    DATA --> ACCEPT[Platform Admin accepts exact version]
+    ACCEPT --> PICK[Planner selects district, RP100, shelters and method]
+    PICK --> JOB[Queued GIS assessment with six persisted steps]
+    JOB --> RESULT[Locked feature rows and totals]
+    RESULT --> MAP[GRP map, complete named-centre table and recommendation]
+    MAP -. explicit optional context .-> SIG[SIG evidence and receipt-bound embed]
+```
+
+### 4.0.1 Target production extension (not implemented)
+
+Production generalizes the candidate from Platform-owned to Hub-owned, requires Hub Admin
+acceptance and records one current selection per category. It also adds object storage only when
+measured upload size or multiple hosts require it. The same pinning and locked-result rules remain.
 
 ```mermaid
 flowchart TD
-    USER[Planner confirms a district] --> CHOICE{What is needed?}
-    CHOICE -->|Quick hazard context| SIGSCREEN[SIG screening\nHazard, exposure, sources and gaps]
-    CHOICE -->|Detailed shelter assessment| RESOLVE[Resolve GRP input versions]
-    SIGSCREEN --> DECIDE{Detailed assessment needed?}
-    DECIDE -->|Yes| RESOLVE
-    DECIDE -->|No| SCREENONLY[Keep as labelled screening evidence]
-
-    BASE[Immutable platform baseline] --> RESOLVE
-    CANDIDATE[User contributes Hub candidate data] --> VALIDATE[Quarantine and worker validation]
-    VALIDATE --> ACCEPT{Hub Admin accepts?}
-    ACCEPT -->|Yes| OVERRIDE[Immutable Hub override version]
-    ACCEPT -->|No| REJECT[Needs correction or remains inactive]
-    OVERRIDE --> RESOLVE
-
-    RESOLVE --> COMPAT{Versions and method compatible?}
-    COMPAT -->|No| STOP[Stop with typed explanation\nNo silent fallback]
-    COMPAT -->|Yes| PIN[Show and pin boundary, data, method IDs and checksums]
-    PIN --> JOB[Queued GRP GIS worker]
-    JOB --> RESULT[Immutable private GRP result]
-    RESULT --> SHARE{Eligible and Admin-approved for SIG?}
-    SHARE -->|No or any Hub-local input| PRIVATE[Remain private in GRP]
-    SHARE -->|Platform inputs and approved public fields| EVIDENCE[Restricted GRP evidence endpoint]
-    EVIDENCE --> SIGMCP[SIG Risk pack, citations and gate]
-    SIGMCP --> RECEIPT[Public receipt and receipt-bound map]
+    UPLOAD[Hub user uploads a candidate] --> QUAR[Quarantine]
+    QUAR --> VALIDATE[Worker validation]
+    VALIDATE --> DECIDE{Hub Admin accepts?}
+    DECIDE -->|No| INACTIVE[Keep inactive or reject with reason]
+    DECIDE -->|Yes| SELECT[Immutable Hub version and current selection]
+    BASE[Immutable Platform baseline] --> RESOLVE[Resolve visible exact inputs]
+    SELECT --> RESOLVE
+    RESOLVE --> PIN[Show and pin IDs, versions and checksums]
+    PIN --> WORKER[Queued GIS worker]
+    WORKER --> PRIVATE[Immutable private GRP result]
+    PRIVATE --> SHARE{Separately approved to share?}
+    SHARE -->|No| GRP[Keep in protected GRP map]
+    SHARE -->|Yes, eligible fields only| EVIDENCE[Restricted evidence/contribution mapping]
+    EVIDENCE --> SIGMCP[SIG risk pack, gate and receipt]
 ```
 
 ```mermaid
@@ -182,6 +193,7 @@ when national raster browsing is measured as necessary.
 Design notes to read before large changes:
 
 - [`docs/architecture-scaling-design.md`](docs/architecture-scaling-design.md) — why GRP is a modular monolith with background jobs, what keeps it ready to split into services later, and the measured triggers for doing so.
+- [`docs/shelter-upload-assessment-architecture.md`](docs/shelter-upload-assessment-architecture.md) — the implemented upload, acceptance, selection, background GIS, trace and result flow, plus a clearly separated production extension.
 - [`docs/thailand-dataset-inventory.md`](docs/thailand-dataset-inventory.md) — what the delivered Thailand files actually contain (928 districts, 10,303 shelters, six 90 m flood tiles in metres, two 12.5 m vulnerability rasters in UTM) and the six decisions they force. ADR-0015 now resolves MVP 1 flood NoData as Unable to assess under an explicit approval assumption.
 - [`docs/thailand-dataset-ingestion-plan.md`](docs/thailand-dataset-ingestion-plan.md) — how the real Thailand boundaries, evacuation centers, RP100 flood raster and vulnerability raster are brought in, and the two options for drawing flood depth on the map.
 - [`docs/data-library-sig-assessment-design.md`](docs/data-library-sig-assessment-design.md) — proposed SIG screening, GRP detailed assessment, versioned platform baseline, Hub-level category overrides, import/upload lifecycle, technical stack and scaling triggers.
@@ -207,11 +219,12 @@ Design notes to read before large changes:
 | Sessions and access | `api/sessions.py`, `api/auth.py`, `api/oidc.py`, `core/identity.py`, `api/permissions.py`, `api/planning_access.py` | CSRF header `X-CSRF-Token`; POST sign-out; revocation via `app_user.sessions_valid_after` |
 | Admin and platform | `api/admin.py`, `api/platform.py`, `api/audit.py`, `grpcli/admin.py` | CLI: `bootstrap-platform-admin`, `ensure-hub`, `assign-member`, `list-access-requests`, `rotate-sig-token` |
 | AI | `core/ai_models.py`, `core/ai_allowance.py`, `api/ai_gateway.py`, `api/langfuse.py`, `api/ai.py` | The gateway is the only provider caller; reserve, call, settle; Langfuse is best effort |
+| Data library and shelter upload | `api/uploads.py`, `api/data_library.py`, `core/browser_uploads.py`, `core/data_import_jobs.py`, `core/shelter_import.py` | Developer-only Platform upload; API streams to quarantine and the worker validates/promotes before explicit acceptance |
 | Assessment | `core/assessment_models.py`, `core/assessment_jobs.py`, `core/gis.py`, `core/result_rules.py`, `core/storage.py`, `core/validation.py`, `api/assessments.py`, `api/catalog.py`, `worker/main.py`, `grpcli/seed.py` | The API never imports GIS; the worker claims with `SKIP LOCKED` |
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py`, `api/sig_connection.py` | See 4.3; `sig_connection` renews the SIG access token before a lookup (ADR-0017) |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
-| Migrations | `migrations/versions/20260916_0001`…`20260920_0010` | Forward-only; `0008` adds the data-library foundation; `0009` adds boundary PostGIS geometry; `0010` adds shelter district membership and indexed PostGIS points |
+| Migrations | `migrations/versions/20260916_0001`…`20260923_0013` | Forward-only; `0008` adds the data-library foundation; `0010` adds shelter district membership and indexed PostGIS points; `0013` adds persistent assessment run steps |
 
 ### 4.2 Frontend (static, no build step)
 
@@ -547,7 +560,7 @@ Owner decisions (16–17 Sep):
 - **External browser calls:** `unpkg.com` (Leaflet) and `openstreetmap.org` (tiles, Nominatim). Acceptable for local use only; vendor Leaflet and use a contracted tile and geocoder before staging.
 - **Real assessment now runs under the approval assumption:** the latest imported boundary, shelter and RP100 versions are current; 928 districts are supported and the six COG tiles are one pinned input. Local proof: Mueang Nan `46 / 0 / 0 / 46` and Bang Bua Thong `1 / 1 / 0 / 0` for in-scope / potentially exposed / not exposed / unable. A signed external golden artifact is still required before production acceptance.
 - **Single-process memory** holds rate limits, the planning answer cache and the SIG token store (access and refresh token); there is no lease renewal for long jobs. A restart still ends every SIG connection, and a second API instance would not see the first one's tokens.
-- `web/planning.js` (~1,200 lines) and `api/planning.py` (~650 lines) are large. Split them before adding much more.
+- `web/planning.js` (~2,350 lines) and `api/planning.py` (~650 lines) are large. Split them before adding much more.
 - **Spec text** needs updating for ADR-0003, ADR-0004 and the Increment 2 scope change.
 - **Phone layout** of the new top bar and sign-in pages is not visually verified.
 
@@ -641,11 +654,146 @@ or deploy this feature to a server before its security gates pass.
 1. Replace ADR-0015's approval assumption with formal science-owner, source/licence and method records.
 2. Run the authority-signed Chiang Yuen case; never alter its expected values to match the implementation.
 3. Prove one Hub shelter override without changing any old result.
-4. Add quarantined browser upload using the same import pipeline after security review.
+4. Generalize the developer-only upload to a quarantined Hub-owned candidate with Hub Admin acceptance after security review.
 5. Build the deployment-VM vulnerability conversion command; activate it only after DEP-07.
 6. Build result exports, then the protected SIG `assessment_ref` evidence path for platform-input results only.
 7. Move to S3-compatible storage/direct multipart upload only when a second host or measured size requires it.
 8. Complete load, restore, security and alert rehearsals before pilot deployment.
+
+### SIG evacuation-centre contribution preparation (23 September 2026)
+
+- Refreshed the public `SERVIR-AI/global-platform` checkout to `6479521`. Its risk pack now
+  accepts `population_*` count grids and sums people by flood class. It still does not calculate
+  a vulnerable-person headcount (`population count × vulnerable share`).
+- Inspected `.local/data-in/evacuation_centers`: `ddpm_shelters` (10,303 points) is the suitable
+  evacuation-centre layer. Early-warning resources (1,533) and volunteer centres (8,199) are
+  distinct datasets and must not be silently merged into it.
+- Prepared an ignored, privacy-reduced structural candidate at
+  `.local/data-out/sig/ddpm_shelters_upload_candidate.geojson` plus a YAML template and QA files.
+  The real SIG point validator accepts its shape: EPSG:4326 Point FeatureCollection, 10,303
+  features, Thailand bounds, 5.5 MB (under the 50 MB contribution cap).
+- **Do not publish it yet.** The source has 1,599 extra records at repeated coordinates across
+  961 groups; 70 groups span multiple districts and 22 span multiple provinces. SIG would accept
+  and count these records, so the data owner must confirm/correct them first. Contact name/phone
+  fields were intentionally excluded. The review list is
+  `.local/data-out/sig/ddpm_shelters_repeated_coordinates.csv`.
+- Ran the candidate through the actual SERVIR `contribute_submit(kind="vector")` implementation
+  in an isolated local cache with local-only auto-approval. Run `20260923-105554` was accepted as
+  contribution `31893e187f57b012`, landed `evacuation_centres`, and reported 10,303 features with
+  bounds `[97.559352, 5.7409892, 105.596775, 20.437451]`. The full ignored result is
+  `.local/data-out/sig/preview-runs/20260923-105554/contribution-result.json`; rerun with
+  `.venv/Scripts/python .local/run_sig_shelter_manifest_preview.py`. This proves the contribution
+  path, but it did **not** call or change the shared SIG service.
+- Intended deployment flow: validate/clean locally → upload the one GeoJSON to a controlled
+  direct-download S3 URL → replace the manifest URL and confirm licence/vintage → call
+  `contribute_submit(kind="vector")` → verify `contribute_status` → test `assemble_pack` for one
+  known district. No S3 credentials are currently configured in this workspace.
+
+### Next proof: real shared SIG submit and Claude Desktop-level presentation
+
+The executable plan and acceptance criteria are in
+[`docs/shared-sig-contribution-e2e-plan.md`](docs/shared-sig-contribution-e2e-plan.md). The next
+session must treat this as an external publication test, not repeat the isolated preview:
+
+1. Freeze one approved, privacy-reduced GeoJSON release and record its GRP version, SHA-256,
+   feature count, bounds, direct-download URL and confirmed provenance. Resolve the current
+   placeholder URL plus the licence, vintage, field meanings and repeated-coordinate decision.
+2. Preflight the public object from outside the application. It must return the expected GeoJSON
+   bytes without login, cookies or an HTML interstitial.
+3. Make exactly one authenticated `contribute_submit(kind="vector")` call and persist the safe
+   response/contribution ID immediately. If the result is uncertain, inspect `contribute_status`
+   before any retry so a timeout cannot create a duplicate contribution.
+4. While staged, test `assemble_pack` as the contributor for Mueang Phitsanulok and require a real
+   `evacuation_centres` finding/trace plus reconcilable district counts. Then obtain SIG human
+   review; do not call a staged preview approved.
+5. Require both approved status and `contribute_status(action="audit")` reporting the landed source
+   live. Repeat `assemble_pack` from a fresh non-contributor session and capture a secret-free
+   contract fixture.
+6. Only after the response shape is proved, add GRP's Admin-only asynchronous contribution record
+   and complete evidence renderer. Planner chat remains read-only and must never publish a source.
+
+Why the current GRP experience is weaker than Claude Desktop: Claude Desktop is a full MCP host and
+automatically exposes the complete tool result, MCP App panel and `next` guidance. GRP currently
+calls only `assemble_pack`, reduces its response into a narrower custom schema and discards some
+source, coverage, centre and display metadata. Fix the orchestration and deterministic renderer;
+do not compensate with a freer LLM. The target UI shows **What SIG found**, **Where people could
+move**, **People and vulnerability**, **What is missing or uncertain**, **Sources** and **Technical
+trace** from one stored evidence package. The LLM explains those same facts, and a failed AI brief
+must not hide them. Retrying the explanation must reuse cached structured evidence rather than
+repeat the multi-minute SIG gather.
+
+The operational map stays in GRP. Show local centre rows on it only when the GRP version is exactly
+mapped to the approved SIG contribution. Do not claim that SIG's current
+`ui_embed(hazard_map)` displays `evacuation_centres`: upstream still needs a receipt-bound asset
+selector or dedicated component for that layer.
+
+### Developer-only shelter ZIP upload and reusable assessment flow (23 September 2026)
+
+- ADR-0018 chooses the existing shared `STORAGE_ROOT` volume for source bytes and PostgreSQL for
+  job/provenance metadata. Do not put Shapefiles in database BLOBs. S3-compatible storage remains
+  the scale-out option; Google Drive is not part of ingestion.
+- The Data Library now shows **Upload a local shelter dataset** when `GRP_ENV=dev` and
+  `SHELTER_BROWSER_UPLOAD_ENABLED=true` (enabled by `deploy/compose.desktop.yml`). A Platform Admin
+  uploads one ZIP containing the exact `ddpm_shelters` Shapefile components. The version table
+  states whether source names are confirmed or generated, and the acceptance confirmation repeats
+  the generated-label warning before an Admin makes that version current.
+- Shelter versions are shown as decision-oriented cards instead of a dense technical table. Each
+  card identifies **Local upload**, **Platform baseline** or **Synthetic demo**, shows its centre and
+  quality counts, and says **Used for real districts**, **Used for test district** or **Available to
+  select**. Planning repeats the selected source type, filename/title, feature count, short version
+  and generated-name warning; accepted uploads are reused without uploading again.
+- `POST /api/v1/uploads/evacuation-centers` streams the ZIP under the 64 MB cap into a generated
+  quarantine subtree. It refuses paths/folders, extra or duplicate files, links, encryption,
+  suspicious expansion, more than 12 members, missing sidecars and over 128 MB extracted data.
+  The API never runs GIS work. A repeated Idempotency-Key returns the same import ID, file list,
+  byte count and support reference as the original request, with `reused=true`.
+- The existing worker reads that generated quarantine source, validates/assigns districts, promotes
+  immutable component files and removes quarantine after success or handled failure. The version
+  stays non-usable until a Platform Admin chooses **Use in new assessments**. That action advances
+  it to `assessment_ready`, records acceptance/audit metadata and makes it the recommended Platform
+  shelter version. It never publishes to SIG.
+- Planning's **Data & run** drawer lists every visible `assessment_ready` shelter version, pins the
+  selected version into the assessment, reloads the same district features on the map, and submits
+  the existing asynchronous worker job. Old accepted shelter versions remain selectable; hazards
+  still require the current version.
+- Migration `20260923_0013` adds six `assessment_run_step` rows per job. `GET
+  /api/v1/assessments/{id}/trace` returns the safe progress shown in Planning. The result reuses the
+  existing synchronized markers/table and deterministic candidate/caution summary.
+- Real-file smoke proof: the delivered DDPM archive is 994,072 compressed bytes and 29,987,922
+  extracted bytes across eight accepted components; the existing reader returned 10,303 points.
+- Verification: Ruff and JavaScript syntax checks pass; `428 passed, 2 skipped` with PostgreSQL-only
+  tests skipped because `GRP_POSTGRES_TEST_URL_FILE` is not configured. On this workstation, run the
+  suite with a D: basetemp because the Windows C: temporary directory is full.
+
+### ADR-0019 status and remaining hardening
+
+- [`docs/adr/0019-reuse-approved-shelter-uploads.md`](docs/adr/0019-reuse-approved-shelter-uploads.md)
+  is accepted for the developer-only Platform slice described above. The complete production
+  decision still requires a Hub-local candidate model, Hub Admin acceptance and a
+  `hub_dataset_selection` record.
+- Chat-started assessments still use the recommended current Platform shelter version. A later
+  production increment must pass an explicit Hub-selected version through chat as well as the
+  direct **Data & run** form.
+- Show uploaded centres directly on the protected GRP map. The public SIG source currently embeds
+  only `hazard_map` and `provenance_graph`; an evacuation-centre `ui_embed` needs an upstream,
+  receipt-bound contract and is not a prerequisite for the GRP MVP flow.
+- Never send Hub-private uploads to SIG automatically. Optional contribution remains a separate
+  Admin-approved export/contribute/receipt workflow.
+- The Product Owner narrowed the first implementation to one district-level shelter-point vertical
+  slice: choose an accepted shelter version, confirm automatically resolved boundary/RP100/method,
+  run the background overlay, show a persisted six-step integration trace, and then display the
+  locked markers, summary cards, complete centre table and a deterministic candidate/gap
+  recommendation. Vulnerability, capacity, routes, proximity and AI recommendations are deferred.
+- The combined operational map stays in GRP. SIG's current `ui_embed` cannot receive the private
+  GRP shelter markers and remains a separate hazard/provenance evidence view. Its payload can carry
+  one asset layer, but the current headline selector only chooses hospitals, schools or buildings;
+  ask SIG for receipt-bound `evacuation_centres` asset selection rather than assuming the iframe
+  shows the contributed centres.
+- Maximize existing runbook features without coupling the local result to SIG: add structured SIG
+  population-by-severity, schools/hospitals/buildings/roads, risk recipe and coverage, documents,
+  citations, review status and declared gaps to separate result tabs. Use a GRP-version-to-SIG-
+  contribution mapping before describing their centre counts as the same source. The runbook's
+  temporary auto-approval behavior is not a GRP approval model.
 
 ---
 
@@ -674,6 +822,6 @@ git fetch; git switch main; git pull --ff-only
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest            # expect 411 passed, 2 PostgreSQL-only skips
+python -m pytest --basetemp .local/pytest-full  # expect 428 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 import api.data_library as routes
 from api.sessions import CurrentPrincipal
 from core.access_models import AppUser, AuditEvent, Base
+from core.assessment_models import Dataset, DatasetVersion
 from core.boundary_import import BOUNDARY_SOURCE_REF, BOUNDARY_STEM, REQUIRED_SUFFIXES
 from core.data_library_models import DataImportJob
 
@@ -39,7 +40,16 @@ def _principal(user_id, *, platform=True) -> CurrentPrincipal:
 def api_world(tmp_path: Path, monkeypatch):
     root = tmp_path / "data-in"
     _source(root)
-    monkeypatch.setattr(routes, "get_settings", lambda: SimpleNamespace(data_in_root=root))
+    monkeypatch.setattr(
+        routes,
+        "get_settings",
+        lambda: SimpleNamespace(
+            data_in_root=root,
+            grp_env="test",
+            shelter_browser_upload_enabled=False,
+            shelter_upload_max_bytes=64 * 1024 * 1024,
+        ),
+    )
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -108,3 +118,54 @@ def test_import_status_hides_report_until_terminal(api_world) -> None:
     assert payload["progress"] == 0
     assert payload["report"] is None
     assert payload["version"] is None
+
+
+@pytest.mark.fast
+def test_platform_admin_accepts_one_exact_shelter_version(api_world) -> None:
+    session, principal = api_world
+    dataset = Dataset(
+        type="evacuation_centers",
+        owner_kind="platform",
+        title="Uploaded DDPM shelters",
+        provider="ADPC local upload",
+    )
+    session.add(dataset)
+    session.flush()
+    old = DatasetVersion(
+        dataset_id=dataset.id,
+        sha256="a" * 64,
+        meta={},
+        readiness="assessment_ready",
+        is_current=True,
+    )
+    uploaded = DatasetVersion(
+        dataset_id=dataset.id,
+        sha256="b" * 64,
+        meta={
+            "shelter_names_confirmed": False,
+            "source_mode": "browser_upload",
+            "original_filename": "local-shelters.zip",
+        },
+        readiness="technically_valid",
+        is_current=False,
+    )
+    session.add_all([old, uploaded])
+    session.commit()
+
+    payload = routes.accept_shelter_version(uploaded.id, principal, session)
+    session.refresh(old)
+    session.refresh(uploaded)
+
+    assert payload["version"]["version_id"] == str(uploaded.id)
+    assert payload["version"]["readiness"] == "assessment_ready"
+    assert payload["version"]["shelter_names_confirmed"] is False
+    assert payload["version"]["source_mode"] == "browser_upload"
+    assert payload["version"]["original_filename"] == "local-shelters.zip"
+    assert payload["version"]["dataset_title"] == "Uploaded DDPM shelters"
+    assert payload["version"]["provider"] == "ADPC local upload"
+    assert uploaded.is_current is True
+    assert uploaded.accepted_by == principal.user_id
+    assert old.is_current is False
+    assert session.scalar(
+        select(AuditEvent).where(AuditEvent.action == "shelter_version_accepted")
+    ) is not None

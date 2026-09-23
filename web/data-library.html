@@ -6,9 +6,9 @@
     <meta name="robots" content="noindex" />
     <meta name="theme-color" content="#0b453d" />
     <title>Data library | SERVIR Global Risk Platform</title>
-    <link rel="stylesheet" href="/styles.css?v=20260920e" />
+    <link rel="stylesheet" href="/styles.css?v=20260923b" />
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/data-library.js?v=20260920b" defer></script>
+    <script src="/data-library.js?v=20260923c" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -16,8 +16,8 @@
       <p class="eyebrow">Administration</p>
       <h1>Data library</h1>
       <p class="workspace-intro">
-        Register immutable baseline versions from the accepted source delivery. Imported files and
-        exact versions persist across container rebuilds.
+        Manage immutable platform and locally uploaded data sources. The selected version is kept
+        with every assessment and persists across container rebuilds.
       </p>
 
       <section class="admin-card" aria-labelledby="boundary-heading">
@@ -62,7 +62,7 @@
 
       <section class="admin-card" aria-labelledby="shelter-heading">
         <div class="admin-card__heading">
-          <div><p class="eyebrow">Platform baseline</p><h2 id="shelter-heading">Evacuation centers</h2></div>
+          <div><p class="eyebrow">Managed sources</p><h2 id="shelter-heading">Evacuation centers</h2></div>
           <span class="status-pill" data-shelter-state>Loading</span>
         </div>
         <p class="admin-card__intro">
@@ -73,15 +73,49 @@
           <button class="button button--primary" type="button" data-import-shelters disabled>Import accepted shelter baseline</button>
         </div>
         <p class="inspector-note" data-shelter-source-note>Checking the required files…</p>
+        <div class="library-upload" data-shelter-upload-panel hidden>
+          <div class="library-upload__heading">
+            <div>
+              <span class="library-source-tag library-source-tag--local">Local data</span>
+              <h3>Add a shelter dataset</h3>
+            </div>
+            <span class="library-upload__privacy">Stored on this GRP server</span>
+          </div>
+          <p class="library-upload__intro">
+            Upload one ZIP containing the <code>ddpm_shelters</code> Shapefile components. GRP
+            validates it in the background; it will not be used until you explicitly select it.
+          </p>
+          <ol class="library-upload__steps" aria-label="Upload workflow">
+            <li><span>1</span>Choose ZIP</li>
+            <li><span>2</span>Validate</li>
+            <li><span>3</span>Select for Planning</li>
+          </ol>
+          <div class="library-upload__controls">
+            <label class="library-file-picker">
+              <span>Choose ZIP file</span>
+              <input type="file" accept=".zip,application/zip" data-shelter-upload-file>
+            </label>
+            <span class="library-file-name" data-shelter-file-name>No file selected</span>
+            <button class="button button--primary" type="button" data-upload-shelters disabled>
+              Upload and validate
+            </button>
+          </div>
+          <p class="library-upload__note" data-shelter-upload-note>
+            Nothing is sent to Google Drive or SIG.
+          </p>
+        </div>
         <div data-shelter-progress hidden>
           <div class="inspector-bar"><span data-shelter-fill></span></div>
           <p class="inspector-note" data-shelter-progress-text></p>
         </div>
-        <h3 class="inspector-subheading">Imported versions</h3>
-        <div class="table-scroll"><table class="data-table">
-          <thead><tr><th>Readiness</th><th>Centers</th><th>Files</th><th>Name conflicts</th><th>Outside</th><th>Imported</th><th>Version</th></tr></thead>
-          <tbody data-shelter-versions></tbody>
-        </table></div>
+        <div class="library-version-heading">
+          <div>
+            <h3>Available shelter sources</h3>
+            <p>The highlighted source is the default for new real-district assessments.</p>
+          </div>
+          <a class="library-planning-link" href="/planning.html">Open Planning →</a>
+        </div>
+        <div class="library-version-list" data-shelter-versions></div>
       </section>
 
       <section class="admin-card" aria-labelledby="hazard-heading">

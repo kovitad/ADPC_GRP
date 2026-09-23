@@ -119,10 +119,11 @@ def _run_one_import_session(
                 lease_minutes=lease_minutes,
             )
         elif job.category == "evacuation_centers":
+            shelter_root = storage.root if job.source_mode == "browser_upload" else root
             version_id = process_shelter_import(
                 session,
                 storage,
-                root,
+                shelter_root,
                 claim,
                 lease_minutes=lease_minutes,
             )
@@ -140,6 +141,7 @@ def _run_one_import_session(
             logger.warning("Data import %s lost its lease", claim.import_id)
         else:
             logger.info("Data import %s published version %s", claim.import_id, version_id)
+            _cleanup_browser_source(storage, job)
     except (BoundaryImportError, ShelterImportError, HazardImportError) as error:
         logger.warning("Data import %s failed validation: %s", claim.import_id, error)
         failed = fail_import(
@@ -180,8 +182,21 @@ def _cleanup_failed_import(session: Session, storage: LocalStorage, claim: Impor
             if dataset_id is not None:
                 version_id = version_id_for_import(claim.import_id)
                 storage.delete_prefix(f"datasets/{dataset_id}/{version_id}")
+            _cleanup_browser_source(storage, job)
     except Exception:  # noqa: BLE001 - cleanup is retried by later housekeeping
         logger.exception("Could not clean failed data import %s", claim.import_id)
+
+
+def _cleanup_browser_source(storage: LocalStorage, job: DataImportJob) -> None:
+    """Remove only the generated quarantine subtree after bytes are promoted or refused."""
+
+    if job.source_mode != "browser_upload":
+        return
+    expected = f"quarantine/browser-uploads/{job.id}/source/"
+    if not job.source_ref.startswith(expected):
+        logger.error("Refusing unexpected browser-upload cleanup path for %s", job.id)
+        return
+    storage.delete_prefix(f"quarantine/browser-uploads/{job.id}")
 
 
 def run_one_inspection(root: Path, lease_minutes: int, storage: LocalStorage | None = None) -> bool:

@@ -226,6 +226,40 @@ class Assessment(Base):
     )
 
 
+class AssessmentRunStep(Base):
+    """Persistent, user-facing progress for one asynchronous assessment run."""
+
+    __tablename__ = "assessment_run_step"
+    __table_args__ = (
+        UniqueConstraint("assessment_id", "step_key", name="uq_assessment_run_step_key"),
+        UniqueConstraint("assessment_id", "sequence", name="uq_assessment_run_step_sequence"),
+        CheckConstraint(
+            "state IN ('queued', 'running', 'completed', 'failed')",
+            name="ck_assessment_run_step_state",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    assessment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("assessment.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(500))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class AssessmentFeature(Base):
     """One locked row per in-scope center (AD-04). Written once, never updated."""
 

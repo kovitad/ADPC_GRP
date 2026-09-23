@@ -43,6 +43,8 @@ services:
       # ADR-0006: Admin data inspector over the read-only source folder below.
       DATA_INSPECTOR_ENABLED: "true"
       DATA_IN_ROOT: /srv/grp/data-in
+      # Local-only pilot: ZIP upload is quarantined in the shared data volume.
+      SHELTER_BROWSER_UPLOAD_ENABLED: "true"
       # Draft methods run only here, for the SYNTHETIC test case (never on servers).
       ALLOW_DRAFT_METHODS: "true"
       # Local testing clicks through pages quickly; servers keep the Section 13.1 limit of 60.

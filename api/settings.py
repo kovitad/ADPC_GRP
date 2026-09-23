@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # Admin data inspector over a read-only source folder (ADR-0006). Docker Desktop only.
     data_inspector_enabled: bool = False
     data_in_root: Path = Path(".local/data-in")
+    # Local Developer-only pilot: a Platform Admin may upload one shelter Shapefile ZIP into
+    # job-scoped quarantine. Servers leave this off until the upload security gate is approved.
+    shelter_browser_upload_enabled: bool = False
+    shelter_upload_max_bytes: int = 64 * 1024 * 1024
+    shelter_upload_max_uncompressed_bytes: int = 128 * 1024 * 1024
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None

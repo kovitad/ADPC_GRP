@@ -78,6 +78,26 @@ The local stack runs PostGIS, Alembic migrations, the API (with the web screens)
 
 Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scripts\run-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
 
+### Test the shelter upload and district workflow
+
+In the local development build, a Platform Admin can open **Data library**, upload one ZIP with
+the `ddpm_shelters` Shapefile components, and follow the background validation progress. Review
+the quality counts, then choose **Use in new assessments** for the exact immutable version.
+
+Open **Planning**, select a supported district, and choose **Data & run**. Confirm the flood
+scenario, accepted shelter source, and method, then start the assessment. The drawer shows six
+persisted worker steps; the finished map and **Centres** tab use the same feature IDs and list every
+returned shelter name, status, reason, and mapped flood depth. The recommendation identifies only
+lower-exposure candidates and explicitly leaves capacity, access, services, routes, and other
+hazards for human review. Optional SIG context is separate and never blocks the local result.
+
+The browser upload/accept action is a developer-only Platform baseline path. Production Hub-local
+ownership and Hub Admin approval remain a later hardening step; uploaded data is never sent to SIG
+automatically.
+
+The current components, trust boundaries, worker sequence and production extension are diagrammed
+in [`docs/shelter-upload-assessment-architecture.md`](docs/shelter-upload-assessment-architecture.md).
+
 ## Run on a shared Ubuntu host
 
 When another application already owns ports 80/443, run the local demo stack on the Ubuntu loopback address and reach it through an SSH tunnel:

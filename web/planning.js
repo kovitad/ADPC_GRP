@@ -34,15 +34,19 @@
     currentPlace: null,
     floodLayers: [],
     floodScenarios: [],
+    centerVersions: [],
     centersVersion: null,
+    methods: [],
     centerRows: [],
     centerSource: null,
     activeCenterId: null,
     assessmentId: null,
     assessmentBoundaryId: null,
+    pendingAssessmentId: null,
     sigConnected: false,
     pollTimer: null,
     busy: false,
+    runBusy: false,
     history: [],
   };
 
@@ -479,6 +483,16 @@
     }
     state.selected = boundary;
     state.explicitSelection = explicit;
+    if (
+      !state.centersVersion
+      || Boolean(state.centersVersion.synthetic) !== Boolean(boundary.synthetic)
+    ) {
+      state.centersVersion = state.centerVersions.find(
+        (version) => Boolean(version.synthetic) === Boolean(boundary.synthetic) && version.is_current,
+      ) || state.centerVersions.find(
+        (version) => Boolean(version.synthetic) === Boolean(boundary.synthetic),
+      ) || null;
+    }
     if (explicit) {
       const districtToggle = $('[data-layer="districts"]');
       const centersToggle = $('[data-layer="centers"]');
@@ -504,6 +518,7 @@
         actions: [chipButton("Show SIG information", () => send(`Show the available flood, risk and population information for ${boundary.name}.`))],
       });
     }
+    syncRunPanel();
   };
 
   const selectedFloodLayer = () => {
@@ -706,6 +721,7 @@
 
   $("[data-flood-scenario]").addEventListener("change", async () => {
     await loadFloodOverlay(selectedFloodLayer());
+    syncRunPanel();
   });
 
   document.querySelectorAll("[data-layer]").forEach((toggle) => {
@@ -723,6 +739,204 @@
     event.currentTarget.setAttribute("aria-expanded", String(!panel.hidden));
   });
 
+  // ---------- configure and run ----------
+  const runPanel = $("[data-run]");
+  const runToggle = $("[data-run-toggle]");
+  const runHazard = $("[data-run-hazard]");
+  const runCenters = $("[data-run-centers]");
+  const runSubmit = $("[data-run-submit]");
+
+  const assessmentMethod = () =>
+    state.methods.find((method) => method.status === "approved") || state.methods[0] || null;
+
+  const centerVersionsForArea = () => state.centerVersions.filter((version) =>
+    version.readiness === "assessment_ready"
+    && (!state.selected || Boolean(version.synthetic) === Boolean(state.selected.synthetic))
+  );
+
+  const centerSourceKind = (version) => {
+    if (version.synthetic) return "Synthetic demo";
+    if (version.source_mode === "browser_upload") return "Local upload";
+    return "Platform baseline";
+  };
+
+  const centerSourceName = (version) => {
+    if (version.source_mode === "browser_upload") {
+      return version.original_filename || "Uploaded shelter dataset";
+    }
+    return version.title;
+  };
+
+  const centerSourceOption = (version) => [
+    centerSourceKind(version),
+    centerSourceName(version),
+    `${Number(version.feature_count || 0).toLocaleString()} centres`,
+    version.is_current ? "recommended" : null,
+  ].filter(Boolean).join(" · ");
+
+  const setRunPanelOpen = (open) => {
+    runPanel.hidden = !open;
+    runToggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      $("[data-layers]").hidden = true;
+      $("[data-layers-toggle]").setAttribute("aria-expanded", "false");
+      syncRunPanel();
+    }
+  };
+
+  const syncRunPanel = () => {
+    $("[data-run-area]").textContent = state.selected
+      ? `${state.selected.name}${state.selected.province_name ? ` · ${state.selected.province_name}` : ""}`
+      : "Select a district on the map";
+
+    const selectedHazardId = runHazard.value || $("[data-flood-scenario]").value;
+    runHazard.replaceChildren();
+    state.floodScenarios.forEach((scenario) => {
+      const option = document.createElement("option");
+      option.value = scenario.layer_id || `rp-${scenario.return_period_years}`;
+      option.textContent = `${scenario.label} · ${scenario.available ? "available" : "not imported"}`;
+      option.disabled = !scenario.available;
+      runHazard.append(option);
+    });
+    const preferredHazard = [...runHazard.options].find((option) => option.value === selectedHazardId)
+      || [...runHazard.options].find((option) => !option.disabled);
+    if (preferredHazard) runHazard.value = preferredHazard.value;
+    runHazard.disabled = !preferredHazard;
+
+    const versions = centerVersionsForArea().sort(
+      (left, right) => Number(right.is_current) - Number(left.is_current)
+        || String(right.created_at).localeCompare(String(left.created_at)),
+    );
+    const selectedCenterId = runCenters.value || state.centersVersion?.version_id;
+    runCenters.replaceChildren();
+    versions.forEach((version) => {
+      const option = document.createElement("option");
+      option.value = version.version_id;
+      option.textContent = centerSourceOption(version);
+      runCenters.append(option);
+    });
+    const preferredCenter = versions.find((version) => version.version_id === selectedCenterId)
+      || versions.find((version) => version.is_current)
+      || versions[0];
+    if (preferredCenter) runCenters.value = preferredCenter.version_id;
+    runCenters.disabled = !preferredCenter;
+    const centerNote = $("[data-run-centers-note]");
+    centerNote.textContent = preferredCenter
+      ? `${centerSourceKind(preferredCenter)} selected · ${Number(preferredCenter.feature_count || 0).toLocaleString()} centres · version ${preferredCenter.version_id.slice(0, 8)}. The exact version will be saved with the result.${preferredCenter.shelter_names_confirmed === false ? " Centre labels are generated; source names are not confirmed." : ""}`
+      : "No accepted shelter dataset matches this area. Ask a Platform Admin to select one in Data library.";
+    centerNote.classList.toggle(
+      "is-warning",
+      Boolean(preferredCenter && preferredCenter.shelter_names_confirmed === false),
+    );
+
+    const method = assessmentMethod();
+    $("[data-run-method]").textContent = method
+      ? `${method.key} ${method.version}${method.status === "approved" ? " · approved" : " · draft"}`
+      : "No method available";
+    const ready = Boolean(state.selected && preferredHazard && preferredCenter && method);
+    runSubmit.disabled = !ready || state.runBusy;
+    if (!state.runBusy) {
+      $("[data-run-status]").textContent = ready
+        ? "Ready. The exact versions above will be saved with the result."
+        : "Select a supported district and available inputs to begin.";
+    }
+  };
+
+  const renderRunTrace = (payload) => {
+    const section = $("[data-run-trace-section]");
+    section.hidden = false;
+    const badge = $("[data-run-state]");
+    badge.textContent = payload.state;
+    badge.className = payload.state === "succeeded"
+      ? "is-complete"
+      : ["failed", "cancelled"].includes(payload.state) ? "is-failed" : "";
+    $("[data-run-reference]").textContent = `Support reference ${payload.support_ref}`;
+    const list = $("[data-run-trace]");
+    list.replaceChildren(...(payload.steps || []).map((step) => {
+      const item = document.createElement("li");
+      item.className = `pw-run-step is-${step.state}`;
+      const mark = document.createElement("span");
+      mark.className = "pw-run-step__mark";
+      mark.textContent = step.state === "completed" ? "✓" : step.state === "failed" ? "!" : "";
+      const text = document.createElement("div");
+      const strong = document.createElement("strong");
+      const detail = document.createElement("small");
+      strong.textContent = step.label;
+      detail.textContent = step.detail || (step.state === "queued" ? "Waiting" : "In progress");
+      text.append(strong, detail);
+      item.append(mark, text);
+      return item;
+    }));
+  };
+
+  const runAssessment = async () => {
+    const hazard = state.floodLayers.find((layer) => layer.id === runHazard.value);
+    const centerVersion = state.centerVersions.find(
+      (version) => version.version_id === runCenters.value,
+    );
+    const method = assessmentMethod();
+    if (!state.selected || !hazard || !centerVersion || !method || state.runBusy) return;
+    state.runBusy = true;
+    syncRunPanel();
+    $("[data-run-status]").textContent = "Recording the request and pinning the selected data versions…";
+    try {
+      state.centersVersion = centerVersion;
+      await drawPendingCenters();
+      const started = await GRP.request("/api/v1/assessments", {
+        method: "POST",
+        idempotencyKey: crypto.randomUUID(),
+        body: {
+          hub_code: state.hubCode,
+          boundary_id: state.selected.id,
+          hazard: {
+            type: "flood",
+            return_period_years: hazard.return_period_years,
+            dataset_version_id: hazard.version_id,
+          },
+          evacuation_centers_dataset_version_id: centerVersion.version_id,
+          vulnerability_dataset_version_id: null,
+          method: { key: method.key, version: method.version },
+        },
+      });
+      state.assessmentId = null;
+      state.pendingAssessmentId = started.assessment_id;
+      showProgress(state.selected.name);
+      GRP.jobs.track({
+        id: started.assessment_id,
+        label: `Shelter screening for ${state.selected.name}`,
+        statusPath: `/api/v1/assessments/${started.assessment_id}`,
+        href: `/planning.html?assessment_id=${encodeURIComponent(started.assessment_id)}`,
+        ownerPath: "/planning.html",
+      });
+      saveState();
+      await watch(started.assessment_id);
+    } catch (error) {
+      state.runBusy = false;
+      $("[data-run-status]").textContent = error.message;
+      syncRunPanel();
+      addMessage("assistant", error.message, { label: error.code, error: true });
+    }
+  };
+
+  runToggle.addEventListener("click", () => setRunPanelOpen(runPanel.hidden));
+  $("[data-run-close]").addEventListener("click", () => setRunPanelOpen(false));
+  runHazard.addEventListener("change", async () => {
+    $("[data-flood-scenario]").value = runHazard.value;
+    await loadFloodOverlay(selectedFloodLayer());
+    syncRunPanel();
+  });
+  runCenters.addEventListener("change", async () => {
+    const chosen = state.centerVersions.find((version) => version.version_id === runCenters.value);
+    if (!chosen) return;
+    state.centersVersion = chosen;
+    state.assessmentId = null;
+    state.assessmentBoundaryId = null;
+    resultCard.hidden = true;
+    await drawPendingCenters();
+    syncRunPanel();
+  });
+  runSubmit.addEventListener("click", runAssessment);
+
   // ---------- result card ----------
   const resultCard = $("[data-result]");
   $("[data-result-close]").addEventListener("click", () => {
@@ -738,6 +952,7 @@
     $("[data-progress]").hidden = false;
     $("[data-stats]").replaceChildren();
     $("[data-result-summary]").hidden = true;
+    $("[data-result-context]").hidden = true;
     $("[data-result-link]").hidden = true;
   };
 
@@ -831,6 +1046,12 @@
     const resultLink = $("[data-result-link]");
     resultLink.href = `/assessments.html?assessment_id=${encodeURIComponent(id)}`;
     resultLink.hidden = false;
+    const contextButton = $("[data-result-context]");
+    contextButton.hidden = !state.chatAvailable;
+    contextButton.onclick = () => send(
+      `Show supporting SIG flood, population, schools, hospitals and roads information for ${result.area}.`,
+      { confirmedPlace: result.area },
+    );
     state.assessmentId = id;
     state.assessmentBoundaryId = result.area_detail.id;
     state.pendingAssessmentId = null;
@@ -862,25 +1083,37 @@
   const watch = async (id) => {
     window.clearTimeout(state.pollTimer);
     try {
-      const job = await GRP.request(`/api/v1/assessments/${id}`);
+      const [job, trace] = await Promise.all([
+        GRP.request(`/api/v1/assessments/${id}`),
+        GRP.request(`/api/v1/assessments/${id}/trace`),
+      ]);
+      renderRunTrace(trace);
       if (job.state !== "queued" && job.state !== "running") GRP.jobs.done(id);
       if (job.state === "succeeded") {
+        state.runBusy = false;
+        $("[data-run-status]").textContent = "Completed. Opening the mapped shelter result…";
+        setRunPanelOpen(false);
         await showResult(id);
       } else if (job.state === "queued" || job.state === "running") {
         $("[data-result-title]").textContent = `${job.area} · ${job.scenario.return_period_years}-year flood`;
         $("[data-result-meta]").textContent = `Working in the background… ref ${job.support_ref}`;
-        state.pollTimer = window.setTimeout(() => watch(id), 5000);
+        $("[data-run-status]").textContent = "The background worker is running. You can leave this panel open or continue using the map.";
+        state.pollTimer = window.setTimeout(() => watch(id), 1500);
       } else {
+        state.runBusy = false;
         state.pendingAssessmentId = null;
         saveState();
         $("[data-progress]").hidden = true;
         $("[data-result-meta]").textContent = `Assessment ${job.state}. Reference ${job.support_ref}.`;
+        syncRunPanel();
         addMessage("assistant", `The assessment ${job.state}${job.error_code ? ` (${job.error_code})` : ""}. Reference ${job.support_ref}.`, { error: true });
       }
     } catch (error) {
+      state.runBusy = false;
       state.pendingAssessmentId = null;
       $("[data-progress]").hidden = true;
       $("[data-result-meta]").textContent = error.message;
+      syncRunPanel();
       saveState();
       addMessage("assistant", error.message, { error: true });
     }
@@ -1714,6 +1947,8 @@
         await drawPendingCenters();
         showProgress(boundary ? boundary.name : "Assessment");
         state.pendingAssessmentId = payload.assessment_id;
+        state.runBusy = true;
+        syncRunPanel();
         saveState();
         GRP.jobs.track({
           id: payload.assessment_id,
@@ -2096,6 +2331,8 @@
       }
       if (saved.pendingAssessmentId && !skipAssessment) {
         state.pendingAssessmentId = saved.pendingAssessmentId;
+        state.runBusy = true;
+        syncRunPanel();
         showProgress(boundary ? boundary.name : "Assessment");
         watch(saved.pendingAssessmentId);
       }
@@ -2171,10 +2408,11 @@
       state.hubCode = membership.hub_code;
       $("[data-hub-name]").textContent = `${membership.hub_name} · ${roleLabel(membership.role)}`;
       const query = `?hub_code=${encodeURIComponent(state.hubCode)}`;
-      const [planning, areas, layers] = await Promise.all([
+      const [planning, areas, layers, methods] = await Promise.all([
         GRP.request("/api/v1/planning/status").catch(() => ({ available: false })),
         GRP.request(`/api/v1/catalog/boundaries${query}`),
         GRP.request(`/api/v1/maps/layers${query}`),
+        GRP.request(`/api/v1/catalog/methods${query}`),
       ]);
       state.chatAvailable = Boolean(planning.available);
       state.sigConnected = Boolean(planning.sig_connected);
@@ -2189,9 +2427,12 @@
       }
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;
+      state.methods = methods.methods || [];
       configureFloodScenarios(layers.flood_scenarios);
-      state.centersVersion = layers.evacuation_centers.find((layer) => !layer.synthetic)
-        || layers.evacuation_centers[0]
+      state.centerVersions = layers.evacuation_centers || [];
+      state.centersVersion = state.centerVersions.find((layer) => layer.is_current && !layer.synthetic)
+        || state.centerVersions.find((layer) => !layer.synthetic)
+        || state.centerVersions[0]
         || null;
       if (state.centersVersion) {
         $("[data-centers-title]").textContent = "Evacuation centers";
@@ -2213,6 +2454,7 @@
       $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
       drawLegend(layers.flood_legend);
       drawDistricts();
+      syncRunPanel();
       await loadFloodOverlay(selectedFloodLayer());
       if (districtToggle.checked) districtLayer.addTo(map);
       if (centersToggle.checked) centersLayer.addTo(map);
@@ -2223,6 +2465,8 @@
       if (requestedAssessmentId) {
         state.assessmentId = null;
         state.pendingAssessmentId = requestedAssessmentId;
+        state.runBusy = true;
+        syncRunPanel();
         showProgress("Loading assessment");
         saveState();
         watch(requestedAssessmentId);

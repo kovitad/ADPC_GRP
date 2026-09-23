@@ -131,6 +131,9 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
     ]
     assert layers["evacuation_centers"][0]["title"] == "Synthetic evacuation centers"
     assert layers["evacuation_centers"][0]["synthetic"] is True
+    assert "source_mode" in layers["evacuation_centers"][0]
+    assert "feature_count" in layers["evacuation_centers"][0]
+    assert "shelter_names_confirmed" in layers["evacuation_centers"][0]
     assert layers["vulnerability"]["available"] is False
     assert "Increment 6" in layers["vulnerability"]["message"]
 
@@ -244,7 +247,7 @@ def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
     ).status_code == 404
 
 
-def test_map_bytes_hide_non_current_versions_without_preview_permission(world) -> None:
+def test_map_hides_old_hazard_but_keeps_accepted_center_version_selectable(world) -> None:
     client = _client(world, "planner@example.test")
     with Session(world["engine"]) as session:
         for version_id in (world["seed"].hazard_version_id, world["seed"].centers_version_id):
@@ -258,13 +261,16 @@ def test_map_bytes_hide_non_current_versions_without_preview_permission(world) -
     layers = client.get("/api/v1/maps/layers").json()
 
     assert layers["flood"] == []
-    assert layers["evacuation_centers"] == []
+    assert [row["version_id"] for row in layers["evacuation_centers"]] == [
+        world["seed"].centers_version_id
+    ]
+    assert layers["evacuation_centers"][0]["is_current"] is False
     assert client.get(
         f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
     ).status_code == 404
     assert client.get(
         f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
-    ).status_code == 404
+    ).status_code == 200
 
 
 def test_map_bytes_allow_explicit_non_current_previews(world) -> None:

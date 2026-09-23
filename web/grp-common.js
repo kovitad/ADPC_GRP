@@ -7,21 +7,29 @@ window.GRP = (() => {
 
   const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-  const request = async (path, { method = "GET", body, idempotencyKey, retried = false } = {}) => {
-    const headers = { Accept: "application/json", ...csrfHeaders() };
+  const request = async (
+    path,
+    { method = "GET", body, idempotencyKey, contentType, extraHeaders = {}, retried = false } = {},
+  ) => {
+    const headers = { Accept: "application/json", ...csrfHeaders(), ...extraHeaders };
     if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const rawBody = body instanceof Blob || body instanceof FormData;
+    if (body !== undefined && !(body instanceof FormData)) {
+      headers["Content-Type"] = contentType || (rawBody ? body.type : "application/json");
+    }
     const response = await fetch(path, {
       method,
       credentials: "same-origin",
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : rawBody ? body : JSON.stringify(body),
     });
     // Rate limited while loading a page: wait as told (at most 10 s) and read once more.
     if (response.status === 429 && method === "GET" && !retried) {
       const seconds = Math.min(10, Math.max(1, Number(response.headers.get("Retry-After")) || 3));
       await wait(seconds * 1000);
-      return request(path, { method, body, idempotencyKey, retried: true });
+      return request(path, {
+        method, body, idempotencyKey, contentType, extraHeaders, retried: true,
+      });
     }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {

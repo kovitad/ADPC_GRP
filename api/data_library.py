@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Header
@@ -10,6 +11,7 @@ from sqlalchemy import func, select
 from api.dependencies import DatabaseSession
 from api.errors import GrpError, new_support_ref, not_found
 from api.permissions import AdminUser, PlatformAdmin
+from api.planning_cache import planning_answer_cache
 from api.settings import get_settings
 from core.access_models import AuditEvent
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
@@ -22,6 +24,7 @@ from core.boundary_import import (
 )
 from core.data_import_jobs import request_import
 from core.data_library_models import DataImportJob, DatasetFile
+from core.dataset_readiness import DatasetReadiness, require_readiness_transition
 from core.hazard_import import HAZARD_SOURCE_REF, hazard_source_available
 from core.models import AssessmentState
 from core.shelter_import import (
@@ -69,6 +72,12 @@ def _version_payload(session: DatabaseSession, version: DatasetVersion) -> dict[
     )
     return {
         "version_id": str(version.id),
+        "dataset_title": dataset.title if dataset else "Managed dataset",
+        "provider": dataset.provider if dataset else "Unknown provider",
+        "owner_kind": dataset.owner_kind if dataset else None,
+        "synthetic": bool(
+            dataset and dataset.provider.casefold() == "grp synthetic test data"
+        ),
         "readiness": version.readiness,
         "edition": version.meta.get("edition"),
         "feature_count": feature_count or 0,
@@ -77,11 +86,27 @@ def _version_payload(session: DatabaseSession, version: DatasetVersion) -> dict[
         "tile_count": version.meta.get("tile_count"),
         "district_name_mismatch_count": version.meta.get("district_name_mismatch_count"),
         "outside_boundary_count": version.meta.get("outside_boundary_count"),
+        "shelter_names_confirmed": version.meta.get("shelter_names_confirmed"),
+        "source_mode": version.meta.get("source_mode"),
+        "original_filename": version.meta.get("original_filename"),
         "sha256": version.sha256,
         "importer_version": version.importer_version,
         "created_at": version.created_at.isoformat(),
         "is_current": version.is_current,
     }
+
+
+def _shelter_version_payload(
+    session: DatabaseSession, version: DatasetVersion, *, can_accept: bool
+) -> dict[str, object]:
+    payload = _version_payload(session, version)
+    payload["can_accept"] = can_accept and version.readiness in {
+        DatasetReadiness.TECHNICALLY_VALID,
+        DatasetReadiness.WAITING_FOR_METHOD,
+        DatasetReadiness.READY_FOR_ACCEPTANCE,
+        DatasetReadiness.ASSESSMENT_READY,
+    }
+    return payload
 
 
 @router.get(
@@ -142,7 +167,20 @@ def data_library(principal: AdminUser, session: DatabaseSession) -> dict[str, ob
             "active_import_id": str(active_jobs["evacuation_centers"].id)
             if "evacuation_centers" in active_jobs
             else None,
-            "versions": [_version_payload(session, version) for version in shelter_versions],
+            "versions": [
+                _shelter_version_payload(
+                    session, version, can_accept=principal.is_platform_admin
+                )
+                for version in shelter_versions
+            ],
+            "browser_upload": {
+                "enabled": (
+                    get_settings().grp_env == "dev"
+                    and get_settings().shelter_browser_upload_enabled
+                ),
+                "max_bytes": get_settings().shelter_upload_max_bytes,
+                "format": "zip",
+            },
         },
         "hazard": {
             "source_available": hazard_source_available(get_settings().data_in_root),
@@ -159,6 +197,88 @@ def data_library(principal: AdminUser, session: DatabaseSession) -> dict[str, ob
                 "Process separately on the deployment VM; scientific meaning pending DEP-07."
             ),
         },
+    }
+
+
+@router.post(
+    "/versions/{version_id}/accept",
+    summary="Accept one shelter version for new assessments",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def accept_shelter_version(
+    version_id: UUID, principal: PlatformAdmin, session: DatabaseSession
+) -> dict[str, object]:
+    row = session.execute(
+        select(DatasetVersion, Dataset)
+        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+        .where(DatasetVersion.id == version_id)
+        .with_for_update()
+    ).first()
+    if row is None:
+        raise not_found()
+    version, dataset = row
+    if dataset.type != "evacuation_centers" or dataset.owner_kind != "platform":
+        raise not_found()
+    if version.readiness in {
+        DatasetReadiness.RECEIVED,
+        DatasetReadiness.VALIDATING,
+        DatasetReadiness.NEEDS_CORRECTION,
+        DatasetReadiness.RETIRED,
+    }:
+        raise GrpError(
+            409,
+            "VALIDATION_FAILED",
+            "This shelter version is not eligible for assessment use.",
+        )
+
+    if version.readiness == DatasetReadiness.TECHNICALLY_VALID:
+        version.readiness = require_readiness_transition(
+            version.readiness, DatasetReadiness.READY_FOR_ACCEPTANCE
+        ).value
+    if version.readiness in {
+        DatasetReadiness.WAITING_FOR_METHOD,
+        DatasetReadiness.READY_FOR_ACCEPTANCE,
+    }:
+        version.readiness = require_readiness_transition(
+            version.readiness, DatasetReadiness.ASSESSMENT_READY
+        ).value
+
+    session.execute(
+        DatasetVersion.__table__.update()
+        .where(
+            DatasetVersion.dataset_id == version.dataset_id,
+            DatasetVersion.id != version.id,
+        )
+        .values(is_current=False)
+    )
+    now = datetime.now(UTC)
+    version.is_current = True
+    version.accepted_by = principal.user_id
+    version.accepted_at = now
+    support_ref = new_support_ref()
+    session.add(
+        AuditEvent(
+            actor_user_id=principal.user_id,
+            actor_kind="person",
+            hub_id=None,
+            action="shelter_version_accepted",
+            target_type="dataset_version",
+            target_id=str(version.id),
+            new_value={
+                "dataset_id": str(dataset.id),
+                "title": dataset.title,
+                "readiness": version.readiness,
+                "is_current": True,
+            },
+            result="success",
+            support_ref=support_ref,
+        )
+    )
+    session.commit()
+    planning_answer_cache.clear()
+    return {
+        "version": _shelter_version_payload(session, version, can_accept=True),
+        "support_ref": support_ref,
     }
 
 

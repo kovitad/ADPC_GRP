@@ -28,6 +28,7 @@ from core.assessment_models import (
     RETURN_PERIODS,
     Assessment,
     AssessmentFeature,
+    AssessmentRunStep,
     Boundary,
     Dataset,
     DatasetVersion,
@@ -42,6 +43,15 @@ from core.validation import canonical_sha256, centers_sha256
 
 logger = logging.getLogger("grp.worker.assessment")
 MAX_ATTEMPTS = 3
+
+ASSESSMENT_RUN_STEPS = (
+    (10, "request_recorded", "Request recorded"),
+    (20, "inputs_resolved", "Exact data versions selected"),
+    (30, "worker_started", "Background worker started"),
+    (40, "district_centres_loaded", "District shelter records loaded"),
+    (50, "flood_overlay_completed", "Flood exposure calculated"),
+    (60, "result_saved", "Locked result saved"),
+)
 
 
 class SubmitError(Exception):
@@ -63,6 +73,76 @@ class SubmitRequest:
     vulnerability_version_id: UUID | None
     method_key: str
     method_version: str
+
+
+def new_run_steps(assessment: Assessment) -> list[AssessmentRunStep]:
+    """Create the stable six-step progress record shown by Planning."""
+
+    now = datetime.now(UTC)
+    details = {
+        "request_recorded": "The Hub request and support reference were recorded.",
+        "inputs_resolved": (
+            f"{assessment.inputs['boundary']['name']}; "
+            f"{assessment.inputs['evacuation_centers']['title']}; "
+            f"RP{assessment.inputs['scenario']['return_period_years']}."
+        ),
+    }
+    return [
+        AssessmentRunStep(
+            assessment_id=assessment.id,
+            sequence=sequence,
+            step_key=step_key,
+            label=label,
+            state="completed" if sequence <= 20 else "queued",
+            detail=details.get(step_key),
+            started_at=now if sequence <= 20 else None,
+            completed_at=now if sequence <= 20 else None,
+        )
+        for sequence, step_key, label in ASSESSMENT_RUN_STEPS
+    ]
+
+
+def _mark_run_step(
+    session: Session,
+    assessment_id: UUID,
+    step_key: str,
+    state: str,
+    detail: str | None = None,
+) -> None:
+    step = session.scalar(
+        select(AssessmentRunStep).where(
+            AssessmentRunStep.assessment_id == assessment_id,
+            AssessmentRunStep.step_key == step_key,
+        )
+    )
+    if step is None:
+        return
+    now = datetime.now(UTC)
+    step.state = state
+    step.detail = detail or step.detail
+    if state in {"running", "completed", "failed"}:
+        step.started_at = step.started_at or now
+    if state in {"completed", "failed"}:
+        step.completed_at = now
+
+
+def _mark_active_step_failed(
+    session: Session, assessment_id: UUID, detail: str
+) -> None:
+    step = session.scalar(
+        select(AssessmentRunStep)
+        .where(
+            AssessmentRunStep.assessment_id == assessment_id,
+            AssessmentRunStep.state.in_(["running", "queued"]),
+        )
+        .order_by(
+            (AssessmentRunStep.state == "running").desc(),
+            AssessmentRunStep.sequence,
+        )
+        .limit(1)
+    )
+    if step is not None:
+        _mark_run_step(session, assessment_id, step.step_key, "failed", detail)
 
 
 def features_sha256(session: Session, version_id: UUID) -> str:
@@ -120,6 +200,11 @@ def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods:
     centers, centers_dataset = _usable_version(
         session, request.centers_version_id, "evacuation_centers", request.hub_id
     )
+    if centers.readiness != "assessment_ready":
+        raise SubmitError(
+            "INPUT_VERSION_MISSING",
+            "The evacuation-centre version has not been accepted for assessments.",
+        )
     synthetic_area = "synthetic" in boundary.source.casefold()
     if (
         _is_synthetic_dataset(hazard_dataset) != synthetic_area
@@ -233,6 +318,13 @@ def claim_next_job(session: Session, *, lease_minutes: int, now: datetime | None
     assessment.lease_until = now + timedelta(minutes=lease_minutes)
     assessment.attempt += 1
     assessment.started_at = assessment.started_at or now
+    _mark_run_step(
+        session,
+        assessment.id,
+        "worker_started",
+        "completed",
+        f"Worker attempt {assessment.attempt} started.",
+    )
     session.commit()
     return assessment.id
 
@@ -242,6 +334,7 @@ def _fail(session: Session, assessment: Assessment, code: str, detail: str) -> N
     assessment.error_code = code
     assessment.lease_until = None
     assessment.completed_at = datetime.now(UTC)
+    _mark_active_step_failed(session, assessment.id, f"{code}: {detail}")
     _audit(session, assessment, "assessment_failed", AuditResult.FAILED,
            {"error_code": code, "detail": detail})
     session.commit()
@@ -333,6 +426,21 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
             select(Feature).where(Feature.dataset_version_id == centers_version.id)
         ).all()
         centers = [CenterInput(f.id, f.name, f.lon, f.lat) for f in features]
+        _mark_run_step(
+            session,
+            assessment.id,
+            "district_centres_loaded",
+            "completed",
+            f"Loaded {len(centers):,} source shelter records; applying the selected district.",
+        )
+        _mark_run_step(
+            session,
+            assessment.id,
+            "flood_overlay_completed",
+            "running",
+            "Testing district shelter points against the pinned flood-depth layer.",
+        )
+        session.commit()
         if pinned_hazard_files:
             with ExitStack() as stack:
                 rasters = [
@@ -353,6 +461,21 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
         return _retry_or_fail(session, assessment_id, error)
 
     rows = [(r.feature_id, str(r.status), r.reason_code, r.flood_depth_m) for r in results]
+    _mark_run_step(
+        session,
+        assessment.id,
+        "flood_overlay_completed",
+        "completed",
+        f"Calculated exposure for {len(in_scope):,} shelter records inside the district.",
+    )
+    _mark_run_step(
+        session,
+        assessment.id,
+        "result_saved",
+        "running",
+        "Checking result rules and saving the locked centre table.",
+    )
+    session.commit()
     errors = validate_center_results([c.feature_id for c in in_scope], rows, method.reason_codes)
     if errors:
         _fail(session, assessment, "RESULT_RULE_FAILED", ",".join(errors))
@@ -387,6 +510,13 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
     locked.state = AssessmentState.SUCCEEDED
     locked.lease_until = None
     locked.completed_at = datetime.now(UTC)
+    _mark_run_step(
+        session,
+        assessment.id,
+        "result_saved",
+        "completed",
+        f"Saved {counts.in_scope:,} locked shelter results.",
+    )
     _audit(session, locked, "assessment_succeeded", AuditResult.SUCCESS, locked.summary)
     session.commit()
     return locked.state
@@ -399,6 +529,13 @@ def _retry_or_fail(session: Session, assessment_id: UUID, error: Exception) -> s
         return assessment.state
     assessment.state = AssessmentState.QUEUED
     assessment.lease_until = None
+    _mark_run_step(
+        session,
+        assessment.id,
+        "worker_started",
+        "queued",
+        f"Temporary worker error; retry {assessment.attempt + 1} queued.",
+    )
     session.commit()
     logger.warning("Assessment %s re-queued after %s", assessment_id, type(error).__name__)
     return assessment.state

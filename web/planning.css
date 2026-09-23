@@ -339,6 +339,8 @@
   cursor: pointer;
 }
 .pw-fab svg { width: 18px; height: 18px; fill: none; stroke: var(--pw-forest); stroke-width: 2; }
+.pw-fab--run { right: 112px; }
+.pw-fab--layers { right: 14px; }
 .pw-layers {
   position: absolute;
   z-index: 900;
@@ -376,6 +378,111 @@
 .pw-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0, 0, 0, 0.12); }
 .pw-dot--hollow { background: #fff; box-shadow: 0 0 0 2px #374151; }
 .pw-muted { margin: 0 0 0 1.5rem; color: var(--pw-muted); font-size: 0.72rem; line-height: 1.4; }
+
+.pw-run {
+  position: absolute;
+  z-index: 1050;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(410px, 100%);
+  border-left: 1px solid var(--pw-line);
+  background: #fff;
+  box-shadow: -12px 0 34px rgb(18 48 64 / 16%);
+  animation: pw-slide-in 0.2s ease-out;
+}
+.pw-run__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.15rem 0.9rem;
+  border-bottom: 1px solid var(--pw-line);
+}
+.pw-run__head h2 { margin: 0.2rem 0 0; font-size: 1.08rem; font-weight: 650; }
+.pw-run__head p { margin: 0.35rem 0 0; color: var(--pw-muted); font-size: 0.76rem; line-height: 1.45; }
+.pw-run__body { min-height: 0; overflow-y: auto; padding: 1rem 1.15rem 1.25rem; }
+.pw-run__area,
+.pw-run__method {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid #dce7ea;
+  border-radius: 11px;
+  background: #f7fafb;
+}
+.pw-run__area > span,
+.pw-run__method > span,
+.pw-run__field > span {
+  color: #5d737d;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+.pw-run__area strong,
+.pw-run__method strong { color: var(--pw-ink); font-size: 0.82rem; font-weight: 650; }
+.pw-run__method small,
+.pw-run__field small { color: var(--pw-muted); font-size: 0.7rem; line-height: 1.4; }
+.pw-run__field small.is-warning {
+  padding: 0.45rem 0.55rem;
+  border-radius: 7px;
+  background: #fff4df;
+  color: #735119;
+}
+.pw-run__manage-source {
+  width: max-content;
+  color: var(--pw-forest-2);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+.pw-run__manage-source:hover { text-decoration: underline; }
+.pw-run__field { display: grid; gap: 0.35rem; margin: 0.85rem 0; }
+.pw-run__field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.5rem 2rem 0.5rem 0.7rem;
+  border: 1px solid #c9d8de;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--pw-ink);
+  font: inherit;
+  font-size: 0.79rem;
+}
+.pw-run__field select:focus { border-color: var(--pw-forest-2); outline: 3px solid rgb(35 128 176 / 12%); }
+.pw-run__submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.9rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--pw-forest-2);
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.pw-run__submit:hover:not(:disabled) { background: var(--pw-forest); }
+.pw-run__submit:disabled { cursor: default; opacity: 0.45; }
+.pw-run__status { margin: 0.55rem 0 0; color: var(--pw-muted); font-size: 0.72rem; line-height: 1.45; }
+.pw-run__trace { margin-top: 1rem; overflow: hidden; border-radius: 12px; background: #25343b; color: #e8f2f4; }
+.pw-run__trace-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.8rem 0.85rem; border-bottom: 1px solid rgb(255 255 255 / 13%); }
+.pw-run__trace h3 { margin: 0; font-size: 0.8rem; font-weight: 650; }
+.pw-run__trace-head span { padding: 0.15rem 0.45rem; border-radius: 999px; background: #39505a; color: #dce8ec; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; }
+.pw-run__trace-head span.is-complete { background: #23775f; color: #e5fff6; }
+.pw-run__trace-head span.is-failed { background: #983e35; color: #fff1ef; }
+.pw-run__trace ol { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.pw-run-step { display: grid; grid-template-columns: 22px 1fr; gap: 0.55rem; padding: 0.65rem 0.85rem; border-bottom: 1px solid rgb(255 255 255 / 9%); }
+.pw-run-step__mark { display: grid; width: 19px; height: 19px; place-items: center; border: 1px solid #71878f; border-radius: 50%; color: #9eb0b7; font-size: 0.63rem; }
+.pw-run-step.is-completed .pw-run-step__mark { border-color: #45b994; background: #329778; color: #fff; }
+.pw-run-step.is-running .pw-run-step__mark { border-color: #66c5e7; border-top-color: transparent; animation: pw-spin 0.9s linear infinite; }
+.pw-run-step.is-failed .pw-run-step__mark { border-color: #ef8b7f; background: #a84439; color: #fff; }
+.pw-run-step strong { display: block; color: #f5fbfc; font-size: 0.73rem; font-weight: 600; }
+.pw-run-step small { display: block; margin-top: 0.12rem; color: #aec0c7; font-size: 0.66rem; line-height: 1.35; }
+.pw-run__trace > p { margin: 0; padding: 0.6rem 0.85rem; color: #afc1c8; font-size: 0.66rem; }
 
 .pw-place-chip {
   position: absolute;
@@ -465,6 +572,18 @@
   cursor: pointer;
 }
 .pw-result__summary:hover { background: #075e55; }
+.pw-result__context {
+  padding: 0.38rem 0.65rem;
+  border: 1px solid #b9d3df;
+  border-radius: 999px;
+  background: #f5fafc;
+  color: var(--pw-forest);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pw-result__context:hover { background: #eaf5f9; }
 .pw-result__link { color: var(--pw-forest); font-size: 0.78rem; font-weight: 700; text-decoration: none; }
 .pw-result__link:hover { text-decoration: underline; }
 .pw-progress { height: 4px; margin: 0.8rem 0 0.2rem; overflow: hidden; border-radius: 999px; background: #e6eeec; }
@@ -543,6 +662,7 @@
   animation: pw-slide-in 0.2s ease-out;
 }
 .has-evidence .pw-fab, .has-evidence .pw-layers { right: calc(min(460px, 100%) + 14px); }
+.has-evidence .pw-fab--run { display: none; }
 .has-evidence .pw-result { left: calc((100% - min(460px, 100%)) / 2); }
 .pw-evidence__head {
   display: flex;
@@ -813,6 +933,8 @@
 @media (max-width: 860px) {
   .pw-evidence { width: 100%; }
   .has-evidence .pw-fab, .has-evidence .pw-layers { right: 14px; }
+  .pw-fab--run { right: 112px; }
+  .pw-run { width: 100%; }
 }
 .pw-status__note {
   padding: 0.4rem 0.55rem;

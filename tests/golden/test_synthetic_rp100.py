@@ -130,18 +130,26 @@ def test_synthetic_case_matches_hand_designed_expected_result_exactly(world) -> 
     submitted = _submit(client, _body(world))
     assessment_id = submitted.json()["assessment_id"]
     queued = client.get(f"/api/v1/assessments/{assessment_id}").json()
+    queued_trace = client.get(f"/api/v1/assessments/{assessment_id}/trace").json()
     not_ready = client.get(f"/api/v1/assessments/{assessment_id}/result")
     final_state = _run_worker(world)
     result = client.get(f"/api/v1/assessments/{assessment_id}/result").json()
     centers = client.get(f"/api/v1/assessments/{assessment_id}/centers?size=200").json()
+    completed_trace = client.get(f"/api/v1/assessments/{assessment_id}/trace").json()
 
     assert submitted.status_code == 202
     assert submitted.headers["Location"] == f"/api/v1/assessments/{assessment_id}"
     assert submitted.headers["Retry-After"] == "5"
     assert queued["state"] == "queued"
+    assert [step["state"] for step in queued_trace["steps"]] == [
+        "completed", "completed", "queued", "queued", "queued", "queued"
+    ]
     assert not_ready.status_code == 409
     assert not_ready.json()["error"]["code"] == "ASSESSMENT_NOT_READY"
     assert final_state == "succeeded"
+    assert len(completed_trace["steps"]) == 6
+    assert all(step["state"] == "completed" for step in completed_trace["steps"])
+    assert completed_trace["steps"][-1]["detail"] == "Saved 7 locked shelter results."
 
     expected_summary = json.loads((CASE / "expected_summary.json").read_text(encoding="utf-8"))
     assert result["summary"] == expected_summary

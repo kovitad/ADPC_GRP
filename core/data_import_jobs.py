@@ -63,6 +63,9 @@ def request_import(
     category: str,
     source_ref: str,
     support_ref: str,
+    source_mode: str = "source_folder",
+    manifest: dict[str, object] | None = None,
+    import_id: UUID | None = None,
 ) -> ImportRequest:
     """Queue once for one person/idempotency key; retries return the existing job."""
 
@@ -75,15 +78,16 @@ def request_import(
     if existing is not None:
         return ImportRequest(existing.id, existing.state, True)
     job = DataImportJob(
+        **({"id": import_id} if import_id is not None else {}),
         hub_id=hub_id,
         requested_by=requested_by,
         idempotency_key=idempotency_key,
         category=category,
-        source_mode="source_folder",
+        source_mode=source_mode,
         source_ref=source_ref,
         state=AssessmentState.QUEUED,
         support_ref=support_ref,
-        manifest={},
+        manifest=dict(manifest or {}),
     )
     session.add(job)
     try:

@@ -143,6 +143,21 @@ def test_data_inspector_supports_profiles_and_shareable_reports() -> None:
     assert "innerHTML" not in script
 
 
+def test_data_library_identifies_local_and_active_shelter_sources() -> None:
+    page = (WEB_ROOT / "data-library.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "data-library.js").read_text(encoding="utf-8")
+
+    assert "Available shelter sources" in page
+    assert "Select for Planning" in page
+    assert "Open Planning" in page
+    assert "Local upload" in script
+    assert "Platform baseline" in script
+    assert "Synthetic demo" in script
+    assert "Used for real districts" in script
+    assert "Centre names are generated" in script
+    assert "innerHTML" not in script
+
+
 def test_planning_location_lookup_requires_an_administrative_district() -> None:
     script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
 
@@ -209,8 +224,12 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260922f" in page
-    assert "/planning.css?v=20260922b" in page
+    assert "/planning.js?v=20260923b" in page
+    assert "/planning.css?v=20260923b" in page
+    assert "Local upload" in script
+    assert "Platform baseline" in script
+    assert "Synthetic demo" in script
+    assert "Manage shelter sources" in page
     assert 'const STORE_KEY = "grp.planning.v5"' in script
     assert "innerHTML" not in script
 

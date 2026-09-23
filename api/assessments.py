@@ -24,8 +24,15 @@ from api.sessions import CurrentPrincipal
 from api.settings import get_settings
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
-from core.assessment_jobs import SubmitError, SubmitRequest, pin_inputs
-from core.assessment_models import Assessment, AssessmentFeature, DatasetVersion, Feature, Method
+from core.assessment_jobs import SubmitError, SubmitRequest, new_run_steps, pin_inputs
+from core.assessment_models import (
+    Assessment,
+    AssessmentFeature,
+    AssessmentRunStep,
+    DatasetVersion,
+    Feature,
+    Method,
+)
 from core.models import AssessmentState
 from core.validation import canonical_sha256
 
@@ -206,6 +213,7 @@ def create_assessment(
     )
     session.add(assessment)
     session.flush()
+    session.add_all(new_run_steps(assessment))
     session.add(
         AuditEvent(
             actor_user_id=principal.user_id,
@@ -282,6 +290,40 @@ def assessment_status(
     assessment_id: UUID, principal: SignedInMember, session: DatabaseSession
 ) -> dict[str, object]:
     return _status_payload(_load_visible(session, principal, assessment_id))
+
+
+@router.get(
+    "/{assessment_id}/trace",
+    summary="User-facing progress for an asynchronous assessment",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def assessment_trace(
+    assessment_id: UUID, principal: SignedInMember, session: DatabaseSession
+) -> dict[str, object]:
+    assessment = _load_visible(session, principal, assessment_id)
+    steps = session.scalars(
+        select(AssessmentRunStep)
+        .where(AssessmentRunStep.assessment_id == assessment.id)
+        .order_by(AssessmentRunStep.sequence)
+    ).all()
+    return {
+        "assessment_id": str(assessment.id),
+        "state": assessment.state,
+        "support_ref": assessment.support_ref,
+        "steps": [
+            {
+                "key": step.step_key,
+                "label": step.label,
+                "state": step.state,
+                "detail": step.detail,
+                "started_at": step.started_at.isoformat() if step.started_at else None,
+                "completed_at": step.completed_at.isoformat()
+                if step.completed_at
+                else None,
+            }
+            for step in steps
+        ],
+    }
 
 
 @router.get(

@@ -78,8 +78,10 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _source_files(root: Path) -> tuple[SourceFile, ...]:
-    folder = root / SHELTER_SOURCE_REF
+def _source_files(
+    root: Path, source_ref: str = SHELTER_SOURCE_REF
+) -> tuple[SourceFile, ...]:
+    folder = root / source_ref
     missing = [
         suffix
         for suffix in REQUIRED_SUFFIXES
@@ -104,14 +106,16 @@ def _source_files(root: Path) -> tuple[SourceFile, ...]:
     return tuple(files)
 
 
-def validate_shelter_collection(root: Path) -> ValidatedShelterCollection:
+def validate_shelter_collection(
+    root: Path, source_ref: str = SHELTER_SOURCE_REF
+) -> ValidatedShelterCollection:
     """Read the complete point layer without exposing fields whose meaning is unconfirmed."""
 
     from shapely import from_wkb
     from shapely.geometry import Point
 
-    source_files = _source_files(root)
-    shp = root / SHELTER_SOURCE_REF / f"{SHELTER_STEM}.shp"
+    source_files = _source_files(root, source_ref)
+    shp = root / source_ref / f"{SHELTER_STEM}.shp"
     try:
         result, _, _, _ = read_vector_explicit(shp, read_geometry=True)
         meta, _, geometries, fields = result
@@ -267,13 +271,21 @@ def process_shelter_import(
     """Assign points by geometry, report name conflicts and atomically publish one version."""
 
     job = session.scalar(select(DataImportJob).where(DataImportJob.id == claim.import_id))
-    if (
-        job is None
-        or job.category != "evacuation_centers"
-        or job.source_ref != SHELTER_SOURCE_REF
-    ):
+    if job is None or job.category != "evacuation_centers":
         raise ShelterImportError("Import job does not reference the accepted shelter source")
-    collection = validate_shelter_collection(source_root)
+    if job.source_mode == "source_folder":
+        if job.source_ref != SHELTER_SOURCE_REF:
+            raise ShelterImportError("Import job does not reference the accepted shelter source")
+    elif job.source_mode == "browser_upload":
+        expected = (
+            f"quarantine/browser-uploads/{job.id}/source/"
+            f"{SHELTER_SOURCE_REF}"
+        )
+        if job.source_ref != expected or job.hub_id is not None:
+            raise ShelterImportError("Browser upload does not reference its own quarantine area")
+    else:
+        raise ShelterImportError("Import source mode is not supported")
+    collection = validate_shelter_collection(source_root, job.source_ref)
     boundary_version, boundaries = _boundary_collection(session)
     assigned, outside, examples = _assign_districts(collection.records, boundaries)
     mismatch_count = sum(item.name_mismatch for item in assigned)
@@ -316,6 +328,8 @@ def process_shelter_import(
             "district_name_mismatch_count": mismatch_count,
             "boundary_version_id": str(boundary_version.id),
             "source_ref": SHELTER_SOURCE_REF,
+            "source_mode": job.source_mode,
+            "original_filename": job.manifest.get("original_filename"),
             "map_preview": True,
             "shelter_names_confirmed": False,
             "district_field": collection.district_field,
