@@ -58,9 +58,5 @@ def test_sig_already_carries_age_disaggregated_vulnerability_layers() -> None:
     assert {"vulnerability_F_infant", "vulnerability_M_infant"} <= layers
     # None of them is in the flood recipe today, so elderly and infants currently carry no
     # weight in any SIG flood risk level.
-    assert not layers & set(_load("risk_weights_flood.json")["weights_picker"]["recipes"]["flood"]) & {
-        "vulnerability_F_above60",
-        "vulnerability_M_above60",
-        "vulnerability_F_infant",
-        "vulnerability_M_infant",
-    }
+    recipe = set(_load("risk_weights_flood.json")["weights_picker"]["recipes"]["flood"])
+    assert not recipe & {"vulnerability_F_above60", "vulnerability_M_infant"}

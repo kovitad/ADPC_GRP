@@ -49,7 +49,11 @@ def _shapefile(root: Path) -> Path:
 
 
 def _text(value: object) -> str:
-    return "" if value is None else str(value).strip()
+    if value is None:
+        return ""
+    text = str(value).strip()
+    # A missing number arrives as NaN; without this it counts as a filled value.
+    return "" if text.lower() in {"nan", "none"} else text
 
 
 def _looks_numeric(values: list[str]) -> bool:
