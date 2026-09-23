@@ -1,0 +1,19 @@
+{
+  "_captured": "2026-09-23 from the shared service at https://servirplatform.sig-gis.com/mcp",
+  "_call": "resolve_place_time(place='Mueang Nan District, Nan, Thailand')",
+  "status": "ok",
+  "asked_month": 9,
+  "month_name": "September",
+  "place": {
+    "status": "ok",
+    "place": "Mueang Nan District, Nan, Thailand",
+    "name": "Mueang Nan District",
+    "area_km2": 1095,
+    "how": "admin boundary ~1095 km²",
+    "is_admin_boundary": true,
+    "bbox": [100.45517, 18.66807, 100.8367, 19.06196],
+    "centroid": [100.65667, 18.87862],
+    "area_cap_km2": 25000
+  },
+  "seasons_note": "no country/crop given, so no season window was resolved — pass both to get one"
+}
