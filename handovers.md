@@ -703,11 +703,21 @@ or deploy this feature to a server before its security gates pass.
   centre name; `DDPM-SHELTER-164` is about 100 km east of its stated subdistrict; 1,599 records
   share a coordinate with another record.
 
+### Handing over to Codex (23 September 2026)
+
+The work order is [`next-action-for-codex.md`](next-action-for-codex.md); the measurements behind
+it are [`docs/sig-platform-gaps.md`](docs/sig-platform-gaps.md). Slice 1 is the shelter re-import
+on a reset sandbox, which is what makes the confirmed names and capacity visible to a planner.
+Nothing on this branch has been run against the live Docker Desktop stack yet.
+
 ### Shared SIG service, measured (23 September 2026)
 
-- `assemble_pack` for a Thai district did not return within 60 s on three attempts, while
-  `api/mcp_client.py:55` sets the client timeout to 45 s. Real Thai lookups may therefore be
-  unable to complete at all; the SIG gather belongs in the background job system.
+- **`assemble_pack` takes about six minutes for a Thai district.** Measured end to end on
+  23 September for Mueang Phitsanulok (728 km²): 2 s to understand the question, **347 s** for
+  the SIG gather, 12 s to write the brief, **367 s** in total (pack `53b0ea5fd81baa6b`). It does
+  complete, and the answer is good. Earlier calls that appeared to fail were a client giving up
+  at 60 s, not the service failing. ADR-0021 moves the gather to a background task so no web
+  request has to carry it; making it faster is SERVIR's, and nothing reports progress meanwhile.
 - SIG resolves Mueang Nan as an OpenStreetMap admin boundary of **1,095 km²**. GRP's own
   district comes from the delivered file, so GRP and SIG counts must be reconciled, not assumed
   equal. The synthetic fixture in `tests/fast/test_planning_chat.py` says 41 km².
