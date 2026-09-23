@@ -680,8 +680,23 @@ or deploy this feature to a server before its security gates pass.
   records and is reported as unknown, never as zero.
 - `tools/show_shelter_record.py` profiles any delivery or contribution candidate through the
   importer's own reader, which is how the numbers above were measured.
-- **Next:** re-import the delivery (versions are immutable, so this is a new version to accept
-  and activate), then check the real names on the map.
+- **Next:** re-import the delivery. This is a sandbox, so the fastest route is a full reset:
+
+  ```powershell
+  .\scripts\docker-desktop.ps1 -Reset -AdminEmail you@example.org -HubAdminEmail you@example.org
+  ```
+
+  `-Reset` removes the database and object volumes after asking, then rebuilds and loads the
+  baseline. Without a reset, run the loader alone against a running stack:
+
+  ```powershell
+  docker compose -f deploy/compose.desktop.yml exec api python -m grpcli.baseline load --actor-email you@example.org
+  ```
+
+  `grpcli/baseline.py` queues the three platform imports in order, waits on the worker, prints
+  each report (feature counts, district mismatches, label statistics, missing capacity) and then
+  calls `activate_mvp1_baseline`, which is the same activation the Platform page performs. It
+  reuses an import that already succeeded, so it is safe to run twice.
 - **Owed by DDPM before any public contribution:** province is wrong on about 22 records
   (`DDPM-SHELTER-119`–`-140` say จันทบุรี but sit in ชลบุรี districts); `#REF!` appears as a
   centre name; `DDPM-SHELTER-164` is about 100 km east of its stated subdistrict; 1,599 records

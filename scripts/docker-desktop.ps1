@@ -3,7 +3,14 @@ param(
     [string[]]$AdminEmail = @(),
     # SERVIR account emails to make Hub Admin of the adpc Hub (can then manage members).
     [string[]]$HubAdminEmail = @(),
-    [switch]$Down
+    [switch]$Down,
+    # Delete the local database and object volumes, then rebuild from empty. Everything
+    # imported locally is lost, including every dataset version and assessment. Local
+    # development only; it asks before it deletes.
+    [switch]$Reset,
+    # Import the delivered Thailand baseline and activate it, so a fresh stack is usable
+    # without three Data Library imports and a Platform activation by hand.
+    [switch]$LoadBaseline
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +23,20 @@ $Compose = @("compose", "-f", "deploy/compose.desktop.yml")
 if ($Down) {
     docker @Compose down
     return
+}
+
+if ($Reset) {
+    Write-Host "This deletes the local GRP database and object storage volumes." -ForegroundColor Yellow
+    Write-Host "Every imported dataset version, feature and assessment on this machine is lost."
+    $answer = Read-Host "Type RESET to continue"
+    if ($answer -cne "RESET") {
+        Write-Host "Nothing was deleted."
+        return
+    }
+    # A reset leaves an empty data library, so load the baseline back unless told otherwise.
+    if (-not $PSBoundParameters.ContainsKey("LoadBaseline")) { $LoadBaseline = $true }
+    docker @Compose down -v
+    Write-Host "Volumes removed. Continuing with a fresh stack."
 }
 
 $SecretRoot = Join-Path $RepositoryRoot ".local\docker\secrets"
@@ -102,6 +123,15 @@ foreach ($email in $AdminEmail) {
 foreach ($email in $HubAdminEmail) {
     $actor = if ($AdminEmail.Count -gt 0) { $AdminEmail[0] } else { $email }
     docker @Compose exec api python -m grpcli.admin assign-member --actor-email $actor --email $email --hub-code adpc --role admin
+}
+
+if ($LoadBaseline) {
+    if ($AdminEmail.Count -eq 0) {
+        Write-Warning "Skipping the baseline load: -LoadBaseline needs -AdminEmail."
+    } else {
+        docker @Compose exec api python -m grpcli.baseline load --actor-email $AdminEmail[0]
+        if ($LASTEXITCODE -ne 0) { throw "Baseline load failed; see the output above." }
+    }
 }
 
 Write-Host ""
