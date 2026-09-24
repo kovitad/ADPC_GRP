@@ -71,12 +71,44 @@ def test_canonical_sig_place_includes_level_province_and_country() -> None:
         name="KANTHARAROM",
         province_name="SI SA KET",
         admin_level="district",
+        country_name="Thailand",
     )
 
     assert (
         api.planning._canonical_sig_place(boundary)
         == "KANTHARAROM District, SI SA KET, Thailand"
     )
+
+
+def test_canonical_sig_place_uses_the_recorded_country_not_a_constant() -> None:
+    boundary = SimpleNamespace(
+        name="Chittagong",
+        province_name="Chattogram",
+        admin_level="district",
+        country_name="Bangladesh",
+    )
+
+    assert (
+        api.planning._canonical_sig_place(boundary)
+        == "Chittagong District, Chattogram, Bangladesh"
+    )
+
+
+def test_canonical_sig_place_declines_a_boundary_with_no_recorded_country() -> None:
+    boundary = SimpleNamespace(
+        name="Synthetic Test District",
+        province_name=None,
+        admin_level="district",
+        country_name=None,
+    )
+
+    assert api.planning._canonical_sig_place(boundary) is None
+
+
+def test_sig_context_boundary_keeps_the_subdistrict_when_no_parent_district_is_loaded() -> None:
+    subdistrict = SimpleNamespace(admin_level="subdistrict", admin_code="330301")
+
+    assert api.planning._sig_context_boundary(subdistrict, []) is subdistrict
 
 
 @pytest.mark.parametrize(
@@ -392,6 +424,7 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
             name_th="กันทรารมย์",
             province_name="SI SA KET",
             province_name_th="ศรีสะเกษ",
+            country_name="Thailand",
             geom={
                 "type": "Polygon",
                 "coordinates": [[[104.5, 15.0], [104.7, 15.0], [104.7, 15.2],

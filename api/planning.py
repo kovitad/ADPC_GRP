@@ -7,6 +7,7 @@ only proposes a mode; GRP code checks the Hub role and runs a fixed SIG tool seq
 from __future__ import annotations
 
 import json
+import logging
 import re
 from time import perf_counter
 from typing import Any, Literal
@@ -42,6 +43,8 @@ from core.identity import MembershipView
 from core.models import AssessmentState
 from core.risk_recipe import RiskRecipe, active_risk_recipe, recipe_payload
 from core.shelter_import import PLATFORM_SHELTER_DATASET_ID
+
+logger = logging.getLogger("grp.planning")
 
 router = APIRouter(prefix="/planning", tags=["planning"])
 
@@ -216,16 +219,26 @@ def _same_area(first: str, second: str) -> bool:
     return bool(_place_parts(first)) and _place_parts(first) == _place_parts(second)
 
 
-def _canonical_sig_place(boundary: Boundary) -> str:
-    """Build an unambiguous SIG place from the managed boundary catalogue."""
+def _canonical_sig_place(boundary: Boundary) -> str | None:
+    """Build an unambiguous SIG place from the managed boundary catalogue.
 
+    The country comes from the boundary delivery, never from a constant, so a second Hub cannot
+    inherit Thailand. A boundary with no recorded country returns None: the caller then sends the
+    label it already had, unenriched. That is not a fail-open on safety, because the exact-area
+    gate in _same_area still has to accept whatever SIG resolves. Do not turn this into a refusal
+    without excluding the synthetic district, which has no country by design.
+    """
+
+    country = (boundary.country_name or "").strip()
+    if not country:
+        return None
     name = boundary.name.strip()
     if boundary.admin_level == "district" and "district" not in name.casefold():
         name = f"{name} District"
     elif boundary.admin_level == "subdistrict" and "subdistrict" not in name.casefold():
         name = f"{name} Subdistrict"
     return ", ".join(
-        part for part in (name, (boundary.province_name or "").strip(), "Thailand") if part
+        part for part in (name, (boundary.province_name or "").strip(), country) if part
     )
 
 
@@ -235,14 +248,25 @@ def _sig_context_boundary(selected: Boundary, boundaries: list[Boundary]) -> Bou
     if selected.admin_level != "subdistrict":
         return selected
     district_code = selected.admin_code[:4]
-    return next(
+    parent = next(
         (
             boundary
             for boundary in boundaries
             if boundary.admin_level == "district" and boundary.admin_code == district_code
         ),
-        selected,
+        None,
     )
+    if parent is None:
+        # Keep the sub-district rather than refusing, because the exact-area gate still decides
+        # whether SIG's answer is usable. Say so in the log: a missing parent means the loaded
+        # hierarchy is incomplete, which is a data problem worth seeing.
+        logger.warning(
+            "No parent district %s for sub-district %s; sending the sub-district to SIG",
+            district_code,
+            selected.admin_code,
+        )
+        return selected
+    return parent
 
 
 def _message_names_boundary(message: str, boundary: Boundary) -> bool:
@@ -786,11 +810,24 @@ async def planning_chat(
         if confirmed_place:
             # Short UI labels are enriched from the managed boundary catalogue before SIG sees
             # them. This prevents its geocoder choosing another same-named place.
-            if selected is not None and (
-                _same_area(confirmed_place, selected.name)
-                or _same_area(confirmed_place, _canonical_sig_place(selected))
+            canonical_selected = _canonical_sig_place(selected) if selected is not None else None
+            enriched = (
+                _canonical_sig_place(_sig_context_boundary(selected, boundaries))
+                if selected is not None
+                else None
+            )
+            if (
+                selected is not None
+                and enriched is not None
+                and (
+                    _same_area(confirmed_place, selected.name)
+                    or (
+                        canonical_selected is not None
+                        and _same_area(confirmed_place, canonical_selected)
+                    )
+                )
             ):
-                action_place = _canonical_sig_place(_sig_context_boundary(selected, boundaries))
+                action_place = enriched
             else:
                 action_place = confirmed_place
         elif proposed_place:
@@ -824,6 +861,7 @@ async def planning_chat(
                 selected.name
                 if mode == "run_assessment"
                 else _canonical_sig_place(_sig_context_boundary(selected, boundaries))
+                or selected.name
             )
         else:
             action_place = None
