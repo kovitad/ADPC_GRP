@@ -107,6 +107,8 @@ VULNERABILITY_PROFILES: dict[str, dict[str, Any]] = {
 }
 VULNERABILITY_SOURCE_REF = "vulnerable_people"
 VULNERABILITY_IMPORTER_VERSION = "grp-vulnerability-display/1"
+# Recorded on every boundary row this Thailand delivery creates; see core/boundary_import.py.
+COUNTRY_NAME = "Thailand"
 
 
 class ThailandFullImportError(ValueError):
@@ -220,6 +222,7 @@ def _materialize_hierarchy(records: list[HierarchyRecord]):
                 name_th=item.name_th,
                 province_name=item.province,
                 province_name_th=item.province_th,
+                country_name=COUNTRY_NAME,
                 geom=item.geometry,
                 source="ADPC Data Science Thailand hierarchy delivery",
                 edition=item.edition,

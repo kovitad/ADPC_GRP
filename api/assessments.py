@@ -358,7 +358,7 @@ def assessment_result(
         **_status_payload(assessment),
         "area_detail": {
             k: pins["boundary"][k]
-            for k in ("id", "name", "name_th", "province_name", "province_name_th",
+            for k in ("id", "name", "name_th", "province_name", "province_name_th", "country_name",
                       "admin_code", "admin_level", "source", "edition", "geometry_sha256")
             if k in pins["boundary"]
         },

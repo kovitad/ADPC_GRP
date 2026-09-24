@@ -32,6 +32,9 @@ from core.import_staging import (
 from core.storage import Storage
 
 BOUNDARY_SOURCE_REF = "administrative_boundary/district_boundary"
+# This importer reads one Thai delivery. The country is recorded on each row rather than assumed
+# by consumers, so another Hub's delivery cannot inherit it.
+COUNTRY_NAME = "Thailand"
 BOUNDARY_STEM = "Thailand_District_Boundaries"
 REQUIRED_SUFFIXES = (".shp", ".shx", ".dbf", ".prj")
 OPTIONAL_SUFFIXES = (".cpg", ".qmd")
@@ -188,6 +191,7 @@ def _materialize_boundaries(
                 name_th=item.name_th,
                 province_name=item.province_name,
                 province_name_th=item.province_name_th,
+                country_name=COUNTRY_NAME,
                 geom=item.geometry,
                 source="ADPC Data Science delivery",
                 edition=item.edition,

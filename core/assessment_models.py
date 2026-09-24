@@ -68,6 +68,9 @@ class Boundary(Base):
     name_th: Mapped[str | None] = mapped_column(String(200))
     province_name: Mapped[str | None] = mapped_column(String(200))
     province_name_th: Mapped[str | None] = mapped_column(String(200))
+    # The country the delivery covers, so a place sent to an external geocoder is unambiguous
+    # without the code assuming one Hub. NULL means unknown: callers must not guess one.
+    country_name: Mapped[str | None] = mapped_column(String(200))
     geom: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
     source: Mapped[str] = mapped_column(String(200), nullable=False)
     edition: Mapped[str] = mapped_column(String(100), nullable=False)
