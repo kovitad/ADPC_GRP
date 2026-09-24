@@ -1188,3 +1188,35 @@ def test_a_sig_only_brief_can_still_be_published(planning) -> None:
 
     assert body["publish_token"] is not None
     assert body["draft_issues"] == []
+
+
+def test_the_deterministic_summary_always_shows_grp_figures() -> None:
+    """SIG computed findings must not crowd out GRP's own rows (ADR-0028)."""
+
+    pack = {
+        "citations": [
+            {"n": 1, "title": "schools vs hazard", "text": "3 of 9 schools",
+             "retrieval": "computed-at-pack-time"},
+            {"n": 2, "title": "Registered village population, THA SONG YANG",
+             "text": "57,197 registered residents live in 116 villages.",
+             "retrieval": "grp-baseline"},
+        ],
+    }
+
+    summary = api.planning._deterministic_evidence_summary(pack, movement_unavailable=False)
+
+    assert "## This district in the GRP data library" in summary
+    assert "57,197 registered residents" in summary
+    # SIG's own computed finding is still preferred within the SIG section.
+    assert "3 of 9 schools" in summary
+    # GRP's row comes first, because it answers the question about this district directly.
+    assert summary.index("57,197") < summary.index("3 of 9 schools")
+
+
+def test_a_pack_with_no_grp_rows_has_no_grp_section() -> None:
+    pack = {"citations": [{"n": 1, "text": "3 of 9 schools", "retrieval": "computed"}]}
+
+    summary = api.planning._deterministic_evidence_summary(pack, movement_unavailable=False)
+
+    assert "GRP data library" not in summary
+    assert summary.startswith("## Available data")

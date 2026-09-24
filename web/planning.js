@@ -38,6 +38,14 @@
     supportingLayers: [],
     vulnerabilityLayers: [],
     localContext: null,
+    // The selected area's GRP figures, fetched once and reused by the popup and the People tab.
+    // null means "loading or none for this area"; undefined means "not asked for yet".
+    areaProfile: null,
+    // Which area areaProfile belongs to, so a first selection is not mistaken for a cached one.
+    areaProfileId: null,
+    // SIG answers already obtained this session, keyed by place. A SIG lookup costs minutes, so
+    // re-selecting a district offers the answer we already have instead of asking to run it again.
+    sigAnswers: new Map(),
     areaLevel: "district",
     centersVersion: null,
     methods: [],
@@ -581,10 +589,9 @@
     );
   };
 
-  const showAreaProfile = async (boundary, layer) => {
-    layer
-      .bindPopup(`<div class="pw-area-pop"><strong>${boundary.name}</strong><br>Loading…</div>`)
-      .openPopup();
+  // Fetched once per area and reused for both the popup and the People tab, so selecting the same
+  // district again costs nothing and the tab never has to say "run something first".
+  const loadAreaProfile = async (boundary) => {
     let profile = areaProfiles.get(boundary.id);
     if (profile === undefined) {
       try {
@@ -594,7 +601,18 @@
       }
       areaProfiles.set(boundary.id, profile);
     }
-    layer.setPopupContent(areaProfileHtml(boundary, profile));
+    if (state.selected && state.selected.id === boundary.id) {
+      state.areaProfile = profile;
+      renderVulnerablePeople({}, "", state.localContext);
+    }
+    return profile;
+  };
+
+  const showAreaProfile = async (boundary, layer) => {
+    layer
+      .bindPopup(`<div class="pw-area-pop"><strong>${boundary.name}</strong><br>Loading…</div>`)
+      .openPopup();
+    layer.setPopupContent(areaProfileHtml(boundary, await loadAreaProfile(boundary)));
   };
 
   const selectBoundary = (
@@ -612,6 +630,12 @@
     }
     state.selected = boundary;
     state.explicitSelection = explicit;
+    if (state.areaProfileId !== boundary.id) {
+      // Clear first so the People tab cannot show the previous district's numbers, then fill.
+      state.areaProfile = null;
+      state.areaProfileId = boundary.id;
+      loadAreaProfile(boundary);
+    }
     if (
       !state.centersVersion
       || Boolean(state.centersVersion.synthetic) !== Boolean(boundary.synthetic)
@@ -1552,6 +1576,80 @@
     box.replaceChildren();
     const heading = document.createElement("h3");
     heading.textContent = "Vulnerable people";
+    // GRP's own figures for the selected district come first. Before this the tab showed only
+    // three raster titles and a disclaimer, which told a planner nothing about their district.
+    const profile = state.areaProfile;
+    const grpCards = [];
+    if (profile && profile.population) {
+      const p = profile.population;
+      grpCards.push(
+        [p.total_population, "people (registered)"],
+        [p.male, "male"],
+        [p.female, "female"],
+        [p.households, "households"],
+        [p.village_count, "villages"],
+      );
+    }
+    if (profile && profile.flood_exposure) {
+      const e = profile.flood_exposure;
+      grpCards.push(
+        [e.people_in_zone, `people inside the RP${e.return_period_years} extent`],
+        [e.villages_in_zone, `villages inside the RP${e.return_period_years} extent`],
+      );
+    }
+    if (profile && profile.evacuation_centers && profile.evacuation_centers.total) {
+      grpCards.push([profile.evacuation_centers.total, "recorded evacuation centres"]);
+    }
+    if (grpCards.length) {
+      const area = profile.area || {};
+      const intro = document.createElement("p");
+      intro.textContent =
+        `${[area.name, area.name_th].filter(Boolean).join(" · ")}`
+        + `${area.province_name ? `, ${area.province_name}` : ""}`
+        + " — from the GRP data library, no SIG lookup needed.";
+      const grid = document.createElement("div");
+      grid.className = "pw-people-grid";
+      grpCards.forEach(([value, label]) => {
+        const card = document.createElement("article");
+        card.className = "pw-people-stat";
+        const strong = document.createElement("strong");
+        const span = document.createElement("span");
+        strong.textContent = value === null || value === undefined
+          ? "unknown"
+          : Number(value).toLocaleString();
+        span.textContent = label;
+        card.append(strong, span);
+        grid.append(card);
+      });
+      box.append(heading, intro, grid);
+      if (profile.evacuation_centers && profile.evacuation_centers.by_type.length) {
+        const kinds = document.createElement("p");
+        kinds.className = "pw-people-note";
+        kinds.textContent =
+          "Recorded centres by kind of place: "
+          + profile.evacuation_centers.by_type
+              .map((item) => `${Number(item.count).toLocaleString()} ${item.label.toLowerCase()}`)
+              .join(", ")
+          + ".";
+        box.append(kinds);
+      }
+      const caveat = document.createElement("p");
+      caveat.className = "pw-people-note";
+      caveat.textContent =
+        (profile.source ? `${profile.source.label}. ${profile.source.caveat} ` : "")
+        + (profile.flood_exposure ? profile.flood_exposure.caveat : "");
+      box.append(caveat);
+      const indicators = local?.vulnerability || [];
+      if (indicators.length) {
+        const note = document.createElement("p");
+        note.className = "pw-people-note";
+        note.textContent =
+          `${indicators.length} source-native vulnerability indicator map(s) can be turned on in `
+          + "Layers for spatial context. They are not people counts.";
+        box.append(note);
+      }
+      return;
+    }
     const values = Object.entries(population).filter(([, value]) => typeof value === "number");
     if (!values.length) {
       const indicators = local?.vulnerability || [];
@@ -2236,6 +2334,27 @@
     }
   };
 
+  const placeKey = (name) => String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+  const rememberSigAnswer = (payload, question) => {
+    const name = payload.area?.requested || payload.area?.sig_place || state.currentPlace;
+    if (!name) return;
+    // Keep only the most recent few: an evidence pack is large and this is session memory only.
+    state.sigAnswers.set(placeKey(name), { payload, question });
+    while (state.sigAnswers.size > 5) {
+      state.sigAnswers.delete(state.sigAnswers.keys().next().value);
+    }
+  };
+
+  const storedSigAnswer = (name) => state.sigAnswers.get(placeKey(name)) || null;
+
+  const showStoredSigAnswer = (name) => {
+    const stored = storedSigAnswer(name);
+    if (!stored) return;
+    addEvidenceMessage(stored.payload, stored.question);
+    renderEvidence(stored.payload, stored.question);
+  };
+
   const send = async (text, {
     publish = false, publishToken = null, echo = true, confirmedPlace = null, refresh = false,
   } = {}) => {
@@ -2343,6 +2462,7 @@
         return;
       }
       if (payload.mode === "sig_evidence" && payload.evidence) {
+        rememberSigAnswer(payload, message);
         addEvidenceMessage(payload, message);
         renderEvidence(payload, message);
       } else {
@@ -2538,10 +2658,17 @@
     chip.append(document.createTextNode(
       `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
     ));
-    chip.append(chipButton("Check SIG flood exposure", () => send(
-      `Check flood exposure for schools, hospitals and roads in ${name}.`,
-      { confirmedPlace: name },
-    )));
+    if (storedSigAnswer(name)) {
+      chip.append(chipButton("Show the SIG evidence I already have", () =>
+        showStoredSigAnswer(name)));
+    }
+    chip.append(chipButton(
+      storedSigAnswer(name) ? "Gather it again from SIG" : "Check SIG flood exposure",
+      () => send(
+        `Check flood exposure for schools, hospitals and roads in ${name}.`,
+        { confirmedPlace: name, refresh: Boolean(storedSigAnswer(name)) },
+      ),
+    ));
     chip.hidden = false;
   };
 
@@ -2574,15 +2701,38 @@
     chip.hidden = false;
     const { place, outsideThailand } = await reverseDistrict(lat, lon);
     if (place) {
-      pickPlace(place);
       const name = externalPlaceName(place);
-      addMessage("assistant", `${name} is selected from the map for SIG flood evidence.`, {
-        label: "Map location selected.",
-        actions: [chipButton("Check SIG flood exposure", () => send(
-          `Check flood exposure for schools, hospitals and roads in ${name}.`,
-          { confirmedPlace: name },
-        ))],
-      });
+      // Clicking the same district again used to repeat the identical prompt in the chat, which
+      // read as the assistant forgetting what it had just been told. The place chip already shows
+      // the selection, so re-selecting is silent.
+      const already = state.currentPlace === name;
+      pickPlace(place);
+      if (!already) {
+        const reuse = storedSigAnswer(name);
+        addMessage(
+          "assistant",
+          reuse
+            ? `${name} is selected. SIG evidence for this district was already gathered in this `
+              + "session, so it can be shown again without another lookup."
+            : `${name} is selected from the map for SIG flood evidence.`,
+          {
+            label: reuse ? "Already gathered this session." : "Map location selected.",
+            actions: [
+              ...(reuse
+                ? [chipButton("Show the SIG evidence I already have", () =>
+                    showStoredSigAnswer(name))]
+                : []),
+              chipButton(
+                reuse ? "Gather it again from SIG" : "Check SIG flood exposure",
+                () => send(
+                  `Check flood exposure for schools, hospitals and roads in ${name}.`,
+                  { confirmedPlace: name, refresh: Boolean(reuse) },
+                ),
+              ),
+            ],
+          },
+        );
+      }
       return;
     }
     chip.textContent = outsideThailand

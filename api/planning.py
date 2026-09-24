@@ -40,6 +40,7 @@ from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
 from core.hazard_import import PLATFORM_HAZARD_DATASET_ID
 from core.identity import MembershipView
+from core.local_evidence import RETRIEVAL as LOCAL_RETRIEVAL
 from core.local_evidence import (
     attach_local_citations,
     cited_local_numbers,
@@ -401,12 +402,17 @@ def _deterministic_evidence_summary(
         and str(item.get("text", "")).strip()
         and str(item.get("kind", "")).casefold() not in {"gaps", "method"}
     ]
+    # GRP's own rows are kept apart from SIG's. They are not "computed" in SIG's sense, so the
+    # preference for pack-time computations below would otherwise drop them entirely whenever SIG
+    # returned any computed finding, which is exactly what a Planner asked about (ADR-0028).
+    local = [item for item in records if item.get("retrieval") == LOCAL_RETRIEVAL]
+    sig_records = [item for item in records if item.get("retrieval") != LOCAL_RETRIEVAL]
     computed = [
         item
-        for item in records
+        for item in sig_records
         if str(item.get("retrieval", "")).casefold().startswith("computed")
     ]
-    findings = computed or records
+    findings = computed or sig_records
 
     def priority(item: dict[str, Any]) -> tuple[int, int]:
         value = f"{item.get('title', '')} {item.get('text', '')}".casefold()
@@ -414,7 +420,15 @@ def _deterministic_evidence_summary(
         return (next((index for index, term in enumerate(terms) if term in value), len(terms)),
                 int(item["n"]))
 
-    lines = ["## Available data"]
+    lines: list[str] = []
+    if local:
+        # First, because it answers "how many people live here" without SIG having to.
+        lines.append("## This district in the GRP data library")
+        for item in local:
+            text = " ".join(str(item["text"]).split())
+            lines.append(f"- {_truncate_evidence_text(text)} [{item['n']}]")
+        lines.append("")
+    lines.append("## Available data")
     if movement_unavailable:
         lines.append(
             "SIG returned district flood information. Evacuation-centre locations are shown "
