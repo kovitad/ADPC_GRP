@@ -178,6 +178,19 @@ on the VM.
 
 ---
 
+## 0.1 Proposed next architecture (ADR-0028, not implemented)
+
+A Planner asked whether six typical questions are answerable. Only the risk-weights question is.
+`docs/adr/0028-answer-planner-questions-from-both-grp-and-sig-evidence.md` records why and what to
+build. Three things a next agent should not redo from scratch:
+
+- Do not add RAG. The questions are numeric aggregations over structured rows; embedding retrieval
+  would supply approximate text where a Planner needs an exact count.
+- Do not add a tool-calling loop without settling AI-09 first. `run_ai_call` reserves, calls once
+  and settles one `request_id`; N provider calls per message has no representation in that ledger.
+- The cheap win is slice 1: the router already extracts `place`, so local rows can be attached to
+  the `sig_flood` citations before `run_ai_call`, behind the same-area check, with no migration.
+
 ## 1. Where we are
 
 | Area | State |
