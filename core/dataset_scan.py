@@ -143,25 +143,59 @@ def _cpg_encoding(path: Path) -> str | None:
     return aliases.get(value.upper(), value) or None
 
 
+# A byte-preserving read: every byte becomes one code point, so the original bytes can be
+# recovered exactly and decoded with the encoding the file declares.
+BYTE_PRESERVING_ENCODING = "ISO-8859-1"
+
+
 def _encoding_candidates(path: Path) -> list[tuple[str, str]]:
     """Declared shapefile encoding first; otherwise explicit, auditable Thai fallbacks."""
 
     if path.suffix.casefold() != ".shp":
         return [("UTF-8", "format")]
     declared = _cpg_encoding(path)
-    candidates = ([(declared, "cpg")] if declared else []) + [
+    # A declared encoding that fails on a few truncated values is recovered rather than abandoned.
+    # Guessing a different encoding decodes every row, silently and wrongly: that is how the
+    # village delivery came in as mojibake while its .cpg said UTF-8. Recovery is only offered
+    # when there is a declared encoding to recover to; without one, guessing is all there is.
+    candidates = (
+        [(declared, "cpg"), (declared, "cpg-recovered")] if declared else []
+    ) + [
         ("UTF-8", "assumed"),
         ("TIS-620", "assumed"),
         ("CP874", "assumed"),
     ]
     unique: list[tuple[str, str]] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, bool]] = set()
     for encoding, source in candidates:
-        key = encoding.casefold().replace("_", "-")
+        key = (encoding.casefold().replace("_", "-"), source == "cpg-recovered")
         if key not in seen:
             unique.append((encoding, source))
             seen.add(key)
     return unique
+
+
+def _recover_declared_text(result, declared: str) -> int:
+    """Re-decode a byte-preserving read with the encoding the file declares.
+
+    Returns the number of values that the declared encoding could not decode. Those keep a
+    replacement character rather than failing the whole file, and the caller reports the count.
+    """
+
+    replaced = 0
+    for column in result[3]:
+        if getattr(column, "dtype", None) is None or column.dtype != object:
+            continue
+        for index, value in enumerate(column):
+            if not isinstance(value, str):
+                continue
+            raw = value.encode(BYTE_PRESERVING_ENCODING, errors="replace")
+            try:
+                column[index] = raw.decode(declared)
+            except UnicodeDecodeError:
+                column[index] = raw.decode(declared, errors="replace")
+                replaced += 1
+    return replaced
 
 
 def read_vector_explicit(path: Path, *, read_geometry: bool = True):
@@ -171,7 +205,13 @@ def read_vector_explicit(path: Path, *, read_geometry: bool = True):
     candidates = _encoding_candidates(path)
     for encoding, source in candidates:
         try:
-            result = read_vector(path, read_geometry=read_geometry, encoding=encoding)
+            if source == "cpg-recovered":
+                result = read_vector(
+                    path, read_geometry=read_geometry, encoding=BYTE_PRESERVING_ENCODING
+                )
+                _recover_declared_text(result, encoding)
+            else:
+                result = read_vector(path, read_geometry=read_geometry, encoding=encoding)
             return result, encoding, source, [item[0] for item in candidates[: len(errors) + 1]]
         except Exception as error:  # noqa: BLE001 - try the next declared fallback
             errors.append(error)
