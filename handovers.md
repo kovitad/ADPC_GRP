@@ -1,12 +1,72 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 23 September 2026 (`main`; shared SIG contribution proof and planner-parity plan added)
+**Updated:** 24 September 2026 (`main`; Thailand Hub bootstrap/data-release design added)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
 **Delivery status:** The developer-only shelter flow is complete in the working tree: upload a Shapefile ZIP once, validate it in the worker, explicitly accept its immutable Platform version, select it in Planning's **Data & run** drawer, follow six persisted background steps, and open the named-centre map/table/recommendation result. The Data Library and Planning selector now identify **Local upload**, **Platform baseline** and **Synthetic demo** sources in plain language, including which source is used for real districts. SIG context remains optional and separate. **428 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax and whitespace checks are clean. Migration `20260923_0013` is applied to the local Docker database. Static web assets are live-mounted; the API/worker image needs one rebuild for the latest source-label fields because the Docker Desktop engine CLI stopped responding during the final visual pass, although the existing app still answers `/api/v1/healthz`.
 
+**New design decision:** `.local/data-in/evacuation_centers` contains three different operational
+point sources, not three interchangeable shelter files: 10,303 shelters, 8,199 civil-defence
+volunteer centres and 1,533 early-warning resources. ADR-0020 proposes one secure point-import
+pipeline with three explicit, independently versioned roles. Only shelters remain an assessment
+input; volunteer centres and early-warning equipment become separately labelled district support
+layers. See [`docs/preparedness-point-data-design.md`](docs/preparedness-point-data-design.md).
+
+**Multi-level planning design:** the administrative delivery contains 77 province, 928 district
+and 7,436 sub-district polygons from edition `2025-10`. ADR-0021 proposes district and sub-district
+as user-selectable assessment levels inside one version-pinned hierarchy. The 80,397 village
+records are points, not boundaries; their declared UTF-8 text currently fails clean decoding and
+they omit 50 current districts/181 current sub-districts. They may later support location search,
+but selecting one must resolve to and confirm a real sub-district polygon. When GRP analyzes a
+sub-district, optional SIG evidence remains explicitly labelled as parent-district-wide context;
+its totals are never disaggregated or combined. See
+[`docs/multi-level-boundary-planning-design.md`](docs/multi-level-boundary-planning-design.md).
+
+**Thailand Hub bootstrap design:** ADR-0022 proposes importing the complete ~2.1 GB Thailand source
+tree from a checksum-pinned external bundle during deployment: boundaries/hierarchy, all three
+preparedness-point roles, RP100 and three separate vulnerability rasters. Source bytes stay out of
+Git/images/database. An idempotent CLI validates, converts and activates one compatible baseline
+release for the ADPC Hub; future Hub uploads remain immutable explicit overrides. The local bundle
+becomes the primary planning evidence, while SIG is optional for missing schools/hospitals/roads,
+documents/feeds and explicit cross-Hub/public exchange. A demo database may be rebuilt without a
+backup after exporting only allow-listed admin/Hub/AI/approved-recipe configuration; secrets remain
+in protected files. See
+[`docs/thailand-hub-bootstrap-data-plan.md`](docs/thailand-hub-bootstrap-data-plan.md).
+
+**External flood scenarios:** the supplied runbook itself names only regional RP100, but the
+reviewed SIG implementation at `6479521` registers JRC regional RP10, RP20, RP50, RP100, RP200 and
+RP500 layers (no RP25). ADR-0023 treats these 1 km, 2016-11 layers as optional district-wide
+screening, discovered from live capabilities and fetched with an exact `assemble_pack` hazard.
+They are not local assessment inputs and their counts are not merged with ADPC RP100. A read-only
+lookup creates no receipt; `ui_embed(hazard_map)` remains behind explicit public-record confirmation.
+See [`docs/adr/0023-sig-return-period-layers-are-external-screening.md`](docs/adr/0023-sig-return-period-layers-are-external-screening.md).
+
 **Handing over:** first execute the reviewed shared-SIG proof in [`docs/shared-sig-contribution-e2e-plan.md`](docs/shared-sig-contribution-e2e-plan.md). The local preview proved file compatibility only; it did not write to the shared service. Before the external write, replace the placeholder direct URL and confirm the licence, vintage, source-name mapping and repeated-coordinate decision. Then record one real contribution ID, test its contributor-only preview, obtain SIG review, prove `live=true`, and repeat `assemble_pack` as a fresh user. Do not retry a timed-out submit blindly and do not send the raw Shapefile or contact fields. In parallel, restart Docker Desktop only if its CLI is still unresponsive, rebuild API/worker, sign in again, then run the local Data library → Planning browser acceptance. Production Hub-local ownership/approval is still deferred. The Ubuntu launcher still needs its first host execution.
+
+For the next point-data implementation slice, review and accept ADR-0020 first. Then add the
+`volunteer_centers` and `early_warning_resources` dataset roles and versioned mapping profiles.
+Do not place either source in the evacuation-place selector and do not normalize volunteer `TEL`,
+`FAX`, `EMAIL` or full address into planner-facing records. Preserve the existing shelter endpoint
+as a compatibility adapter while the generic role-aware upload endpoint is introduced.
+
+For multi-level AOI work, review ADR-0021 and implement the hierarchy before exposing a new level
+in Planning. Generalize the importer, create a compatible boundary-release manifest, reconcile all
+7,436 sub-district parents, then add area search and server-side input resolution. Do not present
+the village point source as boundary coverage, and do not start browser boundary uploads before the
+existing upload security gate is approved.
+
+For deployment-data work, approve ADR-0022 and build the secret-free release manifest/preflight
+first. Do not copy `.local/data-in` into Git or the container image. Implement hierarchy, point and
+hazard dependencies before the bootstrap orchestrator; register child/elderly/disability rasters
+separately as display-ready until DEP-07 supplies an approved calculation method. Add the
+allow-listed admin settings export/apply command before rehearsing a destructive blank-database
+reset. The no-backup rule applies only to this rebuildable demo, not production.
+
+For additional return periods, implement ADR-0023 after recording the live risk-pack capability
+fixture. Offer only layers reported live, under **External SIG screening**. The likely requirement
+is RP20 and RP50, not RP25. Keep local shelter assessment on the imported RP100 until approved local
+RP20/RP50 rasters and methods exist.
 
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
