@@ -65,13 +65,21 @@ def world():
                 households=23594,
             )
         )
-        for index in range(3):
+        for index, (label, facility_type) in enumerate(
+            [
+                ("Centre 0", "school"),
+                ("Centre 1", "school"),
+                ("Centre 2", "temple"),
+                ("Centre 3", None),
+            ]
+        ):
             session.add(
                 Feature(
                     dataset_version_id=center_version.id,
                     boundary_id=kanthararom.id,
-                    name=f"Centre {index}",
-                    lon=104.0,
+                    name=label,
+                    facility_type=facility_type,
+                    lon=104.0 + index / 100,
                     lat=15.0,
                 )
             )
@@ -90,7 +98,10 @@ def test_population_and_centre_counts_become_citations(world) -> None:
     # The unconfirmed-source caveat must travel with the number into the brief.
     assert "not a count of vulnerable people" in population["text"]
     assert "1 of those villages is excluded" in population["text"]
-    assert "3 evacuation centres" in records[1]["text"]
+    assert "4 evacuation centres" in records[1]["text"]
+    # Largest kind first, and the unrecognised one admitted rather than folded into a kind.
+    assert "2 school, 1 buddhist temple" in records[1]["text"]
+    assert "A further 1 could not be classified" in records[1]["text"]
     # Capacity is not assessed, so the count must not read as a list of safe places.
     assert "not a list of safe places" in records[1]["text"]
 
@@ -126,3 +137,19 @@ def test_no_local_records_leaves_the_pack_untouched(world) -> None:
     pack = {"citations": [{"n": 1, "text": "SIG one"}]}
 
     assert attach_local_citations(pack, []) is pack
+
+
+def test_centres_whose_names_say_nothing_get_no_invented_breakdown(world) -> None:
+    session = world["session"]
+    for feature in session.query(Feature).all():
+        feature.facility_type = None
+    session.commit()
+
+    records = local_area_citations(session, world["area"])
+
+    text = records[1]["text"]
+    assert "4 evacuation centres" in text
+    assert "do not identify what kind of place" in text
+    # No count may be attached to any kind of place when none was recognised.
+    assert "By kind of place" not in text
+    assert "could not be classified" not in text

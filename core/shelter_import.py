@@ -21,6 +21,7 @@ from core.data_import_jobs import (
 from core.data_library_models import DataImportJob
 from core.dataset_readiness import DatasetReadiness
 from core.dataset_scan import pick_district_field, read_vector_explicit
+from core.facility_types import classify_facility
 from core.import_staging import (
     SourceFile,
     cleanup_import_staging,
@@ -47,7 +48,7 @@ REQUIRED_FIELDS = (SHELTER_PROVINCE, SHELTER_NAME)
 VILLAGE_FIELD_HINTS = ("หมู", "หม_", "village", "moo")
 SUBDISTRICT_FIELD_HINTS = ("ตำบ", "ตำ_", "tambon", "subdistrict")
 SUPPORTING_UNIT_FIELD_HINTS = ("หน่ว", "สังก", "responsible", "agency")
-IMPORTER_VERSION = "grp-shelters/5"
+IMPORTER_VERSION = "grp-shelters/6"
 PLATFORM_SHELTER_DATASET_ID = uuid5(
     NAMESPACE_URL, "grp:platform-dataset:thailand-ddpm-evacuation-centres"
 )
@@ -311,6 +312,9 @@ def _materialize_shelters(records: list[AssignedShelter]):
                 name=labels[item.source.source_index],
                 lon=item.source.lon,
                 lat=item.source.lat,
+                # From the delivered name, not the composed label: the label may carry a village
+                # qualifier or fall back to a number, neither of which names the kind of place.
+                facility_type=classify_facility(item.source.name),
                 attributes={
                     "admin_code": item.admin_code,
                     "source_name": item.source.name,

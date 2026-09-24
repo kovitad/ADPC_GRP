@@ -9,7 +9,7 @@ import api.catalog as routes
 from api.errors import GrpError
 from api.sessions import CurrentPrincipal
 from core.access_models import Base, uuid7
-from core.assessment_models import Boundary, Dataset, DatasetVersion
+from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import AreaPopulationSummary
 from core.identity import MembershipView
 
@@ -74,6 +74,25 @@ def world():
                 households=23594,
             )
         )
+        centers = Dataset(
+            type="evacuation_centers", owner_kind="platform", title="DDPM", provider="DDPM"
+        )
+        session.add(centers)
+        session.flush()
+        center_version = DatasetVersion(dataset_id=centers.id, sha256="c" * 64, is_current=True)
+        session.add(center_version)
+        session.flush()
+        for index, facility_type in enumerate(["school", "school", "temple", None]):
+            session.add(
+                Feature(
+                    dataset_version_id=center_version.id,
+                    boundary_id=boundary.id,
+                    name=f"Centre {index}",
+                    facility_type=facility_type,
+                    lon=104.0 + index / 100,
+                    lat=15.0,
+                )
+            )
         session.commit()
         yield {"session": session, "boundary_id": boundary.id}
 
@@ -113,3 +132,29 @@ def test_an_unsupported_area_is_not_found(world) -> None:
         routes.area_profile(world["boundary_id"], _principal(), session, None)
 
     assert error.value.status_code == 404
+
+
+def test_the_popup_breaks_recorded_centres_down_by_kind_of_place(world) -> None:
+    payload = routes.area_profile(world["boundary_id"], _principal(), world["session"], None)
+
+    centers = payload["evacuation_centers"]
+    assert centers["total"] == 4
+    # Largest kind first, and the unrecognised row present so the parts sum to the total.
+    assert [(item["key"], item["count"]) for item in centers["by_type"]] == [
+        ("school", 2),
+        ("temple", 1),
+        ("unclassified", 1),
+    ]
+    assert sum(item["count"] for item in centers["by_type"]) == centers["total"]
+    assert "capacity" in centers["caveat"]
+
+
+def test_centre_counts_survive_a_missing_population_row(world) -> None:
+    session = world["session"]
+    session.query(AreaPopulationSummary).delete()
+    session.commit()
+
+    payload = routes.area_profile(world["boundary_id"], _principal(), session, None)
+
+    assert payload["population"] is None
+    assert payload["evacuation_centers"]["total"] == 4

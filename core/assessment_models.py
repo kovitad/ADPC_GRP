@@ -152,6 +152,10 @@ class Feature(Base):
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     lon: Mapped[float] = mapped_column(Float, nullable=False)
     lat: Mapped[float] = mapped_column(Float, nullable=False)
+    # Derived from the delivered Thai name by core/facility_types.py, never delivered as a column.
+    # NULL means the name was not recognised: callers report that as unclassified and must not
+    # fold it into the nearest type (ADR-0028).
+    facility_type: Mapped[str | None] = mapped_column(String(32), index=True)
     attributes: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, default=dict, nullable=False)
 
 

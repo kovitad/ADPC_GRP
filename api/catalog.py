@@ -9,6 +9,8 @@ from api.permissions import SignedInMember
 from api.planning_access import planner_membership
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Method
 from core.data_library_models import AreaPopulationSummary
+from core.facility_types import TYPE_LABELS
+from core.local_evidence import facility_type_counts
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -173,6 +175,17 @@ def area_profile(
         if version is not None
         else None
     )
+    centers_version = session.scalar(
+        select(DatasetVersion)
+        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+        .where(Dataset.type == "evacuation_centers", DatasetVersion.is_current)
+        .order_by(DatasetVersion.created_at.desc())
+    )
+    facilities = (
+        facility_type_counts(session, centers_version.id, boundary.id)
+        if centers_version is not None
+        else {}
+    )
     area = {
         "id": str(boundary.id),
         "name": boundary.name,
@@ -183,11 +196,26 @@ def area_profile(
         "province_name_th": boundary.province_name_th,
         "country_name": boundary.country_name,
     }
+    evacuation_centers = {
+        "total": sum(facilities.values()),
+        "by_type": [
+            {"key": key, "label": TYPE_LABELS.get(key, key), "count": count}
+            for key, count in sorted(facilities.items(), key=lambda item: (-item[1], item[0]))
+        ],
+        "caveat": "Type is read from the delivered Thai name (ADR-0028). Centre capacity, "
+        "building condition and route safety are not assessed.",
+    }
     if summary is None:
         # Fail closed: say there is no population record rather than imply zero people.
-        return {"area": area, "population": None, "source": None}
+        return {
+            "area": area,
+            "population": None,
+            "source": None,
+            "evacuation_centers": evacuation_centers,
+        }
     return {
         "area": area,
+        "evacuation_centers": evacuation_centers,
         "population": {
             "village_count": summary.village_count,
             "counted_village_count": summary.counted_village_count,

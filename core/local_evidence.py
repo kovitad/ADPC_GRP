@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import AreaPopulationSummary
+from core.facility_types import TYPE_LABELS, UNCLASSIFIED
 
 RETRIEVAL = "grp-baseline"
 POPULATION_CAVEAT = (
@@ -85,6 +86,50 @@ def _population_citation(session: Session, boundary: Boundary) -> dict[str, Any]
     }
 
 
+def facility_type_counts(
+    session: Session, version_id: Any, boundary_id: Any
+) -> dict[str, int]:
+    """Count recorded centres by derived facility type for one area.
+
+    One indexed GROUP BY over a few hundred rows, so it stays inside the request budget without a
+    summary table. NULL is reported as ``unclassified`` rather than dropped, because a breakdown
+    that silently omits rows would not add up to the total a Planner is also shown.
+    """
+
+    rows = session.execute(
+        select(Feature.facility_type, func.count(Feature.id))
+        .where(
+            Feature.dataset_version_id == version_id,
+            Feature.boundary_id == boundary_id,
+        )
+        .group_by(Feature.facility_type)
+    ).all()
+    return {(facility_type or UNCLASSIFIED): int(count) for facility_type, count in rows}
+
+
+def _facility_breakdown_sentence(counts: dict[str, int]) -> str:
+    """Describe the mix, largest first, naming the unclassified remainder explicitly."""
+
+    known = {key: value for key, value in counts.items() if key != UNCLASSIFIED}
+    if not known:
+        return (
+            "The delivered names do not identify what kind of place any of these centres are, so "
+            "no breakdown by school, temple or sports ground is available."
+        )
+    ordered = sorted(known.items(), key=lambda item: (-item[1], item[0]))
+    described = ", ".join(
+        f"{count:,} {TYPE_LABELS.get(key, key).lower()}" for key, count in ordered
+    )
+    sentence = f"By kind of place, as read from the delivered Thai names: {described}."
+    unclassified = counts.get(UNCLASSIFIED, 0)
+    if unclassified:
+        sentence += (
+            f" A further {unclassified:,} could not be classified from their delivered name and "
+            "are not counted in any of those kinds."
+        )
+    return sentence
+
+
 def _shelter_citation(session: Session, boundary: Boundary) -> dict[str, Any] | None:
     version = _current_version(session, "evacuation_centers")
     if version is None:
@@ -105,10 +150,15 @@ def _shelter_citation(session: Session, boundary: Boundary) -> dict[str, Any] | 
             "the area has none."
         )
     else:
-        text = (
-            f"The current DDPM evacuation-centre release records {total:,} evacuation centres in "
-            f"{_area_label(boundary)}. Centre capacity, building condition and route safety are "
-            "not assessed, so this is a count of recorded centres and not a list of safe places."
+        counts = facility_type_counts(session, version.id, boundary.id)
+        text = " ".join(
+            [
+                f"The current DDPM evacuation-centre release records {total:,} evacuation centres "
+                f"in {_area_label(boundary)}.",
+                _facility_breakdown_sentence(counts),
+                "Centre capacity, building condition and route safety are not assessed, so this "
+                "is a count of recorded centres and not a list of safe places.",
+            ]
         )
     return {
         "title": f"Recorded evacuation centres, {boundary.name}",

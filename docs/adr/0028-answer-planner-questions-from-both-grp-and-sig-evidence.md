@@ -64,7 +64,7 @@ may cover.
 | Table | Unlocks | Computed |
 | --- | --- | --- |
 | `area_flood_exposure` — area x return period, villages/people/households inside the zone, split by depth band | Q2 | Worker job at activation; village points sampled against the pinned raster with `rasterio.sample()` |
-| `facility_type` on `Feature`, plus per-area counts by type | Q3 | Import time, from the Thai name prefix, same pattern as `AreaPopulationSummary` |
+| `facility_type` on `Feature` | Q3 | Import time, from the Thai name prefix. Per-area counts are one indexed `GROUP BY` over a few hundred rows, so no summary table is added |
 
 `area_flood_exposure` records `counted`, `excluded` and `no_data` village counts so a partial
 sample is visible rather than silently low, matching ADR-0027's handling of unusable rows.
@@ -91,6 +91,8 @@ owner approves a documented suitability method, which is a DEP-07 style decision
 - No new runtime dependency. `rasterio`, `pyogrio` and `shapely` are already the `gis` extra.
 
 ## Slices
+
+Slices 1 and 2 are implemented; the status line above predates them and is kept for the parts that remain.
 
 1. Attach existing `AreaPopulationSummary` and district shelter counts to the `sig_flood`
    citations, behind the same-area check. No migration.

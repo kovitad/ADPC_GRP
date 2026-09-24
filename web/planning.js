@@ -503,10 +503,30 @@
       `<strong>${title}</strong><br><span class="pw-area-pop__level">${levelLabel}` +
       (province ? ` · ${province}` : "") +
       `</span>`;
+    // Recorded evacuation centres by kind of place. Shown even when population is missing,
+    // because the two come from different deliveries and either can be absent alone.
+    const centers = profile && profile.evacuation_centers;
+    const centerRows =
+      centers && centers.total
+        ? `<p class="pw-area-pop__level">Recorded evacuation centres: ` +
+          `${numberText(centers.total)}</p>` +
+          `<table class="pw-area-pop__table"><tbody>` +
+          centers.by_type
+            .map(
+              (item) =>
+                `<tr><th scope="row">${item.label}</th><td>${numberText(item.count)}</td></tr>`,
+            )
+            .join("") +
+          `</tbody></table>` +
+          `<p class="pw-area-pop__caveat">${centers.caveat || ""}</p>`
+        : centers
+          ? `<p class="pw-area-pop__none">No evacuation centres are recorded for this area.</p>`
+          : "";
     if (!profile || !profile.population) {
       return (
         `<div class="pw-area-pop">${head}` +
-        `<p class="pw-area-pop__none">No population record for this area.</p></div>`
+        `<p class="pw-area-pop__none">No population record for this area.</p>` +
+        `${centerRows}</div>`
       );
     }
     const p = profile.population;
@@ -533,7 +553,7 @@
       `<table class="pw-area-pop__table"><tbody>${rows}</tbody></table>${note}` +
       `<p class="pw-area-pop__caveat">${source.label || "Registered village population"}` +
       (source.edition ? ` · edition ${source.edition}` : "") +
-      `. ${source.caveat || ""}</p></div>`
+      `. ${source.caveat || ""}</p>${centerRows}</div>`
     );
   };
 
