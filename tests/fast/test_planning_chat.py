@@ -1127,3 +1127,64 @@ def test_a_place_grp_does_not_hold_attaches_no_local_evidence(planning) -> None:
 
     assert response.status_code == 200, response.json()
     assert "registered residents" not in prompts[-1]
+
+
+def test_a_brief_citing_grp_figures_is_not_offered_a_sig_receipt(planning) -> None:
+    """A SIG receipt asserts SIG's evidence; it must not certify GRP's own numbers."""
+
+    FakeMcp.pack = {
+        **PACK,
+        "target": {"place": "Kanthararom District, Si Sa Ket, Thailand", "hazard": "flood"},
+        "trace": ["aoi[Kanthararom District] 41 km2 via admin boundary ~41 km²"],
+    }
+    with Session(planning["engine"]) as session:
+        dataset = Dataset(
+            type="village_locations", owner_kind="platform", title="Villages", provider="ADPC"
+        )
+        session.add(dataset)
+        session.flush()
+        version = DatasetVersion(dataset_id=dataset.id, sha256="d" * 64, is_current=True)
+        session.add(version)
+        session.flush()
+        session.add(
+            AreaPopulationSummary(
+                dataset_version_id=version.id,
+                admin_code="3303",
+                admin_level="district",
+                village_count=175,
+                counted_village_count=175,
+                excluded_village_count=0,
+                male=43309,
+                female=42259,
+                total_population=85568,
+                households=23594,
+            )
+        )
+        session.commit()
+    # The draft quotes citation 2, which is GRP's population row.
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\n85,568 residents [2]",
+    ]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="How many people live there?",
+        place="Kanthararom District, Si Sa Ket, Thailand",
+    ).json()
+
+    assert body["publish_token"] is None
+    assert any("cannot certify" in issue for issue in body["draft_issues"])
+
+
+def test_a_sig_only_brief_can_still_be_published(planning) -> None:
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    assert body["publish_token"] is not None
+    assert body["draft_issues"] == []

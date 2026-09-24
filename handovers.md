@@ -203,7 +203,12 @@ Three things a next agent should not redo from scratch:
   and settles one `request_id`; N provider calls per message has no representation in that ledger.
 - `grpcli.exposure build` is not wired to anything automatic. Re-run it whenever a new village or
   hazard version becomes current, and note that a re-import lands as `technically_valid` and is
-  invisible until `activate_mvp1_baseline` moves `is_current`.
+  invisible until `activate_mvp1_baseline` moves `is_current`. A superseded exposure table logs a
+  warning naming the area rather than going quiet, so grep `grp.local_evidence` if an exposure
+  figure disappears.
+- A brief that quotes a GRP figure cannot be published as a SIG receipt, by design: SIG's
+  groundedness gate holds only the SIG pack. The receipt is withheld with the reason shown. Do not
+  "fix" this by sending GRP citations to `publish_answer`.
 
 Still refused by design, and no table fixes them: which centres are good candidates as a safe
 place, and where to install early-warning sensors. Both are suitability recommendations that

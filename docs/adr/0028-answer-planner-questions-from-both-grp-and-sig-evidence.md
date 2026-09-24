@@ -101,6 +101,25 @@ Consequences that are not optional:
   cases attached, not a defect introduced here, but any future "how many are safe" question has to
   start by getting a layer that distinguishes dry from unknown.
 
+## A GRP figure in a brief withholds the SIG receipt
+
+`publish_answer` sends SIG only `pack_id`, `question` and the draft text, and SIG's groundedness
+gate holds the SIG pack alone. A brief quoting GRP's citations would therefore either be rejected
+by that gate or mint a public receipt asserting numbers SIG never produced. Neither is acceptable,
+so when the draft actually quotes a GRP citation number the receipt is withheld and the brief is
+shown as unpublishable, with the reason stated. A SIG-only brief publishes exactly as before.
+
+This is checked on what the draft cites, not on what was attached, so attaching GRP evidence never
+costs a Planner a receipt they could otherwise have had.
+
+## The exposure table can be superseded without being rebuilt
+
+`activate_mvp1_baseline` moves `is_current` without recomputing anything, so a new hazard version
+leaves `area_flood_exposure` keyed to the old pair. A missing row and a superseded row would both
+read as silence, which is indistinguishable from a district with nobody exposed. The lookup
+therefore logs a warning naming the area and `python -m grpcli.exposure build` when rows exist for
+the area but not for the current pair.
+
 ## Consequences
 
 - A Planner asking about population or shelters gets GRP's own cited figures in the same brief as

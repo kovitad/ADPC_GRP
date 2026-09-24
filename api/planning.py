@@ -40,7 +40,11 @@ from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
 from core.hazard_import import PLATFORM_HAZARD_DATASET_ID
 from core.identity import MembershipView
-from core.local_evidence import attach_local_citations, local_area_citations
+from core.local_evidence import (
+    attach_local_citations,
+    cited_local_numbers,
+    local_area_citations,
+)
 from core.models import AssessmentState
 from core.risk_recipe import RiskRecipe, active_risk_recipe, recipe_payload
 from core.shelter_import import PLATFORM_SHELTER_DATASET_ID
@@ -1074,6 +1078,15 @@ async def planning_chat(
         **evidence_bundle(payload.message, place, pack, area_payload, trace, None),
         "total_ms": elapsed_ms(request_started),
     }
+    # A SIG receipt asserts SIG's evidence. A brief that quotes GRP's own figures cannot be
+    # published as one, so the receipt is withheld rather than letting SIG vouch for our numbers
+    # or having its groundedness gate reject a pack it never saw them in (ADR-0028).
+    quoted_local = cited_local_numbers(answer, pack)
+    if quoted_local and not issues:
+        issues = [
+            "This brief cites GRP data library figures, which a SIG receipt cannot certify. "
+            "The brief is shown, but no public receipt can be issued for it."
+        ]
     publish_token = None
     if not issues:
         publish_token = encode_publish_token(

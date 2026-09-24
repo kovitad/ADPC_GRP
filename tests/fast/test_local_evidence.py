@@ -11,6 +11,7 @@ from core.data_library_models import AreaFloodExposure, AreaPopulationSummary
 from core.local_evidence import (
     RETRIEVAL,
     attach_local_citations,
+    cited_local_numbers,
     local_area_citations,
 )
 
@@ -252,3 +253,39 @@ def test_a_layer_that_marks_no_village_dry_says_so(world) -> None:
         if item["kind"] == "grp_flood_exposure"
     )
     assert "no village in this area has been positively confirmed as dry" in exposure["text"]
+
+
+def test_a_brief_quoting_grp_figures_is_detected_for_the_receipt_gate() -> None:
+    pack = {"_grp_local_citation_numbers": [3, 4]}
+
+    assert cited_local_numbers("SIG says x [1]. GRP says y [3].", pack) == [3]
+    assert cited_local_numbers("both [3] and [4]", pack) == [3, 4]
+    # A brief that only quotes SIG may still be published.
+    assert cited_local_numbers("only SIG here [1][2]", pack) == []
+    # No GRP citations were attached at all.
+    assert cited_local_numbers("anything [3]", {}) == []
+
+
+def test_a_superseded_exposure_row_is_logged_rather_than_silently_missing(world, caplog) -> None:
+    """An activation moves is_current without rebuilding; that must not look like nobody exposed."""
+
+    session = world["session"]
+    _with_exposure(session, world["area"])
+    # Simulate a newer hazard version becoming current without a rebuild.
+    row = session.query(AreaFloodExposure).one()
+    row.hazard_version_id = row.village_version_id
+    session.commit()
+
+    with caplog.at_level("WARNING"):
+        records = local_area_citations(session, world["area"])
+
+    assert not any(item["kind"] == "grp_flood_exposure" for item in records)
+    assert "exposure is stale" in caplog.text
+    assert "grpcli.exposure build" in caplog.text
+
+
+def test_an_area_that_was_never_built_logs_nothing(world, caplog) -> None:
+    with caplog.at_level("WARNING"):
+        local_area_citations(world["session"], world["area"])
+
+    assert "exposure is stale" not in caplog.text

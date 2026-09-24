@@ -15,6 +15,7 @@ Two deliberate constraints:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from sqlalchemy import func, select
@@ -23,6 +24,8 @@ from sqlalchemy.orm import Session
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import AreaFloodExposure, AreaPopulationSummary
 from core.facility_types import UNCLASSIFIED, counted_label
+
+logger = logging.getLogger("grp.local_evidence")
 
 RETRIEVAL = "grp-baseline"
 POPULATION_CAVEAT = (
@@ -191,8 +194,25 @@ def _exposure_citation(session: Session, boundary: Boundary) -> dict[str, Any] |
         )
     )
     if row is None:
-        # No stored row means the exposure job has not run for this pair of versions. Stay silent:
-        # an absent figure is not a zero, and the request must not compute one.
+        # No row for the current pair of versions. Stay silent rather than compute one here, but
+        # distinguish "never built" from "built for a version that has since been superseded":
+        # an activation moves is_current without rebuilding, and a silently missing exposure
+        # figure is otherwise indistinguishable from a district with nobody exposed.
+        stale = session.scalar(
+            select(func.count(AreaFloodExposure.id)).where(
+                AreaFloodExposure.admin_code == boundary.admin_code,
+                AreaFloodExposure.admin_level == boundary.admin_level,
+            )
+        )
+        if stale:
+            logger.warning(
+                "Area flood exposure is stale for %s %s: rows exist but none for hazard %s and "
+                "villages %s. Re-run python -m grpcli.exposure build.",
+                boundary.admin_level,
+                boundary.admin_code,
+                hazard.id,
+                village.id,
+            )
         return None
     sentences = [
         f"Under the {row.return_period_years}-year flood scenario, {row.people_in_zone:,} "
@@ -273,3 +293,21 @@ def attach_local_citations(
         "citations": citations + numbered,
         "_grp_local_citation_numbers": [item["n"] for item in numbered],
     }
+
+
+def cited_local_numbers(draft: str, pack: dict[str, Any]) -> list[int]:
+    """Which GRP citation numbers the draft actually quotes.
+
+    A SIG receipt is SIG's assertion about SIG's evidence. If a brief quotes GRP's own figures,
+    SIG cannot vouch for them: its groundedness gate only holds the SIG pack, so publishing would
+    either be rejected there or mint a public receipt asserting numbers SIG never produced. The
+    caller withholds the receipt when this returns anything.
+    """
+
+    import re
+
+    numbers = pack.get("_grp_local_citation_numbers")
+    if not isinstance(numbers, list) or not numbers:
+        return []
+    cited = {int(match) for match in re.findall(r"\[(\d+)\]", draft or "")}
+    return sorted(number for number in numbers if int(number) in cited)
