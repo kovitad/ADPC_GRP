@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import AreaFloodExposure, AreaPopulationSummary
-from core.facility_types import TYPE_LABELS, UNCLASSIFIED
+from core.facility_types import UNCLASSIFIED, counted_label
 
 RETRIEVAL = "grp-baseline"
 POPULATION_CAVEAT = (
@@ -117,15 +117,15 @@ def _facility_breakdown_sentence(counts: dict[str, int]) -> str:
             "no breakdown by school, temple or sports ground is available."
         )
     ordered = sorted(known.items(), key=lambda item: (-item[1], item[0]))
-    described = ", ".join(
-        f"{count:,} {TYPE_LABELS.get(key, key).lower()}" for key, count in ordered
-    )
+    described = ", ".join(f"{count:,} {counted_label(key, count)}" for key, count in ordered)
     sentence = f"By kind of place, as read from the delivered Thai names: {described}."
     unclassified = counts.get(UNCLASSIFIED, 0)
     if unclassified:
         sentence += (
-            f" A further {unclassified:,} could not be classified from their delivered name and "
-            "are not counted in any of those kinds."
+            f" A further {unclassified:,} "
+            + ("could not be classified from its delivered name and is" if unclassified == 1
+               else "could not be classified from their delivered names and are")
+            + " not counted in any of those kinds."
         )
     return sentence
 

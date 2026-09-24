@@ -48,7 +48,7 @@ REQUIRED_FIELDS = (SHELTER_PROVINCE, SHELTER_NAME)
 VILLAGE_FIELD_HINTS = ("หมู", "หม_", "village", "moo")
 SUBDISTRICT_FIELD_HINTS = ("ตำบ", "ตำ_", "tambon", "subdistrict")
 SUPPORTING_UNIT_FIELD_HINTS = ("หน่ว", "สังก", "responsible", "agency")
-IMPORTER_VERSION = "grp-shelters/6"
+IMPORTER_VERSION = "grp-shelters/7"
 PLATFORM_SHELTER_DATASET_ID = uuid5(
     NAMESPACE_URL, "grp:platform-dataset:thailand-ddpm-evacuation-centres"
 )

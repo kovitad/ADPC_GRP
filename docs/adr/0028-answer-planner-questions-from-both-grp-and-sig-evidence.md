@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Nothing in this ADR is implemented yet.
+Accepted. Slices 1-3 are implemented and verified on the desktop stack; slice 4 (tool calling) is deferred pending the AI-09 question below.
 
 ## Context
 
@@ -111,7 +111,7 @@ Consequences that are not optional:
 
 ## Slices
 
-Slices 1 and 2 are implemented; the status line above predates them and is kept for the parts that remain.
+Slices 1-3 are implemented. Slice 4 is not.
 
 1. Attach existing `AreaPopulationSummary` and district shelter counts to the `sig_flood`
    citations, behind the same-area check. No migration.

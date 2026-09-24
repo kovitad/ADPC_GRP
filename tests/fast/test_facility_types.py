@@ -49,3 +49,36 @@ def test_every_rule_has_an_english_label() -> None:
     for _, facility_type in PREFIX_RULES + SUBSTRING_RULES:
         assert facility_type in TYPE_LABELS
     assert UNCLASSIFIED in TYPE_LABELS
+
+
+def test_both_thai_spellings_of_multi_purpose_building_are_recognised() -> None:
+    # The delivery carries อเนก and เอนก; missing one silently under-counts community halls.
+    assert classify_facility("อาคารอเนกประสงค์หมู่บ้าน") == "community_hall"
+    assert classify_facility("อาคารเอนกประสงค์หมู่บ้าน") == "community_hall"
+
+
+def test_the_kinds_of_place_that_are_not_buildings_are_recognised() -> None:
+    assert classify_facility("จุดอพยพชั่วคราว") == "temporary_evacuation_point"
+    assert classify_facility("พื้นที่สูงในหมู่บ้าน") == "high_ground"
+    assert classify_facility("บนถนนหลวง42") == "road_or_embankment"
+    assert classify_facility("คันคลองชลประทาน") == "road_or_embankment"
+    assert classify_facility("ค่ายสิรินธร") == "military_site"
+    assert classify_facility("ศูนย์พักพิงพระราชทานฯ") == "shelter_centre"
+
+
+def test_a_school_on_a_road_is_still_a_school() -> None:
+    # The road rules must not outrank a leading kind of place.
+    assert classify_facility("โรงเรียนบ้านถนนใหญ่") == "school"
+
+
+def test_a_count_agrees_in_number_with_its_label() -> None:
+    from core.facility_types import TYPE_LABELS_PLURAL, counted_label
+
+    assert counted_label("school", 1) == "school"
+    assert counted_label("school", 2) == "schools"
+    # The cases naive pluralisation gets wrong.
+    assert counted_label("college", 3) == "colleges or universities"
+    assert counted_label("health_facility", 4) == "health facilities"
+    assert counted_label("church", 2) == "churches"
+    # Every label needs a plural, or a brief prints a singular beside a plural count.
+    assert set(TYPE_LABELS_PLURAL) == set(TYPE_LABELS)

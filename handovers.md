@@ -178,18 +178,37 @@ on the VM.
 
 ---
 
-## 0.1 Proposed next architecture (ADR-0028, not implemented)
+## 0.1 ADR-0028 slices 1-3 are implemented
 
-A Planner asked whether six typical questions are answerable. Only the risk-weights question is.
-`docs/adr/0028-answer-planner-questions-from-both-grp-and-sig-evidence.md` records why and what to
-build. Three things a next agent should not redo from scratch:
+A Planner asked whether six typical questions are answerable. Of the six, the risk-weights one
+already worked; slices 1-3 below make three more answerable, and two stay refused by design.
+
+| Slice | What it does | Where |
+| --- | --- | --- |
+| 1 | Appends GRP's own rows to the SIG citation list before the single draft call, so the brief can cite them | `core/local_evidence.py` |
+| 2 | Derives a facility type from the delivered Thai name at import time and counts it per area | `core/facility_types.py`, migration `20260924_0017` |
+| 3 | Samples village points against the hazard tiles outside the request path and stores one row per area | `core/village_flood_exposure.py`, `grpcli/exposure.py`, migration `20260924_0018` |
+
+Verified on the desktop stack, not only in tests: migrations `0017` and `0018` applied to
+PostgreSQL, `python -m grpcli.exposure build` wrote 8,133 area rows from the real 80,397 villages,
+and a shelter re-import plus baseline activation classified 8,813 of 10,303 centres. Kanthararom
+reads 7,176 residents in 19 villages inside the RP100 extent; Chiang Yuen reads 9 centres as 6
+government offices, 2 schools and 1 unrecognised.
+
+Three things a next agent should not redo from scratch:
 
 - Do not add RAG. The questions are numeric aggregations over structured rows; embedding retrieval
   would supply approximate text where a Planner needs an exact count.
 - Do not add a tool-calling loop without settling AI-09 first. `run_ai_call` reserves, calls once
   and settles one `request_id`; N provider calls per message has no representation in that ledger.
-- The cheap win is slice 1: the router already extracts `place`, so local rows can be attached to
-  the `sig_flood` citations before `run_ai_call`, behind the same-area check, with no migration.
+- `grpcli.exposure build` is not wired to anything automatic. Re-run it whenever a new village or
+  hazard version becomes current, and note that a re-import lands as `technically_valid` and is
+  invisible until `activate_mvp1_baseline` moves `is_current`.
+
+Still refused by design, and no table fixes them: which centres are good candidates as a safe
+place, and where to install early-warning sensors. Both are suitability recommendations that
+`DRAFT_INSTRUCTIONS` forbids and `api/assessments.py` disclaims. Buildings affected by RP100 needs
+a `building_footprints` Data Library category that does not exist, so SIG remains the only path.
 
 ## 0.2 The flood layer has no dry value (measured, 24 September 2026)
 

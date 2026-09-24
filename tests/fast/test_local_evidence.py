@@ -100,8 +100,11 @@ def test_population_and_centre_counts_become_citations(world) -> None:
     assert "1 of those villages is excluded" in population["text"]
     assert "4 evacuation centres" in records[1]["text"]
     # Largest kind first, and the unrecognised one admitted rather than folded into a kind.
-    assert "2 school, 1 buddhist temple" in records[1]["text"]
-    assert "A further 1 could not be classified" in records[1]["text"]
+    assert "2 schools, 1 buddhist temple" in records[1]["text"]
+    assert (
+        "A further 1 could not be classified from its delivered name and is not"
+        in records[1]["text"]
+    )
     # Capacity is not assessed, so the count must not read as a list of safe places.
     assert "not a list of safe places" in records[1]["text"]
 

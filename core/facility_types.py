@@ -44,7 +44,20 @@ PREFIX_RULES: tuple[tuple[str, str], ...] = (
     ("ศาลาการเปรียญ", "temple"),
     ("ศาลา", "community_hall"),
     ("หอประชุม", "community_hall"),
+    # Both Thai spellings of "multi-purpose building" appear in the delivery.
     ("อาคารอเนกประสงค์", "community_hall"),
+    ("อาคารเอนกประสงค์", "community_hall"),
+    ("ศูนย์พักพิง", "shelter_centre"),
+    ("จุดอพยพ", "temporary_evacuation_point"),
+    ("จุดรวมพล", "temporary_evacuation_point"),
+    ("พื้นที่สูง", "high_ground"),
+    ("ที่สูง", "high_ground"),
+    ("ค่าย", "military_site"),
+    ("ฝูงบิน", "military_site"),
+    ("กองพัน", "military_site"),
+    ("บนถนน", "road_or_embankment"),
+    ("ถนน", "road_or_embankment"),
+    ("คันคลอง", "road_or_embankment"),
     ("ที่ว่าการอำเภอ", "government_office"),
     ("องค์การบริหารส่วนตำบล", "government_office"),
     ("อบต.", "government_office"),
@@ -78,8 +91,44 @@ TYPE_LABELS: dict[str, str] = {
     "community_hall": "Community hall",
     "government_office": "Government office",
     "health_facility": "Health facility",
+    "shelter_centre": "Shelter centre",
+    "temporary_evacuation_point": "Temporary evacuation point",
+    "high_ground": "High ground in the village",
+    "military_site": "Military site",
+    "road_or_embankment": "Road or embankment",
     UNCLASSIFIED: "Type not recognised in the source name",
 }
+
+# Written out rather than derived, because appending "s" mangles "college or university" and
+# "health facility". Every value in TYPE_LABELS needs an entry.
+TYPE_LABELS_PLURAL: dict[str, str] = {
+    "school": "schools",
+    "college": "colleges or universities",
+    "childcare_centre": "childcare centres",
+    "temple": "Buddhist temples",
+    "mosque": "mosques",
+    "church": "churches",
+    "sports_ground": "sports grounds or stadiums",
+    "community_hall": "community halls",
+    "government_office": "government offices",
+    "health_facility": "health facilities",
+    "shelter_centre": "shelter centres",
+    "temporary_evacuation_point": "temporary evacuation points",
+    "high_ground": "areas of high ground in a village",
+    "military_site": "military sites",
+    "road_or_embankment": "roads or embankments",
+    UNCLASSIFIED: "of an unrecognised type",
+}
+
+
+def counted_label(facility_type: str, count: int) -> str:
+    """Name a facility type to agree in number with the count beside it."""
+
+    if count == 1:
+        return TYPE_LABELS.get(facility_type, facility_type).lower()
+    return TYPE_LABELS_PLURAL.get(
+        facility_type, TYPE_LABELS.get(facility_type, facility_type).lower()
+    )
 
 
 def classify_facility(name: str) -> str | None:
