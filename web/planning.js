@@ -2050,19 +2050,16 @@
     updateSend();
     const typing = addProgress({ publish });
     try {
-      const payload = await GRP.request("/api/v1/planning/chat", {
-        method: "POST",
-        body: {
-          message: requestMessage,
-          place: confirmedPlace,
-          hub_code: state.hubCode,
-          boundary_id: state.explicitSelection && state.selected ? state.selected.id : null,
-          assessment_id: state.assessmentId,
-          publish_receipt: publish,
-          publish_token: publishToken,
-          refresh,
-          history: state.history.slice(-8),
-        },
+      const payload = await askPlanning({
+        message: requestMessage,
+        place: confirmedPlace,
+        hub_code: state.hubCode,
+        boundary_id: state.explicitSelection && state.selected ? state.selected.id : null,
+        assessment_id: state.assessmentId,
+        publish_receipt: publish,
+        publish_token: publishToken,
+        refresh,
+        history: state.history.slice(-8),
       });
       typing.remove();
       if (payload.usage) showAllowance(payload.usage);
@@ -2135,6 +2132,50 @@
       state.busy = false;
       updateSend();
       input.focus();
+    }
+  };
+
+  // A SIG gather for a Thai district has been measured at over a minute, so the answer comes
+  // back as a job rather than as a held-open request (ADR-0025). The top-bar pill shows it
+  // running, so a planner can switch pages and be told when it lands.
+  const LOOKUP_POLL_MS = 2000;
+  const LOOKUP_GIVE_UP_MS = 10 * 60 * 1000;
+
+  const askPlanning = async (body) => {
+    const started = await GRP.request("/api/v1/planning/lookups", { method: "POST", body });
+    const statusPath = `/api/v1/planning/lookups/${started.job_id}`;
+    GRP.jobs.track({
+      id: started.job_id,
+      label: "SIG evidence lookup",
+      statusPath,
+      href: "/planning.html",
+      ownerPath: "/planning.html",
+    });
+    const deadline = Date.now() + LOOKUP_GIVE_UP_MS;
+    try {
+      for (;;) {
+        const status = await GRP.request(statusPath);
+        if (status.state === "succeeded") return status.answer;
+        if (status.state === "failed") {
+          const failure = new Error(status.error || "The SIG lookup could not be completed.");
+          failure.code = status.error_code;
+          throw failure;
+        }
+        if (Date.now() > deadline) {
+          const timeout = new Error(
+            "This lookup is taking longer than expected. The top bar keeps watching it.",
+          );
+          timeout.code = "LOOKUP_STILL_RUNNING";
+          timeout.keepWatching = true;
+          throw timeout;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, LOOKUP_POLL_MS));
+      }
+    } catch (error) {
+      // Stop watching only what has actually ended. A lookup this page gave up polling is
+      // still running on the server, and the top bar is then the only thing tracking it.
+      if (!error.keepWatching) GRP.jobs.done(started.job_id);
+      throw error;
     }
   };
 

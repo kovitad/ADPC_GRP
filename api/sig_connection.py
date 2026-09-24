@@ -117,9 +117,12 @@ async def sig_access_token(settings: Settings, session_id: str) -> str | None:
 
 
 def forget(session_id: str) -> None:
-    """Drop the session's token and its renewal lock, at sign-out."""
+    """Drop the session's token, its renewal lock and any lookup it started, at sign-out."""
+
+    from api.sig_jobs import sig_lookups
 
     session_token_store.delete(session_id)
+    sig_lookups.forget_session(session_id)
     with _renewal_locks_guard:
         lock = _renewal_locks.get(session_id)
         if lock is not None and not lock.locked():

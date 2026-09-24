@@ -27,6 +27,7 @@ from core.import_staging import (
     promote_staged_import,
     stage_import_files,
 )
+from core.shelter_labels import ShelterLabelInput, compose_labels
 from core.storage import Storage
 
 SHELTER_SOURCE_REF = "evacuation_centers/shelters"
@@ -34,8 +35,17 @@ SHELTER_STEM = "ddpm_shelters"
 REQUIRED_SUFFIXES = (".shp", ".shx", ".dbf", ".prj")
 OPTIONAL_SUFFIXES = (".cpg", ".sbn", ".sbx", ".shp.xml")
 SHELTER_PROVINCE = "จัง"
-REQUIRED_FIELDS = (SHELTER_PROVINCE,)
-IMPORTER_VERSION = "grp-shelters/2"
+# The product owner confirmed these truncated columns on 23 September 2026 (ADR-0024):
+# `สถ_1` names the centre and `รอง` is the number of people it can take.
+SHELTER_NAME = "สถ_1"
+SHELTER_CAPACITY = "รอง"
+REQUIRED_FIELDS = (SHELTER_PROVINCE, SHELTER_NAME)
+# Optional context used only to tell two centres of the same name apart. A delivery without
+# them still imports; the labels just fall back to a number, which the report counts.
+VILLAGE_FIELD_HINTS = ("หมู", "หม_", "village", "moo")
+SUBDISTRICT_FIELD_HINTS = ("ตำบ", "ตำ_", "tambon", "subdistrict")
+SUPPORTING_UNIT_FIELD_HINTS = ("หน่ว", "สังก", "responsible", "agency")
+IMPORTER_VERSION = "grp-shelters/3"
 PLATFORM_SHELTER_DATASET_ID = uuid5(
     NAMESPACE_URL, "grp:platform-dataset:thailand-ddpm-evacuation-centres"
 )
@@ -55,6 +65,10 @@ class ShelterSourceRecord:
     lon: float
     lat: float
     point: object
+    capacity: int | None = None
+    village: str = ""
+    subdistrict: str = ""
+    supporting_unit: str = ""
 
 
 @dataclass(frozen=True)
@@ -130,6 +144,9 @@ def validate_shelter_collection(
     if geometries is None or len(geometries) == 0:
         raise ShelterImportError("Evacuation-centre collection has no features")
     columns = {name: values for name, values in zip(field_names, fields, strict=True)}
+    village_field = _pick_optional_field(field_names, VILLAGE_FIELD_HINTS)
+    subdistrict_field = _pick_optional_field(field_names, SUBDISTRICT_FIELD_HINTS)
+    unit_field = _pick_optional_field(field_names, SUPPORTING_UNIT_FIELD_HINTS)
     records: list[ShelterSourceRecord] = []
     for index, raw_geometry in enumerate(geometries):
         if raw_geometry is None:
@@ -137,20 +154,46 @@ def validate_shelter_collection(
         point = from_wkb(raw_geometry)
         if not isinstance(point, Point) or point.is_empty or not point.is_valid:
             raise ShelterImportError("Evacuation-centre collection contains invalid point geometry")
-        # DEP-06 has not confirmed either truncated `สถ...` field or `รอง`. Do not
-        # infer a planner-facing facility name merely from values that look name-like.
         records.append(
             ShelterSourceRecord(
                 source_index=index,
-                name=f"Evacuation centre {index + 1}",
+                name=_text(columns[SHELTER_NAME][index]),
                 claimed_district=_text(columns[district_field][index]),
                 claimed_province=_text(columns[SHELTER_PROVINCE][index]),
                 lon=float(point.x),
                 lat=float(point.y),
                 point=point,
+                capacity=(
+                    _capacity(columns[SHELTER_CAPACITY][index])
+                    if SHELTER_CAPACITY in columns
+                    else None
+                ),
+                village=_text(columns[village_field][index]) if village_field else "",
+                subdistrict=_text(columns[subdistrict_field][index]) if subdistrict_field else "",
+                supporting_unit=_text(columns[unit_field][index]) if unit_field else "",
             )
         )
     return ValidatedShelterCollection(tuple(records), source_files, district_field)
+
+
+def _pick_optional_field(field_names: list[str], hints: tuple[str, ...]) -> str | None:
+    for candidate in field_names:
+        if any(hint in candidate.lower() for hint in hints):
+            return candidate
+    return None
+
+
+def _capacity(value: object) -> int | None:
+    """A capacity is people, so only a positive whole number is kept; anything else is absent."""
+
+    text = _text(value)
+    if not text:
+        return None
+    try:
+        number = int(float(text))
+    except ValueError:
+        return None
+    return number if number > 0 else None
 
 
 def _name_disagrees(claimed: str, actual: str) -> bool:
@@ -226,7 +269,30 @@ def _assign_districts(
     return assigned, outside, examples
 
 
+def shelter_labels(records: list[AssignedShelter]):
+    """Label every centre uniquely inside the district its geometry actually falls in.
+
+    The claimed district is not used here: a centre that claims one district and sits in
+    another is still labelled where a planner will look for it.
+    """
+
+    return compose_labels(
+        [
+            ShelterLabelInput(
+                source_index=item.source.source_index,
+                facility_name=item.source.name,
+                supporting_unit=item.source.supporting_unit,
+                village=item.source.village,
+                district_key=item.admin_code,
+            )
+            for item in records
+        ]
+    )
+
+
 def _materialize_shelters(records: list[AssignedShelter]):
+    labels, _ = shelter_labels(records)
+
     def materialize(session: Session, version_id: UUID) -> None:
         rows = [
             Feature(
@@ -236,11 +302,16 @@ def _materialize_shelters(records: list[AssignedShelter]):
                 ),
                 dataset_version_id=version_id,
                 boundary_id=item.boundary_id,
-                name=item.source.name,
+                name=labels[item.source.source_index],
                 lon=item.source.lon,
                 lat=item.source.lat,
                 attributes={
                     "admin_code": item.admin_code,
+                    "source_name": item.source.name,
+                    "capacity": item.source.capacity,
+                    "supporting_unit": item.source.supporting_unit,
+                    "subdistrict": item.source.subdistrict,
+                    "village": item.source.village,
                     "claimed_district": item.source.claimed_district,
                     "claimed_province": item.source.claimed_province,
                     "district_name_mismatch": item.name_mismatch,
@@ -291,6 +362,7 @@ def process_shelter_import(
     collection = validate_shelter_collection(source_root, job.source_ref)
     boundary_version, boundaries = _boundary_collection(session)
     assigned, outside, examples = _assign_districts(collection.records, boundaries)
+    _, label_report = shelter_labels(assigned)
     mismatch_count = sum(item.name_mismatch for item in assigned)
     if not renew_import_lease(session, claim, lease_minutes=lease_minutes, progress=35):
         return None
@@ -334,7 +406,7 @@ def process_shelter_import(
             "source_mode": job.source_mode,
             "original_filename": job.manifest.get("original_filename"),
             "map_preview": True,
-            "shelter_names_confirmed": False,
+            "shelter_names_confirmed": True,
             "district_field": collection.district_field,
         },
         report={
@@ -346,7 +418,17 @@ def process_shelter_import(
             "district_name_mismatch_count": mismatch_count,
             "mismatch_examples": examples,
             "district_field": collection.district_field,
-            "unconfirmed_fields_excluded": ["สถา", "สถ_1", "รอง"],
+            "confirmed_fields": {"name": SHELTER_NAME, "capacity": SHELTER_CAPACITY},
+            "labels": {
+                "from_source_name": label_report.from_facility_name,
+                "from_supporting_unit": label_report.from_supporting_unit,
+                "numbered_because_unnamed": label_report.numbered,
+                "qualified_by_village": label_report.qualified_by_village,
+                "numbered_to_stay_distinct": label_report.unresolved,
+            },
+            "capacity_missing_count": sum(
+                1 for item in assigned if item.source.capacity is None
+            ),
         },
         materialize=_materialize_shelters(assigned),
     )

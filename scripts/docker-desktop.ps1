@@ -5,7 +5,14 @@ param(
     [string[]]$HubAdminEmail = @(),
     # Validate, import and activate .local/data-in for the Thailand Hub.
     [switch]$BootstrapThailandData,
-    [switch]$Down
+    [switch]$Down,
+    # Delete the local database and object volumes, then rebuild from empty. Everything
+    # imported locally is lost, including every dataset version and assessment. Local
+    # development only; it asks before it deletes.
+    [switch]$Reset,
+    # Import the delivered Thailand baseline and activate it, so a fresh stack is usable
+    # without three Data Library imports and a Platform activation by hand.
+    [switch]$LoadBaseline
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +25,25 @@ $Compose = @("compose", "-f", "deploy/compose.desktop.yml")
 if ($Down) {
     docker @Compose down
     return
+}
+
+if ($Reset) {
+    Write-Host "This deletes the local GRP database and object storage volumes." -ForegroundColor Yellow
+    Write-Host "Every imported dataset version, feature and assessment on this machine is lost."
+    $answer = Read-Host "Type RESET to continue"
+    if ($answer -cne "RESET") {
+        Write-Host "Nothing was deleted."
+        return
+    }
+    # A reset leaves an empty data library, so load the baseline back unless told otherwise.
+    if (-not $PSBoundParameters.ContainsKey("LoadBaseline")) { $LoadBaseline = $true }
+    # Docker writes progress to stderr, which "Stop" turns into a terminating error — and
+    # aborting here would leave the volumes gone and nothing rebuilt.
+    $ErrorActionPreference = $NativeErrors
+    docker @Compose down -v
+    $ErrorActionPreference = "Stop"
+    if ($LASTEXITCODE -ne 0) { throw "docker compose down -v failed; nothing was rebuilt." }
+    Write-Host "Volumes removed. Continuing with a fresh stack."
 }
 
 $SecretRoot = Join-Path $RepositoryRoot ".local\docker\secrets"
@@ -114,6 +140,15 @@ if ($BootstrapThailandData) {
     docker @Compose exec -T api python -m grpcli.bootstrap install-thailand `
         --actor-email $AdminEmail[0] --hub-code adpc
     if ($LASTEXITCODE -ne 0) { throw "Thailand data bootstrap failed; inspect the API and worker logs." }
+}
+
+if ($LoadBaseline) {
+    if ($AdminEmail.Count -eq 0) {
+        Write-Warning "Skipping the baseline load: -LoadBaseline needs -AdminEmail."
+    } else {
+        docker @Compose exec api python -m grpcli.baseline load --actor-email $AdminEmail[0]
+        if ($LASTEXITCODE -ne 0) { throw "Baseline load failed; see the output above." }
+    }
 }
 
 Write-Host ""

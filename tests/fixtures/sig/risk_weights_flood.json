@@ -1,0 +1,36 @@
+{
+  "_captured": "2026-09-23 from the shared service at https://servirplatform.sig-gis.com/mcp",
+  "_call": "risk_weights(hazard='flood')",
+  "status": "ok",
+  "weights_picker": {
+    "hazard": "flood",
+    "hazards": ["cyclone", "drought", "earthquake", "fire", "flashflood", "flood", "landslides", "storm", "tsunami"],
+    "recipes": {
+      "flood": {
+        "vulnerability_pop_all_total": 0.4,
+        "vulnerability_reclass_blddensity": 0.35,
+        "vulnerability_reclass_road": 0.25
+      }
+    },
+    "available_layers": [
+      "vulnerability_F_15_60",
+      "vulnerability_F_above60",
+      "vulnerability_F_infant",
+      "vulnerability_M_15_60",
+      "vulnerability_M_above60",
+      "vulnerability_M_infant",
+      "vulnerability_pop_all_total",
+      "vulnerability_reclass_blddensity",
+      "vulnerability_reclass_bldheight",
+      "vulnerability_reclass_gdp",
+      "vulnerability_reclass_lai",
+      "vulnerability_reclass_road",
+      "vulnerability_reclass_tcc",
+      "vulnerability_reclass_wdpa"
+    ],
+    "adjusted": {},
+    "staged_for_you": {},
+    "crossing_rule": "clip(round(hazard * V / class_max), 1, class_max)",
+    "note": "Weights are shares of one vulnerability score and must sum to 1. Changing them changes every risk level computed for that hazard, so a proposal is staged for its author and live only once a reviewer approves."
+  }
+}

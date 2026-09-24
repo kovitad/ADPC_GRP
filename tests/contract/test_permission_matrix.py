@@ -171,6 +171,9 @@ KNOWN_UNCOVERED = {
     "planning_chat_api_v1_planning_chat_post",
     # Planning tests cover status access.
     "planning_status_api_v1_planning_status_get",
+    # Planning tests cover starting a lookup and reading only your own.
+    "start_lookup_api_v1_planning_lookups_post",
+    "read_lookup_api_v1_planning_lookups__job_id__get",
 }
 
 

@@ -89,7 +89,7 @@ def _boundary_version(session: Session) -> DatasetVersion:
 
 
 @pytest.mark.fast
-def test_validate_shelters_excludes_unconfirmed_names_and_selects_district_field(
+def test_validate_shelters_reads_the_confirmed_name_and_selects_district_field(
     tmp_path: Path, monkeypatch
 ) -> None:
     _delivery(tmp_path)
@@ -98,7 +98,7 @@ def test_validate_shelters_excludes_unconfirmed_names_and_selects_district_field
     collection = validate_shelter_collection(tmp_path)
 
     assert len(collection.records) == 2
-    assert collection.records[0].name == "Evacuation centre 1"
+    assert collection.records[0].name == "Shelter one"
     assert collection.records[0].claimed_district == "เขตหนึ่ง"
     assert collection.district_field == "district_name"
     assert {item.storage_name for item in collection.source_files} == {
@@ -147,12 +147,11 @@ def test_process_shelters_assigns_geometry_and_reports_name_mismatch(
         assert version.meta["boundary_version_id"] == str(boundary_version.id)
         assert version.meta["feature_count"] == 2
         assert version.meta["district_field"] == "district_name"
-        assert version.meta["shelter_names_confirmed"] is False
-        assert job.report["unconfirmed_fields_excluded"] == ["สถา", "สถ_1", "รอง"]
-        assert [feature.name for feature in features] == [
-            "Evacuation centre 1",
-            "Evacuation centre 2",
-        ]
+        assert version.meta["shelter_names_confirmed"] is True
+        assert job.report["confirmed_fields"] == {"name": "สถ_1", "capacity": "รอง"}
+        assert job.report["labels"]["from_source_name"] == 2
+        assert [feature.name for feature in features] == ["Shelter one", "Shelter two"]
+        assert features[0].attributes["source_name"] == "Shelter one"
         assert features[0].attributes["district_name_mismatch"] is False
         assert features[1].attributes["district_name_mismatch"] is True
         assert features[0].boundary_id != features[1].boundary_id

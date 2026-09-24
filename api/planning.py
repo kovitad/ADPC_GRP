@@ -33,6 +33,7 @@ from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
 from api.sig_connection import sig_access_token, sig_connection
 from api.sig_evidence import check_area, tool_payload, verified_hazard_embed
+from api.sig_jobs import app_session, run_in_background, sig_lookups
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
@@ -1201,6 +1202,53 @@ def _current_assessment_input(
             DatasetVersion.return_period_years == return_period_years,
         )
     return session.scalar(query.order_by(DatasetVersion.created_at.desc()))
+
+
+@router.post(
+    "/lookups",
+    summary="Start a SIG evidence lookup that outlives the request",
+    openapi_extra={"x-grp-access": "protected"},
+)
+async def start_lookup(
+    payload: PlanningChat, principal: SignedInMember, session: DatabaseSession
+) -> dict[str, Any]:
+    """Answer the same question as the chat route, but in the background.
+
+    A district gather on the shared SIG service has been measured at over 60 seconds. Rather
+    than hold a request open for that, the work runs as a task in this process and the browser
+    watches it with the job tracker it already uses for assessments (ADR-0025).
+    """
+
+    settings = get_settings()
+    if not planning_chat_available(settings):
+        raise not_found()
+    # Refuse here, in the request, for everything a person can be told about immediately.
+    planner_membership(principal, payload.hub_code)
+    job = sig_lookups.start(principal.session_id, label="SIG evidence lookup")
+
+    async def work() -> dict[str, Any]:
+        tasks = BackgroundTasks()
+        with app_session() as own_session:
+            answer = await planning_chat(payload, principal, own_session, tasks)
+        # The chat route hands Langfuse and the audit log to the request's background tasks;
+        # this job has no request, so it runs them itself.
+        await tasks()
+        return answer
+
+    run_in_background(job.id, work())
+    return {"job_id": job.id, "state": job.state, "poll": f"/api/v1/planning/lookups/{job.id}"}
+
+
+@router.get(
+    "/lookups/{job_id}",
+    summary="Read a SIG evidence lookup this session started",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_lookup(job_id: str, principal: SignedInMember) -> dict[str, Any]:
+    job = sig_lookups.get(job_id, principal.session_id)
+    if job is None:
+        raise not_found()
+    return job.view()
 
 
 @router.get(
