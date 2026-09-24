@@ -29,7 +29,9 @@ class DataImportJob(Base):
     __tablename__ = "data_import_job"
     __table_args__ = (
         CheckConstraint(
-            "category IN ('boundary', 'evacuation_centers', 'hazard', 'vulnerability')",
+            "category IN ('boundary', 'evacuation_centers', 'hazard', "
+            "'volunteer_centers', 'early_warning_resources', 'village_locations', "
+            "'vulnerability_child', 'vulnerability_elderly', 'vulnerability_disability')",
             name="ck_data_import_category",
         ),
         CheckConstraint(

@@ -15,6 +15,7 @@ from core.dataset_readiness import DatasetReadiness, require_readiness_transitio
 from core.gis import METHOD_KEY, METHOD_VERSION, REASON_CODES
 from core.hazard_import import PLATFORM_HAZARD_DATASET_ID
 from core.shelter_import import PLATFORM_SHELTER_DATASET_ID
+from core.thailand_full_import import full_dataset_ids
 
 
 class BaselineActivationError(ValueError):
@@ -93,12 +94,8 @@ def activate_mvp1_baseline(
     boundary_version = _latest(
         session, PLATFORM_BOUNDARY_DATASET_ID, version_id=boundary_version_id
     )
-    centers_version = _latest(
-        session, PLATFORM_SHELTER_DATASET_ID, version_id=centers_version_id
-    )
-    hazard_version = _latest(
-        session, PLATFORM_HAZARD_DATASET_ID, version_id=hazard_version_id
-    )
+    centers_version = _latest(session, PLATFORM_SHELTER_DATASET_ID, version_id=centers_version_id)
+    hazard_version = _latest(session, PLATFORM_HAZARD_DATASET_ID, version_id=hazard_version_id)
     if hazard_version.return_period_years != 100:
         raise BaselineActivationError("The approved MVP 1 hazard must be RP100")
 
@@ -130,8 +127,11 @@ def activate_mvp1_baseline(
         )
         .values(is_supported=False)
     )
+    supported_boundaries = [
+        boundary for boundary in boundaries if boundary.admin_level in {"district", "subdistrict"}
+    ]
     for boundary in boundaries:
-        boundary.is_supported = True
+        boundary.is_supported = boundary in supported_boundaries
 
     method = session.scalar(
         select(Method).where(Method.key == METHOD_KEY, Method.version == METHOD_VERSION)
@@ -141,8 +141,7 @@ def activate_mvp1_baseline(
             key=METHOD_KEY,
             version=METHOD_VERSION,
             reason_codes={
-                code: {**rule, "status": str(rule["status"])}
-                for code, rule in REASON_CODES.items()
+                code: {**rule, "status": str(rule["status"])} for code, rule in REASON_CODES.items()
             },
             status="approved",
             approved_by=actor_email,
@@ -159,7 +158,10 @@ def activate_mvp1_baseline(
         "evacuation_centers_version_id": str(centers_version.id),
         "hazard_version_id": str(hazard_version.id),
         "method": {"key": METHOD_KEY, "version": METHOD_VERSION},
-        "supported_districts": len(boundaries),
+        "supported_districts": sum(item.admin_level == "district" for item in supported_boundaries),
+        "supported_subdistricts": sum(
+            item.admin_level == "subdistrict" for item in supported_boundaries
+        ),
         "no_data_policy": "unable_to_assess",
     }
     session.add(
@@ -175,3 +177,34 @@ def activate_mvp1_baseline(
     )
     session.flush()
     return payload
+
+
+def activate_supporting_layers(
+    session: Session,
+    *,
+    actor_user_id: UUID,
+    version_ids: dict[str, UUID],
+    now: datetime | None = None,
+) -> dict[str, str]:
+    """Make the exact imported supporting versions visible without making them assessment inputs."""
+
+    now = now or datetime.now(UTC)
+    activated: dict[str, str] = {}
+    for category, dataset_id in full_dataset_ids().items():
+        version_id = version_ids.get(category)
+        if version_id is None:
+            raise BaselineActivationError(f"Missing imported supporting layer {category}")
+        version = _latest(session, dataset_id, version_id=version_id)
+        if version.readiness != DatasetReadiness.TECHNICALLY_VALID:
+            raise BaselineActivationError(f"Supporting layer {category} is not technically valid")
+        session.execute(
+            DatasetVersion.__table__.update()
+            .where(DatasetVersion.dataset_id == dataset_id, DatasetVersion.id != version.id)
+            .values(is_current=False)
+        )
+        version.is_current = True
+        version.accepted_by = actor_user_id
+        version.accepted_at = now
+        activated[category] = str(version.id)
+    session.flush()
+    return activated

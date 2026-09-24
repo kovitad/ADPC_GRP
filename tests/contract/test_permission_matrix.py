@@ -81,6 +81,7 @@ MATRIX = {
     # Planning map layers require a Hub role; a Platform Admin has no implicit Hub access.
     "map_layers": (401, 200, 200, 200, 403),
     "hazard_overlay": (401, 404, 404, 404, 403),
+    "vulnerability_overlay": (401, 404, 404, 404, 403),
     "dataset_features": (401, 404, 404, 404, 403),
 }
 
@@ -130,6 +131,9 @@ MATRIX_OPERATION_IDS = {
     "read_import": "read_import_api_v1_data_library_imports__import_id__get",
     "map_layers": "map_layers_api_v1_maps_layers_get",
     "hazard_overlay": "hazard_overlay_api_v1_maps_hazard__version_id__overlay_png_get",
+    "vulnerability_overlay": (
+        "vulnerability_overlay_api_v1_maps_vulnerability__version_id__overlay_png_get"
+    ),
     "dataset_features": "dataset_features_api_v1_maps_datasets__version_id__features_get",
 }
 
@@ -390,6 +394,11 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "read_import": ("GET", f"/api/v1/data-library/imports/{user_id}", None),
         "map_layers": ("GET", "/api/v1/maps/layers", None),
         "hazard_overlay": ("GET", f"/api/v1/maps/hazard/{user_id}/overlay.png", None),
+        "vulnerability_overlay": (
+            "GET",
+            f"/api/v1/maps/vulnerability/{user_id}/overlay.png",
+            None,
+        ),
         "dataset_features": ("GET", f"/api/v1/maps/datasets/{user_id}/features", None),
     }
     method, path, body = requests[route]

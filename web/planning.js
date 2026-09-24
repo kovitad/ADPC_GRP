@@ -35,6 +35,9 @@
     floodLayers: [],
     floodScenarios: [],
     centerVersions: [],
+    supportingLayers: [],
+    vulnerabilityLayers: [],
+    areaLevel: "district",
     centersVersion: null,
     methods: [],
     centerRows: [],
@@ -89,6 +92,8 @@
   }).addTo(map);
   const districtLayer = window.L.featureGroup().addTo(map);
   const centersLayer = window.L.featureGroup().addTo(map);
+  const supportingMapLayers = new Map();
+  const vulnerabilityMapLayers = new Map();
   const centerRenderer = window.L.canvas({ padding: 0.35 });
   const centerMarkers = new Map();
   let centerFilter = "all";
@@ -512,6 +517,7 @@
       drawPendingCenters({ openPanel: announce }).catch((error) => {
         addMessage("assistant", error.message, { error: true });
       });
+      loadEnabledSupportingLayers().catch(() => {});
     }
     if (announce && !state.busy) {
       addMessage("assistant", `${boundary.name} is selected. The available flood and evacuation-centre layers are shown on the map.`, {
@@ -708,6 +714,94 @@
     if (openPanel) document.querySelector('[data-ev-tab="centres"]').click();
   };
 
+  const supportingColour = (role) => ({
+    volunteer_centers: "#7c3aed",
+    early_warning_resources: "#d97706",
+    village_locations: "#475569",
+  }[role] || "#475569");
+
+  const loadSupportingLayer = async (source) => {
+    let group = supportingMapLayers.get(source.version_id);
+    if (!group) {
+      group = window.L.featureGroup();
+      supportingMapLayers.set(source.version_id, group);
+    }
+    group.clearLayers();
+    if (!state.selected) return;
+    const url = new URL(source.features_url, window.location.origin);
+    url.searchParams.set("boundary_id", state.selected.id);
+    url.searchParams.set("hub_code", state.hubCode);
+    const collection = await GRP.request(`${url.pathname}${url.search}`);
+    collection.features.forEach((feature) => {
+      const [lon, lat] = feature.geometry.coordinates;
+      const properties = feature.properties;
+      window.L.circleMarker([lat, lon], {
+        radius: source.role === "village_locations" ? 3 : 5,
+        color: "#fff",
+        weight: 1,
+        fillColor: supportingColour(source.role),
+        fillOpacity: 0.9,
+      }).bindPopup(popup(properties.name, [source.title_th || source.title])).addTo(group);
+    });
+    const toggle = document.querySelector(`[data-supporting-version="${source.version_id}"]`);
+    if (toggle?.checked) group.addTo(map);
+  };
+
+  const loadEnabledSupportingLayers = async () => {
+    await Promise.all(state.supportingLayers.map(async (source) => {
+      const toggle = document.querySelector(`[data-supporting-version="${source.version_id}"]`);
+      if (toggle?.checked) await loadSupportingLayer(source);
+    }));
+  };
+
+  const buildSupplementalLayerControls = () => {
+    const supporting = $("[data-supporting-layer-controls]");
+    supporting.replaceChildren();
+    state.supportingLayers.forEach((source) => {
+      const label = document.createElement("label");
+      label.className = "pw-toggle";
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.dataset.supportingVersion = source.version_id;
+      const title = document.createElement("span");
+      title.textContent = `${source.title_th ? `${source.title_th} / ` : ""}${source.title}`;
+      toggle.addEventListener("change", async () => {
+        if (toggle.checked) await loadSupportingLayer(source);
+        else supportingMapLayers.get(source.version_id)?.remove();
+      });
+      label.append(toggle, title);
+      supporting.append(label);
+    });
+
+    const vulnerability = $("[data-vulnerability-layer-controls]");
+    vulnerability.replaceChildren();
+    state.vulnerabilityLayers.forEach((source) => {
+      const label = document.createElement("label");
+      label.className = "pw-toggle";
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.dataset.vulnerabilityVersion = source.version_id;
+      const title = document.createElement("span");
+      title.textContent = `${source.title_th ? `${source.title_th} / ` : ""}${source.title}`;
+      toggle.addEventListener("change", async () => {
+        let overlay = vulnerabilityMapLayers.get(source.version_id);
+        if (toggle.checked && !overlay) {
+          const response = await fetch(source.image_url, { credentials: "same-origin" });
+          if (!response.ok) return;
+          overlay = window.L.imageOverlay(URL.createObjectURL(await response.blob()), source.bounds, {
+            opacity: 0.62,
+            interactive: false,
+          });
+          vulnerabilityMapLayers.set(source.version_id, overlay);
+        }
+        if (toggle.checked) overlay?.addTo(map);
+        else overlay?.remove();
+      });
+      label.append(toggle, title);
+      vulnerability.append(label);
+    });
+  };
+
   $("[data-centre-search]").addEventListener("input", renderCenterList);
   document.querySelectorAll("[data-centre-filter]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -739,6 +833,31 @@
     event.currentTarget.setAttribute("aria-expanded", String(!panel.hidden));
   });
 
+  $("[data-area-level]").addEventListener("change", async (event) => {
+    const nextLevel = event.currentTarget.value;
+    const priorDistrict = state.selected?.admin_level === "district" ? state.selected : null;
+    if (nextLevel === "subdistrict" && !priorDistrict) {
+      event.currentTarget.value = "district";
+      addMessage("assistant", "Select a district first, then choose Sub-district in Layers.", { error: true });
+      return;
+    }
+    const params = new URLSearchParams({ hub_code: state.hubCode, level: nextLevel });
+    if (priorDistrict) params.set("parent_admin_code", priorDistrict.admin_code);
+    const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
+    state.areaLevel = nextLevel;
+    state.boundaries = payload.boundaries;
+    state.selected = null;
+    drawDistricts();
+    $("[data-boundary-layer-title]").textContent = nextLevel === "subdistrict"
+      ? `Sub-district boundaries in ${priorDistrict.name}`
+      : "District boundaries";
+    $("[data-search-input]").placeholder = `Search a ${nextLevel === "subdistrict" ? "sub-district" : "district"} in Thailand`;
+    if (districtLayer.getLayers().length) {
+      map.fitBounds(districtLayer.getBounds(), { padding: [40, 40] });
+    }
+    syncRunPanel();
+  });
+
   // ---------- configure and run ----------
   const runPanel = $("[data-run]");
   const runToggle = $("[data-run-toggle]");
@@ -768,10 +887,11 @@
   };
 
   const centerSourceOption = (version) => [
-    centerSourceKind(version),
-    centerSourceName(version),
+    version.is_current ? "Recommended · Ready" : "Previous version · Ready",
+    version.title_th ? `${version.title_th} / ${centerSourceName(version)}` : centerSourceName(version),
     `${Number(version.feature_count || 0).toLocaleString()} centres`,
-    version.is_current ? "recommended" : null,
+    centerSourceKind(version),
+    `v${version.version_id.slice(0, 8)}`,
   ].filter(Boolean).join(" · ");
 
   const setRunPanelOpen = (open) => {
@@ -809,11 +929,18 @@
     );
     const selectedCenterId = runCenters.value || state.centersVersion?.version_id;
     runCenters.replaceChildren();
-    versions.forEach((version) => {
-      const option = document.createElement("option");
-      option.value = version.version_id;
-      option.textContent = centerSourceOption(version);
-      runCenters.append(option);
+    [true, false].forEach((isCurrent) => {
+      const matching = versions.filter((version) => Boolean(version.is_current) === isCurrent);
+      if (!matching.length) return;
+      const group = document.createElement("optgroup");
+      group.label = isCurrent ? "Recommended dataset" : "Previous versions";
+      matching.forEach((version) => {
+        const option = document.createElement("option");
+        option.value = version.version_id;
+        option.textContent = centerSourceOption(version);
+        group.append(option);
+      });
+      runCenters.append(group);
     });
     const preferredCenter = versions.find((version) => version.version_id === selectedCenterId)
       || versions.find((version) => version.is_current)
@@ -2430,6 +2557,8 @@
       state.methods = methods.methods || [];
       configureFloodScenarios(layers.flood_scenarios);
       state.centerVersions = layers.evacuation_centers || [];
+      state.supportingLayers = layers.supporting_points || [];
+      state.vulnerabilityLayers = layers.vulnerability || [];
       state.centersVersion = state.centerVersions.find((layer) => layer.is_current && !layer.synthetic)
         || state.centerVersions.find((layer) => !layer.synthetic)
         || state.centerVersions[0]
@@ -2451,7 +2580,10 @@
       previewNote.textContent = mapPreview
         ? "Source preview — the available flood and evacuation-centre data is shown directly."
         : "";
-      $("[data-vulnerability-note]").textContent = layers.vulnerability.message;
+      $("[data-vulnerability-note]").textContent = state.vulnerabilityLayers.length
+        ? "Source-native display indicators only; GRP does not combine them into a risk score."
+        : "No vulnerability indicator is active.";
+      buildSupplementalLayerControls();
       drawLegend(layers.flood_legend);
       drawDistricts();
       syncRunPanel();

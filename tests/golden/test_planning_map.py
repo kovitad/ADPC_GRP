@@ -41,9 +41,14 @@ def world(tmp_path, monkeypatch) -> Iterator[dict]:
     secret = tmp_path / "session_secret"
     secret.write_text("map-session-secret-with-enough-length", encoding="utf-8")
     settings = Settings(
-        _env_file=None, session_secret_file=secret, allow_draft_methods=True,
-        storage_root=tmp_path / "data", ai_feature_enabled=True, ai_model="test-model",
-        grp_env="dev", planning_chat_enabled=True,
+        _env_file=None,
+        session_secret_file=secret,
+        allow_draft_methods=True,
+        storage_root=tmp_path / "data",
+        ai_feature_enabled=True,
+        ai_model="test-model",
+        grp_env="dev",
+        planning_chat_enabled=True,
     )
     for module in (api.access, api.assessments, api.maps, api.permissions, api.planning):
         monkeypatch.setattr(module, "get_settings", lambda: settings)
@@ -55,12 +60,18 @@ def world(tmp_path, monkeypatch) -> Iterator[dict]:
     with Session(engine) as session:
         bootstrap_platform_admin(session, "owner@example.test")
         ensure_hub(session, actor_email="owner@example.test", code="adpc", name="ADPC Hub")
-        assign_member(session, actor_email="owner@example.test", email="planner@example.test",
-                      hub_code="adpc", role="planner")
+        assign_member(
+            session,
+            actor_email="owner@example.test",
+            email="planner@example.test",
+            hub_code="adpc",
+            role="planner",
+        )
         seed = seed_synthetic_rp100(session, storage)
         owner = session.scalar(select(AppUser).where(AppUser.email == "owner@example.test"))
-        update_setting(session, actor_user_id=owner.id, token_limit_per_person=50_000,
-                       ai_enabled=True)
+        update_setting(
+            session, actor_user_id=owner.id, token_limit_per_person=50_000, ai_enabled=True
+        )
         session.commit()
         users = {user.email: user.id for user in session.scalars(select(AppUser))}
 
@@ -71,8 +82,14 @@ def world(tmp_path, monkeypatch) -> Iterator[dict]:
     app.dependency_overrides[database_session] = test_session
     limiter.reset()
     try:
-        yield {"settings": settings, "engine": engine, "storage": storage, "seed": seed,
-               "users": users, "monkeypatch": monkeypatch}
+        yield {
+            "settings": settings,
+            "engine": engine,
+            "storage": storage,
+            "seed": seed,
+            "users": users,
+            "monkeypatch": monkeypatch,
+        }
     finally:
         app.dependency_overrides.clear()
 
@@ -80,7 +97,8 @@ def world(tmp_path, monkeypatch) -> Iterator[dict]:
 def _client(world: dict, email: str) -> TestClient:
     response = Response()
     set_session_cookie(
-        response, world["settings"],
+        response,
+        world["settings"],
         IdentityLinkResult(allowed=True, reason="allowed", user_id=world["users"][email]),
         issued_at=int(datetime.now(UTC).timestamp()) - 5,
     )
@@ -92,7 +110,7 @@ def _client(world: dict, email: str) -> TestClient:
     return client
 
 
-def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
+def test_layers_list_flood_centers_and_optional_supporting_layers(world) -> None:
     layers = _client(world, "planner@example.test").get("/api/v1/maps/layers").json()
 
     flood = layers["flood"][0]
@@ -102,10 +120,7 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
     assert south_west == pytest.approx([14.99, 100.0])
     assert north_east == pytest.approx([15.11, 100.12])
     assert len(layers["flood_legend"]["classes"]) == 5
-    assert all(
-        item["rgba"][0] > item["rgba"][2]
-        for item in layers["flood_legend"]["classes"]
-    )
+    assert all(item["rgba"][0] > item["rgba"][2] for item in layers["flood_legend"]["classes"])
     assert layers["flood_scenarios"] == [
         {
             "return_period_years": 20,
@@ -134,8 +149,8 @@ def test_layers_list_flood_centers_and_vulnerability_placeholder(world) -> None:
     assert "source_mode" in layers["evacuation_centers"][0]
     assert "feature_count" in layers["evacuation_centers"][0]
     assert "shelter_names_confirmed" in layers["evacuation_centers"][0]
-    assert layers["vulnerability"]["available"] is False
-    assert "Increment 6" in layers["vulnerability"]["message"]
+    assert layers["supporting_points"] == []
+    assert layers["vulnerability"] == []
 
 
 def test_overlay_picture_is_a_png_and_does_not_change_the_input_fingerprint(world) -> None:
@@ -211,10 +226,13 @@ def test_center_points_can_be_scoped_to_current_boundary_by_stable_admin_code(wo
 def test_center_points_reject_unknown_or_unsupported_boundary(world) -> None:
     client = _client(world, "planner@example.test")
 
-    assert client.get(
-        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features",
-        params={"boundary_id": str(uuid4())},
-    ).status_code == 404
+    assert (
+        client.get(
+            f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features",
+            params={"boundary_id": str(uuid4())},
+        ).status_code
+        == 404
+    )
 
 
 def test_center_api_keeps_the_importers_stable_generated_name(world) -> None:
@@ -242,9 +260,12 @@ def test_map_layers_need_hub_role_and_hide_unknown_versions(world) -> None:
     assert owner.get("/api/v1/maps/layers").status_code == 403
     assert planner.get(f"/api/v1/maps/hazard/{uuid4()}/overlay.png").status_code == 404
     # A center dataset is not a flood picture.
-    assert planner.get(
-        f"/api/v1/maps/hazard/{world['seed'].centers_version_id}/overlay.png"
-    ).status_code == 404
+    assert (
+        planner.get(
+            f"/api/v1/maps/hazard/{world['seed'].centers_version_id}/overlay.png"
+        ).status_code
+        == 404
+    )
 
 
 def test_map_hides_old_hazard_but_keeps_accepted_center_version_selectable(world) -> None:
@@ -265,12 +286,14 @@ def test_map_hides_old_hazard_but_keeps_accepted_center_version_selectable(world
         world["seed"].centers_version_id
     ]
     assert layers["evacuation_centers"][0]["is_current"] is False
-    assert client.get(
-        f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
-    ).status_code == 200
+    assert (
+        client.get(f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png").status_code
+        == 404
+    )
+    assert (
+        client.get(f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features").status_code
+        == 200
+    )
 
 
 def test_map_bytes_allow_explicit_non_current_previews(world) -> None:
@@ -282,12 +305,14 @@ def test_map_bytes_allow_explicit_non_current_previews(world) -> None:
             version.meta = {**version.meta, "map_preview": True}
         session.commit()
 
-    assert client.get(
-        f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png"
-    ).status_code == 200
-    assert client.get(
-        f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features"
-    ).status_code == 200
+    assert (
+        client.get(f"/api/v1/maps/hazard/{world['seed'].hazard_version_id}/overlay.png").status_code
+        == 200
+    )
+    assert (
+        client.get(f"/api/v1/maps/datasets/{world['seed'].centers_version_id}/features").status_code
+        == 200
+    )
 
 
 def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:
@@ -299,15 +324,20 @@ def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:
         json={
             "hub_code": "adpc",
             "boundary_id": seed.boundary_id,
-            "hazard": {"type": "flood", "return_period_years": 100,
-                       "dataset_version_id": seed.hazard_version_id},
+            "hazard": {
+                "type": "flood",
+                "return_period_years": 100,
+                "dataset_version_id": seed.hazard_version_id,
+            },
             "evacuation_centers_dataset_version_id": seed.centers_version_id,
             "method": {"key": "center-flood-overlay", "version": "1.0.0"},
         },
     ).json()
     assessment_id = submitted["assessment_id"]
-    not_ready = client.post(f"/api/v1/assessments/{assessment_id}/explain",
-                            json={"question": "Which centers are exposed?"})
+    not_ready = client.post(
+        f"/api/v1/assessments/{assessment_id}/explain",
+        json={"question": "Which centers are exposed?"},
+    )
     with Session(world["engine"]) as session:
         process_job(session, world["storage"], claim_next_job(session, lease_minutes=15))
     prompts: list[str] = []
@@ -318,8 +348,10 @@ def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:
 
     world["monkeypatch"].setattr(api.ai_gateway, "call_openai", provider)
 
-    answer = client.post(f"/api/v1/assessments/{assessment_id}/explain",
-                         json={"question": "Which centers are exposed?"})
+    answer = client.post(
+        f"/api/v1/assessments/{assessment_id}/explain",
+        json={"question": "Which centers are exposed?"},
+    )
 
     assert not_ready.status_code == 409
     body = answer.json()
@@ -397,9 +429,7 @@ def test_confirmed_assessment_area_overrides_a_different_model_place(world) -> N
         ' "return_period_years": 100}',
     )
 
-    body = _chat(
-        client, "Assess the selected area", place="Synthetic Test District"
-    ).json()
+    body = _chat(client, "Assess the selected area", place="Synthetic Test District").json()
 
     assert body["mode"] == "assessment_started"
     assert body["boundary_id"] == world["seed"].boundary_id
@@ -450,9 +480,7 @@ def test_confirmed_place_with_conflicting_province_does_not_start_grp_job(world)
     proposed = _chat(
         client, "Assess Synthetic Test District in Bangkok", boundary_id=world["seed"].boundary_id
     ).json()
-    confirmed = _chat(
-        client, "Assess Synthetic Test District in Bangkok", place=proposed["place"]
-    )
+    confirmed = _chat(client, "Assess Synthetic Test District in Bangkok", place=proposed["place"])
 
     assert proposed["mode"] == "needs_area_confirmation"
     assert confirmed.status_code == 401  # unsupported GRP area falls through to SIG

@@ -16,20 +16,7 @@ from sqlalchemy.orm import Session
 
 from core.access_models import AppUser, Hub
 from core.assessment_models import DatasetVersion
-from core.boundary_import import (
-    BOUNDARY_SOURCE_REF,
-    BOUNDARY_STEM,
-    PLATFORM_BOUNDARY_DATASET_ID,
-)
-from core.boundary_import import (
-    IMPORTER_VERSION as BOUNDARY_IMPORTER_VERSION,
-)
-from core.boundary_import import (
-    OPTIONAL_SUFFIXES as BOUNDARY_OPTIONAL_SUFFIXES,
-)
-from core.boundary_import import (
-    REQUIRED_SUFFIXES as BOUNDARY_REQUIRED_SUFFIXES,
-)
+from core.boundary_import import PLATFORM_BOUNDARY_DATASET_ID
 from core.data_import_jobs import ImportRequest, request_import
 from core.data_library_models import DataImportJob
 from core.hazard_import import (
@@ -55,9 +42,19 @@ from core.shelter_import import (
 from core.shelter_import import (
     REQUIRED_SUFFIXES as SHELTER_REQUIRED_SUFFIXES,
 )
+from core.thailand_full_import import (
+    HIERARCHY_IMPORTER_VERSION,
+    HIERARCHY_SOURCE_REF,
+    POINT_IMPORTER_VERSION,
+    POINT_PROFILES,
+    VULNERABILITY_IMPORTER_VERSION,
+    VULNERABILITY_PROFILES,
+    VULNERABILITY_SOURCE_REF,
+    full_dataset_ids,
+)
 from core.validation import canonical_sha256, sha256_file
 
-BOOTSTRAP_RELEASE = "thailand-mvp1-supported-v1"
+BOOTSTRAP_RELEASE = "thailand-mvp1-complete-v2"
 TERMINAL_STATES = frozenset(
     {AssessmentState.SUCCEEDED, AssessmentState.FAILED, AssessmentState.CANCELLED}
 )
@@ -104,16 +101,22 @@ def _shapefile_paths(
 
 
 def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
-    """Locate the three source collections already supported end to end."""
+    """Locate every collection in the approved Thailand Hub baseline."""
 
     root = root.resolve()
-    boundary_files = _shapefile_paths(
-        root,
-        BOUNDARY_SOURCE_REF,
-        BOUNDARY_STEM,
-        BOUNDARY_REQUIRED_SUFFIXES,
-        BOUNDARY_OPTIONAL_SUFFIXES,
+    hierarchy_root = root / HIERARCHY_SOURCE_REF
+    boundary_files = tuple(
+        sorted(
+            (
+                path
+                for path in hierarchy_root.rglob("*")
+                if path.is_file() and "village" not in path.relative_to(hierarchy_root).parts
+            ),
+            key=lambda path: path.as_posix(),
+        )
     )
+    if not boundary_files:
+        raise ThailandBootstrapError("administrative_boundary is missing")
     shelter_files = _shapefile_paths(
         root,
         SHELTER_SOURCE_REF,
@@ -127,12 +130,41 @@ def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
         raise ThailandBootstrapError(
             f"{HAZARD_SOURCE_REF} must contain exactly {EXPECTED_TILE_COUNT} GeoTIFF files"
         )
+    supporting = tuple(
+        BootstrapSource(
+            category,
+            str(profile["source_ref"]),
+            profile["dataset_id"],
+            POINT_IMPORTER_VERSION,
+            _shapefile_paths(
+                root,
+                str(profile["source_ref"]),
+                str(profile["stem"]),
+                (".shp", ".shx", ".dbf", ".prj"),
+                (".cpg", ".sbn", ".sbx", ".shp.xml"),
+            ),
+        )
+        for category, profile in POINT_PROFILES.items()
+    )
+    vulnerability = tuple(
+        BootstrapSource(
+            category,
+            VULNERABILITY_SOURCE_REF,
+            profile["dataset_id"],
+            VULNERABILITY_IMPORTER_VERSION,
+            (root / VULNERABILITY_SOURCE_REF / str(profile["filename"]),),
+        )
+        for category, profile in VULNERABILITY_PROFILES.items()
+    )
+    missing_rasters = [str(item.files[0]) for item in vulnerability if not item.files[0].is_file()]
+    if missing_rasters:
+        raise ThailandBootstrapError("Vulnerability delivery is incomplete")
     return (
         BootstrapSource(
             "boundary",
-            BOUNDARY_SOURCE_REF,
+            HIERARCHY_SOURCE_REF,
             PLATFORM_BOUNDARY_DATASET_ID,
-            BOUNDARY_IMPORTER_VERSION,
+            HIERARCHY_IMPORTER_VERSION,
             boundary_files,
         ),
         BootstrapSource(
@@ -142,6 +174,7 @@ def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
             SHELTER_IMPORTER_VERSION,
             shelter_files,
         ),
+        *supporting,
         BootstrapSource(
             "hazard",
             HAZARD_SOURCE_REF,
@@ -149,6 +182,7 @@ def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
             HAZARD_IMPORTER_VERSION,
             hazard_files,
         ),
+        *vulnerability,
     )
 
 
@@ -240,10 +274,19 @@ def bootstrap_library_status(session: Session, root: Path) -> dict[str, object]:
     """Return a cheap, non-hashing status for the Admin Data Library."""
 
     categories: dict[str, dict[str, object]] = {}
+    supplemental_ids = full_dataset_ids()
     specs = (
-        ("boundary", BOUNDARY_SOURCE_REF, PLATFORM_BOUNDARY_DATASET_ID),
+        ("boundary", HIERARCHY_SOURCE_REF, PLATFORM_BOUNDARY_DATASET_ID),
         ("evacuation_centers", SHELTER_SOURCE_REF, PLATFORM_SHELTER_DATASET_ID),
+        *(
+            (category, str(profile["source_ref"]), supplemental_ids[category])
+            for category, profile in POINT_PROFILES.items()
+        ),
         ("hazard", HAZARD_SOURCE_REF, PLATFORM_HAZARD_DATASET_ID),
+        *(
+            (category, VULNERABILITY_SOURCE_REF, supplemental_ids[category])
+            for category in VULNERABILITY_PROFILES
+        ),
     )
     for category, source_ref, dataset_id in specs:
         current = session.scalar(
@@ -254,20 +297,16 @@ def bootstrap_library_status(session: Session, root: Path) -> dict[str, object]:
         )
         categories[category] = {
             "source_present": (root / source_ref).is_dir(),
-            "active": bool(current and current.readiness == "assessment_ready"),
+            "active": bool(current),
             "version_id": str(current.id) if current else None,
         }
     return {
         "release": BOOTSTRAP_RELEASE,
         "ready": all(bool(item["active"]) for item in categories.values()),
         "categories": categories,
-        "detected_next": {
-            "administrative_levels": (root / "administrative_boundary").is_dir(),
-            "supporting_points": (root / "evacuation_centers").is_dir(),
-            "vulnerability": (root / "vulnerable_people").is_dir(),
-        },
         "scope_note": (
-            "This installer currently activates district boundaries, DDPM shelters and RP100. "
-            "Sub-districts, supporting point roles and vulnerability displays remain staged next."
+            "This release activates the administrative hierarchy, DDPM shelters, volunteer and "
+            "warning resources, village locations, RP100, and three separate display-only "
+            "vulnerability indicators."
         ),
     }

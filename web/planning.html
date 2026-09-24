@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/planning.css?v=20260923b" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260923b" defer></script>
+    <script src="/planning.js?v=20260924c" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -93,7 +93,12 @@
           Layers
         </button>
         <div class="pw-layers" data-layers hidden>
-          <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span>District boundaries</span></label>
+          <label class="pw-scenario-label" for="area-level">Planning boundary level</label>
+          <select id="area-level" data-area-level aria-label="Planning boundary level">
+            <option value="district">District</option>
+            <option value="subdistrict">Sub-district (inside selected district)</option>
+          </select>
+          <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span data-boundary-layer-title>District boundaries</span></label>
           <div class="pw-layer-choice">
             <label class="pw-toggle"><input type="checkbox" data-layer="flood" /><span data-flood-title>Flood depth</span></label>
             <label class="pw-scenario-label" for="flood-scenario">Scenario</label>
@@ -108,7 +113,8 @@
             <span><i class="pw-dot" style="--c:#6b7280"></i>Unable to assess</span>
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
-          <label class="pw-toggle is-disabled"><input type="checkbox" disabled /><span>Vulnerable people</span></label>
+          <div data-supporting-layer-controls></div>
+          <div data-vulnerability-layer-controls></div>
           <p class="pw-muted" data-map-preview-note hidden></p>
           <p class="pw-muted" data-vulnerability-note>Not available yet.</p>
         </div>

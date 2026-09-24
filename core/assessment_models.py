@@ -33,6 +33,9 @@ class DatasetType(StrEnum):
     BOUNDARY = "boundary"
     HAZARD = "hazard"
     EVACUATION_CENTERS = "evacuation_centers"
+    VOLUNTEER_CENTERS = "volunteer_centers"
+    EARLY_WARNING_RESOURCES = "early_warning_resources"
+    VILLAGE_LOCATIONS = "village_locations"
     VULNERABILITY = "vulnerability"
 
 
@@ -80,7 +83,8 @@ class Dataset(Base):
     __tablename__ = "dataset"
     __table_args__ = (
         CheckConstraint(
-            "type IN ('boundary', 'hazard', 'evacuation_centers', 'vulnerability')",
+            "type IN ('boundary', 'hazard', 'evacuation_centers', 'volunteer_centers', "
+            "'early_warning_resources', 'village_locations', 'vulnerability')",
             name="ck_dataset_type",
         ),
         CheckConstraint("owner_kind IN ('platform', 'hub_local')", name="ck_dataset_owner"),

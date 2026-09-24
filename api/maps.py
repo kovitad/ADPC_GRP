@@ -19,14 +19,11 @@ router = APIRouter(prefix="/maps", tags=["maps"])
 
 MAP_RETURN_PERIODS = (20, 50, 100)
 
-VULNERABILITY_PLACEHOLDER = {
-    "id": "vulnerable-people",
-    "title": "Vulnerable people",
-    "available": False,
-    "message": (
-        "Not available yet. The approved vulnerability layer and its meaning arrive in "
-        "Increment 6 (dependency DEP-07)."
-    ),
+POINT_DATASET_TYPES = {
+    "evacuation_centers",
+    "volunteer_centers",
+    "early_warning_resources",
+    "village_locations",
 }
 
 
@@ -43,13 +40,10 @@ def _visible_version(session, version_id: UUID, hub_id: UUID) -> tuple[DatasetVe
         raise not_found()
     version, dataset = row
     assessment_ready_centers = (
-        dataset.type == "evacuation_centers"
-        and version.readiness == "assessment_ready"
+        dataset.type in POINT_DATASET_TYPES and version.readiness == "assessment_ready"
     )
     if not (
-        version.is_current
-        or version.meta.get("map_preview") is True
-        or assessment_ready_centers
+        version.is_current or version.meta.get("map_preview") is True or assessment_ready_centers
     ):
         raise not_found()
     return row
@@ -79,10 +73,7 @@ def map_layers(
         for row in rows
         if row[0].is_current
         or row[0].meta.get("map_preview") is True
-        or (
-            row[1].type == "evacuation_centers"
-            and row[0].readiness == "assessment_ready"
-        )
+        or (row[1].type == "evacuation_centers" and row[0].readiness == "assessment_ready")
     ]
     rows.sort(
         key=lambda row: (row[0].meta.get("map_preview") is True, row[0].created_at),
@@ -129,6 +120,12 @@ def map_layers(
             "id": f"centers-{version.id}",
             "version_id": str(version.id),
             "title": dataset.title,
+            "title_th": version.meta.get("title_th")
+            or (
+                "ศูนย์พักพิงและศูนย์อพยพของ ปภ."
+                if dataset.provider.casefold() != "grp synthetic test data"
+                else None
+            ),
             "owner_kind": dataset.owner_kind,
             "provider": dataset.provider,
             "synthetic": dataset.provider.casefold() == "grp synthetic test data",
@@ -145,12 +142,46 @@ def map_layers(
         for version, dataset in rows
         if dataset.type == "evacuation_centers"
     ]
+    supporting_points = [
+        {
+            "id": f"{dataset.type}-{version.id}",
+            "version_id": str(version.id),
+            "role": dataset.type,
+            "title": dataset.title,
+            "title_th": version.meta.get("title_th"),
+            "provider": dataset.provider,
+            "features_url": f"/api/v1/maps/datasets/{version.id}/features",
+            "feature_count": version.meta.get("feature_count"),
+            "available": version.is_current,
+        }
+        for version, dataset in rows
+        if dataset.type in POINT_DATASET_TYPES - {"evacuation_centers"} and version.is_current
+    ]
+    vulnerability = [
+        {
+            "id": f"vulnerability-{version.id}",
+            "version_id": str(version.id),
+            "indicator_key": version.meta.get("indicator_key"),
+            "title": dataset.title,
+            "title_th": version.meta.get("title_th"),
+            "provider": dataset.provider,
+            "image_url": f"/api/v1/maps/vulnerability/{version.id}/overlay.png",
+            "bounds": version.meta.get("overlay_bounds"),
+            "available": bool(version.meta.get("overlay_key")) and version.is_current,
+            "display_only": True,
+            "meaning": version.meta.get("meaning"),
+            "display_range": version.meta.get("display_range"),
+        }
+        for version, dataset in rows
+        if dataset.type == "vulnerability" and version.is_current
+    ]
     return {
         "flood": flood,
         "flood_scenarios": flood_scenarios,
         "flood_legend": legend(),
         "evacuation_centers": centers,
-        "vulnerability": VULNERABILITY_PLACEHOLDER,
+        "supporting_points": supporting_points,
+        "vulnerability": vulnerability,
         "note": "Available source layers are displayed directly; an assessment is optional.",
     }
 
@@ -181,6 +212,31 @@ def hazard_overlay(
 
 
 @router.get(
+    "/vulnerability/{version_id}/overlay.png",
+    summary="Display-only vulnerability indicator picture",
+    openapi_extra={"x-grp-access": "protected"},
+    response_class=Response,
+)
+def vulnerability_overlay(
+    version_id: UUID,
+    principal: SignedInMember,
+    session: DatabaseSession,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> Response:
+    hub = planner_membership(principal, hub_code)
+    version, dataset = _visible_version(session, version_id, hub.hub_id)
+    key = version.meta.get("overlay_key")
+    storage = LocalStorage(get_settings().storage_root)
+    if dataset.type != "vulnerability" or not key or not storage.exists(str(key)):
+        raise not_found()
+    return Response(
+        storage.read_bytes(str(key)),
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.get(
     "/datasets/{version_id}/features",
     summary="Evacuation center points for the map",
     openapi_extra={"x-grp-access": "protected"},
@@ -194,7 +250,7 @@ def dataset_features(
 ) -> dict[str, object]:
     hub = planner_membership(principal, hub_code)
     version, dataset = _visible_version(session, version_id, hub.hub_id)
-    if dataset.type != "evacuation_centers":
+    if dataset.type not in POINT_DATASET_TYPES:
         raise not_found()
     query = select(Feature).where(Feature.dataset_version_id == version.id)
     boundary = None
@@ -205,13 +261,24 @@ def dataset_features(
         # Imported source points and the current boundary catalogue can have different
         # version-specific UUIDs. Match the stable administrative code as well as the
         # UUID so a catalogue refresh does not disconnect otherwise valid points.
-        query = query.where(
-            or_(
-                Feature.boundary_id == boundary.id,
-                Feature.attributes["admin_code"].as_string() == boundary.admin_code,
+        if boundary.admin_level == "district":
+            query = query.where(
+                or_(
+                    Feature.boundary_id == boundary.id,
+                    Feature.attributes["admin_code"].as_string() == boundary.admin_code,
+                )
             )
-        )
     features = session.scalars(query.order_by(Feature.name, Feature.id)).all()
+    if boundary is not None and boundary.admin_level == "subdistrict":
+        from shapely.geometry import Point, shape
+
+        polygon = shape(boundary.geom)
+        features = [
+            feature
+            for feature in features
+            if feature.attributes.get("subdistrict_code") == boundary.admin_code
+            or polygon.covers(Point(feature.lon, feature.lat))
+        ]
     return {
         "type": "FeatureCollection",
         "total": len(features),
@@ -238,6 +305,8 @@ def dataset_features(
                     "status": "not_assessed",
                     "source_title": dataset.title,
                     "source_provider": dataset.provider,
+                    "role": dataset.type,
+                    "attributes": feature.attributes,
                 },
             }
             for feature in features

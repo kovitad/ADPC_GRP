@@ -1,17 +1,19 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 24 September 2026 (`codex/thailand-hub-bootstrap`; supported Thailand baseline installer implemented and run locally)
+**Updated:** 24 September 2026 (`codex/thailand-hub-bootstrap`; complete Thailand Hub baseline installed and activated locally)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The first Thailand Hub bootstrap slice is implemented and proven against the
-real local bundle. `python -m grpcli.bootstrap install-thailand` hashes the supported source bytes,
-queues district boundaries, DDPM shelters and six RP100 tiles in dependency order, waits for the
-worker, and activates those exact immutable versions. A second run reused all three completed jobs
-instead of creating versions. The Data Library shows a plain-language Thailand release status.
-Docker API/worker were rebuilt and are healthy; the active local release has **928 supported
-districts, 10,303 shelters across 673 districts, and RP100**. **433 tests pass and 2
-PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Bash syntax and whitespace checks are clean.
+**Delivery status:** The complete Thailand Hub bootstrap is implemented and proven against the
+real local bundle. `python -m grpcli.bootstrap install-thailand` hashes all nine supported source
+collections, queues them in dependency order, waits for the worker and activates one compatible
+immutable release. The successful local release contains **77 provinces, 928 supported districts,
+7,436 supported sub-districts, 10,303 shelters, 8,199 volunteer centres, 1,533 early-warning
+resources, 80,397 village points, RP100, and separate child, older-person and disability display
+layers**. Re-running the installer reuses completed imports and safely retries only failed,
+unpublished jobs. The Data Library shows the activation state of every source. The assessment and
+Planning selectors now group one exact **Recommended · Ready** shelter version above clearly
+labelled previous versions, with bilingual title, record count and short immutable version ID.
 
 **VM deployment readiness:** both Ubuntu modes now carry the data workflow. The shared-host
 launcher uses ignored `.local/data-in`; the dedicated staging Compose mounts
@@ -21,31 +23,31 @@ runs the installer, and prints its status. Worker raster scratch is disk-backed 
 rather than the previous 64 MB in-memory `/tmp`. This is implemented and Compose/shell validated,
 but has not yet been executed on the staging VM or pushed from the current branch.
 
-**New design decision:** `.local/data-in/evacuation_centers` contains three different operational
+**Implemented point-data decision:** `.local/data-in/evacuation_centers` contains three different operational
 point sources, not three interchangeable shelter files: 10,303 shelters, 8,199 civil-defence
-volunteer centres and 1,533 early-warning resources. ADR-0020 proposes one secure point-import
-pipeline with three explicit, independently versioned roles. Only shelters remain an assessment
-input; volunteer centres and early-warning equipment become separately labelled district support
-layers. See [`docs/preparedness-point-data-design.md`](docs/preparedness-point-data-design.md).
+volunteer centres and 1,533 early-warning resources. They are imported as three explicit,
+independently versioned roles. Only shelters appear in the assessment input selector; volunteer
+centres and early-warning equipment are separately labelled optional map layers. See
+[`docs/preparedness-point-data-design.md`](docs/preparedness-point-data-design.md).
 
-**Multi-level planning design:** the administrative delivery contains 77 province, 928 district
-and 7,436 sub-district polygons from edition `2025-10`. ADR-0021 proposes district and sub-district
-as user-selectable assessment levels inside one version-pinned hierarchy. The 80,397 village
-records are points, not boundaries; their declared UTF-8 text currently fails clean decoding and
-they omit 50 current districts/181 current sub-districts. They may later support location search,
-but selecting one must resolve to and confirm a real sub-district polygon. When GRP analyzes a
-sub-district, optional SIG evidence remains explicitly labelled as parent-district-wide context;
-its totals are never disaggregated or combined. See
+**Multi-level planning implementation:** the administrative delivery contains 77 province, 928 district
+and 7,436 sub-district polygons from edition `2025-10`. District and sub-district are now
+user-selectable levels inside one version-pinned hierarchy. The importer derives the Thailand
+country outline from the 77 provinces because the delivered `nation` file contains only Samut
+Songkhram; the original file is retained for provenance and never presented as national coverage.
+The 80,397 village records remain point context, not boundaries. When GRP analyzes a sub-district,
+optional SIG evidence remains parent-district-wide context; its totals are never disaggregated or
+combined. See
 [`docs/multi-level-boundary-planning-design.md`](docs/multi-level-boundary-planning-design.md).
 
 **Thailand Hub bootstrap implementation:** ADR-0022 defines importing the complete ~2.1 GB Thailand source
 tree from a checksum-pinned external bundle during deployment: boundaries/hierarchy, all three
 preparedness-point roles, RP100 and three separate vulnerability rasters. Source bytes stay out of
 Git/images/database. An idempotent CLI validates, converts and activates one compatible baseline
-release for the ADPC Hub; future Hub uploads remain immutable explicit overrides. The first
-vertical slice now automates and proves the already-supported district/shelter/RP100 release. The
-province/sub-district hierarchy, volunteer/warning roles, vulnerability display conversion,
-release.yaml authority metadata, admin-settings export/apply and Hub-local selections remain next.
+release for the ADPC Hub; future Hub uploads remain immutable explicit overrides. The hierarchy,
+three point roles, RP100 and three vulnerability display conversions are now implemented and
+activated locally. `release.yaml` authority metadata, admin-settings export/apply and production
+Hub-local approval remain next.
 The local bundle
 becomes the primary planning evidence, while SIG is optional for missing schools/hospitals/roads,
 documents/feeds and explicit cross-Hub/public exchange. A demo database may be rebuilt without a
@@ -63,23 +65,16 @@ See [`docs/adr/0023-sig-return-period-layers-are-external-screening.md`](docs/ad
 
 **Handing over:** first execute the reviewed shared-SIG proof in [`docs/shared-sig-contribution-e2e-plan.md`](docs/shared-sig-contribution-e2e-plan.md). The local preview proved file compatibility only; it did not write to the shared service. Before the external write, replace the placeholder direct URL and confirm the licence, vintage, source-name mapping and repeated-coordinate decision. Then record one real contribution ID, test its contributor-only preview, obtain SIG review, prove `live=true`, and repeat `assemble_pack` as a fresh user. Do not retry a timed-out submit blindly and do not send the raw Shapefile or contact fields. In parallel, restart Docker Desktop only if its CLI is still unresponsive, rebuild API/worker, sign in again, then run the local Data library → Planning browser acceptance. Production Hub-local ownership/approval is still deferred. The Ubuntu launcher still needs its first host execution.
 
-For the next point-data implementation slice, review and accept ADR-0020 first. Then add the
-`volunteer_centers` and `early_warning_resources` dataset roles and versioned mapping profiles.
-Do not place either source in the evacuation-place selector and do not normalize volunteer `TEL`,
-`FAX`, `EMAIL` or full address into planner-facing records. Preserve the existing shelter endpoint
-as a compatibility adapter while the generic role-aware upload endpoint is introduced.
-
-For multi-level AOI work, review ADR-0021 and implement the hierarchy before exposing a new level
-in Planning. Generalize the importer, create a compatible boundary-release manifest, reconcile all
-7,436 sub-district parents, then add area search and server-side input resolution. Do not present
-the village point source as boundary coverage, and do not start browser boundary uploads before the
-existing upload security gate is approved.
+The three point roles and multi-level hierarchy are now implemented. Keep volunteer centres and
+early-warning resources out of the evacuation-place selector, and never expose volunteer `TEL`,
+`FAX`, `EMAIL` or full address. Villages remain point context rather than boundary coverage. The
+next data-governance work is a signed release manifest, production Hub approval and a generic
+role-aware upload flow; browser boundary uploads remain behind the existing upload security gate.
 
 For the next deployment-data slice, add the secret-free signed/approved `release.yaml` authority
 manifest on top of the runtime byte inventory; do not copy `.local/data-in` into Git or the
-container image. Generalize boundaries to province/sub-district, add the two supporting point
-roles, then register child/elderly/disability rasters separately as display-ready until DEP-07
-supplies an approved calculation method. Add the allow-listed admin settings export/apply command
+container image. The three vulnerability rasters are registered separately and remain display-only
+until DEP-07 supplies an approved calculation method. Add the allow-listed admin settings export/apply command
 before rehearsing a destructive blank-database reset. The no-backup rule applies only to this
 rebuildable demo, not production.
 
@@ -104,7 +99,7 @@ RP20/RP50 rasters and methods exist.
 | Planner assistant and map (ADR-0004/0016/0019) | **Built, Docker Desktop only**: display-first OSM map, explicit accepted shelter-source selection, asynchronous assessment trace, district-scoped complete centre list synchronized with markers and locked assessment rows, deterministic planning summary, chat and optional SIG evidence |
 | SIG live map embed | **Implemented**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path and sandboxed iframe. Hazard layers remain hazard-only; an active ADR-0015 recipe additionally permits one exact declared SIG risk layer |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
-| Thailand baseline (ADR-0009/0015) | **Built, imported and locally activated**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. The same pinned versions now support queued real-district screening; NoData is Unable to assess |
+| Thailand baseline (ADR-0009/0015/0020/0021/0022) | **Built, imported and locally activated**: 77 provinces, 928 districts, 7,436 sub-districts, 10,303 DDPM shelters, 8,199 volunteer centres, 1,533 warning resources, 80,397 village points, RP100 and three display-only vulnerability layers. Only shelters are assessment candidates; NoData is Unable to assess |
 | Ubuntu deployment | **Built on current branch**: shared-host launcher keeps loopback port 8000; dedicated staging bootstrap/Caddy path now mounts the external Thailand bundle read-only, provisions Admin/Hub on request and runs the same idempotent installer; needs first VM execution |
 | SIG risk/map contract (ADR-0014/0015) | **Built on current branch**: risk remains withheld without an approved recipe; the active versioned recipe enables cited SIG risk values and one explicitly declared risk layer, while missing/multiple/unknown layers still fail closed |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
@@ -151,7 +146,7 @@ docker compose -f deploy/compose.desktop.yml up -d --build api worker
 ```
 
 **Important facts about the local stack:**
-- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; asset query strings are bumped when their files change (`planning.js` and `planning.css` are currently `?v=20260923b`; Data Library JS is `?v=20260923c`). **Bump asset versions when changing shared CSS or JS.**
+- `web/` is mounted from disk: HTML, JS and CSS changes need only a browser refresh. Pages are served with `Cache-Control: no-cache` in dev; current query strings are `planning.js?v=20260924c`, `assessments.js?v=20260924b` and `data-library.js?v=20260924b`. **Bump asset versions when changing shared CSS or JS.**
 - **Python changes need an image rebuild.** The local `grp-api:desktop` image was successfully rebuilt on 18 September from the committed source, including `api/errors.py` and `api/rate_limits.py`; the API and worker were recreated from that image. No copied-file workaround remains.
 - Local rate limit: `deploy/compose.desktop.yml` sets `RATE_LIMITS` with 300 API requests per person per minute, so quick menu switching does not hit 429. Servers keep the Section 13.1 value of 60.
 - After any API restart, **sign in again**. The SIG MCP token and its refresh token live only in process memory (ADR-0002, ADR-0017). Within a running API they now renew themselves, so a session no longer stops working after an hour; only a restart ends it.

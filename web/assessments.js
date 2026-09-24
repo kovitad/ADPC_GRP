@@ -31,6 +31,14 @@
     select.append(item);
   };
 
+  const centerOptionText = (dataset) => {
+    const status = dataset.is_current ? "Recommended · Ready" : "Previous version · Ready";
+    const count = Number(dataset.feature_count || 0);
+    const names = `${dataset.title_th ? `${dataset.title_th} / ` : ""}${dataset.title}`;
+    const countText = count ? ` · ${count.toLocaleString()} centres` : "";
+    return `${status} · ${names}${countText} · v${dataset.version_id.slice(0, 8)}`;
+  };
+
   const setAssessmentUrl = (id) => {
     const url = new URL(window.location.href);
     url.searchParams.set("assessment_id", id);
@@ -54,15 +62,22 @@
         dataset.version_id,
         `RP${dataset.return_period_years} · ${dataset.title} (${dataset.provider})`,
       ));
-    ["platform", "hub_local"].forEach((owner) => {
+    const seenVersions = new Set();
+    [true, false].forEach((isCurrent) => {
       const group = document.createElement("optgroup");
-      group.label = owner === "platform" ? "Platform data" : "Saved local data";
+      group.label = isCurrent ? "Recommended dataset" : "Previous versions";
       compatible
-        .filter((dataset) => dataset.type === "evacuation_centers" && dataset.owner_kind === owner)
+        .filter((dataset) => dataset.type === "evacuation_centers" && dataset.is_current === isCurrent)
+        .filter((dataset) => {
+          if (seenVersions.has(dataset.version_id)) return false;
+          seenVersions.add(dataset.version_id);
+          return true;
+        })
+        .sort((left, right) => Number(right.is_current) - Number(left.is_current))
         .forEach((dataset) => option(
           group,
           dataset.version_id,
-          `${dataset.title} (${dataset.provider})`,
+          centerOptionText(dataset),
         ));
       if (group.children.length) centers.append(group);
     });

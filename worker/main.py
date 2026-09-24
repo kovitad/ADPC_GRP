@@ -31,6 +31,12 @@ from core.shelter_import import (
     process_shelter_import,
 )
 from core.storage import LocalStorage
+from core.thailand_full_import import (
+    ThailandFullImportError,
+    process_hierarchy_import,
+    process_point_import,
+    process_vulnerability_import,
+)
 
 logger = logging.getLogger("grp.worker")
 stop_event = Event()
@@ -111,13 +117,18 @@ def _run_one_import_session(
         if job is None:
             raise BoundaryImportError("This import job no longer exists")
         if job.category == "boundary":
-            version_id = process_boundary_import(
-                session,
-                storage,
-                root,
-                claim,
-                lease_minutes=lease_minutes,
-            )
+            if job.source_ref == "administrative_boundary":
+                version_id = process_hierarchy_import(
+                    session, storage, root, claim, lease_minutes=lease_minutes
+                )
+            else:
+                version_id = process_boundary_import(
+                    session,
+                    storage,
+                    root,
+                    claim,
+                    lease_minutes=lease_minutes,
+                )
         elif job.category == "evacuation_centers":
             shelter_root = storage.root if job.source_mode == "browser_upload" else root
             version_id = process_shelter_import(
@@ -135,6 +146,18 @@ def _run_one_import_session(
                 claim,
                 lease_minutes=lease_minutes,
             )
+        elif job.category in {
+            "volunteer_centers",
+            "early_warning_resources",
+            "village_locations",
+        }:
+            version_id = process_point_import(
+                session, storage, root, claim, lease_minutes=lease_minutes
+            )
+        elif job.category.startswith("vulnerability_"):
+            version_id = process_vulnerability_import(
+                session, storage, root, claim, lease_minutes=lease_minutes
+            )
         else:
             raise BoundaryImportError("This import category is not enabled yet")
         if version_id is None:
@@ -142,7 +165,12 @@ def _run_one_import_session(
         else:
             logger.info("Data import %s published version %s", claim.import_id, version_id)
             _cleanup_browser_source(storage, job)
-    except (BoundaryImportError, ShelterImportError, HazardImportError) as error:
+    except (
+        BoundaryImportError,
+        ShelterImportError,
+        HazardImportError,
+        ThailandFullImportError,
+    ) as error:
         logger.warning("Data import %s failed validation: %s", claim.import_id, error)
         failed = fail_import(
             session,

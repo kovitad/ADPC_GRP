@@ -170,7 +170,10 @@ def _boundary_collection(session: Session) -> tuple[DatasetVersion, list[Boundar
             "Import the platform district boundaries before evacuation centres"
         )
     boundaries = session.scalars(
-        select(Boundary).where(Boundary.collection_version_id == version.id)
+        select(Boundary).where(
+            Boundary.collection_version_id == version.id,
+            Boundary.admin_level == "district",
+        )
     ).all()
     if not boundaries:
         raise ShelterImportError("The platform district-boundary version has no materialized areas")

@@ -19,19 +19,24 @@ def boundaries(
     principal: SignedInMember,
     session: DatabaseSession,
     hub_code: str | None = Query(default=None, max_length=64),
+    level: str = Query(default="district", pattern="^(district|subdistrict)$"),
+    parent_admin_code: str | None = Query(default=None, max_length=64),
 ) -> dict[str, object]:
     planner_membership(principal, hub_code)
-    rows = session.scalars(
-        select(Boundary).where(Boundary.is_supported).order_by(Boundary.name)
-    ).all()
+    statement = select(Boundary).where(Boundary.is_supported, Boundary.admin_level == level)
+    if level == "subdistrict" and parent_admin_code:
+        statement = statement.where(Boundary.admin_code.like(f"{parent_admin_code[:4]}%"))
+    rows = session.scalars(statement.order_by(Boundary.name)).all()
     return {
         "boundaries": [
             {
                 "id": str(row.id),
                 "name": row.name,
+                "name_th": row.name_th,
                 "admin_code": row.admin_code,
                 "admin_level": row.admin_level,
                 "province_name": row.province_name,
+                "province_name_th": row.province_name_th,
                 "source": row.source,
                 "edition": row.edition,
                 "synthetic": "synthetic" in row.source.casefold(),
@@ -75,12 +80,20 @@ def datasets(
                 "type": dataset.type,
                 "owner_kind": dataset.owner_kind,
                 "title": dataset.title,
+                "title_th": version.meta.get("title_th")
+                or (
+                    "ศูนย์พักพิงและศูนย์อพยพของ ปภ."
+                    if dataset.type == "evacuation_centers"
+                    and dataset.provider.casefold() != "grp synthetic test data"
+                    else None
+                ),
                 "provider": dataset.provider,
                 "synthetic": dataset.provider.casefold() == "grp synthetic test data",
                 "return_period_years": version.return_period_years,
                 "edition": version.meta.get("edition"),
                 "sha256": version.sha256,
                 "readiness": version.readiness,
+                "feature_count": version.meta.get("feature_count"),
                 "is_current": version.is_current,
                 "created_at": version.created_at.isoformat(),
             }

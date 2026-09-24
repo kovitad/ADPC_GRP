@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from api.settings import get_settings
-from core.baseline_activation import activate_mvp1_baseline
+from core.baseline_activation import activate_mvp1_baseline, activate_supporting_layers
 from core.data_import_jobs import requeue_failed_import
 from core.db import get_engine
 from core.models import AssessmentState
@@ -64,9 +64,7 @@ def install_thailand(
     sources = discover_supported_sources(source_root)
     print(f"Preflight found {len(sources)} supported Thailand source collections.")
     with Session(get_engine()) as session:
-        actor = require_bootstrap_context(
-            session, actor_email=actor_email, hub_code=hub_code
-        )
+        actor = require_bootstrap_context(session, actor_email=actor_email, hub_code=hub_code)
         actor_id = actor.id
 
     version_ids: dict[str, UUID] = {}
@@ -79,9 +77,7 @@ def install_thailand(
             flush=True,
         )
         with Session(get_engine()) as session:
-            queued = queue_prepared_source(
-                session, actor_user_id=actor_id, prepared=prepared
-            )
+            queued = queue_prepared_source(session, actor_user_id=actor_id, prepared=prepared)
         if queued.reused:
             print(f"  Reusing import {queued.import_id} ({queued.state}).", flush=True)
             if queued.state in {AssessmentState.FAILED, AssessmentState.CANCELLED}:
@@ -107,6 +103,11 @@ def install_thailand(
             boundary_version_id=version_ids["boundary"],
             centers_version_id=version_ids["evacuation_centers"],
             hazard_version_id=version_ids["hazard"],
+        )
+        payload["supporting_layers"] = activate_supporting_layers(
+            session,
+            actor_user_id=actor_id,
+            version_ids=version_ids,
         )
         session.commit()
         payload["hub_code"] = hub_code.strip().lower()

@@ -58,13 +58,19 @@
     state.textContent = bootstrap.ready ? "Ready" : "Setup needed";
     state.classList.toggle("status-pill--success", bootstrap.ready);
     summary.textContent = bootstrap.ready
-      ? "The supported Thailand baseline is active for new district planning."
+      ? "The complete Thailand Hub baseline is active for district and sub-district planning."
       : "One or more supported baseline inputs still need to be imported and activated.";
     categories.replaceChildren();
     const labels = {
-      boundary: "District boundaries",
+      boundary: "Administrative hierarchy",
       evacuation_centers: "DDPM shelters",
+      volunteer_centers: "DDPM volunteer centres",
+      early_warning_resources: "Early-warning resources",
+      village_locations: "Village locations",
       hazard: "100-year flood depth",
+      vulnerability_child: "Child sensitivity",
+      vulnerability_elderly: "Older-person sensitivity",
+      vulnerability_disability: "Disability support indicator",
     };
     Object.entries(bootstrap.categories).forEach(([key, value]) => {
       const item = element("div", `library-bootstrap__item${value.active ? " is-ready" : ""}`);
