@@ -256,17 +256,31 @@ from core.assessment_models import Boundary
 from core.local_evidence import local_area_citations
 with session_scope() as s:
     b = s.scalar(select(Boundary).where(Boundary.name == 'CHIANG YUEN',
-                                        Boundary.admin_level == 'district'))
+                                        Boundary.admin_level == 'district',
+                                        Boundary.is_supported))
     for c in local_area_citations(s, b):
         print(); print('[' + c['kind'] + ']'); print(c['text'])
 "
 ```
 
+**`Boundary.is_supported` is not optional in that query.** The table holds one row per district per
+boundary collection, so `CHIANG YUEN` matches three rows and only the newest is supported. Querying
+by name alone returns an orphan from a superseded collection with no centres linked to it, which
+looks exactly like a regression and is not one. The product paths are safe: `api/catalog.area_profile`
+404s a boundary that is not supported, and `_match_boundary` only searches supported rows.
+
 **Expected on the current data** (this is the regression baseline, so a change here is a finding):
-Kanthararom 85,568 residents in 175 villages, 7,176 in 19 villages inside the RP100 extent, and no
-evacuation centres recorded. Chiang Yuen 57,197 residents, 0 inside the extent, 9 centres as 6
-government offices, 2 schools and 1 unrecognised. Nationally `area_flood_exposure` holds 8,133 rows
-and `feature.facility_type` is set on 8,813 of 10,303 centres.
+Kanthararom 85,568 residents in 175 villages, 7,176 in 19 villages inside the RP100 extent, and 34
+evacuation centres. Chiang Yuen 57,197 residents, 0 inside the extent, 9 centres as 6 government
+offices, 2 schools and 1 unrecognised. Nationally `area_flood_exposure` holds 8,133 rows and
+`feature.facility_type` is set on 8,813 of 10,303 centres.
+
+**Restart with `.\scripts\docker-desktop.ps1`, not with bare `docker compose up`.** The script
+exports `SERVIR_AUTH_CLIENT_ID` from `.local\servir_auth_client_id` into its own environment before
+calling compose; the compose file resolves `${SERVIR_AUTH_CLIENT_ID:-}` to empty without it and
+sign-in then fails closed with "Sign-in is temporarily unavailable". The ID lives outside `.env` on
+purpose. There is no `servir_auth_client_secret` file and none is needed: the client is public and
+uses PKCE.
 
 **If the popup shows no facility breakdown**, the shelter version is imported but not activated. A
 re-import lands as `technically_valid` and is invisible until `activate_mvp1_baseline` moves
