@@ -14,16 +14,19 @@ layers**. Re-running the installer reuses completed imports and safely retries o
 unpublished jobs. The Data Library shows the activation state of every source. The assessment and
 Planning selectors now group one exact **Recommended · Ready** shelter version above clearly
 labelled previous versions, with bilingual title, record count and short immutable version ID.
-The current real shelter version is `da769049` (assessment-ready, 10,303 records); `37108d23` is a
-previous assessment-ready version and is deliberately retained for reproducibility. **438 tests
-pass, 2 PostgreSQL-only tests skip, and Ruff is clean.** Docker API, worker and database are healthy.
+The current real shelter version is `61a17773` (`grp-shelters/5`, assessment-ready, 10,303 records).
+It correctly maps the delivered `สถา` column to facility name, `สถ_1` to supporting unit and `รอง`
+to capacity. A fresh Chiang Yuen assessment `01a0d226-8c97-7278-8b2e-f4f1cd947e71` completed with
+all nine real names, including `อบต.นาทอง`; older versions remain immutable for reproducibility.
 
-Claude's `claude/vibrant-tesla-5iarzt` was fetched through `12a3fa7`. Its review fixes are valid but
-that branch is not merged here: it contains a separate background-SIG/baseline-loader stack and
-overlaps this branch's shelter importer, Planning UI, ADR numbers and handover. Integrate it with a
-reviewed merge after preserving the user-owned untracked `next-action-for-codex.md`; do not assume
-the commit's green suite proves the real bootstrap command. The nine-source command above is the
-one executed successfully in this branch.
+Claude's `claude/vibrant-tesla-5iarzt` through `12a3fa7` is integrated by reviewed merge `2ecc733`.
+This includes the bounded background SIG queue, lookup timeout cleanup, resilient profiler,
+baseline-loader support reference, label-length guard and safer Docker reset. The merge preserved
+the user-owned untracked planning documents. Its shelter-field ADR originally reversed two
+truncated Thai columns; that was corrected against the real source and proven by re-import and a
+fresh assessment. The nine-source installer remains the deployment path for the complete release.
+**455 tests pass, 2 PostgreSQL-only tests skip, Ruff is clean, and the local API/database/worker
+stack is healthy.**
 
 **VM deployment readiness:** both Ubuntu modes now carry the data workflow. The shared-host
 launcher uses ignored `.local/data-in`; the dedicated staging Compose mounts

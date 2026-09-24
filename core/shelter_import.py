@@ -35,9 +35,11 @@ SHELTER_STEM = "ddpm_shelters"
 REQUIRED_SUFFIXES = (".shp", ".shx", ".dbf", ".prj")
 OPTIONAL_SUFFIXES = (".cpg", ".sbn", ".sbx", ".shp.xml")
 SHELTER_PROVINCE = "จัง"
-# The product owner confirmed these truncated columns on 23 September 2026 (ADR-0024):
-# `สถ_1` names the centre and `รอง` is the number of people it can take.
-SHELTER_NAME = "สถ_1"
+# The real delivery and the previously proven v4 import confirm these truncated columns
+# (ADR-0024): `สถา` is the facility, `สถ_1` is the responsible/supporting unit, and
+# `รอง` is the number of people it can take.
+SHELTER_NAME = "สถา"
+SHELTER_SUPPORTING_UNIT = "สถ_1"
 SHELTER_CAPACITY = "รอง"
 REQUIRED_FIELDS = (SHELTER_PROVINCE, SHELTER_NAME)
 # Optional context used only to tell two centres of the same name apart. A delivery without
@@ -45,7 +47,7 @@ REQUIRED_FIELDS = (SHELTER_PROVINCE, SHELTER_NAME)
 VILLAGE_FIELD_HINTS = ("หมู", "หม_", "village", "moo")
 SUBDISTRICT_FIELD_HINTS = ("ตำบ", "ตำ_", "tambon", "subdistrict")
 SUPPORTING_UNIT_FIELD_HINTS = ("หน่ว", "สังก", "responsible", "agency")
-IMPORTER_VERSION = "grp-shelters/3"
+IMPORTER_VERSION = "grp-shelters/5"
 PLATFORM_SHELTER_DATASET_ID = uuid5(
     NAMESPACE_URL, "grp:platform-dataset:thailand-ddpm-evacuation-centres"
 )
@@ -146,7 +148,11 @@ def validate_shelter_collection(
     columns = {name: values for name, values in zip(field_names, fields, strict=True)}
     village_field = _pick_optional_field(field_names, VILLAGE_FIELD_HINTS)
     subdistrict_field = _pick_optional_field(field_names, SUBDISTRICT_FIELD_HINTS)
-    unit_field = _pick_optional_field(field_names, SUPPORTING_UNIT_FIELD_HINTS)
+    unit_field = (
+        SHELTER_SUPPORTING_UNIT
+        if SHELTER_SUPPORTING_UNIT in field_names
+        else _pick_optional_field(field_names, SUPPORTING_UNIT_FIELD_HINTS)
+    )
     records: list[ShelterSourceRecord] = []
     for index, raw_geometry in enumerate(geometries):
         if raw_geometry is None:
@@ -418,7 +424,11 @@ def process_shelter_import(
             "district_name_mismatch_count": mismatch_count,
             "mismatch_examples": examples,
             "district_field": collection.district_field,
-            "confirmed_fields": {"name": SHELTER_NAME, "capacity": SHELTER_CAPACITY},
+            "confirmed_fields": {
+                "name": SHELTER_NAME,
+                "capacity": SHELTER_CAPACITY,
+                "supporting_unit": SHELTER_SUPPORTING_UNIT,
+            },
             "labels": {
                 "from_source_name": label_report.from_facility_name,
                 "from_supporting_unit": label_report.from_supporting_unit,

@@ -34,11 +34,12 @@ def _fake_read(*_args, **_kwargs):
     from shapely.geometry import Point
 
     return (
-        {"crs": "EPSG:4326", "fields": ["สถ_1", "district_name", "จัง"]},
+        {"crs": "EPSG:4326", "fields": ["สถา", "สถ_1", "district_name", "จัง"]},
         None,
         [to_wkb(Point(100.25, 14.25)), to_wkb(Point(101.25, 14.25))],
         [
             ["Shelter one", "Shelter two"],
+            ["Unit one", "Unit two"],
             ["เขตหนึ่ง", "เขตหนึ่ง"],
             ["จังหวัด", "จังหวัด"],
         ],
@@ -148,7 +149,11 @@ def test_process_shelters_assigns_geometry_and_reports_name_mismatch(
         assert version.meta["feature_count"] == 2
         assert version.meta["district_field"] == "district_name"
         assert version.meta["shelter_names_confirmed"] is True
-        assert job.report["confirmed_fields"] == {"name": "สถ_1", "capacity": "รอง"}
+        assert job.report["confirmed_fields"] == {
+            "name": "สถา",
+            "capacity": "รอง",
+            "supporting_unit": "สถ_1",
+        }
         assert job.report["labels"]["from_source_name"] == 2
         assert [feature.name for feature in features] == ["Shelter one", "Shelter two"]
         assert features[0].attributes["source_name"] == "Shelter one"

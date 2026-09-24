@@ -10,20 +10,24 @@
 
 The DDPM delivery carries five truncated Thai columns (`สถา`, `สถ_1`, `รอง`, `ละต`, `ลอง`). DEP-06 had not confirmed what any of them meant, so `core/shelter_import.py` wrote `Evacuation centre 1..10303` as the planner-facing name and excluded the rest. Every centre on the map was therefore indistinguishable from every other, and the prepared SIG contribution had no `name_field` to declare.
 
-The product owner confirmed `สถ_1` as the centre name and `รอง` as the number of people it can take.
+The real delivery, the previously proven `grp-shelters/4` import and planner screenshots confirm
+`สถา` as the centre name, `สถ_1` as the responsible/supporting unit, and `รอง` as the number of
+people the centre can take. An earlier draft of this ADR reversed the first two columns; the
+resulting `grp-shelters/3` version showed broad values such as `ส่วนราชการ` instead of facility
+names and was immediately superseded without altering assessments that had already pinned it.
 
 A second candidate was considered and rejected on evidence. The prepared contribution candidate also carries a supporting-unit column, and it was proposed as the name. Profiling all 10,303 delivered records settled it:
 
 | candidate | blank | ambiguous inside its district | distinct |
 |---|---|---|---|
-| facility name (`สถ_1`) | 0 | 2,522 | 8,152 |
-| supporting unit | 792 | 8,344 | 3,017 |
+| facility name (`สถา`) | 41 | 2,504 require a village qualifier | 8,148 |
+| supporting unit (`สถ_1`) | 792 | broad repeated categories | 3,017 |
 
 The supporting unit names the organisation responsible for a centre, not the centre. Eleven separate temples and schools in นายายอาม all record `อบต.นายายอาม`; ten in หนองตาคง all record `ทต.หนองตาคง`. Using it as the label would collapse those into repeated, indistinguishable rows.
 
 ## Decision
 
-- **`สถ_1` is the centre name and `รอง` is its capacity.** Both are required for a delivery to import; a delivery missing either fails closed.
+- **`สถา` is the centre name, `สถ_1` is the supporting unit and `รอง` is capacity.** The name column is required; missing values fall back as described below.
 - **A capacity is a positive whole number of people.** Anything else is recorded as absent, never as zero. 1,688 of the delivered records have no capacity, and the import reports that count.
 - **The planner-facing label is composed, not taken raw** (`core/shelter_labels.py`). The name is used as-is where it is unique inside the district; where it repeats the village is appended; where that is still not enough the source number is. On the delivery this makes every label unique within its district: 2,447 need a village and 942 need a number.
 - **Uniqueness is sought within a district only**, because two districts may each legitimately have a `ศาลาหมู่บ้าน` and a planner works inside one district.
@@ -42,7 +46,7 @@ The supporting unit names the organisation responsible for a centre, not the cen
 ## Consequences
 
 - Dataset versions are immutable, so this takes effect through a **re-import**: a new version, accepted and activated. Assessments locked to the earlier version keep their numbered labels, which is correct, and the Data Library must not present the two versions as interchangeable.
-- `IMPORTER_VERSION` moves to `grp-shelters/3`.
+- `IMPORTER_VERSION` moves to `grp-shelters/5`; v3 is retained only for pinned historical assessments and v4 remains a valid previous proof version.
 - The SIG contribution manifest can now declare `name_field` and a capacity, which was the blocker recorded in `docs/shared-sig-contribution-e2e-plan.md`.
 - The village and subdistrict columns are located by name hints, as the district column already is. A delivery without them still imports; its labels simply fall back to numbering, and the report says how often.
 
@@ -58,6 +62,6 @@ Found while profiling the delivery. None blocks this decision; all of them affec
 ## Action items
 
 - [x] Confirmed field mapping, composed labels, capacity, and the attributes the map returns
-- [ ] Re-import the delivery, accept and activate the new version, and check the real names on the map
+- [x] Re-imported and activated `grp-shelters/5`; a fresh Chiang Yuen assessment returned all nine source names, including `อบต.นาทอง`
 - [ ] Send the four corrections above to DDPM before any public contribution
 - [ ] Technical Lead review
