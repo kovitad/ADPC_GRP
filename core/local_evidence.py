@@ -222,8 +222,12 @@ def _exposure_citation(session: Session, boundary: Boundary) -> dict[str, Any] |
     ]
     bands = row.depth_bands if isinstance(row.depth_bands, dict) else {}
     if bands:
+        def band_text(label: object, value: dict[str, Any]) -> str:
+            count = int(value.get("villages", 0))
+            return f"{label}: {count:,} village" + ("" if count == 1 else "s")
+
         described = ", ".join(
-            f"{str(label)}: {int(value.get('villages', 0)):,} villages"
+            band_text(label, value)
             for label, value in bands.items()
             if isinstance(value, dict)
         )

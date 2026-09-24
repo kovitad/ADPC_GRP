@@ -215,6 +215,7 @@ def test_flood_exposure_states_the_count_and_never_implies_safety(world) -> None
     assert "is an undercount" in exposure["text"]
     assert "does not model which part of a village floods" in exposure["text"]
     assert "0–0.5 m: 30 villages" in exposure["text"]
+    assert "1–1.5 m: 10 villages" in exposure["text"]
 
 
 def test_a_complete_sample_makes_no_excuses(world) -> None:
@@ -289,3 +290,18 @@ def test_an_area_that_was_never_built_logs_nothing(world, caplog) -> None:
         local_area_citations(world["session"], world["area"])
 
     assert "exposure is stale" not in caplog.text
+
+
+def test_a_single_village_band_is_not_plural(world) -> None:
+    _with_exposure(
+        world["session"],
+        world["area"],
+        depth_bands={"> 2 m": {"villages": 1, "people": 300}},
+    )
+
+    exposure = next(
+        item
+        for item in local_area_citations(world["session"], world["area"])
+        if item["kind"] == "grp_flood_exposure"
+    )
+    assert "> 2 m: 1 village." in exposure["text"]
