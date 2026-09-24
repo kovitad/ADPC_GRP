@@ -8,7 +8,7 @@ from api.errors import not_found
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Method
-from core.data_library_models import AreaPopulationSummary
+from core.data_library_models import AreaFloodExposure, AreaPopulationSummary
 from core.facility_types import TYPE_LABELS
 from core.local_evidence import facility_type_counts
 
@@ -196,6 +196,43 @@ def area_profile(
         "province_name_th": boundary.province_name_th,
         "country_name": boundary.country_name,
     }
+    hazard_version = session.scalar(
+        select(DatasetVersion)
+        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+        .where(Dataset.type == "hazard", DatasetVersion.is_current)
+        .order_by(DatasetVersion.created_at.desc())
+    )
+    exposure_row = (
+        session.scalar(
+            select(AreaFloodExposure).where(
+                AreaFloodExposure.hazard_version_id == hazard_version.id,
+                AreaFloodExposure.village_version_id == version.id,
+                AreaFloodExposure.admin_code == boundary.admin_code,
+                AreaFloodExposure.admin_level == boundary.admin_level,
+            )
+        )
+        if hazard_version is not None and version is not None
+        else None
+    )
+    # None means the exposure job has not run for this pair of versions, which is not zero exposed.
+    flood_exposure = (
+        None
+        if exposure_row is None
+        else {
+            "return_period_years": exposure_row.return_period_years,
+            "villages_in_zone": exposure_row.villages_in_zone,
+            "people_in_zone": exposure_row.people_in_zone,
+            "households_in_zone": exposure_row.households_in_zone,
+            "no_data_village_count": exposure_row.no_data_village_count,
+            "villages_in_zone_without_population": (
+                exposure_row.villages_in_zone_without_population
+            ),
+            "depth_bands": exposure_row.depth_bands,
+            "caveat": "A village is a point, so this counts villages whose recorded location "
+            "falls inside the modelled extent. Villages that could not be measured count as "
+            "neither exposed nor dry.",
+        }
+    )
     evacuation_centers = {
         "total": sum(facilities.values()),
         "by_type": [
@@ -212,10 +249,12 @@ def area_profile(
             "population": None,
             "source": None,
             "evacuation_centers": evacuation_centers,
+            "flood_exposure": flood_exposure,
         }
     return {
         "area": area,
         "evacuation_centers": evacuation_centers,
+        "flood_exposure": flood_exposure,
         "population": {
             "village_count": summary.village_count,
             "counted_village_count": summary.counted_village_count,

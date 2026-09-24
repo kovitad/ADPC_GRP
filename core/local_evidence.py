@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
-from core.data_library_models import AreaPopulationSummary
+from core.data_library_models import AreaFloodExposure, AreaPopulationSummary
 from core.facility_types import TYPE_LABELS, UNCLASSIFIED
 
 RETRIEVAL = "grp-baseline"
@@ -170,6 +170,69 @@ def _shelter_citation(session: Session, boundary: Boundary) -> dict[str, Any] | 
     }
 
 
+def _exposure_citation(session: Session, boundary: Boundary) -> dict[str, Any] | None:
+    """State how many people the exposure job measured inside the flood extent.
+
+    Reads one stored row. The wording separates three things a single number would blur: people in
+    the zone, villages that could not be measured at all, and in-zone villages whose population was
+    unusable. Without that, a low figure reads as safety rather than as missing data.
+    """
+
+    hazard = _current_version(session, "hazard")
+    village = _current_version(session, "village_locations")
+    if hazard is None or village is None:
+        return None
+    row = session.scalar(
+        select(AreaFloodExposure).where(
+            AreaFloodExposure.hazard_version_id == hazard.id,
+            AreaFloodExposure.village_version_id == village.id,
+            AreaFloodExposure.admin_code == boundary.admin_code,
+            AreaFloodExposure.admin_level == boundary.admin_level,
+        )
+    )
+    if row is None:
+        # No stored row means the exposure job has not run for this pair of versions. Stay silent:
+        # an absent figure is not a zero, and the request must not compute one.
+        return None
+    sentences = [
+        f"Under the {row.return_period_years}-year flood scenario, {row.people_in_zone:,} "
+        f"registered residents live in the {row.villages_in_zone:,} villages of "
+        f"{_area_label(boundary)} that fall inside the modelled flood extent, in "
+        f"{row.households_in_zone:,} households.",
+    ]
+    bands = row.depth_bands if isinstance(row.depth_bands, dict) else {}
+    if bands:
+        described = ", ".join(
+            f"{str(label)}: {int(value.get('villages', 0)):,} villages"
+            for label, value in bands.items()
+            if isinstance(value, dict)
+        )
+        sentences.append(f"By modelled water depth at the village point: {described}.")
+    if row.no_data_village_count:
+        sentences.append(
+            f"{row.no_data_village_count:,} of this area's {row.village_count:,} villages could "
+            "not be measured because they fall outside the flood layer's coverage or on a cell "
+            "with no value, so they count as neither exposed nor dry."
+        )
+    if row.villages_in_zone_without_population:
+        sentences.append(
+            f"{row.villages_in_zone_without_population:,} villages inside the extent have no "
+            "usable population figure, so the number of residents above is an undercount."
+        )
+    sentences.append(
+        "A village is a point, so this counts villages whose recorded location falls in the "
+        "extent; it does not model which part of a village floods."
+    )
+    return {
+        "title": f"People inside the modelled flood extent, {boundary.name}",
+        "text": " ".join(sentences),
+        "source": "GRP data library: village points sampled against the flood layer",
+        "retrieval": RETRIEVAL,
+        "validation": "Computed outside the request from the current hazard and village versions.",
+        "kind": "grp_flood_exposure",
+    }
+
+
 def local_area_citations(session: Session, boundary: Boundary) -> list[dict[str, Any]]:
     """Citation records for one verified area, in SIG's citation shape but unnumbered.
 
@@ -177,7 +240,7 @@ def local_area_citations(session: Session, boundary: Boundary) -> list[dict[str,
     Planner. An empty list means GRP holds nothing for this area and the brief stays SIG-only.
     """
 
-    builders = (_population_citation, _shelter_citation)
+    builders = (_population_citation, _exposure_citation, _shelter_citation)
     return [record for builder in builders if (record := builder(session, boundary)) is not None]
 
 

@@ -176,3 +176,59 @@ class AreaPopulationSummary(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
     )
+
+
+class AreaFloodExposure(Base):
+    """Village-derived population inside one flood scenario's extent, computed outside the request.
+
+    Answers "how many people in this district are in the RP100 zone", which needs the village
+    points and the hazard raster together. Sampling 80,397 points is worker-side work by
+    definition (AGENTS.md), so it is computed once per pair of dataset versions and read here by a
+    single indexed lookup.
+
+    The row records what could not be measured as well as what could: a village outside every
+    raster tile, or on a nodata cell, is counted in ``no_data_village_count`` and excluded from
+    both the in-zone and the dry totals. A partial sample is therefore visible as partial rather
+    than reported as a low exposure figure, the same discipline as ADR-0027's excluded villages.
+
+    ``depth_bands`` holds the count of in-zone villages and their people per band, keyed by the
+    labels in core/hazard_overlay.DEPTH_CLASSES so the map legend and this table cannot drift.
+    """
+
+    __tablename__ = "area_flood_exposure"
+    __table_args__ = (
+        UniqueConstraint(
+            "hazard_version_id",
+            "village_version_id",
+            "admin_code",
+            "admin_level",
+            name="uq_area_flood_exposure_area",
+        ),
+        CheckConstraint(
+            "admin_level IN ('district', 'subdistrict')",
+            name="ck_area_flood_exposure_level",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    hazard_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    village_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    return_period_years: Mapped[int] = mapped_column(Integer, nullable=False)
+    admin_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    admin_level: Mapped[str] = mapped_column(String(32), nullable=False)
+    village_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    measured_village_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    no_data_village_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    villages_in_zone: Mapped[int] = mapped_column(Integer, nullable=False)
+    people_in_zone: Mapped[int] = mapped_column(Integer, nullable=False)
+    households_in_zone: Mapped[int] = mapped_column(Integer, nullable=False)
+    # In-zone villages whose population was unusable, so people_in_zone understates them.
+    villages_in_zone_without_population: Mapped[int] = mapped_column(Integer, nullable=False)
+    depth_bands: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
+    )

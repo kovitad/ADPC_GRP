@@ -522,11 +522,34 @@
         : centers
           ? `<p class="pw-area-pop__none">No evacuation centres are recorded for this area.</p>`
           : "";
+    // People inside the modelled flood extent. Absent means the exposure job has not run for
+    // these dataset versions, which is not the same as nobody being exposed, so nothing is shown.
+    const exposure = profile && profile.flood_exposure;
+    const exposureRows = exposure
+      ? `<p class="pw-area-pop__level">Inside the RP` +
+        `${numberText(exposure.return_period_years)} modelled flood extent</p>` +
+        `<table class="pw-area-pop__table"><tbody>` +
+        `<tr><th scope="row">Villages</th><td>${numberText(exposure.villages_in_zone)}</td></tr>` +
+        `<tr><th scope="row">People</th><td>${numberText(exposure.people_in_zone)}</td></tr>` +
+        `<tr><th scope="row">Households</th>` +
+        `<td>${numberText(exposure.households_in_zone)}</td></tr>` +
+        `</tbody></table>` +
+        (exposure.no_data_village_count
+          ? `<p class="pw-area-pop__note">${numberText(exposure.no_data_village_count)} ` +
+            `village(s) could not be measured against the flood layer.</p>`
+          : "") +
+        (exposure.villages_in_zone_without_population
+          ? `<p class="pw-area-pop__note">` +
+            `${numberText(exposure.villages_in_zone_without_population)} village(s) inside the ` +
+            `extent have no usable population figure, so People is an undercount.</p>`
+          : "") +
+        `<p class="pw-area-pop__caveat">${exposure.caveat || ""}</p>`
+      : "";
     if (!profile || !profile.population) {
       return (
         `<div class="pw-area-pop">${head}` +
         `<p class="pw-area-pop__none">No population record for this area.</p>` +
-        `${centerRows}</div>`
+        `${exposureRows}${centerRows}</div>`
       );
     }
     const p = profile.population;
@@ -553,7 +576,7 @@
       `<table class="pw-area-pop__table"><tbody>${rows}</tbody></table>${note}` +
       `<p class="pw-area-pop__caveat">${source.label || "Registered village population"}` +
       (source.edition ? ` · edition ${source.edition}` : "") +
-      `. ${source.caveat || ""}</p>${centerRows}</div>`
+      `. ${source.caveat || ""}</p>${exposureRows}${centerRows}</div>`
     );
   };
 
