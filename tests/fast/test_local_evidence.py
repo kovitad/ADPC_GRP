@@ -1,0 +1,128 @@
+"""GRP's own figures reach the brief as citations, and never borrow another area's numbers."""
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
+
+from core.access_models import Base
+from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
+from core.data_library_models import AreaPopulationSummary
+from core.local_evidence import (
+    RETRIEVAL,
+    attach_local_citations,
+    local_area_citations,
+)
+
+
+def _boundary(code: str, name: str) -> Boundary:
+    return Boundary(
+        admin_code=code,
+        admin_level="district",
+        name=name,
+        province_name="SI SA KET",
+        country_name="Thailand",
+        geom={"type": "Polygon", "coordinates": []},
+        source="ADPC Data Science Thailand hierarchy delivery",
+        edition="2025-10",
+        geometry_sha256="a" * 64,
+        is_supported=True,
+    )
+
+
+@pytest.fixture
+def world():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        kanthararom = _boundary("3303", "KANTHARAROM")
+        elsewhere = _boundary("3304", "KHUKHAN")
+        villages = Dataset(
+            type="village_locations", owner_kind="platform", title="Villages", provider="ADPC"
+        )
+        centers = Dataset(
+            type="evacuation_centers", owner_kind="platform", title="DDPM", provider="DDPM"
+        )
+        session.add_all([kanthararom, elsewhere, villages, centers])
+        session.flush()
+        village_version = DatasetVersion(dataset_id=villages.id, sha256="b" * 64, is_current=True)
+        center_version = DatasetVersion(dataset_id=centers.id, sha256="c" * 64, is_current=True)
+        session.add_all([village_version, center_version])
+        session.flush()
+        session.add(
+            AreaPopulationSummary(
+                dataset_version_id=village_version.id,
+                admin_code="3303",
+                admin_level="district",
+                village_count=175,
+                counted_village_count=174,
+                excluded_village_count=1,
+                male=43309,
+                female=42259,
+                total_population=85568,
+                households=23594,
+            )
+        )
+        for index in range(3):
+            session.add(
+                Feature(
+                    dataset_version_id=center_version.id,
+                    boundary_id=kanthararom.id,
+                    name=f"Centre {index}",
+                    lon=104.0,
+                    lat=15.0,
+                )
+            )
+        session.commit()
+        yield {"session": session, "area": kanthararom, "elsewhere": elsewhere}
+
+
+def test_population_and_centre_counts_become_citations(world) -> None:
+    records = local_area_citations(world["session"], world["area"])
+
+    kinds = [item["kind"] for item in records]
+    assert kinds == ["grp_population", "grp_evacuation_centers"]
+    population = records[0]
+    assert "85,568 registered residents" in population["text"]
+    assert "175 villages" in population["text"]
+    # The unconfirmed-source caveat must travel with the number into the brief.
+    assert "not a count of vulnerable people" in population["text"]
+    assert "1 of those villages is excluded" in population["text"]
+    assert "3 evacuation centres" in records[1]["text"]
+    # Capacity is not assessed, so the count must not read as a list of safe places.
+    assert "not a list of safe places" in records[1]["text"]
+
+
+def test_retrieval_is_not_marked_computed_so_sig_findings_are_not_suppressed(world) -> None:
+    # _deterministic_evidence_summary prefers records whose retrieval starts with "computed" and
+    # would otherwise drop every SIG finding in favour of GRP's own.
+    for record in local_area_citations(world["session"], world["area"]):
+        assert not record["retrieval"].casefold().startswith("computed")
+    assert RETRIEVAL == "grp-baseline"
+
+
+def test_an_area_with_no_rows_contributes_no_citations(world) -> None:
+    records = local_area_citations(world["session"], world["elsewhere"])
+
+    # No population row means no population citation: silence, never an implied zero.
+    assert [item["kind"] for item in records] == ["grp_evacuation_centers"]
+    assert "records no centres" in records[0]["text"]
+    assert "not that the area has none" in records[0]["text"]
+
+
+def test_citations_continue_the_sig_numbering(world) -> None:
+    pack = {"citations": [{"n": 1, "text": "SIG one"}, {"n": 2, "text": "SIG two"}]}
+
+    merged = attach_local_citations(pack, local_area_citations(world["session"], world["area"]))
+
+    assert [item["n"] for item in merged["citations"]] == [1, 2, 3, 4]
+    assert merged["_grp_local_citation_numbers"] == [3, 4]
+    assert merged["citations"][0]["text"] == "SIG one"
+
+
+def test_no_local_records_leaves_the_pack_untouched(world) -> None:
+    pack = {"citations": [{"n": 1, "text": "SIG one"}]}
+
+    assert attach_local_citations(pack, []) is pack

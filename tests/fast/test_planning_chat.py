@@ -31,7 +31,8 @@ from api.token_store import session_token_store
 from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import update_setting
 from core.ai_models import LlmUsage
-from core.assessment_models import Boundary
+from core.assessment_models import Boundary, Dataset, DatasetVersion
+from core.data_library_models import AreaPopulationSummary
 from core.identity import IdentityLinkResult
 from core.risk_recipe import RiskRecipe
 from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
@@ -1043,3 +1044,86 @@ def test_a_lookup_refuses_a_hub_the_person_does_not_plan_for(planning) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_grp_population_reaches_the_brief_beside_sig_evidence(planning) -> None:
+    """ADR-0028 slice 1: the model is given GRP's own rows for the verified area."""
+
+    prompts: list[str] = []
+    instruction_log: list[str] = []
+
+    async def capturing(settings, *, instructions, prompt, hub_code):
+        prompts.append(prompt)
+        instruction_log.append(instructions)
+        return planning["replies"].pop(0), "test-model", 50, 20
+
+    planning["monkeypatch"].setattr(api.ai_gateway, "call_openai", capturing)
+    FakeMcp.pack = {
+        **PACK,
+        "target": {"place": "Kanthararom District, Si Sa Ket, Thailand", "hazard": "flood"},
+        "trace": ["aoi[Kanthararom District] 41 km2 via admin boundary ~41 km²"],
+    }
+    with Session(planning["engine"]) as session:
+        dataset = Dataset(
+            type="village_locations", owner_kind="platform", title="Villages", provider="ADPC"
+        )
+        session.add(dataset)
+        session.flush()
+        version = DatasetVersion(dataset_id=dataset.id, sha256="d" * 64, is_current=True)
+        session.add(version)
+        session.flush()
+        session.add(
+            AreaPopulationSummary(
+                dataset_version_id=version.id,
+                admin_code="3303",
+                admin_level="district",
+                village_count=175,
+                counted_village_count=174,
+                excluded_village_count=1,
+                male=43309,
+                female=42259,
+                total_population=85568,
+                households=23594,
+            )
+        )
+        session.commit()
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+
+    response = _ask(
+        _client(planning, "planner@example.test"),
+        message="How many people live there?",
+        place="Kanthararom District, Si Sa Ket, Thailand",
+    )
+
+    body = response.json()
+    assert response.status_code == 200, body
+    assert body["area"]["verified"] is True
+    draft_prompt = prompts[-1]
+    # GRP's own figure is in the evidence the model may quote, numbered after SIG's.
+    assert "85,568 registered residents" in draft_prompt
+    assert '"n": 2' in draft_prompt
+    assert "not a count of vulnerable people" in draft_prompt
+    # And the model is told whose number it is, so it cannot attribute it to SIG.
+    assert "GRP data library" in instruction_log[-1]
+
+
+def test_a_place_grp_does_not_hold_attaches_no_local_evidence(planning) -> None:
+    """An unmatched area must not borrow another district's numbers."""
+
+    prompts: list[str] = []
+
+    async def capturing(settings, *, instructions, prompt, hub_code):
+        prompts.append(prompt)
+        return planning["replies"].pop(0), "test-model", 50, 20
+
+    planning["monkeypatch"].setattr(api.ai_gateway, "call_openai", capturing)
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+
+    response = _ask(
+        _client(planning, "planner@example.test"),
+        message="How many people live there?",
+        place="Mueang Nan District, Nan, Thailand",
+    )
+
+    assert response.status_code == 200, response.json()
+    assert "registered residents" not in prompts[-1]

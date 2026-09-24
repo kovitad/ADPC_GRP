@@ -40,6 +40,7 @@ from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
 from core.hazard_import import PLATFORM_HAZARD_DATASET_ID
 from core.identity import MembershipView
+from core.local_evidence import attach_local_citations, local_area_citations
 from core.models import AssessmentState
 from core.risk_recipe import RiskRecipe, active_risk_recipe, recipe_payload
 from core.shelter_import import PLATFORM_SHELTER_DATASET_ID
@@ -98,18 +99,27 @@ DRAFT_INSTRUCTIONS = (
 )
 
 
-def _draft_instructions(recipe: RiskRecipe | None) -> str:
+GRP_EVIDENCE_INSTRUCTION = (
+    " Some citations are marked with the source \"GRP data library\". Those are this platform's "
+    "own imported records, not SIG's: attribute them to the GRP data library and repeat their "
+    "stated caveats. Never merge a GRP count with a SIG count into one figure."
+)
+
+
+def _draft_instructions(recipe: RiskRecipe | None, *, local_evidence: bool = False) -> str:
     if recipe is None:
-        return DRAFT_INSTRUCTIONS + (
+        instructions = DRAFT_INSTRUCTIONS + (
             " MVP 1 has no approved vulnerability-weighted risk recipe: do not repeat risk "
             "levels, risk scores, weights or counts by risk class even if the source pack "
             "contains them. Use water-depth or flood-hazard classes only."
         )
-    return DRAFT_INSTRUCTIONS + (
-        " The supplied SIG vulnerability-weighted risk evidence may be reported exactly when "
-        "cited. Identify it as SIG risk screening under the approved recipe version supplied in "
-        "the prompt; do not recompute or reinterpret a risk class."
-    )
+    else:
+        instructions = DRAFT_INSTRUCTIONS + (
+            " The supplied SIG vulnerability-weighted risk evidence may be reported exactly when "
+            "cited. Identify it as SIG risk screening under the approved recipe version supplied "
+            "in the prompt; do not recompute or reinterpret a risk class."
+        )
+    return instructions + (GRP_EVIDENCE_INSTRUCTION if local_evidence else "")
 
 
 def _evidence_label(recipe: dict[str, object] | None) -> str:
@@ -973,6 +983,23 @@ async def planning_chat(
                 }
 
             pack = _screen_pack_for_mvp1(pack, risk_recipe)
+            # GRP's own figures for the same area, so the brief can cite them beside SIG's
+            # (ADR-0028). _match_boundary demands an exact place match, so an ambiguous or
+            # unknown area attaches nothing rather than borrowing another district's numbers.
+            local_boundary = _match_boundary(list(boundaries), place)
+            local_records = (
+                local_area_citations(session, local_boundary)
+                if local_boundary is not None
+                else []
+            )
+            pack = attach_local_citations(pack, local_records)
+            trace.append(
+                {
+                    "step": "grp_baseline_evidence",
+                    "detail": f"{len(local_records)} GRP citation(s)",
+                    "duration_ms": elapsed_ms(step_started),
+                }
+            )
 
             draft = await run_ai_call(
                 session,
@@ -980,7 +1007,9 @@ async def planning_chat(
                 user_id=principal.user_id,
                 hub_id=hub.hub_id,
                 hub_code=hub.hub_code,
-                instructions=_draft_instructions(risk_recipe),
+                instructions=_draft_instructions(
+                    risk_recipe, local_evidence=bool(local_records)
+                ),
                 prompt=json.dumps(
                     {
                         "question": payload.message,
