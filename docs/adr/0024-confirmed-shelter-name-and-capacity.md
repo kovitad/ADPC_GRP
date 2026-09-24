@@ -1,4 +1,4 @@
-# ADR-0020: The delivered shelter name and capacity columns are confirmed, and labels are composed
+# ADR-0024: The delivered shelter name and capacity columns are confirmed, and labels are composed
 
 **Status:** Accepted by the product owner on 23 September 2026. Closes the shelter half of DEP-06.
 

@@ -1216,7 +1216,7 @@ async def start_lookup(
 
     A district gather on the shared SIG service has been measured at over 60 seconds. Rather
     than hold a request open for that, the work runs as a task in this process and the browser
-    watches it with the job tracker it already uses for assessments (ADR-0021).
+    watches it with the job tracker it already uses for assessments (ADR-0025).
     """
 
     settings = get_settings()

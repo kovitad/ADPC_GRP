@@ -4,7 +4,7 @@ The delivered data carries two candidates. The facility column names the place �
 `โรงเรียนวัดโพธิ์ลังกามิตรภาพที่ 171` — while the supporting-unit column names the organisation
 responsible for it. The second is far coarser: eleven separate temples and schools in นายายอาม
 all record `อบต.นายายอาม`. So the facility names the centre and the supporting unit does not
-(ADR-0020).
+(ADR-0024).
 
 The facility name is still not unique. Generic ones repeat — `ศาลาประชาคมหมู่บ้าน` appears in
 eight villages of ตกพรม alone — and a few records repeat outright at one coordinate. So a label
@@ -21,6 +21,9 @@ from dataclasses import dataclass
 
 NUMBERED_LABEL = "Evacuation centre {number}"
 QUALIFIER_SEPARATOR = " · "
+# Feature.name is VARCHAR(300). A delivered facility name can be long, and qualifiers are
+# appended after it, so the name is trimmed rather than the qualifier that makes it unique.
+MAX_LABEL = 300
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,17 @@ class ShelterLabelReport:
 
 def _clean(value: str) -> str:
     return " ".join(str(value or "").split())
+
+
+def _fit(base: str, qualifier: str = "") -> str:
+    """Join a label to its qualifier within the column, shortening the label if it must."""
+
+    if not qualifier:
+        return base if len(base) <= MAX_LABEL else base[: MAX_LABEL - 1].rstrip() + "…"
+    room = MAX_LABEL - len(qualifier) - len(QUALIFIER_SEPARATOR)
+    if len(base) > room:
+        base = base[: max(1, room - 1)].rstrip() + "…"
+    return f"{base}{QUALIFIER_SEPARATOR}{qualifier}"
 
 
 def _base_label(record: ShelterLabelInput) -> tuple[str, str]:
@@ -96,18 +110,16 @@ def compose_labels(
             base = bases[record.source_index][0]
             village = _clean(record.village)
             if counts[base] > 1 and village:
-                with_village[record.source_index] = f"{base}{QUALIFIER_SEPARATOR}{village}"
+                with_village[record.source_index] = _fit(base, village)
                 qualified += 1
             else:
-                with_village[record.source_index] = base
+                with_village[record.source_index] = _fit(base)
 
         still_repeated = Counter(with_village.values())
         for record in group:
             candidate = with_village[record.source_index]
             if still_repeated[candidate] > 1:
-                labels[record.source_index] = (
-                    f"{candidate}{QUALIFIER_SEPARATOR}{record.source_index + 1}"
-                )
+                labels[record.source_index] = _fit(candidate, str(record.source_index + 1))
                 numbered_to_stay_distinct += 1
             else:
                 labels[record.source_index] = candidate

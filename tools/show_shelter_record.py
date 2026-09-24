@@ -80,9 +80,19 @@ def _profile(name: str, values: list[str]) -> dict:
         "samples": sorted(distinct)[:SAMPLE_VALUES],
     }
     if report["numeric"]:
-        numbers = [float(value) for value in filled]
-        report["min"] = min(numbers)
-        report["max"] = max(numbers)
+        # _looks_numeric only sampled the first 200, so a stray word further down is normal.
+        numbers = []
+        stray = 0
+        for value in filled:
+            try:
+                numbers.append(float(value))
+            except ValueError:
+                stray += 1
+        if numbers:
+            report["min"] = min(numbers)
+            report["max"] = max(numbers)
+        if stray:
+            report["non_numeric_values"] = stray
     # A column that is almost entirely distinct text is a name; one with few distinct values
     # is a category; a numeric one with a wide range is a count or a capacity.
     if filled and not report["numeric"]:

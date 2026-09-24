@@ -1,6 +1,6 @@
-# ADR-0021: A SIG evidence lookup runs as a background task, not inside the request
+# ADR-0025: A SIG evidence lookup runs as a background task, not inside the request
 
-**Status:** Accepted for the Developer environment (Docker Desktop) on 23 September 2026. Extends ADR-0004.
+**Status:** Accepted for the Developer environment (Docker Desktop) on 23 September 2026. Extends ADR-0004. Numbered around the ADRs added on `main` the same week.
 
 **Date:** 2026-09-23
 

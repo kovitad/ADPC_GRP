@@ -35,7 +35,7 @@ Measured end to end on 23 September for Mueang Phitsanulok District (728 km²), 
 
 It completes and the answer is good. Four earlier attempts from a different client appeared to fail only because that client gave up at 60 s.
 
-Nothing tells a caller how long it will take or how far along it is. GRP's side is handled (ADR-0021: the lookup runs as a background task and the browser polls it). What we cannot supply is progress.
+Nothing tells a caller how long it will take or how far along it is. GRP's side is handled (ADR-0025: the lookup runs as a background task and the browser polls it). What we cannot supply is progress.
 
 **Ask:** is six minutes expected for a district of this size, and can a caller see progress while it runs?
 

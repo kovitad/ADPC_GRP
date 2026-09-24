@@ -35,7 +35,12 @@ if ($Reset) {
     }
     # A reset leaves an empty data library, so load the baseline back unless told otherwise.
     if (-not $PSBoundParameters.ContainsKey("LoadBaseline")) { $LoadBaseline = $true }
+    # Docker writes progress to stderr, which "Stop" turns into a terminating error — and
+    # aborting here would leave the volumes gone and nothing rebuilt.
+    $ErrorActionPreference = $NativeErrors
     docker @Compose down -v
+    $ErrorActionPreference = "Stop"
+    if ($LASTEXITCODE -ne 0) { throw "docker compose down -v failed; nothing was rebuilt." }
     Write-Host "Volumes removed. Continuing with a fresh stack."
 }
 

@@ -15,9 +15,9 @@ All of it passes: **444 tests, 2 skipped** (PostgreSQL only), `ruff check .` cle
 | Landed | Where |
 |---|---|
 | SIG access token renews itself instead of forcing a sign-in | `api/sig_connection.py`, ADR-0017 |
-| Evacuation centres carry their real names and capacity | `core/shelter_import.py`, `core/shelter_labels.py`, ADR-0020 |
+| Evacuation centres carry their real names and capacity | `core/shelter_import.py`, `core/shelter_labels.py`, ADR-0024 |
 | A fresh sandbox reaches a working baseline in one command | `grpcli/baseline.py`, `scripts/docker-desktop.ps1 -Reset` |
-| A SIG lookup survives a six-minute gather | `api/sig_jobs.py`, ADR-0021 |
+| A SIG lookup survives a six-minute gather | `api/sig_jobs.py`, ADR-0025 |
 | First real recordings of the SIG contract | `tests/fixtures/sig/`, `tests/contract/test_sig_recorded_contract.py` |
 | A tool that profiles any delivery or contribution candidate | `tools/show_shelter_record.py` |
 
@@ -27,7 +27,7 @@ Nothing here has been run against the live Docker Desktop stack. That is Slice 1
 
 ## 2. Slice 1 — re-import the shelters and see the names
 
-The product owner confirmed on 23 September that `สถ_1` is the centre name and `รอง` is its capacity (ADR-0020). The importer now reads both, and composes a label that is unique inside each district. **No existing row changes**: dataset versions are immutable, so this takes effect through a new version.
+The product owner confirmed on 23 September that `สถ_1` is the centre name and `รอง` is its capacity (ADR-0024). The importer now reads both, and composes a label that is unique inside each district. **No existing row changes**: dataset versions are immutable, so this takes effect through a new version.
 
 This is a sandbox, so the fastest route is a full reset:
 
@@ -95,7 +95,7 @@ Values come from `core/hazard_overlay.py:18-22`. Do **not** add a `countries` fi
 
 - **Do not submit the evacuation-centre vector layer.** It needs a public direct-download URL, and the delivery still carries the corrections in Section 6. At 5.5 MB a per-file Google Drive link is enough; object storage is not required.
 - **Do not fabricate a JRC depth-damage table.** The numbers in the SERVIR runbook are illustrative. Publishing them under JRC's name would put an unverified figure on a shared platform with someone else's authority on it.
-- **Do not chase the six-minute gather.** ADR-0021 survives it. Making it faster is SERVIR's.
+- **Do not chase the six-minute gather.** ADR-0025 survives it. Making it faster is SERVIR's.
 
 ---
 

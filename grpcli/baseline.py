@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from api.errors import new_support_ref
 from core.baseline_activation import BaselineActivationError, activate_mvp1_baseline
 from core.boundary_import import BOUNDARY_SOURCE_REF
 from core.data_import_jobs import request_import
@@ -94,7 +95,7 @@ def _queue(actor_user_id: UUID, category: str, source_ref: str) -> UUID:
             idempotency_key=f"baseline-{category}-{uuid4()}",
             category=category,
             source_ref=source_ref,
-            support_ref=None,
+            support_ref=new_support_ref(),
         )
         session.commit()
         return result.import_id

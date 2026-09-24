@@ -223,8 +223,8 @@ Design notes to read before large changes:
 | Assessment | `core/assessment_models.py`, `core/assessment_jobs.py`, `core/gis.py`, `core/result_rules.py`, `core/storage.py`, `core/validation.py`, `api/assessments.py`, `api/catalog.py`, `worker/main.py`, `grpcli/seed.py` | The API never imports GIS; the worker claims with `SKIP LOCKED` |
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py`, `api/sig_connection.py` | See 4.3; `sig_connection` renews the SIG access token before a lookup (ADR-0017) |
-| Shelter labels | `core/shelter_labels.py`, `core/shelter_import.py`, `tools/show_shelter_record.py` | ADR-0020: `สถ_1` is the name, `รอง` the capacity; labels composed and ambiguity counted |
-| Background SIG lookups | `api/sig_jobs.py`, `api/planning.py` | ADR-0021: a gather runs as a task in the API process and the browser polls it, because SIG exceeds the 45 s client timeout |
+| Shelter labels | `core/shelter_labels.py`, `core/shelter_import.py`, `tools/show_shelter_record.py` | ADR-0024: `สถ_1` is the name, `รอง` the capacity; labels composed and ambiguity counted |
+| Background SIG lookups | `api/sig_jobs.py`, `api/planning.py` | ADR-0025: a gather runs as a task in the API process and the browser polls it, because SIG exceeds the 45 s client timeout |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
 | Migrations | `migrations/versions/20260916_0001`…`20260923_0013` | Forward-only; `0008` adds the data-library foundation; `0010` adds shelter district membership and indexed PostGIS points; `0013` adds persistent assessment run steps |
 
@@ -662,7 +662,7 @@ or deploy this feature to a server before its security gates pass.
 7. Move to S3-compatible storage/direct multipart upload only when a second host or measured size requires it.
 8. Complete load, restore, security and alert rehearsals before pilot deployment.
 
-### Shelter names and capacity confirmed (23 September 2026, ADR-0020)
+### Shelter names and capacity confirmed (23 September 2026, ADR-0024)
 
 - The product owner confirmed the truncated delivery columns: **`สถ_1` is the evacuation-centre
   name and `รอง` is its capacity**. `core/shelter_import.py` no longer writes
@@ -716,7 +716,7 @@ Nothing on this branch has been run against the live Docker Desktop stack yet.
   23 September for Mueang Phitsanulok (728 km²): 2 s to understand the question, **347 s** for
   the SIG gather, 12 s to write the brief, **367 s** in total (pack `53b0ea5fd81baa6b`). It does
   complete, and the answer is good. Earlier calls that appeared to fail were a client giving up
-  at 60 s, not the service failing. ADR-0021 moves the gather to a background task so no web
+  at 60 s, not the service failing. ADR-0025 moves the gather to a background task so no web
   request has to carry it; making it faster is SERVIR's, and nothing reports progress meanwhile.
 - SIG resolves Mueang Nan as an OpenStreetMap admin boundary of **1,095 km²**. GRP's own
   district comes from the delivered file, so GRP and SIG counts must be reconciled, not assumed

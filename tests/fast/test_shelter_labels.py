@@ -2,7 +2,7 @@
 
 Measured over the delivered 10,303 records: the facility name is never blank and leaves 2,522
 records ambiguous inside their district, while the supporting unit is blank 792 times and
-leaves 8,344 ambiguous. See ADR-0020.
+leaves 8,344 ambiguous. See ADR-0024.
 """
 
 from core.shelter_labels import ShelterLabelInput, compose_labels
@@ -119,4 +119,17 @@ def test_whitespace_does_not_create_a_false_difference() -> None:
     )
 
     assert labels[0].startswith("ศาลา หมู่บ้าน")
+    assert labels[0] != labels[1]
+
+
+def test_a_long_name_is_trimmed_so_the_qualifier_survives() -> None:
+    """Feature.name is VARCHAR(300); the qualifier is what keeps two rows apart."""
+
+    long_name = "วัด" + "ก" * 400
+    labels, _ = compose_labels(
+        [_record(0, facility=long_name, village="3"), _record(1, facility=long_name, village="9")]
+    )
+
+    assert all(len(label) <= 300 for label in labels.values())
+    assert labels[0].endswith("· 3") and labels[1].endswith("· 9")
     assert labels[0] != labels[1]

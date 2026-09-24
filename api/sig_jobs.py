@@ -4,7 +4,7 @@ A district lookup on the shared SERVIR service has been measured at over 60 seco
 web request cannot usefully wait that long. AD-03 sends GIS to the worker, and this is not GIS:
 it is a network call to SIG, authorized by a token that lives only in this process's memory
 (ADR-0002). A worker cannot see that token, so the task runs here and the browser polls it with
-the same job tracker that watches an assessment (ADR-0021).
+the same job tracker that watches an assessment (ADR-0025).
 
 In-process, like the token store and the answer cache: a restart loses running lookups, and a
 second API instance cannot see the first one's. Dev only, as the whole planner chat is.
@@ -22,6 +22,10 @@ from typing import Any
 from uuid import uuid4
 
 MAX_JOBS = 200
+# A lookup holds a database connection for its whole run, and a run is minutes. The default
+# SQLAlchemy pool is 5 with 10 overflow, so a handful of concurrent lookups would starve every
+# other request. Queue beyond this rather than take a connection we cannot give back.
+MAX_CONCURRENT = 3
 # A finished lookup stays readable long enough for a person to come back to the tab.
 KEEP_FINISHED = timedelta(minutes=30)
 # A lookup that never finishes must not hold a slot for ever.
@@ -162,13 +166,33 @@ def app_session() -> Iterator[Any]:
         generator.close()
 
 
+_semaphore: asyncio.Semaphore | None = None
+
+
+def _slots() -> Any:
+    """One semaphore per event loop, created on the loop that will wait on it."""
+
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    return _semaphore
+
+
 def run_in_background(job_id: str, work: Any) -> None:
     """Start `work` (a coroutine) and record its outcome on the job, whatever happens."""
 
     async def guarded() -> None:
-        sig_lookups.mark_running(job_id)
         try:
-            answer = await work
+            # The job stays queued until a slot frees, so its state is the truth about it.
+            async with _slots():
+                sig_lookups.mark_running(job_id)
+                answer = await asyncio.wait_for(work, GIVE_UP_AFTER.total_seconds())
+        except TimeoutError:
+            sig_lookups.fail(
+                job_id,
+                "LOOKUP_TIMED_OUT",
+                "SIG did not answer in time. The connection was released; please ask again.",
+            )
         except asyncio.CancelledError:
             sig_lookups.fail(job_id, "CANCELLED", "The lookup was cancelled.")
             raise

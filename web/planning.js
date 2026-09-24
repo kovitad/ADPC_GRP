@@ -2009,7 +2009,7 @@
   };
 
   // A SIG gather for a Thai district has been measured at over a minute, so the answer comes
-  // back as a job rather than as a held-open request (ADR-0021). The top-bar pill shows it
+  // back as a job rather than as a held-open request (ADR-0025). The top-bar pill shows it
   // running, so a planner can switch pages and be told when it lands.
   const LOOKUP_POLL_MS = 2000;
   const LOOKUP_GIVE_UP_MS = 10 * 60 * 1000;
@@ -2036,16 +2036,19 @@
         }
         if (Date.now() > deadline) {
           const timeout = new Error(
-            "The SIG lookup is still running. Leave this page open, or ask again.",
+            "This lookup is taking longer than expected. The top bar keeps watching it.",
           );
           timeout.code = "LOOKUP_STILL_RUNNING";
+          timeout.keepWatching = true;
           throw timeout;
         }
         await new Promise((resolve) => window.setTimeout(resolve, LOOKUP_POLL_MS));
       }
-    } finally {
-      // The page reports the outcome itself, so the pill must not also announce it.
-      GRP.jobs.done(started.job_id);
+    } catch (error) {
+      // Stop watching only what has actually ended. A lookup this page gave up polling is
+      // still running on the server, and the top bar is then the only thing tracking it.
+      if (!error.keepWatching) GRP.jobs.done(started.job_id);
+      throw error;
     }
   };
 

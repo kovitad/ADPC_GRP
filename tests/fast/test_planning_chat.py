@@ -894,7 +894,7 @@ def test_publish_token_is_dropped_when_the_pack_is_too_large(planning, monkeypat
     assert body["draft_issues"] == ["This evidence pack is too large to publish from this screen"]
 
 
-# --- background lookups (ADR-0021) -----------------------------------------------------
+# --- background lookups (ADR-0025) -----------------------------------------------------
 
 
 def test_a_lookup_runs_in_the_background_and_returns_the_same_answer(planning) -> None:

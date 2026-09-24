@@ -35,7 +35,7 @@ SHELTER_STEM = "ddpm_shelters"
 REQUIRED_SUFFIXES = (".shp", ".shx", ".dbf", ".prj")
 OPTIONAL_SUFFIXES = (".cpg", ".sbn", ".sbx", ".shp.xml")
 SHELTER_PROVINCE = "จัง"
-# The product owner confirmed these truncated columns on 23 September 2026 (ADR-0020):
+# The product owner confirmed these truncated columns on 23 September 2026 (ADR-0024):
 # `สถ_1` names the centre and `รอง` is the number of people it can take.
 SHELTER_NAME = "สถ_1"
 SHELTER_CAPACITY = "รอง"
