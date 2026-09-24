@@ -122,6 +122,7 @@ def test_process_boundary_import_publishes_files_version_and_features_together(
             category="boundary",
             source_ref=BOUNDARY_SOURCE_REF,
             support_ref="GRP-BOUNDARY",
+            manifest={"source_sha256": "source-digest", "importer_version": "test"},
         )
         claim = claim_next_import(session, lease_minutes=15)
 
@@ -142,6 +143,8 @@ def test_process_boundary_import_publishes_files_version_and_features_together(
             select(DatasetFile).where(DatasetFile.dataset_version_id == version_id)
         ).all()
         assert job.state == "succeeded"
+        assert job.manifest["source_sha256"] == "source-digest"
+        assert job.manifest["managed_manifest"]["manifest_sha256"] == version.sha256
         assert version.readiness == "technically_valid"
         assert version.meta["feature_count"] == 2
         assert len(boundaries) == 2

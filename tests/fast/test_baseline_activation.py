@@ -190,3 +190,82 @@ def test_activate_latest_imported_baseline() -> None:
                 allow_draft_methods=False,
             )
         assert "Real districts cannot use synthetic" in mixed_centers.value.detail
+
+
+def test_activation_can_pin_explicit_import_versions() -> None:
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        user = AppUser(email="owner@example.test", is_platform_admin=True)
+        datasets = [
+            Dataset(
+                id=dataset_id,
+                type=dataset_type,
+                owner_kind="platform",
+                title=dataset_type,
+                provider="Approved source",
+            )
+            for dataset_id, dataset_type in (
+                (PLATFORM_BOUNDARY_DATASET_ID, "boundary"),
+                (PLATFORM_SHELTER_DATASET_ID, "evacuation_centers"),
+                (PLATFORM_HAZARD_DATASET_ID, "hazard"),
+            )
+        ]
+        session.add_all([user, *datasets])
+        session.flush()
+        versions = {}
+        for dataset in datasets:
+            session.add(
+                DatasetVersion(
+                    dataset_id=dataset.id,
+                    sha256="0" * 64,
+                    return_period_years=100 if dataset.type == "hazard" else None,
+                    readiness=(
+                        "waiting_for_method" if dataset.type == "hazard" else "technically_valid"
+                    ),
+                    is_current=False,
+                )
+            )
+            selected = DatasetVersion(
+                dataset_id=dataset.id,
+                sha256="1" * 64,
+                return_period_years=100 if dataset.type == "hazard" else None,
+                readiness=(
+                    "waiting_for_method" if dataset.type == "hazard" else "technically_valid"
+                ),
+                is_current=False,
+            )
+            session.add(selected)
+            versions[dataset.type] = selected
+        session.flush()
+        geometry = {
+            "type": "Polygon",
+            "coordinates": [[[100, 15], [101, 15], [101, 16], [100, 15]]],
+        }
+        session.add(
+            Boundary(
+                admin_code="TH-SELECTED",
+                admin_level="district",
+                name="Selected district",
+                geom=geometry,
+                source="Approved source",
+                edition="2026",
+                geometry_sha256=canonical_sha256(geometry),
+                collection_version_id=versions["boundary"].id,
+                is_supported=False,
+            )
+        )
+        session.flush()
+
+        result = activate_mvp1_baseline(
+            session,
+            actor_user_id=user.id,
+            actor_email=user.email,
+            boundary_version_id=versions["boundary"].id,
+            centers_version_id=versions["evacuation_centers"].id,
+            hazard_version_id=versions["hazard"].id,
+        )
+        session.commit()
+
+        assert result["boundary_version_id"] == str(versions["boundary"].id)
+        assert all(version.is_current for version in versions.values())

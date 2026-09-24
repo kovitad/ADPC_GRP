@@ -18,6 +18,7 @@ ACTION="up"
 CONFIGURE_AI=false
 CONFIGURE_LANGFUSE=false
 REGISTER_SIG_CLIENT=false
+BOOTSTRAP_THAILAND_DATA=false
 SERVIR_CLIENT_ID=""
 
 usage() {
@@ -38,6 +39,8 @@ Options:
                             secret key and environment. Both keys are hidden.
   --register-sig-client     Register a localhost public PKCE client with SIG.
   --servir-client-id ID     Use an already registered non-secret SIG client ID.
+  --bootstrap-thailand-data Validate, import and activate the supported Thailand
+                            baseline from .local/data-in. Requires --admin-email.
   --status                  Show container and health status without rebuilding.
   --down                    Stop this stack. Docker volumes and data are kept.
   -h, --help                Show this help.
@@ -93,6 +96,10 @@ while [ "$#" -gt 0 ]; do
             require_value "$1" "${2:-}"
             SERVIR_CLIENT_ID="$2"
             shift 2
+            ;;
+        --bootstrap-thailand-data)
+            BOOTSTRAP_THAILAND_DATA=true
+            shift
             ;;
         --status)
             ACTION="status"
@@ -298,6 +305,9 @@ esac
 if [ "${#HUB_ADMIN_EMAILS[@]}" -gt 0 ] && [ "${#ADMIN_EMAILS[@]}" -eq 0 ]; then
     die "--hub-admin-email requires at least one --admin-email to act as Platform Admin"
 fi
+if $BOOTSTRAP_THAILAND_DATA && [ "${#ADMIN_EMAILS[@]}" -eq 0 ]; then
+    die "--bootstrap-thailand-data requires --admin-email to record the activation decision"
+fi
 
 RUNNING_API="$(compose ps -q api 2>/dev/null || true)"
 if [ -z "$RUNNING_API" ] && command -v ss >/dev/null 2>&1 \
@@ -345,6 +355,12 @@ for email in "${HUB_ADMIN_EMAILS[@]}"; do
         --hub-code adpc --role admin
 done
 
+if $BOOTSTRAP_THAILAND_DATA; then
+    log "Installing the supported Thailand baseline. This can take several minutes..."
+    compose exec -T api python -m grpcli.bootstrap install-thailand \
+        --actor-email "${ADMIN_EMAILS[0]}" --hub-code adpc
+fi
+
 if command -v curl >/dev/null 2>&1; then
     curl -fsS --max-time 10 http://127.0.0.1:8000/api/v1/healthz >/dev/null \
         || die "Containers started, but the API health check failed. Run this script with --status and inspect the logs."
@@ -366,6 +382,7 @@ Then open on your own computer:
 
 Useful commands:
   ./scripts/docker-ubuntu.sh --status
+  ./scripts/docker-ubuntu.sh --admin-email you@adpc.net --bootstrap-thailand-data
   docker compose --env-file .local/ubuntu-compose.env -f deploy/compose.desktop.yml logs -f api worker
   ./scripts/docker-ubuntu.sh --down
 EOF

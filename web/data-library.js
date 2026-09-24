@@ -50,6 +50,34 @@
     return node;
   };
 
+  const renderBootstrap = (bootstrap) => {
+    const state = document.querySelector("[data-bootstrap-state]");
+    const summary = document.querySelector("[data-bootstrap-summary]");
+    const categories = document.querySelector("[data-bootstrap-categories]");
+    const next = document.querySelector("[data-bootstrap-next]");
+    state.textContent = bootstrap.ready ? "Ready" : "Setup needed";
+    state.classList.toggle("status-pill--success", bootstrap.ready);
+    summary.textContent = bootstrap.ready
+      ? "The supported Thailand baseline is active for new district planning."
+      : "One or more supported baseline inputs still need to be imported and activated.";
+    categories.replaceChildren();
+    const labels = {
+      boundary: "District boundaries",
+      evacuation_centers: "DDPM shelters",
+      hazard: "100-year flood depth",
+    };
+    Object.entries(bootstrap.categories).forEach(([key, value]) => {
+      const item = element("div", `library-bootstrap__item${value.active ? " is-ready" : ""}`);
+      item.append(
+        element("span", "library-bootstrap__dot", value.active ? "✓" : "—"),
+        element("strong", "", labels[key] || key),
+        element("small", "", value.active ? `Active · ${value.version_id.slice(0, 8)}` : "Not active"),
+      );
+      categories.append(item);
+    });
+    next.textContent = bootstrap.scope_note;
+  };
+
   const sourceKind = (version) => {
     if (version.synthetic) return { label: "Synthetic demo", modifier: "demo" };
     if (version.source_mode === "browser_upload") {
@@ -338,6 +366,7 @@
     try {
       const payload = await GRP.request("/api/v1/data-library");
       canImport = payload.can_import_platform_baseline;
+      renderBootstrap(payload.thailand_bootstrap);
       Object.keys(configs).forEach((category) => renderCategory(category, payload[configs[category].payload]));
       vulnerability.textContent = payload.vulnerability.message;
     } catch (error) {

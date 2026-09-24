@@ -3,6 +3,8 @@ param(
     [string[]]$AdminEmail = @(),
     # SERVIR account emails to make Hub Admin of the adpc Hub (can then manage members).
     [string[]]$HubAdminEmail = @(),
+    # Validate, import and activate .local/data-in for the Thailand Hub.
+    [switch]$BootstrapThailandData,
     [switch]$Down
 )
 
@@ -102,6 +104,16 @@ foreach ($email in $AdminEmail) {
 foreach ($email in $HubAdminEmail) {
     $actor = if ($AdminEmail.Count -gt 0) { $AdminEmail[0] } else { $email }
     docker @Compose exec api python -m grpcli.admin assign-member --actor-email $actor --email $email --hub-code adpc --role admin
+}
+
+if ($BootstrapThailandData) {
+    if ($AdminEmail.Count -eq 0) {
+        throw "-BootstrapThailandData requires -AdminEmail to record the activation decision."
+    }
+    Write-Host "Installing the supported Thailand baseline. This can take several minutes..."
+    docker @Compose exec -T api python -m grpcli.bootstrap install-thailand `
+        --actor-email $AdminEmail[0] --hub-code adpc
+    if ($LASTEXITCODE -ne 0) { throw "Thailand data bootstrap failed; inspect the API and worker logs." }
 }
 
 Write-Host ""

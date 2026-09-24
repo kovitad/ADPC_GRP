@@ -1,10 +1,17 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 24 September 2026 (`main`; Thailand Hub bootstrap/data-release design added)
+**Updated:** 24 September 2026 (`codex/thailand-hub-bootstrap`; supported Thailand baseline installer implemented and run locally)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
-**Delivery status:** The developer-only shelter flow is complete in the working tree: upload a Shapefile ZIP once, validate it in the worker, explicitly accept its immutable Platform version, select it in Planning's **Data & run** drawer, follow six persisted background steps, and open the named-centre map/table/recommendation result. The Data Library and Planning selector now identify **Local upload**, **Platform baseline** and **Synthetic demo** sources in plain language, including which source is used for real districts. SIG context remains optional and separate. **428 tests pass and 2 PostgreSQL-only tests skip**; Ruff, JavaScript syntax and whitespace checks are clean. Migration `20260923_0013` is applied to the local Docker database. Static web assets are live-mounted; the API/worker image needs one rebuild for the latest source-label fields because the Docker Desktop engine CLI stopped responding during the final visual pass, although the existing app still answers `/api/v1/healthz`.
+**Delivery status:** The first Thailand Hub bootstrap slice is implemented and proven against the
+real local bundle. `python -m grpcli.bootstrap install-thailand` hashes the supported source bytes,
+queues district boundaries, DDPM shelters and six RP100 tiles in dependency order, waits for the
+worker, and activates those exact immutable versions. A second run reused all three completed jobs
+instead of creating versions. The Data Library shows a plain-language Thailand release status.
+Docker API/worker were rebuilt and are healthy; the active local release has **928 supported
+districts, 10,303 shelters across 673 districts, and RP100**. **431 tests pass and 2
+PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Bash syntax and whitespace checks are clean.
 
 **New design decision:** `.local/data-in/evacuation_centers` contains three different operational
 point sources, not three interchangeable shelter files: 10,303 shelters, 8,199 civil-defence
@@ -23,11 +30,15 @@ sub-district, optional SIG evidence remains explicitly labelled as parent-distri
 its totals are never disaggregated or combined. See
 [`docs/multi-level-boundary-planning-design.md`](docs/multi-level-boundary-planning-design.md).
 
-**Thailand Hub bootstrap design:** ADR-0022 proposes importing the complete ~2.1 GB Thailand source
+**Thailand Hub bootstrap implementation:** ADR-0022 defines importing the complete ~2.1 GB Thailand source
 tree from a checksum-pinned external bundle during deployment: boundaries/hierarchy, all three
 preparedness-point roles, RP100 and three separate vulnerability rasters. Source bytes stay out of
 Git/images/database. An idempotent CLI validates, converts and activates one compatible baseline
-release for the ADPC Hub; future Hub uploads remain immutable explicit overrides. The local bundle
+release for the ADPC Hub; future Hub uploads remain immutable explicit overrides. The first
+vertical slice now automates and proves the already-supported district/shelter/RP100 release. The
+province/sub-district hierarchy, volunteer/warning roles, vulnerability display conversion,
+release.yaml authority metadata, admin-settings export/apply and Hub-local selections remain next.
+The local bundle
 becomes the primary planning evidence, while SIG is optional for missing schools/hospitals/roads,
 documents/feeds and explicit cross-Hub/public exchange. A demo database may be rebuilt without a
 backup after exporting only allow-listed admin/Hub/AI/approved-recipe configuration; secrets remain
@@ -56,12 +67,13 @@ in Planning. Generalize the importer, create a compatible boundary-release manif
 the village point source as boundary coverage, and do not start browser boundary uploads before the
 existing upload security gate is approved.
 
-For deployment-data work, approve ADR-0022 and build the secret-free release manifest/preflight
-first. Do not copy `.local/data-in` into Git or the container image. Implement hierarchy, point and
-hazard dependencies before the bootstrap orchestrator; register child/elderly/disability rasters
-separately as display-ready until DEP-07 supplies an approved calculation method. Add the
-allow-listed admin settings export/apply command before rehearsing a destructive blank-database
-reset. The no-backup rule applies only to this rebuildable demo, not production.
+For the next deployment-data slice, add the secret-free signed/approved `release.yaml` authority
+manifest on top of the runtime byte inventory; do not copy `.local/data-in` into Git or the
+container image. Generalize boundaries to province/sub-district, add the two supporting point
+roles, then register child/elderly/disability rasters separately as display-ready until DEP-07
+supplies an approved calculation method. Add the allow-listed admin settings export/apply command
+before rehearsing a destructive blank-database reset. The no-backup rule applies only to this
+rebuildable demo, not production.
 
 For additional return periods, implement ADR-0023 after recording the live risk-pack capability
 fixture. Offer only layers reported live, under **External SIG screening**. The likely requirement

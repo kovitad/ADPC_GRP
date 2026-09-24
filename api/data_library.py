@@ -34,6 +34,7 @@ from core.shelter_import import (
     SHELTER_SOURCE_REF,
     SHELTER_STEM,
 )
+from core.thailand_bootstrap import bootstrap_library_status
 
 router = APIRouter(prefix="/data-library", tags=["data-library"])
 
@@ -146,6 +147,9 @@ def data_library(principal: AdminUser, session: DatabaseSession) -> dict[str, ob
     }
     return {
         "can_import_platform_baseline": principal.is_platform_admin,
+        "thailand_bootstrap": bootstrap_library_status(
+            session, get_settings().data_in_root
+        ),
         "boundary": {
             "source_available": _boundary_source_available(),
             "source_ref": BOUNDARY_SOURCE_REF,

@@ -1,6 +1,6 @@
 # Thailand Hub bootstrap data plan
 
-**Status:** Proposed
+**Status:** In progress — district, shelter and RP100 bootstrap slice implemented
 
 **Scope:** Repeatable deployment of the delivered `.local/data-in` Thailand bundle, followed later
 by reusable Hub-owned uploads.
@@ -282,12 +282,20 @@ import them as local versioned hazard inputs. Use SIG meanwhile for contextual s
 
 ## Implementation slices
 
-1. Define and validate the secret-free Thailand release manifest and data-bundle preflight CLI.
+The first deployed slice now provides `grpcli.bootstrap install-thailand`: runtime source-byte
+inventory, stable per-category checksums, worker-queued dependency order, exact-version activation,
+safe retry of unpublished failures, cross-admin reuse of completed imports, launcher flags and a
+Data Library release-status card. It was run twice against the local bundle; the second run reused
+all three imports. It intentionally does not label the remaining delivered data as imported.
+
+1. Define and validate the authority-approved, secret-free Thailand `release.yaml` manifest on top
+   of the implemented runtime byte preflight.
 2. Implement ADR-0021 hierarchy import/release activation.
 3. Implement ADR-0020 preparedness point profiles and supporting layers.
 4. Generalize the hazard importer/activation into the release graph.
 5. Build one-raster-at-a-time vulnerability COG registration and display-only AOI rendering.
-6. Add the idempotent `grpcli.bootstrap install-thailand` orchestrator and persisted progress.
+6. ~~Add the idempotent `grpcli.bootstrap install-thailand` orchestrator and persisted progress.~~
+   **Implemented for district boundaries, DDPM shelters and RP100; extend with slices 2–5.**
 7. Add allow-listed admin settings export/apply and launcher flags.
 8. Add Hub dataset selections and compatible upload candidates.
 9. Make Planning local-first and move SIG into an optional **Add external evidence** action.

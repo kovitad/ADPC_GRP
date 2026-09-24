@@ -38,6 +38,9 @@ def test_shared_host_runbook_documents_tunnel_and_rerun() -> None:
     runbook = (REPOSITORY_ROOT / "deploy" / "UBUNTU_SHARED_HOST.md").read_text(
         encoding="utf-8"
     )
+    launcher = (REPOSITORY_ROOT / "scripts" / "docker-ubuntu.sh").read_text(
+        encoding="utf-8"
+    )
 
     assert "127.0.0.1:8000" in runbook
     assert "PuTTY" in runbook
@@ -45,3 +48,6 @@ def test_shared_host_runbook_documents_tunnel_and_rerun() -> None:
     assert "--configure-ai" in runbook
     assert "--configure-langfuse" in runbook
     assert "Do not put `OPENAI_API_KEY`" in runbook
+    assert "--bootstrap-thailand-data" in launcher
+    assert "python -m grpcli.bootstrap install-thailand" in launcher
+    assert ".local/data-in/administrative_boundary/district_boundary/" in runbook

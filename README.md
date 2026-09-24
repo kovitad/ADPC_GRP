@@ -98,6 +98,27 @@ automatically.
 The current components, trust boundaries, worker sequence and production extension are diagrammed
 in [`docs/shelter-upload-assessment-architecture.md`](docs/shelter-upload-assessment-architecture.md).
 
+### Install the Thailand Hub baseline
+
+Keep the approved source bundle outside Git under `.local/data-in`. After the Docker stack and an
+ADPC Platform Admin exist, install the currently supported district boundaries, DDPM shelters and
+RP100 source in dependency order:
+
+```powershell
+.\scripts\docker-desktop.ps1 -AdminEmail you@adpc.net -BootstrapThailandData
+```
+
+On Ubuntu, use:
+
+```bash
+./scripts/docker-ubuntu.sh --admin-email you@adpc.net --bootstrap-thailand-data
+```
+
+The command hashes the source bytes, queues the GIS work, waits for the
+worker and activates the exact imported versions. It is safe to rerun. See **Data library** for the
+active release and [`deploy/UBUNTU_SHARED_HOST.md`](deploy/UBUNTU_SHARED_HOST.md) for paths and
+operations.
+
 ## Run on a shared Ubuntu host
 
 When another application already owns ports 80/443, run the local demo stack on the Ubuntu loopback address and reach it through an SSH tunnel:

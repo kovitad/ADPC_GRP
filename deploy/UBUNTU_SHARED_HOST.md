@@ -27,6 +27,29 @@ This command builds the images, registers a localhost SERVIR/SIG OAuth client, s
 
 The script prompts without echo for the OpenAI key, OpenAI model, Langfuse Cloud URL, public key, secret key and environment. Press Enter to accept the displayed defaults for the model (`gpt-5.2`), Langfuse URL (`https://cloud.langfuse.com`) and environment (`development`). The script is safe to rerun. Existing generated secrets and Docker volumes are kept. For later rebuilds, use the same command without the three setup flags.
 
+## Install the Thailand baseline
+
+Copy the approved data bundle into the ignored `.local/data-in` directory, preserving these paths:
+
+```text
+.local/data-in/administrative_boundary/district_boundary/
+.local/data-in/evacuation_centers/shelters/
+.local/data-in/floods/flood_depth_rp100/
+```
+
+Then run the idempotent installer. It hashes the source bytes, queues boundaries, shelters and
+RP100 in dependency order, waits for the worker, and activates those exact versions:
+
+```bash
+./scripts/docker-ubuntu.sh \
+  --admin-email you@adpc.net \
+  --bootstrap-thailand-data
+```
+
+A rerun reuses the import recorded for the same source bytes and importer version. It can safely
+requeue an unpublished failed attempt. Check the result under **Data library** in the application,
+or run `docker compose --env-file .local/ubuntu-compose.env -f deploy/compose.desktop.yml exec -T api python -m grpcli.bootstrap status`.
+
 If SIG registration has already supplied a client ID, use `--servir-client-id CLIENT_ID` instead. The client is public and its ID is not a password, but it is still stored only in the ignored local configuration.
 
 ## Open the application safely

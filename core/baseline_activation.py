@@ -21,7 +21,21 @@ class BaselineActivationError(ValueError):
     """The approved baseline cannot be activated without all imported inputs."""
 
 
-def _latest(session: Session, dataset_id: UUID) -> DatasetVersion:
+def _latest(
+    session: Session, dataset_id: UUID, *, version_id: UUID | None = None
+) -> DatasetVersion:
+    if version_id is not None:
+        version = session.scalar(
+            select(DatasetVersion)
+            .where(
+                DatasetVersion.id == version_id,
+                DatasetVersion.dataset_id == dataset_id,
+            )
+            .with_for_update()
+        )
+        if version is None:
+            raise BaselineActivationError("The requested baseline version does not exist")
+        return version
     version = session.scalar(
         select(DatasetVersion)
         .where(DatasetVersion.dataset_id == dataset_id)
@@ -64,6 +78,9 @@ def activate_mvp1_baseline(
     *,
     actor_user_id: UUID,
     actor_email: str,
+    boundary_version_id: UUID | None = None,
+    centers_version_id: UUID | None = None,
+    hazard_version_id: UUID | None = None,
     now: datetime | None = None,
 ) -> dict[str, object]:
     """Activate the latest imported platform baseline and the approved overlay method.
@@ -73,9 +90,15 @@ def activate_mvp1_baseline(
     """
 
     now = now or datetime.now(UTC)
-    boundary_version = _latest(session, PLATFORM_BOUNDARY_DATASET_ID)
-    centers_version = _latest(session, PLATFORM_SHELTER_DATASET_ID)
-    hazard_version = _latest(session, PLATFORM_HAZARD_DATASET_ID)
+    boundary_version = _latest(
+        session, PLATFORM_BOUNDARY_DATASET_ID, version_id=boundary_version_id
+    )
+    centers_version = _latest(
+        session, PLATFORM_SHELTER_DATASET_ID, version_id=centers_version_id
+    )
+    hazard_version = _latest(
+        session, PLATFORM_HAZARD_DATASET_ID, version_id=hazard_version_id
+    )
     if hazard_version.return_period_years != 100:
         raise BaselineActivationError("The approved MVP 1 hazard must be RP100")
 

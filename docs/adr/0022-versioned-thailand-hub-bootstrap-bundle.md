@@ -1,6 +1,6 @@
 # ADR-0022: Versioned Thailand Hub bootstrap bundle
 
-**Status:** Proposed
+**Status:** Accepted; implementation in progress
 
 **Date:** 24 September 2026
 
@@ -53,7 +53,8 @@ The implementation plan is
 
 1. [ ] Confirm source/licence/authority metadata and checksums for the release manifest.
 2. [ ] Measure transformed disk use and define bootstrap host preflight requirements.
-3. [ ] Implement the dependency-aware importer and atomic release activation.
+3. [x] Implement the dependency-aware installer and exact-version activation for the existing
+   district, shelter and RP100 importers; broader release-atomic activation follows with hierarchy.
 4. [ ] Implement display-only vulnerability conversion without a composite method.
 5. [ ] Implement allow-listed admin settings export/apply and rehearse a blank reset.
 6. [ ] Add Hub override selections and prove historical assessment replay.

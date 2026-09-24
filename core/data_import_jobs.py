@@ -277,7 +277,13 @@ def promote_import_version(
         job.lease_until = None
         job.completed_at = now
         job.dataset_version_id = version_id
-        job.manifest = dict(promoted.manifest)
+        # Preserve the request-side source identity (for example the Thailand bootstrap source
+        # checksum) while recording the immutable managed manifest.  This lets a later bootstrap
+        # prove that the same bytes were already imported, even when a different Admin runs it.
+        job.manifest = {
+            **dict(job.manifest or {}),
+            "managed_manifest": dict(promoted.manifest),
+        }
         job.report = report
         session.commit()
     except Exception:
@@ -313,6 +319,31 @@ def finish_import(
             completed_at=now,
             dataset_version_id=dataset_version_id,
             report=report,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    session.commit()
+    return bool(result.rowcount)
+
+
+def requeue_failed_import(session: Session, import_id: UUID) -> bool:
+    """Retry one unpublished terminal import without creating another immutable identity."""
+
+    result = session.execute(
+        update(DataImportJob)
+        .where(
+            DataImportJob.id == import_id,
+            DataImportJob.state.in_([AssessmentState.FAILED, AssessmentState.CANCELLED]),
+            DataImportJob.dataset_version_id.is_(None),
+        )
+        .values(
+            state=AssessmentState.QUEUED,
+            progress=0,
+            lease_until=None,
+            started_at=None,
+            completed_at=None,
+            error_code=None,
+            report=None,
         )
         .execution_options(synchronize_session=False)
     )

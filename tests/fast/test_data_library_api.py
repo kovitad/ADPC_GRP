@@ -101,6 +101,8 @@ def test_data_library_reuses_active_import_and_shows_it(api_world) -> None:
     assert payload["boundary"]["source_available"] is True
     assert payload["boundary"]["active_import_id"] == first["import_id"]
     assert payload["boundary"]["versions"] == []
+    assert payload["thailand_bootstrap"]["ready"] is False
+    assert payload["thailand_bootstrap"]["categories"]["boundary"]["source_present"] is True
 
 
 @pytest.mark.fast
