@@ -113,16 +113,22 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (session of 24 September 2026, `main` at `ec3672a`)
+## 0. Start here (session of 24 September 2026, `main` at `d841729`)
 
 Read this section, then `AGENTS.md`, then Section 7. **Ignore `next-action-for-codex.md`** — it is an
 untracked note from 21 September whose whole Slice 1 and Slice 3 are already delivered. Details and
 evidence are in Section 7.
 
-**State:** `main` at `ec3672a`, pushed. 476 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
-**win32 Python 3.12**. Alembic head `20260924_0016`, and the running desktop database is at the same
+**State:** `main` at `d841729`, pushed. 516 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
+**win32 Python 3.12**. Alembic head `20260924_0018`, and the running desktop database is at the same
 revision. The stack was rebuilt, re-imported and verified after every change below. Working tree
 clean apart from two untracked user-owned planning notes, which must be left alone.
+
+**Rebuild before testing.** The desktop image is `grp-api:desktop` and the `migrate` service
+carries the build, so `docker compose -f deploy/compose.desktop.yml build api` reports "no services
+to build". Use `build migrate`, then `up -d --force-recreate api worker`. A container quietly
+running older code is the single most common way to conclude a change did not work. Confirm with
+`docker compose ... exec -T api python -c "from core.local_evidence import cited_local_numbers"`.
 
 **What this session changed, in dependency order:**
 
@@ -214,6 +220,62 @@ Still refused by design, and no table fixes them: which centres are good candida
 place, and where to install early-warning sensors. Both are suitability recommendations that
 `DRAFT_INSTRUCTIONS` forbids and `api/assessments.py` disclaims. Buildings affected by RP100 needs
 a `building_footprints` Data Library category that does not exist, so SIG remains the only path.
+
+## 0.1.1 How to see slices 1-3 working
+
+```bash
+docker compose --env-file .env -f deploy/compose.desktop.yml build migrate
+docker compose --env-file .env -f deploy/compose.desktop.yml up -d --force-recreate api worker
+docker compose --env-file .env -f deploy/compose.desktop.yml run --rm migrate   # head 20260924_0018
+```
+
+Sign in again afterwards: recreating the API drops the session.
+
+**Slice 2 and 3 in the map popup.** Open Planning, click a district. The popup now carries three
+blocks: registered village population, people inside the RP100 extent, and recorded evacuation
+centres broken down by kind of place. Switch the level selector to sub-district and click a polygon
+for the same three at that level.
+
+**Slice 1 in the chat box.** Ask *"How many people live in Kanthararom District, Si Sa Ket?"* The
+brief should cite a GRP figure alongside SIG's, attributed to the GRP data library, and the receipt
+button should be unavailable with the reason shown. Ask *"Which schools are exposed in Mueang Nan
+District, Nan?"* and the receipt should still be offered, because that brief quotes SIG only.
+
+**Without the browser**, which is faster when checking wording:
+
+```bash
+docker compose --env-file .env -f deploy/compose.desktop.yml exec -T worker python -c "
+from sqlalchemy import select
+from core.db import session_scope
+from core.assessment_models import Boundary
+from core.local_evidence import local_area_citations
+with session_scope() as s:
+    b = s.scalar(select(Boundary).where(Boundary.name == 'CHIANG YUEN',
+                                        Boundary.admin_level == 'district'))
+    for c in local_area_citations(s, b):
+        print(); print('[' + c['kind'] + ']'); print(c['text'])
+"
+```
+
+**Expected on the current data** (this is the regression baseline, so a change here is a finding):
+Kanthararom 85,568 residents in 175 villages, 7,176 in 19 villages inside the RP100 extent, and no
+evacuation centres recorded. Chiang Yuen 57,197 residents, 0 inside the extent, 9 centres as 6
+government offices, 2 schools and 1 unrecognised. Nationally `area_flood_exposure` holds 8,133 rows
+and `feature.facility_type` is set on 8,813 of 10,303 centres.
+
+**If the popup shows no facility breakdown**, the shelter version is imported but not activated. A
+re-import lands as `technically_valid` and is invisible until `activate_mvp1_baseline` moves
+`is_current`. Check with:
+
+```sql
+select importer_version, is_current, readiness from dataset_version v
+ join dataset d on d.id = v.dataset_id where d.type = 'evacuation_centers'
+ order by v.created_at desc;
+```
+
+**If an exposure figure disappears**, the table is keyed on the hazard and village version pair and
+an activation can supersede it without rebuilding. Grep the API log for `grp.local_evidence`: it
+logs a warning naming the area, then re-run `python -m grpcli.exposure build` in the worker.
 
 ## 0.2 The flood layer has no dry value (measured, 24 September 2026)
 
