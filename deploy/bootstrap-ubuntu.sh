@@ -2,13 +2,15 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="1.1.0"
+readonly SCRIPT_VERSION="1.2.0"
 readonly DEFAULT_REPOSITORY="https://github.com/kovitad/ADPC_GRP.git"
 readonly DEFAULT_IMAGE="ghcr.io/kovitad/adpc_grp:main"
 readonly DEFAULT_DOMAIN="staging-risk-servir.adpc.net"
 readonly BASE_DIR="/srv/grp"
 readonly APP_DIR="${BASE_DIR}/app"
 readonly DATA_DIR="${BASE_DIR}/data"
+readonly SOURCE_DATA_DIR="${BASE_DIR}/bootstrap-data"
+readonly TMP_DIR="${BASE_DIR}/tmp"
 readonly SECRETS_DIR="${BASE_DIR}/secrets"
 readonly RELEASES_DIR="${BASE_DIR}/releases"
 readonly BACKUP_DIR="${BASE_DIR}/backup-staging"
@@ -21,6 +23,8 @@ DOMAIN="$DEFAULT_DOMAIN"
 DEPLOY_USER=""
 ENABLE_UFW="false"
 CHECK_ONLY="false"
+ADMIN_EMAIL=""
+BOOTSTRAP_THAILAND_DATA="false"
 SSH_ALLOW_CIDRS=()
 APT_UPDATED="false"
 
@@ -48,6 +52,8 @@ Options:
   --image IMAGE               Image used by image mode (default: $DEFAULT_IMAGE)
   --domain NAME               Public DNS name (default: $DEFAULT_DOMAIN)
   --deploy-user USER          Account that owns the checkout (default: SUDO_USER)
+  --admin-email EMAIL         Idempotently provision this Platform Admin and ADPC Hub
+  --bootstrap-thailand-data   Import and activate /srv/grp/bootstrap-data after deployment
   --enable-ufw                Enable UFW after safe allow rules are installed
   --ssh-allow-cidr CIDR       SSH source network; repeat for multiple networks
   --check-only                Report state without changing the machine
@@ -67,6 +73,8 @@ while [ "$#" -gt 0 ]; do
         --image) require_option_value "$@"; IMAGE="$2"; shift 2 ;;
         --domain) require_option_value "$@"; DOMAIN="$2"; shift 2 ;;
         --deploy-user) require_option_value "$@"; DEPLOY_USER="$2"; shift 2 ;;
+        --admin-email) require_option_value "$@"; ADMIN_EMAIL="$2"; shift 2 ;;
+        --bootstrap-thailand-data) BOOTSTRAP_THAILAND_DATA="true"; shift ;;
         --enable-ufw) ENABLE_UFW="true"; shift ;;
         --ssh-allow-cidr)
             require_option_value "$@"
@@ -84,6 +92,12 @@ done
 [[ "$GIT_REF" =~ ^[A-Za-z0-9._/-]+$ ]] && [[ "$GIT_REF" != -* ]] || die "Invalid --ref value"
 [[ "$IMAGE" =~ ^[A-Za-z0-9._:/@-]+$ ]] || die "Invalid --image value"
 [[ "$REPOSITORY" != -* ]] || die "Invalid --repo value"
+if [ -n "$ADMIN_EMAIL" ]; then
+    [[ "$ADMIN_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] \
+        || die "Invalid --admin-email value"
+fi
+[ "$BOOTSTRAP_THAILAND_DATA" = "false" ] || [ -n "$ADMIN_EMAIL" ] \
+    || die "--bootstrap-thailand-data requires --admin-email"
 
 if [ -z "$DEPLOY_USER" ]; then
     if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
@@ -108,7 +122,7 @@ show_status() {
             && log "docker compose: installed" \
             || warn "docker compose: not installed"
     fi
-    for directory in "$APP_DIR" "$DATA_DIR" "$SECRETS_DIR" "$RELEASES_DIR" "$BACKUP_DIR"; do
+    for directory in "$APP_DIR" "$DATA_DIR" "$SOURCE_DATA_DIR" "$TMP_DIR" "$SECRETS_DIR" "$RELEASES_DIR" "$BACKUP_DIR"; do
         [ -d "$directory" ] && log "$directory: present" || warn "$directory: missing"
     done
     if [ -d "$APP_DIR/.git" ]; then
@@ -229,6 +243,8 @@ log "Creating GRP filesystem layout"
 install -d -m 0755 "$BASE_DIR"
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_GROUP" -m 0755 "$APP_DIR" "$RELEASES_DIR"
 install -d -o 10001 -g 10001 -m 0750 "$DATA_DIR"
+install -d -o "$DEPLOY_USER" -g 10001 -m 2750 "$SOURCE_DATA_DIR"
+install -d -o 10001 -g 10001 -m 0700 "$TMP_DIR"
 install -d -o root -g root -m 0700 "$SECRETS_DIR" "$BACKUP_DIR"
 
 normalise_repository() {
@@ -396,6 +412,21 @@ for attempt in $(seq 1 30); do
     [ "$attempt" -lt 30 ] || die "GRP API did not become healthy within 150 seconds"
     sleep 5
 done
+
+if [ -n "$ADMIN_EMAIL" ]; then
+    log "Applying declarative Platform Admin and ADPC Hub configuration"
+    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.admin \
+        bootstrap-platform-admin --email "$ADMIN_EMAIL"
+    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.admin \
+        ensure-hub --actor-email "$ADMIN_EMAIL" --code adpc --name "ADPC Hub"
+fi
+
+if [ "$BOOTSTRAP_THAILAND_DATA" = "true" ]; then
+    log "Installing the supported Thailand baseline from $SOURCE_DATA_DIR"
+    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.bootstrap install-thailand \
+        --actor-email "$ADMIN_EMAIL" --hub-code adpc
+    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.bootstrap status
+fi
 
 RELEASE_TIME="$(date -u +%Y%m%dT%H%M%SZ)"
 RELEASE_FILE="$RELEASES_DIR/release-$RELEASE_TIME.txt"

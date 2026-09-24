@@ -28,6 +28,8 @@ services:
     restart: unless-stopped
     env_file:
       - ../.env
+    environment:
+      DATA_IN_ROOT: /srv/grp/data-in
     depends_on:
       db:
         condition: service_healthy
@@ -35,6 +37,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - /srv/grp/data:/srv/grp/data
+      - /srv/grp/bootstrap-data:/srv/grp/data-in:ro
       - /srv/grp/secrets:/run/source-secrets:ro
     read_only: true
     tmpfs:
@@ -60,16 +63,19 @@ services:
     restart: unless-stopped
     env_file:
       - ../.env
+    environment:
+      DATA_IN_ROOT: /srv/grp/data-in
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - /srv/grp/data:/srv/grp/data
+      - /srv/grp/bootstrap-data:/srv/grp/data-in:ro
       - /srv/grp/secrets:/run/source-secrets:ro
+      - /srv/grp/tmp:/tmp
     read_only: true
     tmpfs:
       - /run:rw,noexec,nosuid,nodev,size=1m
-      - /tmp:rw,noexec,nosuid,nodev,size=64m
     cap_drop:
       - ALL
     cap_add:

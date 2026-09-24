@@ -25,6 +25,36 @@ For the initial deployment, source mode is the reliable choice:
 sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode source
 ```
 
+To install the Thailand baseline during the same deployment, prepare its protected host directory
+and copy the approved external bundle first:
+
+```bash
+sudo install -d -o "$USER" -g 10001 -m 2750 /srv/grp/bootstrap-data
+```
+
+Preserve the following folder structure. `/srv/grp/bootstrap-data` is outside Git and the container
+image and is mounted read-only into API/worker:
+
+```text
+/srv/grp/bootstrap-data/administrative_boundary/district_boundary/
+/srv/grp/bootstrap-data/evacuation_centers/shelters/
+/srv/grp/bootstrap-data/floods/flood_depth_rp100/
+```
+
+The deployment account owns the source directory, while group `10001` gives the non-root worker
+read access. Do not copy secrets into it. Then deploy, provision the Admin/Hub and run the
+idempotent installer:
+
+```bash
+sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh \
+  --deploy-mode source \
+  --admin-email you@adpc.net \
+  --bootstrap-thailand-data
+```
+
+The worker uses `/srv/grp/tmp` for bounded temporary GIS products so large raster conversion does
+not consume a small in-memory `/tmp`. Both the data import and Admin provisioning are safe to rerun.
+
 Normal releases can pull the prebuilt GitHub Container Registry image and avoid compiling GIS dependencies on the VM:
 
 ```bash
@@ -65,6 +95,9 @@ sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --check-only
 sudo docker compose --env-file /srv/grp/app/.env \
   -f /srv/grp/app/deploy/compose.yml ps
 curl --fail http://127.0.0.1:8000/api/v1/healthz
+sudo docker compose --env-file /srv/grp/app/.env \
+  -f /srv/grp/app/deploy/compose.yml exec --no-TTY api \
+  python -m grpcli.bootstrap status
 sudo journalctl -u caddy --since "15 minutes ago" --no-pager
 ```
 
@@ -80,4 +113,4 @@ After OIDC configuration, open the staging root and complete SERVIR sign-in. Boo
 - Service failure: run `sudo docker compose --env-file /srv/grp/app/.env -f /srv/grp/app/deploy/compose.yml logs --tail 200`.
 - Database recovery: stop API and worker, restore the coordinated database and `/srv/grp/data` backup, deploy the matching code/image, run the migration, and recheck health.
 
-Do not delete `/srv/grp/data`, `/srv/grp/secrets`, or the Compose database volume during troubleshooting.
+Do not delete `/srv/grp/data`, `/srv/grp/bootstrap-data`, `/srv/grp/secrets`, or the Compose database volume during troubleshooting.

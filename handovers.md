@@ -10,8 +10,16 @@ queues district boundaries, DDPM shelters and six RP100 tiles in dependency orde
 worker, and activates those exact immutable versions. A second run reused all three completed jobs
 instead of creating versions. The Data Library shows a plain-language Thailand release status.
 Docker API/worker were rebuilt and are healthy; the active local release has **928 supported
-districts, 10,303 shelters across 673 districts, and RP100**. **431 tests pass and 2
+districts, 10,303 shelters across 673 districts, and RP100**. **433 tests pass and 2
 PostgreSQL-only tests skip**; Ruff, JavaScript syntax, Bash syntax and whitespace checks are clean.
+
+**VM deployment readiness:** both Ubuntu modes now carry the data workflow. The shared-host
+launcher uses ignored `.local/data-in`; the dedicated staging Compose mounts
+`/srv/grp/bootstrap-data` read-only at `/srv/grp/data-in` for API/worker. The dedicated bootstrap
+accepts `--admin-email` plus `--bootstrap-thailand-data`, provisions the Platform Admin/ADPC Hub,
+runs the installer, and prints its status. Worker raster scratch is disk-backed at `/srv/grp/tmp`
+rather than the previous 64 MB in-memory `/tmp`. This is implemented and Compose/shell validated,
+but has not yet been executed on the staging VM or pushed from the current branch.
 
 **New design decision:** `.local/data-in/evacuation_centers` contains three different operational
 point sources, not three interchangeable shelter files: 10,303 shelters, 8,199 civil-defence
@@ -97,7 +105,7 @@ RP20/RP50 rasters and methods exist.
 | SIG live map embed | **Implemented**: receipt-bound `ui_embed(hazard_map)`, restricted SIG host/path and sandboxed iframe. Hazard layers remain hazard-only; an active ADR-0015 recipe additionally permits one exact declared SIG risk layer |
 | Source data inspector (ADR-0006) | **Built, Docker Desktop only**: Admin-only page over the read-only `.local/data-in` mount; worker job, cached on a file fingerprint, neutral evidence-led confirmation points for the data team, points cross-checked against boundaries on a map |
 | Thailand baseline (ADR-0009/0015) | **Built, imported and locally activated**: 10,303 DDPM evacuation centres plus one six-tile RP100 version, six COGs and a national display PNG. The same pinned versions now support queued real-district screening; NoData is Unable to assess |
-| Ubuntu shared-host demo | **Built on current branch**: idempotent `scripts/docker-ubuntu.sh`, loopback port 8000, hidden AI-key prompt, ignored mode-0600 secret files, SIG localhost client registration and PuTTY tunnel runbook; needs first execution on Ubuntu |
+| Ubuntu deployment | **Built on current branch**: shared-host launcher keeps loopback port 8000; dedicated staging bootstrap/Caddy path now mounts the external Thailand bundle read-only, provisions Admin/Hub on request and runs the same idempotent installer; needs first VM execution |
 | SIG risk/map contract (ADR-0014/0015) | **Built on current branch**: risk remains withheld without an approved recipe; the active versioned recipe enables cited SIG risk values and one explicitly declared risk layer, while missing/multiple/unknown layers still fail closed |
 | UI shell | Shared left-aligned top bar, SERVIR Global Collaborative logo, one palette from the logo |
 | Increment 3, SIG connection | Not started (needs DEP-01, DEP-08, DEP-09, DEP-13) |

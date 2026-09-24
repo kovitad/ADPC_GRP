@@ -13,6 +13,8 @@ Start with the operational runbook in [`BOOTSTRAP.md`](BOOTSTRAP.md). The bootst
 /srv/grp/bootstrap/       downloaded bootstrap script
 /srv/grp/app/             repository checkout and non-secret .env
 /srv/grp/data/            rasters, uploads, and locked results
+/srv/grp/bootstrap-data/  read-only source bundle used by Thailand bootstrap
+/srv/grp/tmp/             worker-owned temporary GIS workspace
 /srv/grp/releases/        release manifests and Caddy backups
 /srv/grp/secrets/         root-owned secret files, mode 0600
 /srv/grp/backup-staging/  temporary encrypted backup files
