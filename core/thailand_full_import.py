@@ -27,7 +27,7 @@ from core.data_import_jobs import (
     renew_import_lease,
     version_id_for_import,
 )
-from core.data_library_models import DataImportJob
+from core.data_library_models import AreaPopulationSummary, DataImportJob
 from core.dataset_readiness import DatasetReadiness
 from core.dataset_scan import read_vector_explicit
 from core.import_staging import (
@@ -78,9 +78,22 @@ POINT_PROFILES: dict[str, dict[str, Any]] = {
         "district_code": "acode",
         "subdistrict_code": "tcode",
         "safe_fields": ("pcode", "pname", "tname", "acode", "aname", "tcode", "mcode"),
+        # The delivery's undocumented spreadsheet columns. docs/vulnerable-people-data-proof.md
+        # holds the evidence for each mapping: male + female == total on 99.52% of rows, and a
+        # district reconciles against its real registered population. ADR-0027 records that these
+        # remain unconfirmed by the data owner and must never be labelled as vulnerability.
+        "population_fields": {
+            "male": "oct_side_9",
+            "female": "oct_side10",
+            "total_population": "oct_side11",
+            "households": "oct_side12",
+        },
+        "importer_version": "grp-village-population/1",
     },
 }
 POINT_IMPORTER_VERSION = "grp-supporting-points/1"
+# A village whose recorded total exceeds this is a misplaced spreadsheet cell, not a village.
+MAX_PLAUSIBLE_VILLAGE_POPULATION = 100_000
 
 VULNERABILITY_PROFILES: dict[str, dict[str, Any]] = {
     "vulnerability_child": {
@@ -390,6 +403,9 @@ def process_point_import(
     }
     rows: list[dict[str, Any]] = []
     outside = 0
+    # Aggregated once here so a planner click is a single indexed read, never a GIS scan of
+    # 80,397 points in a web request.
+    population_by_area: dict[tuple[str, str], dict[str, int]] = {}
     for index, raw in enumerate(geometries):
         point = from_wkb(raw) if raw is not None else None
         if not isinstance(point, Point) or point.is_empty or not point.is_valid:
@@ -436,6 +452,29 @@ def process_point_import(
                 "role": profile["dataset_type"],
             }
         )
+        population = _village_population(columns, profile, index)
+        if profile.get("population_fields"):
+            for area_level, area in (("district", district), ("subdistrict", subdistrict)):
+                if area is None:
+                    continue
+                bucket = population_by_area.setdefault(
+                    (area.admin_code, area_level),
+                    {
+                        "village_count": 0,
+                        "counted_village_count": 0,
+                        "male": 0,
+                        "female": 0,
+                        "total_population": 0,
+                        "households": 0,
+                    },
+                )
+                bucket["village_count"] += 1
+                if population is not None:
+                    bucket["counted_village_count"] += 1
+                    for key, value in population.items():
+                        bucket[key] += value
+        if population is not None:
+            safe_attributes.update({key: str(value) for key, value in population.items()})
         rows.append(
             {
                 "source_index": index,
@@ -474,7 +513,33 @@ def process_point_import(
                 for item in rows
             ]
         )
+        target_session.add_all(
+            [
+                AreaPopulationSummary(
+                    id=uuid5(
+                        NAMESPACE_URL,
+                        f"grp:area-population:{target_version_id}:{level}:{admin_code}",
+                    ),
+                    dataset_version_id=target_version_id,
+                    admin_code=admin_code,
+                    admin_level=level,
+                    village_count=bucket["village_count"],
+                    counted_village_count=bucket["counted_village_count"],
+                    excluded_village_count=(
+                        bucket["village_count"] - bucket["counted_village_count"]
+                    ),
+                    male=bucket["male"],
+                    female=bucket["female"],
+                    total_population=bucket["total_population"],
+                    households=bucket["households"],
+                )
+                for (admin_code, level), bucket in sorted(population_by_area.items())
+            ]
+        )
 
+    counted_villages = sum(b["counted_village_count"] for (_, lvl), b in population_by_area.items()
+                           if lvl == "district")
+    district_areas = sum(1 for (_, lvl) in population_by_area if lvl == "district")
     published = promote_import_version(
         session,
         claim,
@@ -488,7 +553,7 @@ def process_point_import(
         ),
         promoted=promoted,
         readiness=DatasetReadiness.TECHNICALLY_VALID,
-        importer_version=POINT_IMPORTER_VERSION,
+        importer_version=str(profile.get("importer_version", POINT_IMPORTER_VERSION)),
         version_metadata={
             "feature_count": len(rows),
             "outside_district_count": outside,
@@ -496,11 +561,31 @@ def process_point_import(
             "title_th": profile["title_th"],
             "map_preview": True,
             "display_only": True,
+            **(
+                {
+                    "population_source": "registered village population, source columns "
+                    "unconfirmed by the data owner (ADR-0027)",
+                    "population_areas": district_areas,
+                    "population_counted_villages": counted_villages,
+                    "population_excluded_villages": len(rows) - counted_villages,
+                }
+                if profile.get("population_fields")
+                else {}
+            ),
         },
         report={
             "message": f"{profile['title']} imported as supporting map evidence.",
             "feature_count": len(rows),
             "outside_district_count": outside,
+            **(
+                {
+                    "population_counted_villages": counted_villages,
+                    "population_excluded_villages": len(rows) - counted_villages,
+                    "population_areas": district_areas,
+                }
+                if profile.get("population_fields")
+                else {}
+            ),
         },
         materialize=materialize,
     )
@@ -572,6 +657,37 @@ def _render_vulnerability_preview(
         right = left + transform.a * width
         bottom = top + transform.e * height
         return [[bottom, left], [top, right]], {"min": float(low), "max": float(high)}
+
+
+def _village_population(columns: dict, profile: dict, index: int) -> dict[str, int] | None:
+    """Read one village's counts, or None when the row cannot be trusted.
+
+    A row is only counted when all four values are present whole numbers, male + female equals
+    the recorded total, and the total is a plausible village size. Everything else is excluded and
+    reported, never silently coerced to zero: 385 rows of the delivery break the identity and
+    fifteen record more people than the largest Thai city.
+    """
+
+    fields = profile.get("population_fields")
+    if not fields:
+        return None
+    values: dict[str, int] = {}
+    for key, column in fields.items():
+        raw = columns.get(column, [None] * (index + 1))[index]
+        if raw is None:
+            return None
+        try:
+            number = float(raw)
+        except (TypeError, ValueError):
+            return None
+        if number != number or number in (float("inf"), float("-inf")) or number < 0:
+            return None
+        values[key] = int(round(number))
+    if values["male"] + values["female"] != values["total_population"]:
+        return None
+    if not 0 < values["total_population"] <= MAX_PLAUSIBLE_VILLAGE_POPULATION:
+        return None
+    return values
 
 
 def process_vulnerability_import(

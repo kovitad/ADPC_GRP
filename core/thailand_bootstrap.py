@@ -135,7 +135,7 @@ def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
             category,
             str(profile["source_ref"]),
             profile["dataset_id"],
-            POINT_IMPORTER_VERSION,
+            str(profile.get("importer_version", POINT_IMPORTER_VERSION)),
             _shapefile_paths(
                 root,
                 str(profile["source_ref"]),

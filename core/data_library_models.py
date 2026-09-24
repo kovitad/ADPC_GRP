@@ -133,3 +133,46 @@ class HubDatasetSelection(Base):
     selected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
     )
+
+
+class AreaPopulationSummary(Base):
+    """Village-derived population counts for one area, computed once at import time.
+
+    A web request must never aggregate 80,397 village points, so one row per area per village
+    dataset version is written by the importer and read by a single indexed lookup. The source
+    columns are the delivery's undocumented `oct_side*` fields; see
+    docs/vulnerable-people-data-proof.md for the evidence that they are male, female, total and
+    households, and ADR-0027 for the labelling this obliges. These are registered village
+    population counts and are not a vulnerability measure.
+    """
+
+    __tablename__ = "area_population_summary"
+    __table_args__ = (
+        UniqueConstraint(
+            "dataset_version_id",
+            "admin_code",
+            "admin_level",
+            name="uq_area_population_summary_area",
+        ),
+        CheckConstraint(
+            "admin_level IN ('district', 'subdistrict')",
+            name="ck_area_population_summary_level",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    dataset_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    admin_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    admin_level: Mapped[str] = mapped_column(String(32), nullable=False)
+    village_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    counted_village_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    excluded_village_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    male: Mapped[int] = mapped_column(Integer, nullable=False)
+    female: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_population: Mapped[int] = mapped_column(Integer, nullable=False)
+    households: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
+    )
