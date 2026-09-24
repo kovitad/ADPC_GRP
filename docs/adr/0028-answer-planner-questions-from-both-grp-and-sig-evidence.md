@@ -82,6 +82,25 @@ coverage decides.
 No table makes a siting or safety recommendation defensible. They stay refused until a method
 owner approves a documented suitability method, which is a DEP-07 style decision.
 
+## The flood layer has no dry value, which constrains every exposure figure
+
+Measured on the delivered RP100 tiles while building slice 3: nodata is -9999, the lowest valid
+value is 0.1 m, and **no cell holds 0**. Dry land is absent, not zero. Nationally, 13,000 of 80,397
+villages carry a depth and every one of them is inside the extent; not one district contains a
+village positively confirmed as dry.
+
+Consequences that are not optional:
+
+- ``villages_in_zone`` and ``people_in_zone`` are assertable. A dry or safe count is not.
+- ``no_data_village_count`` mixes dry, outside-the-modelled-area and outside-coverage. It must
+  never be presented as a count of people who are safe, and the wording in
+  ``core/local_evidence.py`` says so.
+- This is also why ``core/gis.classify_center`` returns ``not_exposed_under_scenario`` only for a
+  depth of exactly 0 and therefore never returns it for this delivery: an unflooded shelter comes
+  back ``unable_to_assess`` with ``NO_FLOOD_DATA``. That is existing method behaviour with golden
+  cases attached, not a defect introduced here, but any future "how many are safe" question has to
+  start by getting a layer that distinguishes dry from unknown.
+
 ## Consequences
 
 - A Planner asking about population or shelters gets GRP's own cited figures in the same brief as

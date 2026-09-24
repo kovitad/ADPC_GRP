@@ -195,7 +195,7 @@ def _with_exposure(session, area, **overrides):
     session.commit()
 
 
-def test_flood_exposure_states_the_count_and_what_it_could_not_measure(world) -> None:
+def test_flood_exposure_states_the_count_and_never_implies_safety(world) -> None:
     _with_exposure(world["session"], world["area"])
 
     records = local_area_citations(world["session"], world["area"])
@@ -205,7 +205,9 @@ def test_flood_exposure_states_the_count_and_what_it_could_not_measure(world) ->
     assert "40 villages" in exposure["text"]
     assert "100-year flood scenario" in exposure["text"]
     # The three honesty clauses, each of which a single number would hide.
-    assert "5 of this area's 175 villages could not be measured" in exposure["text"]
+    assert "remaining 5 of this area's 175 villages carry no modelled depth" in exposure["text"]
+    # The layer has no dry cell, so an unmeasured village must never read as safe.
+    assert "must not be reported as safe" in exposure["text"]
     assert "is an undercount" in exposure["text"]
     assert "does not model which part of a village floods" in exposure["text"]
     assert "0–0.5 m: 30 villages" in exposure["text"]
@@ -234,3 +236,16 @@ def test_no_exposure_row_stays_silent_rather_than_reporting_zero_exposed(world) 
     records = local_area_citations(world["session"], world["area"])
 
     assert not any(item["kind"] == "grp_flood_exposure" for item in records)
+
+
+def test_a_layer_that_marks_no_village_dry_says_so(world) -> None:
+    # The delivered RP100 layer gives a depth only where it floods, so every measured village is
+    # in the zone. A planner must not read the rest as checked and found safe.
+    _with_exposure(world["session"], world["area"], measured_village_count=40)
+
+    exposure = next(
+        item
+        for item in local_area_citations(world["session"], world["area"])
+        if item["kind"] == "grp_flood_exposure"
+    )
+    assert "no village in this area has been positively confirmed as dry" in exposure["text"]

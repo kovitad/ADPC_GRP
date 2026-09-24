@@ -18,6 +18,7 @@ from typing import Never
 
 from sqlalchemy import select
 
+from api.settings import get_settings
 from core.assessment_models import Dataset, DatasetVersion
 from core.data_library_models import DatasetFile
 from core.db import session_scope
@@ -76,7 +77,7 @@ def build(return_period_years: int) -> None:
         hazard_id, village_id = hazard.id, villages.id
         written = build_area_flood_exposure(
             session,
-            LocalStorage(),
+            LocalStorage(get_settings().storage_root),
             hazard_version_id=hazard_id,
             village_version_id=village_id,
             return_period_years=return_period_years,

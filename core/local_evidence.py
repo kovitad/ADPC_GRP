@@ -210,9 +210,11 @@ def _exposure_citation(session: Session, boundary: Boundary) -> dict[str, Any] |
         sentences.append(f"By modelled water depth at the village point: {described}.")
     if row.no_data_village_count:
         sentences.append(
-            f"{row.no_data_village_count:,} of this area's {row.village_count:,} villages could "
-            "not be measured because they fall outside the flood layer's coverage or on a cell "
-            "with no value, so they count as neither exposed nor dry."
+            f"The remaining {row.no_data_village_count:,} of this area's {row.village_count:,} "
+            "villages carry no modelled depth. The flood layer records a depth only where the "
+            "model produced flooding, so those villages are dry, outside the modelled area, or "
+            "outside the layer's coverage, and this data cannot tell those apart. They must not "
+            "be reported as safe."
         )
     if row.villages_in_zone_without_population:
         sentences.append(
@@ -223,6 +225,13 @@ def _exposure_citation(session: Session, boundary: Boundary) -> dict[str, Any] |
         "A village is a point, so this counts villages whose recorded location falls in the "
         "extent; it does not model which part of a village floods."
     )
+    if row.measured_village_count and row.measured_village_count == row.villages_in_zone:
+        # True of the whole delivered RP100 layer, so say it rather than let the reader infer that
+        # every other village was checked and found safe.
+        sentences.append(
+            "Every village this layer gives a depth for is inside the extent, so no village in "
+            "this area has been positively confirmed as dry."
+        )
     return {
         "title": f"People inside the modelled flood extent, {boundary.name}",
         "text": " ".join(sentences),

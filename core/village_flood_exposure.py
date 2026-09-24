@@ -12,8 +12,11 @@ What this deliberately does not do:
 
 * It does not interpolate. A village is a point, so it is in the zone or it is not, at the depth
   of the cell it sits in. No area-weighted share of a village's people is invented.
-* It does not treat unmeasured as dry. A village outside every tile or on a nodata cell is counted
-  in ``no_data_village_count`` and left out of both totals, so a partial raster reads as partial.
+* It does not claim a village is dry. The delivered RP100 layer holds a depth only where the model
+  produced flooding: its lowest valid value is 0.1 m and it has no zero-depth cell. So a village
+  with no value is dry, outside the modelled domain, or outside the layer's coverage, and this
+  data cannot separate those. Such villages go to ``no_data_village_count`` and are left out of
+  both totals; only the in-zone figures are asserted.
 * It does not silently drop a village whose population was unusable. Those are counted in
   ``villages_in_zone_without_population``, because otherwise people_in_zone would look complete.
 """
@@ -25,8 +28,9 @@ from typing import Any
 
 from core.hazard_overlay import DEPTH_CLASSES
 
-# A depth at or below this reads as dry rather than as a shallow flood, matching
-# core/gis.classify_center, which treats only depth > 0 as inside the extent.
+# A depth at or below this is not inside the extent, matching core/gis.classify_center, which
+# treats only depth > 0 as flooded. The delivered layer carries no zero-depth cell, so in practice
+# this only guards against a future layer that encodes dry as 0 rather than as nodata.
 DRY_DEPTH_M = 0.0
 
 

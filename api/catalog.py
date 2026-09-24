@@ -229,8 +229,9 @@ def area_profile(
             ),
             "depth_bands": exposure_row.depth_bands,
             "caveat": "A village is a point, so this counts villages whose recorded location "
-            "falls inside the modelled extent. Villages that could not be measured count as "
-            "neither exposed nor dry.",
+            "falls inside the modelled extent. The flood layer records a depth only where the "
+            "model produced flooding, so the remaining villages are dry, outside the modelled "
+            "area or outside its coverage, and must not be read as confirmed safe.",
         }
     )
     evacuation_centers = {

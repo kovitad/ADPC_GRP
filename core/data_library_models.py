@@ -186,10 +186,13 @@ class AreaFloodExposure(Base):
     definition (AGENTS.md), so it is computed once per pair of dataset versions and read here by a
     single indexed lookup.
 
-    The row records what could not be measured as well as what could: a village outside every
-    raster tile, or on a nodata cell, is counted in ``no_data_village_count`` and excluded from
-    both the in-zone and the dry totals. A partial sample is therefore visible as partial rather
-    than reported as a low exposure figure, the same discipline as ADR-0027's excluded villages.
+    The row records what carried no depth as well as what did. ``no_data_village_count`` is
+    deliberately not called a dry count: the delivered RP100 layer stores a depth only where the
+    model produced flooding, its lowest valid value is 0.1 m and it contains no zero-depth cell, so
+    a village with no value is dry, outside the modelled domain, or outside the layer's coverage,
+    and this data cannot tell those apart. ``villages_in_zone`` and ``people_in_zone`` are
+    therefore the trustworthy figures; nothing here may be presented as a count of people who are
+    safe. The same reason core/gis.classify_center never returns a not-exposed status in practice.
 
     ``depth_bands`` holds the count of in-zone villages and their people per band, keyed by the
     labels in core/hazard_overlay.DEPTH_CLASSES so the map legend and this table cannot drift.

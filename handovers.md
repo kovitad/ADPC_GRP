@@ -191,6 +191,19 @@ build. Three things a next agent should not redo from scratch:
 - The cheap win is slice 1: the router already extracts `place`, so local rows can be attached to
   the `sig_flood` citations before `run_ai_call`, behind the same-area check, with no migration.
 
+## 0.2 The flood layer has no dry value (measured, 24 September 2026)
+
+The delivered RP100 tiles use nodata -9999, their lowest valid value is 0.1 m, and no cell holds 0.
+Dry land is absent rather than zero. So of 80,397 villages, 13,000 carry a depth and every one of
+them is inside the extent; 217 districts have no measured village at all.
+
+Read every exposure figure accordingly: people inside the extent is assertable, a count of people
+who are safe is not, and `no_data_village_count` mixes dry with outside-coverage. This is also why
+`core/gis.classify_center` never returns `not_exposed_under_scenario` for this delivery: an
+unflooded shelter comes back `unable_to_assess` / `NO_FLOOD_DATA`. That is existing method
+behaviour with golden cases attached, so do not "fix" it to report safety without a layer that
+distinguishes dry from unknown, and a method decision to go with it.
+
 ## 1. Where we are
 
 | Area | State |

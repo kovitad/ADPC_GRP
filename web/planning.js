@@ -536,7 +536,8 @@
         `</tbody></table>` +
         (exposure.no_data_village_count
           ? `<p class="pw-area-pop__note">${numberText(exposure.no_data_village_count)} ` +
-            `village(s) could not be measured against the flood layer.</p>`
+            `village(s) carry no modelled depth: dry, or outside the layer. Not confirmed ` +
+            `safe.</p>`
           : "") +
         (exposure.villages_in_zone_without_population
           ? `<p class="pw-area-pop__note">` +
