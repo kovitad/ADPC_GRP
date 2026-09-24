@@ -26,6 +26,11 @@ label it **district-wide supporting context**. Never disaggregate, combine or re
 values as sub-district values. The complete design is in
 [`docs/multi-level-boundary-planning-design.md`](../multi-level-boundary-planning-design.md).
 
+Every SIG request originating from a managed boundary uses the catalogue's full unambiguous name:
+administrative level, province and country. Short screen labels such as `KANTHARAROM` must become
+`KANTHARAROM District, SI SA KET, Thailand` before they reach SIG. GRP still checks the AOI returned
+by SIG and refuses evidence for a different or approximate area.
+
 ## Options considered
 
 | Option | Assessment |
@@ -49,5 +54,5 @@ values as sub-district values. The complete design is in
 1. [ ] Confirm district and sub-district as the two assessment-eligible MVP levels.
 2. [ ] Confirm source/licence and approval of the `2025-10` sub-district population attributes.
 3. [ ] Resolve the village file's incorrect/ambiguous text encoding and provenance.
-4. [ ] Implement hierarchy import, release validation and AOI search.
+4. [x] Implement hierarchy import, release validation, AOI search and canonical SIG place names.
 5. [ ] Prove one sub-district assessment and its parent-district SIG context end to end.

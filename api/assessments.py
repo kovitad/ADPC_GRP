@@ -358,8 +358,9 @@ def assessment_result(
         **_status_payload(assessment),
         "area_detail": {
             k: pins["boundary"][k]
-            for k in ("id", "name", "admin_code", "admin_level", "source", "edition",
-                      "geometry_sha256")
+            for k in ("id", "name", "name_th", "province_name", "province_name_th",
+                      "admin_code", "admin_level", "source", "edition", "geometry_sha256")
+            if k in pins["boundary"]
         },
         "datasets": [
             {"role": "hazard", **pins["hazard"]},
@@ -419,6 +420,10 @@ def assessment_centers(
                 "status": row.status,
                 "reason_code": row.reason_code,
                 "flood_depth_m": row.flood_depth_m,
+                "capacity": feature.attributes.get("capacity"),
+                "supporting_unit": feature.attributes.get("supporting_unit") or None,
+                "subdistrict": feature.attributes.get("subdistrict") or None,
+                "village": feature.attributes.get("village") or None,
             }
             for row, feature in rows
         ],

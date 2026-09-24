@@ -312,7 +312,9 @@ def dataset_features(
                     "source_title": dataset.title,
                     "source_provider": dataset.provider,
                     "role": dataset.type,
-                    "attributes": feature.attributes,
+                    # Do not return the raw delivered record for supporting datasets: volunteer
+                    # files contain contact fields that are not planner map data. Shelter facts
+                    # needed by the decision UI are exposed individually above.
                 },
             }
             for feature in features

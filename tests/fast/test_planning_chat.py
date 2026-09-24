@@ -31,6 +31,7 @@ from api.token_store import session_token_store
 from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import update_setting
 from core.ai_models import LlmUsage
+from core.assessment_models import Boundary
 from core.identity import IdentityLinkResult
 from core.risk_recipe import RiskRecipe
 from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
@@ -62,6 +63,19 @@ def test_real_boundary_match_includes_the_province_name() -> None:
             [boundary], "Mueang Nan District, Nan, Thailand"
         )
         is boundary
+    )
+
+
+def test_canonical_sig_place_includes_level_province_and_country() -> None:
+    boundary = SimpleNamespace(
+        name="KANTHARAROM",
+        province_name="SI SA KET",
+        admin_level="district",
+    )
+
+    assert (
+        api.planning._canonical_sig_place(boundary)
+        == "KANTHARAROM District, SI SA KET, Thailand"
     )
 
 
@@ -371,10 +385,29 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
         assign_member(session, actor_email="owner@example.test", email="planner@example.test",
                       hub_code="adpc", role="planner")
         owner = session.scalar(select(AppUser).where(AppUser.email == "owner@example.test"))
+        boundary = Boundary(
+            admin_code="3303",
+            admin_level="district",
+            name="KANTHARAROM",
+            name_th="กันทรารมย์",
+            province_name="SI SA KET",
+            province_name_th="ศรีสะเกษ",
+            geom={
+                "type": "Polygon",
+                "coordinates": [[[104.5, 15.0], [104.7, 15.0], [104.7, 15.2],
+                                 [104.5, 15.2], [104.5, 15.0]]],
+            },
+            source="Thailand hierarchy delivery",
+            edition="2025-10",
+            geometry_sha256="c" * 64,
+            is_supported=True,
+        )
+        session.add(boundary)
         update_setting(session, actor_user_id=owner.id, token_limit_per_person=100_000,
                        ai_enabled=True)
         session.commit()
         users = {user.email: user.id for user in session.scalars(select(AppUser))}
+        boundary_id = str(boundary.id)
 
     def test_session() -> Iterator[Session]:
         with Session(engine) as session:
@@ -385,7 +418,7 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
     planning_answer_cache.clear()
     try:
         yield {"settings": settings, "engine": engine, "users": users, "replies": replies,
-               "monkeypatch": monkeypatch}
+               "boundary_id": boundary_id, "monkeypatch": monkeypatch}
     finally:
         planning_answer_cache.clear()
         app.dependency_overrides.clear()
@@ -524,6 +557,32 @@ def test_confirmed_area_overrides_a_different_model_place(planning) -> None:
     assert response.status_code == 200
     assert response.json()["mode"] == "sig_evidence"
     assert FakeMcp.calls[0][1]["place"] == "Mueang Nan District, Nan, Thailand"
+
+
+def test_selected_boundary_enriches_short_confirmed_place_before_sig(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\n3 [1]",
+    ]
+    FakeMcp.pack = {
+        **PACK,
+        "stats": {"place": "Kanthararom District"},
+        "trace": [
+            "aoi[Kanthararom District] 664 km2 via admin boundary ~664 km²",
+            "clip[hazard_flood]",
+        ],
+    }
+
+    response = _ask(
+        _client(planning, "planner@example.test"),
+        message="Show supporting SIG flood information for KANTHARAROM.",
+        place="KANTHARAROM",
+        boundary_id=planning["boundary_id"],
+    )
+
+    assert response.status_code == 200, response.json()
+    assert response.json()["mode"] == "sig_evidence"
+    assert FakeMcp.calls[0][1]["place"] == "KANTHARAROM District, SI SA KET, Thailand"
 
 
 def test_model_only_sig_area_needs_confirmation_before_any_sig_call(planning) -> None:

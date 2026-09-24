@@ -22,6 +22,11 @@ source independently. Only `evacuation_centers` may be pinned into the MVP 1 she
 assessment. The other two roles are optional, district-scoped supporting layers and do not alter a
 locked assessment.
 
+When a planner selects an area, show volunteer-centre and early-warning points by default and
+summarize all three supporting roles, including village locations, in the decision panel. Keep
+their counts and provenance explicitly outside the locked shelter-flood result. Vulnerability
+rasters are likewise shown as current display context, never silently treated as assessment inputs.
+
 Upload one Shapefile ZIP per role. Never infer the role from a field value, merge roles, activate a
 technically valid upload automatically, or publish it to SIG automatically. Exclude volunteer
 contact fields from planner-facing normalized data.
@@ -49,8 +54,8 @@ The detailed workflow and acceptance criteria are in
 
 ## Action items
 
-1. [ ] Confirm the user-facing English/Thai names for the three roles.
-2. [ ] Confirm that volunteer contact fields are not required in MVP 1.
-3. [ ] Implement the three versioned import profiles and migration.
-4. [ ] Add separate Data Library review cards and supporting map layers.
-5. [ ] Prove record counts, privacy exclusions and unchanged assessment fingerprints in tests.
+1. [ ] Confirm the final user-facing English/Thai names for the three roles.
+2. [x] Exclude volunteer contact fields from planner-facing API responses.
+3. [x] Implement the three versioned import profiles and migration.
+4. [x] Add separate Data Library review cards and supporting map layers.
+5. [x] Show area-scoped counts in the decision summary without changing assessment fingerprints.

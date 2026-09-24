@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 24 September 2026 (`codex/thailand-hub-bootstrap`; complete Thailand Hub baseline installed and activated locally)
+**Updated:** 24 September 2026 (`main`; complete Thailand Hub baseline installed and activated locally)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -25,8 +25,19 @@ baseline-loader support reference, label-length guard and safer Docker reset. Th
 the user-owned untracked planning documents. Its shelter-field ADR originally reversed two
 truncated Thai columns; that was corrected against the real source and proven by re-import and a
 fresh assessment. The nine-source installer remains the deployment path for the complete release.
-**455 tests pass, 2 PostgreSQL-only tests skip, Ruff is clean, and the local API/database/worker
+**457 tests pass, 2 PostgreSQL-only tests skip, Ruff is clean, and the local API/database/worker
 stack is healthy.**
+
+**Latest planning integration fix:** short assessment labels are no longer sent directly to SIG.
+The selected catalogue boundary supplies administrative level, province and country (for example,
+`KANTHARAROM District, SI SA KET, Thailand`), while the returned SIG AOI must still pass the exact
+area gate. The decision panel now reports area-scoped volunteer centres, early-warning resources
+and villages, exposes the three local vulnerability rasters as display-only context, and shows
+reported shelter capacity/supporting-unit details. Volunteer contact fields are excluded from map
+API responses. Supporting context never changes a locked assessment or creates a risk score.
+For Kanthararom, the current local data resolves to 18 civil-defence volunteer centres, no
+early-warning resource records and 175 village locations; the three national vulnerability
+indicator maps are available as display context.
 
 **VM deployment readiness:** both Ubuntu modes now carry the data workflow. The shared-host
 launcher uses ignored `.local/data-in`; the dedicated staging Compose mounts
@@ -311,7 +322,7 @@ Design notes to read before large changes:
 | Assessment | `core/assessment_models.py`, `core/assessment_jobs.py`, `core/gis.py`, `core/result_rules.py`, `core/storage.py`, `core/validation.py`, `api/assessments.py`, `api/catalog.py`, `worker/main.py`, `grpcli/seed.py` | The API never imports GIS; the worker claims with `SKIP LOCKED` |
 | Map | `api/maps.py`, `core/hazard_overlay.py` | Display-only flood PNG drawn at seed time |
 | Planner assistant | `api/planning.py`, `api/sig_evidence.py`, `api/mcp_client.py`, `api/token_store.py`, `api/sig_connection.py` | See 4.3; `sig_connection` renews the SIG access token before a lookup (ADR-0017) |
-| Shelter labels | `core/shelter_labels.py`, `core/shelter_import.py`, `tools/show_shelter_record.py` | ADR-0024: `สถ_1` is the name, `รอง` the capacity; labels composed and ambiguity counted |
+| Shelter labels | `core/shelter_labels.py`, `core/shelter_import.py`, `tools/show_shelter_record.py` | ADR-0024: `สถา` is the name, `สถ_1` the supporting unit and `รอง` the capacity; labels composed and ambiguity counted |
 | Background SIG lookups | `api/sig_jobs.py`, `api/planning.py` | ADR-0025: a gather runs as a task in the API process and the browser polls it, because SIG exceeds the 45 s client timeout |
 | SIG service login | `api/integrations/sig.py` | Evidence endpoint returns 404 until Increment 3 |
 | Migrations | `migrations/versions/20260916_0001`…`20260923_0013` | Forward-only; `0008` adds the data-library foundation; `0010` adds shelter district membership and indexed PostGIS points; `0013` adds persistent assessment run steps |
@@ -750,16 +761,15 @@ or deploy this feature to a server before its security gates pass.
 7. Move to S3-compatible storage/direct multipart upload only when a second host or measured size requires it.
 8. Complete load, restore, security and alert rehearsals before pilot deployment.
 
-### Shelter names and capacity confirmed (23 September 2026, ADR-0024)
+### Shelter names and capacity confirmed (24 September 2026, ADR-0024)
 
-- The product owner confirmed the truncated delivery columns: **`สถ_1` is the evacuation-centre
-  name and `รอง` is its capacity**. `core/shelter_import.py` no longer writes
-  `Evacuation centre 1..10303`; `IMPORTER_VERSION` is now `grp-shelters/3`.
-- A supporting-unit column was proposed as the name and rejected on measured evidence over all
-  10,303 records: the name is never blank and leaves 2,522 records ambiguous inside their
-  district, while the supporting unit is blank 792 times and leaves 8,344 ambiguous, because it
-  names the responsible organisation rather than the place. Eleven temples and schools in
-  นายายอาม all record `อบต.นายายอาม`.
+- The real delivery and proven v4 import confirm **`สถา` as the evacuation-centre name, `สถ_1`
+  as its responsible/supporting unit and `รอง` as capacity**. The briefly active v3 mapping had
+  reversed the first two fields; v5 corrects it and has been re-imported and verified against a
+  fresh real assessment.
+- Measured evidence over all 10,303 records shows why the fields cannot be interchanged: the
+  supporting unit is blank 792 times and repeats broad organisation categories, while the facility
+  field carries the real school, temple, office or shelter name.
 - `core/shelter_labels.py` composes the planner-facing label: the name where it is unique in the
   district, plus the village where it repeats, plus the source number where that is still not
   enough. On the delivery that is 2,447 villages and 942 numbers, and every label is unique
@@ -769,7 +779,9 @@ or deploy this feature to a server before its security gates pass.
   records and is reported as unknown, never as zero.
 - `tools/show_shelter_record.py` profiles any delivery or contribution candidate through the
   importer's own reader, which is how the numbers above were measured.
-- **Next:** re-import the delivery. This is a sandbox, so the fastest route is a full reset:
+- The current accepted version is `61a17773` (`grp-shelters/5`). A fresh Chiang Yuen assessment
+  `01a0d226-8c97-7278-8b2e-f4f1cd947e71` proved its real names end to end. For a blank sandbox,
+  the fastest full reset remains:
 
   ```powershell
   .\scripts\docker-desktop.ps1 -Reset -AdminEmail you@example.org -HubAdminEmail you@example.org
@@ -793,10 +805,10 @@ or deploy this feature to a server before its security gates pass.
 
 ### Handing over to Codex (23 September 2026)
 
-The work order is [`next-action-for-codex.md`](next-action-for-codex.md); the measurements behind
-it are [`docs/sig-platform-gaps.md`](docs/sig-platform-gaps.md). Slice 1 is the shelter re-import
-on a reset sandbox, which is what makes the confirmed names and capacity visible to a planner.
-Nothing on this branch has been run against the live Docker Desktop stack yet.
+The historical work order is the user-owned, untracked `next-action-for-codex.md`; the measurements
+behind it are [`docs/sig-platform-gaps.md`](docs/sig-platform-gaps.md). Its shelter re-import slice
+is complete and proven in the live Docker Desktop stack. The external shared-SIG contribution
+write remains intentionally pending.
 
 ### Shared SIG service, measured (23 September 2026)
 
@@ -978,6 +990,6 @@ git fetch; git switch main; git pull --ff-only
 python -m venv .venv; .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev,gis]"
 python -m ruff check .
-python -m pytest --basetemp .local/pytest-full  # expect 428 passed, 2 PostgreSQL-only skips
+python -m pytest --basetemp .local/pytest-full  # expect 457 passed, 2 PostgreSQL-only skips
 .\scripts\docker-desktop.ps1 -AdminEmail <you> -HubAdminEmail <you>
 ```

@@ -239,6 +239,9 @@ def pin_inputs(session: Session, request: SubmitRequest, *, allow_draft_methods:
         "boundary": {
             "id": str(boundary.id),
             "name": boundary.name,
+            "name_th": boundary.name_th,
+            "province_name": boundary.province_name,
+            "province_name_th": boundary.province_name_th,
             "admin_code": boundary.admin_code,
             "admin_level": boundary.admin_level,
             "source": boundary.source,

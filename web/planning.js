@@ -37,6 +37,7 @@
     centerVersions: [],
     supportingLayers: [],
     vulnerabilityLayers: [],
+    localContext: null,
     areaLevel: "district",
     centersVersion: null,
     methods: [],
@@ -93,6 +94,7 @@
   const districtLayer = window.L.featureGroup().addTo(map);
   const centersLayer = window.L.featureGroup().addTo(map);
   const supportingMapLayers = new Map();
+  const supportingCollections = new Map();
   const vulnerabilityMapLayers = new Map();
   const centerRenderer = window.L.canvas({ padding: 0.35 });
   const centerMarkers = new Map();
@@ -473,6 +475,13 @@
     });
   };
 
+  const canonicalSigPlace = (boundary) => {
+    let name = String(boundary.name || "").trim();
+    if (boundary.admin_level === "district" && !/district/i.test(name)) name += " District";
+    if (boundary.admin_level === "subdistrict" && !/subdistrict/i.test(name)) name += " Subdistrict";
+    return [name, boundary.province_name, "Thailand"].filter(Boolean).join(", ");
+  };
+
   const selectBoundary = (
     boundary,
     { announce = false, explicit = announce, preserveAssessment = false } = {},
@@ -517,11 +526,15 @@
       drawPendingCenters({ openPanel: announce }).catch((error) => {
         addMessage("assistant", error.message, { error: true });
       });
-      loadEnabledSupportingLayers().catch(() => {});
     }
     if (announce && !state.busy) {
       addMessage("assistant", `${boundary.name} is selected. The available flood and evacuation-centre layers are shown on the map.`, {
-        actions: [chipButton("Show SIG information", () => send(`Show the available flood, risk and population information for ${boundary.name}.`))],
+        actions: [chipButton("Show SIG information", () => {
+          const place = canonicalSigPlace(boundary);
+          return send(`Show the available flood, risk and population information for ${place}.`, {
+            confirmedPlace: place,
+          });
+        })],
       });
     }
     syncRunPanel();
@@ -594,6 +607,12 @@
       lines.push(`Mapped flood depth ${center.flood_depth_m} m`);
     }
     if (center.reason_meaning) lines.push(center.reason_meaning);
+    if (center.capacity !== null && center.capacity !== undefined) {
+      lines.push(`Reported capacity ${Number(center.capacity).toLocaleString()} people`);
+    }
+    if (center.supporting_unit) lines.push(`Supporting unit ${center.supporting_unit}`);
+    if (center.village) lines.push(`Village ${center.village}`);
+    if (center.subdistrict) lines.push(`Sub-district ${center.subdistrict}`);
     return lines;
   };
 
@@ -703,6 +722,10 @@
         reason_code: null,
         reason_meaning: null,
         flood_depth_m: null,
+        capacity: feature.properties.capacity,
+        supporting_unit: feature.properties.supporting_unit,
+        subdistrict: feature.properties.subdistrict,
+        village: feature.properties.village,
       };
     });
     setCenterRows(
@@ -710,6 +733,8 @@
       `${collection.source.title} · ${collection.source.provider} · ${collection.boundary.name}`,
     );
     drawCenterMarkers(centers);
+    await loadLocalContext(state.selected.id);
+    await enableRecommendedSupportingLayers();
     renderSourceSummary(collection);
     if (openPanel) document.querySelector('[data-ev-tab="centres"]').click();
   };
@@ -728,10 +753,7 @@
     }
     group.clearLayers();
     if (!state.selected) return;
-    const url = new URL(source.features_url, window.location.origin);
-    url.searchParams.set("boundary_id", state.selected.id);
-    url.searchParams.set("hub_code", state.hubCode);
-    const collection = await GRP.request(`${url.pathname}${url.search}`);
+    const collection = await getSupportingCollection(source, state.selected.id);
     collection.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       const properties = feature.properties;
@@ -745,6 +767,49 @@
     });
     const toggle = document.querySelector(`[data-supporting-version="${source.version_id}"]`);
     if (toggle?.checked) group.addTo(map);
+  };
+
+  const getSupportingCollection = async (source, boundaryId) => {
+    const cacheKey = `${source.version_id}:${boundaryId}`;
+    if (supportingCollections.has(cacheKey)) return supportingCollections.get(cacheKey);
+    const url = new URL(source.features_url, window.location.origin);
+    url.searchParams.set("boundary_id", boundaryId);
+    url.searchParams.set("hub_code", state.hubCode);
+    const collection = await GRP.request(`${url.pathname}${url.search}`);
+    supportingCollections.set(cacheKey, collection);
+    return collection;
+  };
+
+  const loadLocalContext = async (boundaryId) => {
+    const supporting = await Promise.all(state.supportingLayers.map(async (source) => {
+      try {
+        const collection = await getSupportingCollection(source, boundaryId);
+        return { ...source, count: collection.total };
+      } catch (_error) {
+        return { ...source, count: null };
+      }
+    }));
+    state.localContext = {
+      boundaryId,
+      supporting,
+      vulnerability: state.vulnerabilityLayers.filter((item) => item.available),
+    };
+    return state.localContext;
+  };
+
+  const enableRecommendedSupportingLayers = async () => {
+    const recommended = state.supportingLayers.filter(
+      (source) => source.role === "volunteer_centers" || source.role === "early_warning_resources",
+    );
+    await Promise.all(recommended.map(async (source) => {
+      const toggle = document.querySelector(`[data-supporting-version="${source.version_id}"]`);
+      if (toggle) toggle.checked = true;
+      try {
+        await loadSupportingLayer(source);
+      } catch (_error) {
+        if (toggle) toggle.checked = false;
+      }
+    }));
   };
 
   const loadEnabledSupportingLayers = async () => {
@@ -1107,6 +1172,7 @@
       reason_meaning:
         (result.reason_codes[center.reason_code] || {}).meaning || center.reason_code || null,
     }));
+    await loadLocalContext(result.area_detail.id);
     setCenterRows(
       assessedCenters,
       `Locked assessment ${result.support_ref} · ${result.area} · RP${result.scenario.return_period_years}`,
@@ -1175,10 +1241,18 @@
     resultLink.hidden = false;
     const contextButton = $("[data-result-context]");
     contextButton.hidden = !state.chatAvailable;
-    contextButton.onclick = () => send(
-      `Show supporting SIG flood, population, schools, hospitals and roads information for ${result.area}.`,
-      { confirmedPlace: result.area },
-    );
+    contextButton.onclick = () => {
+      const boundary = state.boundaries.find((item) => item.id === result.area_detail.id);
+      const place = boundary ? canonicalSigPlace(boundary) : [
+        result.area,
+        result.area_detail.province_name,
+        "Thailand",
+      ].filter(Boolean).join(", ");
+      return send(
+        `Show supporting SIG flood, population, schools, hospitals and roads information for ${place}.`,
+        { confirmedPlace: place },
+      );
+    };
     state.assessmentId = id;
     state.assessmentBoundaryId = result.area_detail.id;
     state.pendingAssessmentId = null;
@@ -1187,7 +1261,10 @@
     window.history.replaceState({}, "", url);
     renderContext();
     const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
-    if (boundary) selectBoundary(boundary, { explicit: true, preserveAssessment: true });
+    if (boundary) {
+      selectBoundary(boundary, { explicit: true, preserveAssessment: true });
+      await enableRecommendedSupportingLayers();
+    }
     saveState();
     if (quiet) return;
     renderAssessmentSummary(result, assessedCenters);
@@ -1355,17 +1432,41 @@
     }));
   };
 
-  const renderVulnerablePeople = (population = {}, source = "") => {
+  const renderVulnerablePeople = (population = {}, source = "", local = state.localContext) => {
     const box = $("[data-vulnerable-content]");
     box.replaceChildren();
     const heading = document.createElement("h3");
     heading.textContent = "Vulnerable people";
     const values = Object.entries(population).filter(([, value]) => typeof value === "number");
     if (!values.length) {
-      const empty = document.createElement("p");
-      empty.textContent =
-        "No approved district population breakdown is included here. Centre capacity and individual or household needs are not inferred.";
-      box.append(heading, empty);
+      const indicators = local?.vulnerability || [];
+      if (!indicators.length) {
+        const empty = document.createElement("p");
+        empty.textContent =
+          "No approved district population breakdown is included here. Centre capacity and individual or household needs are not inferred.";
+        box.append(heading, empty);
+        return;
+      }
+      const intro = document.createElement("p");
+      intro.textContent =
+        "Thailand Hub has the following source-native vulnerability indicator maps. Turn one on in Layers to inspect its spatial pattern.";
+      const grid = document.createElement("div");
+      grid.className = "pw-people-grid";
+      indicators.forEach((indicator) => {
+        const card = document.createElement("article");
+        card.className = "pw-people-stat";
+        const strong = document.createElement("strong");
+        const label = document.createElement("span");
+        strong.textContent = indicator.title_th || indicator.title;
+        label.textContent = indicator.meaning || "Display-only source indicator";
+        card.append(strong, label);
+        grid.append(card);
+      });
+      const note = document.createElement("p");
+      note.className = "pw-people-note";
+      note.textContent =
+        "These rasters are map context, not people counts and not part of the locked flood calculation. An approved method is required before combining them into a risk score.";
+      box.append(heading, intro, grid, note);
       return;
     }
     const intro = document.createElement("p");
@@ -1387,6 +1488,31 @@
     note.textContent =
       "These are cited district-level aggregates from SIG. They are not linked to a specific evacuation centre, household or map point, and categories may overlap.";
     box.append(heading, intro, grid, note);
+  };
+
+  const localCoverage = () => {
+    const context = state.localContext;
+    if (!context) return [];
+    const labels = {
+      volunteer_centers: "Civil-defence volunteer centres",
+      early_warning_resources: "Early-warning resources",
+      village_locations: "Village locations",
+    };
+    const rows = context.supporting.map((item) => ({
+      label: labels[item.role] || item.title,
+      status: item.count === null ? "missing" : "available",
+      detail: item.count === null
+        ? "Could not load this layer for the selected area"
+        : `${Number(item.count).toLocaleString()} record(s) in this area`,
+    }));
+    if (context.vulnerability.length) {
+      rows.push({
+        label: "Vulnerability indicator maps",
+        status: "available",
+        detail: `${context.vulnerability.length} display-only indicator(s) available in Layers`,
+      });
+    }
+    return rows;
   };
 
   const renderSourceSummary = (collection) => {
@@ -1423,9 +1549,10 @@
     renderCoverage([
       { label: "District boundary", status: "available", detail: collection.boundary.name },
       { label: "Evacuation-centre locations", status: "available", detail: `${collection.total} source record(s)` },
+      ...localCoverage(),
       { label: "Flood status by centre", status: "missing", detail: "Run an assessment to classify these same records" },
       { label: "Capacity, services and routes", status: "missing", detail: "No approved centre-level source is linked" },
-      { label: "Vulnerable groups", status: "missing", detail: "No centre-linked population evidence is available" },
+      { label: "Vulnerable people counts", status: "missing", detail: "Indicator maps are available, but no approved count method is linked" },
     ]);
     $("[data-summary-brief]").replaceChildren(summaryNotice(
       "No safety claim",
@@ -1436,7 +1563,7 @@
       "Route accessibility and travel safety have not been assessed.",
       "District population evidence, when available from SIG, is not tied to individual centres.",
     ]);
-    renderVulnerablePeople();
+    renderVulnerablePeople({}, "", state.localContext);
     openEvidence();
   };
 
@@ -1446,8 +1573,12 @@
       centers,
       `Locked assessment ${result.support_ref} · ${result.area} · RP${result.scenario.return_period_years}`,
     );
-    renderGaps([...(result.gaps || []), ...(result.limits || [])]);
-    renderVulnerablePeople();
+    renderGaps([
+      ...(result.gaps || []),
+      ...(result.limits || []),
+      "Local preparedness points and vulnerability maps are current planning context; they are not pinned inputs to this locked centre-flood result.",
+    ]);
+    renderVulnerablePeople({}, "", state.localContext);
     const hero = $("[data-summary-hero]");
     const movementSection = $("[data-summary-movement-section]");
     const fundingSection = $("[data-summary-funding-section]");
@@ -1546,9 +1677,11 @@
       { label: "Flood hazard", status: "available", detail: `RP${result.scenario.return_period_years} locked input` },
       { label: "Evacuation-centre locations", status: "available", detail: `${result.summary.in_scope} centres screened` },
       { label: "Movement screening", status: candidates.length ? "available" : "blocked", detail: candidates.length ? `${candidates.length} lower-exposure candidate(s)` : "No candidate from this result" },
-      { label: "Capacity and essential services", status: "missing", detail: "No approved source in this result" },
+      ...localCoverage(),
+      { label: "Reported centre capacity", status: centers.some((item) => item.capacity != null) ? "available" : "missing", detail: centers.some((item) => item.capacity != null) ? "Shown per centre where supplied; not a suitability check" : "No capacity value supplied for these centres" },
+      { label: "Essential services", status: "missing", detail: "No approved service-readiness source is linked" },
       { label: "Accessibility and routes", status: "missing", detail: "Travel safety has not been assessed" },
-      { label: "Vulnerable groups", status: "missing", detail: "Waits on DEP-07" },
+      { label: "Vulnerable people calculation", status: "missing", detail: "Display maps are loaded; an approved calculation still waits on DEP-07" },
       { label: "Interventions and costs", status: "missing", detail: "Waits on approved DEP-12 template" },
     ]);
     $("[data-summary-brief]").replaceChildren(summaryNotice(

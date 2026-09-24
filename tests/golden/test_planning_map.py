@@ -181,6 +181,7 @@ def test_center_points_are_geojson(world) -> None:
     assert collection["features"][0]["geometry"]["type"] == "Point"
     assert collection["features"][0]["properties"]["status"] == "not_assessed"
     assert collection["features"][0]["properties"]["feature_id"]
+    assert "attributes" not in collection["features"][0]["properties"]
     names = {feature["properties"]["name"] for feature in collection["features"]}
     assert "Synthetic Clinic E" in names
 

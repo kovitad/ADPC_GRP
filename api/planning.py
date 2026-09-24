@@ -216,6 +216,35 @@ def _same_area(first: str, second: str) -> bool:
     return bool(_place_parts(first)) and _place_parts(first) == _place_parts(second)
 
 
+def _canonical_sig_place(boundary: Boundary) -> str:
+    """Build an unambiguous SIG place from the managed boundary catalogue."""
+
+    name = boundary.name.strip()
+    if boundary.admin_level == "district" and "district" not in name.casefold():
+        name = f"{name} District"
+    elif boundary.admin_level == "subdistrict" and "subdistrict" not in name.casefold():
+        name = f"{name} Subdistrict"
+    return ", ".join(
+        part for part in (name, (boundary.province_name or "").strip(), "Thailand") if part
+    )
+
+
+def _sig_context_boundary(selected: Boundary, boundaries: list[Boundary]) -> Boundary:
+    """SIG evidence is district-wide; promote a selected sub-district to its parent district."""
+
+    if selected.admin_level != "subdistrict":
+        return selected
+    district_code = selected.admin_code[:4]
+    return next(
+        (
+            boundary
+            for boundary in boundaries
+            if boundary.admin_level == "district" and boundary.admin_code == district_code
+        ),
+        selected,
+    )
+
+
 def _message_names_boundary(message: str, boundary: Boundary) -> bool:
     """A model-suggested GRP area is usable only when the user named it explicitly."""
 
@@ -755,7 +784,15 @@ async def planning_chat(
         confirmed_place = (payload.place or "").strip()
         proposed_place = decision["place"]
         if confirmed_place:
-            action_place = confirmed_place
+            # Short UI labels are enriched from the managed boundary catalogue before SIG sees
+            # them. This prevents its geocoder choosing another same-named place.
+            if selected is not None and (
+                _same_area(confirmed_place, selected.name)
+                or _same_area(confirmed_place, _canonical_sig_place(selected))
+            ):
+                action_place = _canonical_sig_place(_sig_context_boundary(selected, boundaries))
+            else:
+                action_place = confirmed_place
         elif proposed_place:
             if selected is not None and _same_area(proposed_place, selected.name):
                 action_place = selected.name
@@ -783,7 +820,11 @@ async def planning_chat(
         elif selected is not None and (
             mode == "run_assessment" or "synthetic" not in selected.source.lower()
         ):
-            action_place = selected.name
+            action_place = (
+                selected.name
+                if mode == "run_assessment"
+                else _canonical_sig_place(_sig_context_boundary(selected, boundaries))
+            )
         else:
             action_place = None
         decision["place"] = action_place
