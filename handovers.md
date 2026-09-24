@@ -669,6 +669,14 @@ Owner decisions (16–17 Sep):
   (`core/data_library_models.py:102`): either use it for the per-Hub override it was designed for
   or drop it, before a second activation mechanism grows beside `core/baseline_activation.py`. See
   the code review below.
+- **A vulnerable-people count cannot be produced from the data we hold**, and the village layer's
+  Thai names are stored as mojibake. Both are proved with numbers in
+  [`docs/vulnerable-people-data-proof.md`](docs/vulnerable-people-data-proof.md): the three
+  rasters are a 0-1 index and a four-class ranking, SIG's age layers are weight layers outside
+  the flood recipe (DEP-07 is still unanswered), and the village shapefile carries unimported,
+  undocumented male/female/total/household columns that would give a **population** table only.
+  Fix the encoding first; do not import the population columns before the data owner confirms
+  them.
 - **Spec text** needs updating for ADR-0003, ADR-0004 and the Increment 2 scope change.
 - **Phone layout** of the new top bar and sign-in pages is not visually verified.
 
