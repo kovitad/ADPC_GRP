@@ -130,6 +130,11 @@ to build". Use `build migrate`, then `up -d --force-recreate api worker`. A cont
 running older code is the single most common way to conclude a change did not work. Confirm with
 `docker compose ... exec -T api python -c "from core.local_evidence import cited_local_numbers"`.
 
+**If `build migrate` produces no output and never finishes**, it is the BuildKit cache, not the
+Dockerfile. This happened at 640 entries / 26 GB: the build hung before emitting a single line.
+`docker buildx prune --filter until=24h -f` freed 5 GB and the same build then completed in 22
+seconds. Prune cache only; leave images, volumes and the database alone.
+
 **What this session changed, in dependency order:**
 
 | # | Commit | Change |
