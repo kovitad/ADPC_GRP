@@ -14,6 +14,16 @@ layers**. Re-running the installer reuses completed imports and safely retries o
 unpublished jobs. The Data Library shows the activation state of every source. The assessment and
 Planning selectors now group one exact **Recommended · Ready** shelter version above clearly
 labelled previous versions, with bilingual title, record count and short immutable version ID.
+The current real shelter version is `da769049` (assessment-ready, 10,303 records); `37108d23` is a
+previous assessment-ready version and is deliberately retained for reproducibility. **438 tests
+pass, 2 PostgreSQL-only tests skip, and Ruff is clean.** Docker API, worker and database are healthy.
+
+Claude's `claude/vibrant-tesla-5iarzt` was fetched through `12a3fa7`. Its review fixes are valid but
+that branch is not merged here: it contains a separate background-SIG/baseline-loader stack and
+overlaps this branch's shelter importer, Planning UI, ADR numbers and handover. Integrate it with a
+reviewed merge after preserving the user-owned untracked `next-action-for-codex.md`; do not assume
+the commit's green suite proves the real bootstrap command. The nine-source command above is the
+one executed successfully in this branch.
 
 **VM deployment readiness:** both Ubuntu modes now carry the data workflow. The shared-host
 launcher uses ignored `.local/data-in`; the dedicated staging Compose mounts
