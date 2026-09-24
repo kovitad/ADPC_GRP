@@ -470,16 +470,87 @@
       layer.on("click", (event) => {
         window.L.DomEvent.stop(event);
         selectBoundary(boundary, { announce: true });
+        showAreaProfile(boundary, layer);
       });
       districtLayer.addLayer(layer);
     });
   };
 
   const canonicalSigPlace = (boundary) => {
+    // The country comes from the boundary delivery, matching api/planning.py. With none recorded
+    // the short label is sent unchanged and the exact-area gate decides, as it does server side.
+    const country = String(boundary.country_name || "").trim();
+    if (!country) return String(boundary.name || "").trim();
     let name = String(boundary.name || "").trim();
     if (boundary.admin_level === "district" && !/district/i.test(name)) name += " District";
     if (boundary.admin_level === "subdistrict" && !/subdistrict/i.test(name)) name += " Subdistrict";
-    return [name, boundary.province_name, "Thailand"].filter(Boolean).join(", ");
+    return [name, boundary.province_name, country].filter(Boolean).join(", ");
+  };
+
+  // ---------- area profile popup ----------
+  const areaProfiles = new Map();
+
+  const numberText = (value) =>
+    value === null || value === undefined ? "unknown" : Number(value).toLocaleString();
+
+  const areaProfileHtml = (boundary, profile) => {
+    const levelLabel = boundary.admin_level === "subdistrict" ? "Sub-district" : "District";
+    const title = [boundary.name, boundary.name_th].filter(Boolean).join(" · ");
+    const province = [boundary.province_name, boundary.province_name_th]
+      .filter(Boolean)
+      .join(" · ");
+    const head =
+      `<strong>${title}</strong><br><span class="pw-area-pop__level">${levelLabel}` +
+      (province ? ` · ${province}` : "") +
+      `</span>`;
+    if (!profile || !profile.population) {
+      return (
+        `<div class="pw-area-pop">${head}` +
+        `<p class="pw-area-pop__none">No population record for this area.</p></div>`
+      );
+    }
+    const p = profile.population;
+    const source = profile.source || {};
+    const rows = [
+      ["Villages", numberText(p.village_count)],
+      ["People", numberText(p.total_population)],
+      ["Male", numberText(p.male)],
+      ["Female", numberText(p.female)],
+      ["Households", numberText(p.households)],
+    ]
+      .map(
+        ([label, value]) =>
+          `<tr><th scope="row">${label}</th><td>${value}</td></tr>`,
+      )
+      .join("");
+    const excluded = Number(p.excluded_village_count || 0);
+    const note = excluded
+      ? `<p class="pw-area-pop__note">${numberText(excluded)} village(s) excluded: the source ` +
+        `figures do not add up or are implausible.</p>`
+      : "";
+    return (
+      `<div class="pw-area-pop">${head}` +
+      `<table class="pw-area-pop__table"><tbody>${rows}</tbody></table>${note}` +
+      `<p class="pw-area-pop__caveat">${source.label || "Registered village population"}` +
+      (source.edition ? ` · edition ${source.edition}` : "") +
+      `. ${source.caveat || ""}</p></div>`
+    );
+  };
+
+  const showAreaProfile = async (boundary, layer) => {
+    layer
+      .bindPopup(`<div class="pw-area-pop"><strong>${boundary.name}</strong><br>Loading…</div>`)
+      .openPopup();
+    let profile = areaProfiles.get(boundary.id);
+    if (profile === undefined) {
+      try {
+        profile = await GRP.request(`/api/v1/catalog/areas/${boundary.id}/profile`);
+      } catch (error) {
+        profile = null;
+      }
+      areaProfiles.set(boundary.id, profile);
+    }
+    layer.setPopupContent(areaProfileHtml(boundary, profile));
   };
 
   const selectBoundary = (

@@ -51,6 +51,10 @@ MATRIX = {
     "hub_security_log": (401, 403, 200, 200, 200),
     "read_ai_setting": (401, 403, 403, 403, 200),
     "change_ai_setting": (401, 403, 403, 403, 200),
+    # The area profile is planning data: planning roles reach it, a Platform Admin with no
+    # planning membership does not. The fixture has no boundary, so a reached route 404s
+    # rather than confirming an area exists.
+    "area_profile": (401, 404, 404, 404, 403),
     "read_risk_recipe": (401, 403, 403, 403, 200),
     "change_risk_recipe": (401, 403, 403, 403, 200),
     # Authorized Platform Admin reaches the input-readiness check; this fixture has no full set.
@@ -101,6 +105,7 @@ MATRIX_OPERATION_IDS = {
     "hub_security_log": "audit_events_api_v1_admin_audit_events_get",
     "read_ai_setting": "read_ai_setting_api_v1_platform_ai_usage_setting_get",
     "change_ai_setting": "change_ai_setting_api_v1_platform_ai_usage_setting_put",
+    "area_profile": "area_profile_api_v1_catalog_areas__boundary_id__profile_get",
     "read_risk_recipe": "read_risk_recipe_api_v1_platform_risk_recipe_get",
     "change_risk_recipe": "change_risk_recipe_api_v1_platform_risk_recipe_put",
     "activate_baseline": "activate_baseline_api_v1_platform_mvp1_activate_post",
@@ -318,6 +323,10 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             f"/api/v1/admin/hubs/adpc/members/{member}",
             json={"role": "planner", "status": "active"},
             headers=headers,
+        )
+    if route == "area_profile":
+        return client.get(
+            "/api/v1/catalog/areas/00000000-0000-7000-8000-000000000000/profile"
         )
     if route == "access_message":
         return client.get(f"/api/v1/admin/hubs/adpc/members/{member}/access-message")
