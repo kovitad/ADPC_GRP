@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 24 September 2026 (`main`; complete Thailand Hub baseline installed and activated locally)
+**Updated:** 24 September 2026 (`main`; complete Thailand Hub baseline installed and activated locally; read-only code review of `5f4b8cd` recorded in Section 7)
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -35,7 +35,7 @@ area gate. The decision panel now reports area-scoped volunteer centres, early-w
 and villages, exposes the three local vulnerability rasters as display-only context, and shows
 reported shelter capacity/supporting-unit details. Volunteer contact fields are excluded from map
 API responses. Supporting context never changes a locked assessment or creates a risk score.
-For Kanthararom, the current local data resolves to 18 civil-defence volunteer centres, no
+For Kanthararom, the current local data resolves to 34 evacuation centres, 18 civil-defence volunteer centres, no
 early-warning resource records and 175 village locations; the three national vulnerability
 indicator maps are available as display context.
 
@@ -662,8 +662,147 @@ Owner decisions (16–17 Sep):
 - **Real assessment now runs under the approval assumption:** the latest imported boundary, shelter and RP100 versions are current; 928 districts are supported and the six COG tiles are one pinned input. Local proof: Mueang Nan `46 / 0 / 0 / 46` and Bang Bua Thong `1 / 1 / 0 / 0` for in-scope / potentially exposed / not exposed / unable. A signed external golden artifact is still required before production acceptance.
 - **Single-process memory** holds rate limits, the planning answer cache and the SIG token store (access and refresh token); there is no lease renewal for long jobs. A restart still ends every SIG connection, and a second API instance would not see the first one's tokens.
 - `web/planning.js` (~2,350 lines) and `api/planning.py` (~650 lines) are large. Split them before adding much more.
+- **`_canonical_sig_place` hardcodes `"Thailand"`** (`api/planning.py:219`): correct for the only
+  Hub with real data, wrong for the second one. `Boundary` has no country column. See the code
+  review below.
+- **`hub_dataset_selection` is a migrated table that no application code reads or writes**
+  (`core/data_library_models.py:102`): either use it for the per-Hub override it was designed for
+  or drop it, before a second activation mechanism grows beside `core/baseline_activation.py`. See
+  the code review below.
 - **Spec text** needs updating for ADR-0003, ADR-0004 and the Increment 2 scope change.
 - **Phone layout** of the new top bar and sign-in pages is not visually verified.
+
+### Code review of `main` at `5f4b8cd` (24 September 2026)
+
+Read-only review. No code was changed. It covers HEAD against what this handover claims, the two
+most recent `fix:` commits, and the standing `AGENTS.md` invariants (route access labels, permission
+matrix coverage, fail closed).
+
+**Verification actually performed.** `python -m pytest` on **win32, Python 3.12**: 457 passed,
+2 skipped. `python -m ruff check .`: clean. The two skips are
+`tests/contract/test_postgres_data_import.py`, which needs `GRP_POSTGRES_TEST_URL_FILE`. A green
+Windows suite does **not** prove the `grp` to `grpcli` rename, because Windows has no standard
+library `grp` module. The rename has not been re-proved on a Linux interpreter where `grp` is built
+in; state which interpreter proved it in the pull request.
+
+**`next-action-for-codex.md` is stale and should not be worked from as written.** It is an untracked
+review note from 21 September against `codex/sig-embedded-flood-map`. Its whole Slice 1 is already
+done on `main`:
+
+- Task 1, the rename: the package is `grpcli/`, `pyproject.toml:36` packages `grpcli*`, and no
+  reference to the old `grp` package name remains in code, scripts, packaging or docs (the only
+  surviving `grp` is the OS group in `deploy/Dockerfile`, which is correct and must stay).
+- Task 2, data-library permission cases: present in `tests/contract/test_permission_matrix.py`.
+- Task 3, the completeness ratchet:
+  `test_every_protected_operation_is_matrixed_or_explicitly_deferred` asserts **equality** between
+  the operations declaring `x-grp-access: protected` and `MATRIX_OPERATION_IDS | KNOWN_UNCOVERED`,
+  so it bites in both directions — a new protected route with no entry fails, and a stale exemption
+  fails too. `KNOWN_UNCOVERED` now holds **18** entries, not the 26 the note predicted, because the
+  matrix itself grew; the matrix covers 40 routes.
+- Its Slice 3, the activation path, also exists: `core/baseline_activation.py` with the
+  `POST /api/v1/platform/mvp1/activate` route at `api/platform.py:125`, audited as
+  `mvp1_baseline_activated`. The imported baseline described in Section 1 is reachable, which is
+  what that note's Section 5 said was missing.
+
+**Runnability check, 24 September 2026.** Nothing needs fixing to run the stack. `import api.main`
+succeeds, `python -m alembic heads` is a single head `20260924_0014`, the running database reports
+the same revision, `docker compose config` validates for both `deploy/compose.yml` and
+`deploy/compose.desktop.yml`, and the live desktop stack answers `/api/v1/healthz` with
+`{"status":"ok"}` with `api`, `worker` and `db` healthy. The working tree is clean apart from two
+untracked planning notes. The three findings above are correctness and future-Hub concerns, not
+start-up blockers.
+
+**Where the interrupted risk-recipe session stopped.** A previous Codex session was working from a
+product-owner approval to activate the documented vulnerability calculation and was compacted before
+it finished. It left **nothing in the working tree** — no partial edit to recover. Its reading of the
+code was correct and the state is:
+
+- The approved weights exist exactly as stated — population 0.40, building density 0.35, road
+  distance 0.25, missing cells Unable to assess — at `core/risk_recipe.py:29`.
+- They are used for **display and evidence only**. `DEFAULT_WEIGHTS` has no consumer outside
+  `core/risk_recipe.py`; the recipe reaches the planner through `api/planning.py` and
+  `web/planning.js:1946`. GRP does not calculate this risk locally; SIG remains the calculator
+  (ADR-0015).
+- The boundary Codex was about to enforce **is already enforced, and more strictly than it assumed**.
+  `core/assessment_jobs.py:219` refuses any submission carrying a `vulnerability_version_id` with
+  "Vulnerability is not available until method 2", and nothing anywhere writes
+  `AssessmentFeature.vulnerability_value`. The three delivered indicator rasters are separately typed
+  as `vulnerability_child`, `vulnerability_elderly` and `vulnerability_disability`
+  (`core/data_library_models.py:34`) and imported under `grp-vulnerability-display/1`
+  (`core/thailand_full_import.py:109`), so the 40/35/25 weights cannot be applied to them.
+- What genuinely remains is the **record, not the code**: the G-16 gap in the bullets above — replace
+  the placeholder science-owner and source wording on the active recipe version with the formal SIG
+  approval reference, as a new audited version rather than an edit. That is a data and DEP-07 task.
+  Do not wire a local vulnerability calculation on the strength of a chat approval; ADR-0015 and
+  DEP-07 both have to move first.
+
+**Findings 1 and 2 are fixed; finding 3 is deliberately documentation only (24 September 2026).**
+
+- **Finding 1 fixed.** `Boundary` now carries `country_name` (`core/assessment_models.py`, migration
+  `20260924_0015_boundary_country.py`), nullable, set by both importers from a named constant
+  (`core/boundary_import.py`, `core/thailand_full_import.py`). `_canonical_sig_place` reads the
+  recorded country instead of a literal and returns `None` when none is recorded; callers then send
+  the unenriched label, and the exact-area gate still decides whether SIG's answer is usable. The
+  synthetic district has no country by design and stays `NULL`. The migration backfills only the two
+  deliveries named exactly as Thai, so the existing 10,298 real boundaries keep the Kanthararom
+  behaviour without a re-import; the live desktop database was upgraded and verified as
+  8,442 + 1,856 `Thailand` with the one synthetic row `NULL`. `country_name` is also pinned into the
+  assessment area record and returned in `area_detail`, which the existing key guard makes safe for
+  assessments pinned before this change.
+- **Finding 2 fixed.** `_sig_context_boundary` no longer falls back silently: a missing parent
+  district is logged at warning level with both admin codes on `grp.planning`. It still returns the
+  sub-district rather than refusing, because the area gate is the real guard and refusing would
+  change planner-visible behaviour.
+- **Finding 3 is intentionally not code.** `hub_dataset_selection` is referenced by
+  `docs/adr/0019-reuse-approved-shelter-uploads.md`, `docs/data-library-solution-review.md` and four
+  other design documents including the architecture diagram. Dropping it is an architecture change
+  needing its own ADR, and using it means building the per-Hub override feature, which is not in
+  scope. It now carries a docstring at `core/data_library_models.py` naming it reserved by design,
+  pointing at the approved design, and telling the next agent not to grow a second activation
+  mechanism beside it and not to drop it without an ADR.
+
+The decision is recorded in
+[`docs/adr/0026-boundary-country-and-hub-independent-places.md`](docs/adr/0026-boundary-country-and-hub-independent-places.md),
+including why `hub_dataset_selection` stays reserved.
+
+**Validation after the fixes:** 460 passed (three new cases prove the recorded country is used, a
+non-Thai country works, a boundary with no country is declined, and the missing-parent fallback),
+2 skipped, Ruff clean, on win32 Python 3.12. `alembic upgrade head` applied cleanly to the running
+PostgreSQL stack and `/api/v1/healthz` stayed `ok`. **The API image still holds the pre-fix code:
+rebuild the desktop stack before testing Add SIG context, then sign in again.**
+
+**Findings from the review, in order of weight.**
+
+1. **`_canonical_sig_place` hardcodes `"Thailand"` for every Hub** (`api/planning.py:219`). It
+   appends the literal country to the place string sent to SIG. `Boundary`
+   (`core/assessment_models.py:56`) has no country column, so there is nothing to derive it from,
+   and the function is not Hub-guarded. In the confirmed-place branch (`api/planning.py:791`) there
+   is also no synthetic-source guard, so a confirmed synthetic boundary is labelled `Thailand` as
+   well. Today only the Thailand Hub has real data, so this is not wrong in production yet; it
+   becomes wrong the moment a second Hub is onboarded, and `AGENTS.md` requires failing closed on
+   unknown Hubs. The fix is to carry the country on the boundary collection or the Hub, not to
+   widen the string.
+2. **`_sig_context_boundary` falls back open, not closed** (`api/planning.py:232`). When a selected
+   sub-district has no parent district in the loaded list, `next(..., selected)` silently returns
+   the sub-district, so a sub-district place is sent to SIG although the comment states SIG evidence
+   is district-wide. The exact-area gate still applies afterwards, so this is a clarity and
+   fail-closed concern rather than a data leak, but the silent fallback should either be logged or
+   refused.
+3. **`admin_code[:4]` as the district prefix is an accepted Thai convention, not a defect.** The
+   same slice is used at `core/thailand_full_import.py:418` and `api/catalog.py:28`. Recording it
+   here so it is not relitigated: it is a documented constraint of the TIS code layout and it will
+   need revisiting with the country field in finding 1 when a non-Thai hierarchy arrives.
+4. **`HubDatasetSelection` is still dead code.** It is declared at
+   `core/data_library_models.py:102` and migrated in
+   `migrations/versions/20260919_0008_data_library_foundation.py:140`, and no application code reads
+   or writes it. Activation happens instead through `is_current` and `is_supported` in
+   `core/baseline_activation.py`. Either give the table a use in the per-Hub override it was
+   designed for, or remove it with a migration — an unused table with a unique constraint invites a
+   second, divergent activation mechanism.
+5. **`api/maps.py` no longer returns raw delivered attributes** and exposes only name, capacity,
+   supporting unit, sub-district and village. This was verified as intended: volunteer contact
+   fields are excluded and the shelter facts the decision panel needs are listed individually. No
+   action.
 
 ---
 

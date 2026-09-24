@@ -100,6 +100,17 @@ class DatasetFile(Base):
 
 
 class HubDatasetSelection(Base):
+    """Reserved by design and not yet used by any code path.
+
+    The approved data-library design keeps a per-Hub override of which version a category resolves
+    to (see docs/adr/0019-reuse-approved-shelter-uploads.md and
+    docs/data-library-solution-review.md). MVP 1 activates one release for every Hub through
+    is_current and is_supported in core/baseline_activation.py, so nothing reads or writes this
+    table yet. Do not add a second activation mechanism beside it, and do not drop it without a new
+    ADR: the approved design and its diagrams depend on it.
+    """
+
+
     __tablename__ = "hub_dataset_selection"
     __table_args__ = (
         UniqueConstraint("hub_id", "category", "scenario_key", name="uq_hub_dataset_selection"),
