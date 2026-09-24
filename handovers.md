@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 24 September 2026 (`main`; complete Thailand Hub baseline installed and activated locally; read-only code review of `5f4b8cd` recorded in Section 7)
+**Updated:** 24 September 2026 (`main` at `ec3672a`, pushed; Thailand baseline active, SIG place country fixed, village encoding fixed, per-area population imported and shown on click). **Next agent: read Section 0 first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -110,6 +110,71 @@ RP20/RP50 rasters and methods exist.
 **Baseline:** `GRP-ARC-001` v2.2. The secure copy `2026-09-15_GRP-ARC-001_MVP1_Solution_Architecture_Specification_v2.2.docx` is at the repo root and ignored by Git. On top of it sit the ADRs and product-owner decisions in Section 6.
 
 > **Start here if you are a new agent:** read Sections 1, 3, 4 and 10, then `AGENTS.md`. Do not merge `experiment/planning-chat`. Do not store secrets, and do not print the `.env` values.
+
+---
+
+## 0. Start here (session of 24 September 2026, `main` at `ec3672a`)
+
+Read this section, then `AGENTS.md`, then Section 7. **Ignore `next-action-for-codex.md`** — it is an
+untracked note from 21 September whose whole Slice 1 and Slice 3 are already delivered. Details and
+evidence are in Section 7.
+
+**State:** `main` at `ec3672a`, pushed. 476 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
+**win32 Python 3.12**. Alembic head `20260924_0016`, and the running desktop database is at the same
+revision. The stack was rebuilt, re-imported and verified after every change below. Working tree
+clean apart from two untracked user-owned planning notes, which must be left alone.
+
+**What this session changed, in dependency order:**
+
+| # | Commit | Change |
+|---|---|---|
+| 1 | `84c4ff7` | `Boundary.country_name`, nullable, set by both importers; migration `..._0015` backfills only the two exactly-named Thai deliveries |
+| 2 | `84521f3` | `_canonical_sig_place` reads the recorded country and declines when there is none; `_sig_context_boundary` logs a missing parent district instead of falling back silently |
+| 3 | `d43630f` | ADR-0026, the code review in Section 7, and the docstring making `hub_dataset_selection` reserved-by-design |
+| 4 | `a2f7e5c` | `docs/vulnerable-people-data-proof.md`: what the vulnerability data can and cannot say |
+| 5 | `c6490e3` | Shapefile encoding recovery — a declared `.cpg` encoding is recovered, not abandoned for a guess |
+| 6 | `79ea577` | Village population imported; per-area totals aggregated at import time into `area_population_summary` |
+| 7 | `9365e83` | `GET /api/v1/catalog/areas/{id}/profile` and the Planning map click popup |
+| 8 | `ec3672a` | ADR-0027 and the labelling it obliges |
+
+**Three things a next agent will otherwise get wrong:**
+
+1. **Do not add a local vulnerability calculation.** The approved 40/35/25 weights are display and
+   evidence only; `DEFAULT_WEIGHTS` has no consumer outside `core/risk_recipe.py`, and
+   `core/assessment_jobs.py` refuses any submission carrying a `vulnerability_version_id`. A
+   vulnerable-person count is **not obtainable** from this delivery — see
+   `docs/vulnerable-people-data-proof.md`. DEP-07 and ADR-0015 both have to move first. An earlier
+   session was interrupted mid-way through acting on a chat approval for exactly this; it left
+   nothing in the tree, and what actually remains is the G-16 **record**, not code.
+2. **The village population numbers are real but their source columns are not confirmed.** They are
+   labelled "Registered village population" with an explicit caveat, per ADR-0027. Never relabel them
+   as vulnerability, age or disability. If the data owner corrects the column meanings, the label and
+   the numbers change together under a new importer version.
+3. **`read_vector_explicit` is shared by every importer and the inspector.** The encoding change is
+   system-wide by design. Only `village.shp` takes the recovery path; the other seven delivered
+   shapefiles decode on their first candidate.
+
+**Recommended next work, smallest first:**
+
+1. **Prove the rename on Linux.** The `grp` to `grpcli` rename has never been verified on an
+   interpreter where `grp` is built in, because Windows has no stdlib `grp`. One `pytest` run on
+   Linux settles it; say which interpreter in the pull request.
+2. **Send the data owner two asks in one message:** confirm the four village population columns
+   (with the 385 identity violations and the fifteen implausible rows), and confirm whether any age
+   or disability breakdown exists anywhere in the delivery. Both are in
+   `docs/vulnerable-people-data-proof.md` ready to paste. Longest lead time, start today.
+3. **Replace the G-16 placeholder approval** with a new audited recipe version carrying the formal
+   SIG approval reference. Data task, not a calculation.
+4. **Burn down `KNOWN_UNCOVERED`.** 18 protected operations are exempted from the permission matrix
+   by name; the ratchet keeps the list honest but does not shrink it.
+5. **Carry the country properly for a second Hub.** `country_name` is set from a per-module constant.
+   A second Hub's delivery must set its own, and `Hub` still has only a code and a name.
+6. **Split `web/planning.js` and `api/planning.py`** before adding more. Both grew again this session.
+
+**Still deliberately not done:** dropping or using `hub_dataset_selection` (needs its own ADR, see
+Section 7); any browser upload, real flood assessment or vulnerability raster import (ADR-0008,
+DEP-05, DEP-07); staging deployment, which remains implemented and Compose-validated but never run
+on the VM.
 
 ---
 
@@ -783,8 +848,9 @@ including why `hub_dataset_selection` stays reserved.
 **Validation after the fixes:** 460 passed (three new cases prove the recorded country is used, a
 non-Thai country works, a boundary with no country is declined, and the missing-parent fallback),
 2 skipped, Ruff clean, on win32 Python 3.12. `alembic upgrade head` applied cleanly to the running
-PostgreSQL stack and `/api/v1/healthz` stayed `ok`. **The API image still holds the pre-fix code:
-rebuild the desktop stack before testing Add SIG context, then sign in again.**
+PostgreSQL stack and `/api/v1/healthz` stayed `ok`. The desktop image was then rebuilt and the
+running code was confirmed to read the recorded country. The same hardcoded country was later found
+and fixed in `web/planning.js` as well.
 
 **Findings from the review, in order of weight.**
 
