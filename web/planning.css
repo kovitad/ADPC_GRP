@@ -149,6 +149,14 @@
 
 .pw-msg { display: flex; gap: 0.55rem; margin: 0.85rem 0; animation: pw-in 0.18s ease-out; }
 .pw-msg--user { justify-content: flex-end; }
+.pw-avatar svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
 .pw-avatar {
   flex: none;
   display: grid;

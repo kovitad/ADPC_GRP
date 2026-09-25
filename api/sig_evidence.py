@@ -72,7 +72,7 @@ def check_area(requested_place: str, pack: dict[str, Any]) -> AreaCheck:
     requested_head = _normalize(requested_place.split(",")[0])
     if aoi_line is None:
         return AreaCheck(
-            False, requested_place, sig_place, None, "SIG did not report the area used"
+            False, requested_place, sig_place, None, "Global Risk did not report the area used"
         )
     match = AOI_PATTERN.match(aoi_line)
     aoi_name = match.group("name") if match else ""
@@ -82,7 +82,8 @@ def check_area(requested_place: str, pack: dict[str, Any]) -> AreaCheck:
             requested_place,
             sig_place,
             aoi_line,
-            "SIG did not find an admin boundary for this place and used an approximate area",
+            "Global Risk did not find an admin boundary for this place and used an approximate "
+            "area",
         )
     names = {_normalize(aoi_name), _normalize(sig_place or "")} - {""}
     if not requested_head or requested_head not in names:
@@ -91,7 +92,7 @@ def check_area(requested_place: str, pack: dict[str, Any]) -> AreaCheck:
             requested_place,
             sig_place,
             aoi_line,
-            "SIG analysed a different place from the one requested",
+            "Global Risk analysed a different place from the one requested",
         )
     return AreaCheck(True, requested_place, sig_place, aoi_line, "Admin boundary matched")
 
@@ -184,7 +185,9 @@ def verified_hazard_embed(
 
     url = embed_url(result, allowed_host)
     if url is None:
-        return EmbedCheck(None, None, None, False, "SIG did not return an allowed hazard-map URL.")
+        return EmbedCheck(
+            None, None, None, False, "Global Risk did not return an allowed hazard-map URL."
+        )
     layers = _displayed_layers(result.structured_content)
     if not layers:
         return EmbedCheck(
@@ -192,7 +195,7 @@ def verified_hazard_embed(
             None,
             None,
             False,
-            "SIG did not identify the layer displayed by the embedded map.",
+            "Global Risk did not identify the layer displayed by the embedded map.",
         )
     normalized = [layer.casefold().strip() for layer in layers]
     risk_layers = [layer for layer in normalized if FLOOD_RISK_LAYER.fullmatch(layer)]
@@ -204,14 +207,15 @@ def verified_hazard_embed(
                 displayed,
                 "risk",
                 True,
-                "Displayed SIG vulnerability-weighted flood-risk layer verified.",
+                "Displayed Global Risk vulnerability-weighted flood-risk layer verified.",
             )
         return EmbedCheck(
             None,
             displayed,
             "risk",
             False,
-            "SIG returned a vulnerability-weighted risk map; MVP 1 shows flood hazard only.",
+            "Global Risk returned a vulnerability-weighted risk map; MVP 1 shows flood hazard "
+            "only.",
         )
     hazard_layers = [layer for layer in normalized if FLOOD_HAZARD_LAYER.fullmatch(layer)]
     if len(hazard_layers) != 1 or len(normalized) != 1:
@@ -220,6 +224,6 @@ def verified_hazard_embed(
             ", ".join(layers),
             None,
             False,
-            "SIG did not return one recognized flood-hazard layer for the embedded map.",
+            "Global Risk did not return one recognized flood-hazard layer for the embedded map.",
         )
     return EmbedCheck(url, layers[0], "hazard", True, "Displayed flood-hazard layer verified.")

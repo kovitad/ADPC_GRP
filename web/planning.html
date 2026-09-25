@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260925b" />
-    <link rel="stylesheet" href="/planning.css?v=20260925e" />
+    <link rel="stylesheet" href="/planning.css?v=20260925f" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260925h" defer></script>
+    <script src="/planning.js?v=20260925i" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -33,7 +33,7 @@
               class="button button--secondary button--compact"
               type="button"
               data-clear-chat
-              title="Forget this conversation and the SIG evidence gathered for it"
+              title="Forget this conversation and the Global Risk evidence gathered for it"
               hidden
             >New conversation</button>
             <span class="pw-pill" data-allowance title="Your AI allowance this month">AI …</span>
@@ -197,7 +197,7 @@
           <div class="pw-stats" data-stats></div>
           <div class="pw-result__actions">
             <button class="pw-result__summary" type="button" data-result-summary>Decision summary</button>
-            <button class="pw-result__context" type="button" data-result-context hidden>Add SIG context</button>
+            <button class="pw-result__context" type="button" data-result-context hidden>Add Global Risk context</button>
             <a class="pw-result__link" data-result-link href="/assessments.html">Sources, limits and full table →</a>
           </div>
         </div>
@@ -225,10 +225,10 @@
               </div>
             </div>
           </div>
-          <section class="pw-publish" data-publish-confirm hidden aria-label="Create public SIG receipt">
+          <section class="pw-publish" data-publish-confirm hidden aria-label="Create public Global Risk receipt">
             <strong>Verify this exact brief and create a public receipt?</strong>
             <p>
-              SIG will check every citation against this evidence pack. If it passes, SIG stores a
+              Global Risk will check every citation against this evidence pack. If it passes, Global Risk stores a
               replayable public receipt and unlocks its live hazard map. The receipt proves what was
               checked; it does not scientifically approve the method or certify any place as safe.
               The question, brief and evidence references may be accessible through a public link.
@@ -247,7 +247,7 @@
               Centres <span data-centre-count></span>
             </button>
             <button type="button" role="tab" data-ev-tab="vulnerable" aria-selected="false">People</button>
-            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="false">SIG evidence</button>
+            <button type="button" role="tab" data-ev-tab="evidence" aria-selected="false">Global Risk evidence</button>
             <button type="button" role="tab" data-ev-tab="missing" aria-selected="false">Gaps</button>
             <button type="button" role="tab" data-ev-tab="trace" aria-selected="false">Technical trace</button>
           </div>
@@ -324,11 +324,11 @@
         <div class="pw-sig" data-sig hidden>
           <div class="pw-sig__bar">
             <div>
-              <span class="pw-sig__eyebrow">SIG live component · public receipt</span>
+              <span class="pw-sig__eyebrow">Global Risk live component · public receipt</span>
               <strong data-sig-title>Flood hazard and asset exposure</strong>
               <span class="pw-sig__meta" data-sig-meta></span>
             </div>
-            <button class="pw-icon-button" type="button" data-sig-close aria-label="Close SIG map">×</button>
+            <button class="pw-icon-button" type="button" data-sig-close aria-label="Close Global Risk map">×</button>
           </div>
           <p class="pw-sig__help" id="sig-map-help" data-sig-help>
             Shows assets intersecting mapped flood-hazard classes. It is not a vulnerability-weighted
@@ -336,7 +336,7 @@
           </p>
           <iframe
             data-sig-frame
-            title="SIG receipt-bound flood hazard and asset exposure map"
+            title="Global Risk receipt-bound flood hazard and asset exposure map"
             aria-describedby="sig-map-help"
             sandbox="allow-scripts allow-same-origin"
             referrerpolicy="no-referrer"

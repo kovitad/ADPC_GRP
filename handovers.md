@@ -115,6 +115,17 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
+### 0.00 Naming: planners see "Global Risk", not "SIG" (25 September)
+
+The owner asked for "Global Risk" instead of "SIG", and a globe instead of the letters "AI" on the
+assistant's avatar. Every planner-visible string on the Planning page, and the API text that reaches
+the chat (labels, errors, area and map checks, lookup failures), now says Global Risk. The router and
+brief prompts tell the model to use the name too, so their versions moved to `planning-router-v2` and
+`planning-draft-v4`. **Unchanged on purpose:** identifiers (`sig_*`, the `sig_flood` mode), error codes
+such as `SIG_REAUTH_REQUIRED`, audit action names, comments, docstrings, OpenAPI summaries, and pages
+other than Planning (sign-in and registration still say "SIG account", because that is the account the
+person signs in with). Asset versions are now `planning.js?v=20260925i` and `planning.css?v=20260925f`.
+
 ### 0.0 Latest: the assistant remembers (ADR-0029, `241313b` and `7a3ae55`, 25 September)
 
 The owner asked: "the chat AI remember the context of user yet .. i ask same question he should not
@@ -160,7 +171,7 @@ ADR-0004's "chat text is not stored". A restored "Confirm the district" message 
 its button (known gap, ADR-0029).
 
 **If it misbehaves, look here first:** a card with no "gathered" line means `planning.js` is cached,
-so check that `?v=20260925h` is served. A 422 on the first question after a restore means the
+so check that `?v=20260925i` is served. A 422 on the first question after a restore means the
 restored `history` broke `ChatTurn` validation, which `test_a_restored_history_always_validates`
 should have caught. For a SIG call where reuse was expected, compare `place_key`: the pack is keyed on
 the canonical SIG place, so a differently spelled place is a different key by design.
@@ -183,7 +194,7 @@ two untracked user-owned planning notes, which must be left alone.
    `tests/fast/test_auth_entry.py` asserts the exact `?v=` of `planning.js`, `planning.css`,
    `assessments.js` and `styles.css`. Editing one of those files without bumping its query string in
    the HTML *and* the assertion means a browser keeps the old file, which looks exactly like a change
-   that did not work. Current: `?v=20260925h` for `planning.js`, `?v=20260925e` for `planning.css`.
+   that did not work. Current: `?v=20260925i` for `planning.js`, `?v=20260925f` for `planning.css`.
 3. **Restart with `.\scripts\docker-desktop.ps1`, never bare `docker compose up`** — see 0.2 below.
 4. **The fast tier runs on SQLite and cannot catch every SQL defect.** A `GROUP BY` over a
    `func.substr(...)` expression passed every fast test and failed on PostgreSQL, because SQLAlchemy

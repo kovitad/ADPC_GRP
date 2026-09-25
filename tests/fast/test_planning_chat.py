@@ -304,7 +304,8 @@ def test_deterministic_summary_marks_truncation_and_preserves_cross_references()
 
     assert "[12]" in answer
     assert "… (full text in Evidence) [1]" in answer
-    assert len(answer.split("## Key SIG findings\n", 1)[1].split("\n", 1)[0]) < len(long_text)
+    findings = answer.split("## Key Global Risk findings\n", 1)[1]
+    assert len(findings.split("\n", 1)[0]) < len(long_text)
 
 
 def test_deterministic_summary_reports_findings_hidden_by_display_limit() -> None:
@@ -966,7 +967,7 @@ def test_display_request_with_bad_draft_still_shows_structured_data(planning) ->
 
     assert body["answer_source"] == "deterministic_fallback"
     assert body["answer"].startswith(
-        "## Available data\nSIG returned the following cited flood information"
+        "## Available data\nGlobal Risk returned the following cited flood information"
     )
     assert "3 of 9 schools [1]" in body["answer"]
     assert body["publish_token"] is None

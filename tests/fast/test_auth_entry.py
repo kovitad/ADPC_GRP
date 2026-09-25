@@ -216,16 +216,16 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Flood and evacuation-centre layers are visible" in script
     assert "Candidate means lower mapped flood exposure" in page
     assert "Deterministic evidence summary · not publishable" in script
-    assert "Key findings from SIG evidence" in script
+    assert "Key findings from Global Risk evidence" in script
     assert "Existing evidence may be restored from this browser tab" in script
     # The connection banner offers the one action that helps, and warns before expiry.
     assert "Sign in again" in script
     assert "SIG_EXPIRY_WARNING_SECONDS" in script
-    assert "SIG metadata consistency" in script
+    assert "Global Risk metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925h" in page
-    assert "/planning.css?v=20260925e" in page
+    assert "/planning.js?v=20260925i" in page
+    assert "/planning.css?v=20260925f" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
     assert "Synthetic demo" in script

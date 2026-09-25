@@ -191,14 +191,17 @@ def run_in_background(job_id: str, work: Any) -> None:
             sig_lookups.fail(
                 job_id,
                 "LOOKUP_TIMED_OUT",
-                "SIG did not answer in time. The connection was released; please ask again.",
+                "Global Risk did not answer in time. The connection was released; please ask "
+                "again.",
             )
         except asyncio.CancelledError:
             sig_lookups.fail(job_id, "CANCELLED", "The lookup was cancelled.")
             raise
         except Exception as error:  # noqa: BLE001 - a job records every failure as its state
             code = getattr(error, "code", None) or type(error).__name__
-            message = getattr(error, "message", None) or "The SIG lookup could not be completed."
+            message = (
+                getattr(error, "message", None) or "The Global Risk lookup could not be completed."
+            )
             sig_lookups.fail(job_id, str(code), str(message))
         else:
             sig_lookups.succeed(job_id, answer)

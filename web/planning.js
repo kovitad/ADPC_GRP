@@ -138,6 +138,27 @@
     if (welcome) welcome.remove();
   };
 
+  // The assistant speaks for Global Risk, so its avatar is a globe rather than the letters "AI".
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const globeAvatar = () => {
+    const avatar = document.createElement("span");
+    avatar.className = "pw-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    [
+      ["circle", { cx: "12", cy: "12", r: "9" }],
+      ["ellipse", { cx: "12", cy: "12", rx: "4", ry: "9" }],
+      ["path", { d: "M3 12h18M4.6 7.5h14.8M4.6 16.5h14.8" }],
+    ].forEach(([tag, attributes]) => {
+      const shape = document.createElementNS(SVG_NS, tag);
+      Object.entries(attributes).forEach(([name, value]) => shape.setAttribute(name, value));
+      svg.append(shape);
+    });
+    avatar.append(svg);
+    return avatar;
+  };
+
   const addMessage = (role, text, { label, actions = [], error = false, record = true, confirmation = null } = {}) => {
     hideWelcome();
     if (record && !restoring) {
@@ -146,13 +167,7 @@
     }
     const row = document.createElement("div");
     row.className = `pw-msg pw-msg--${role}${error ? " pw-msg--error" : ""}`;
-    if (role === "assistant") {
-      const avatar = document.createElement("span");
-      avatar.className = "pw-avatar";
-      avatar.setAttribute("aria-hidden", "true");
-      avatar.textContent = "AI";
-      row.append(avatar);
-    }
+    if (role === "assistant") row.append(globeAvatar());
     const bubble = document.createElement("div");
     bubble.className = "pw-bubble";
     bubble.textContent = text;
@@ -208,7 +223,7 @@
       brief.open = payload.answer_source === "deterministic_fallback";
       const summary = document.createElement("summary");
       summary.textContent = payload.answer_source === "deterministic_fallback"
-        ? "Key findings from SIG evidence"
+        ? "Key findings from Global Risk evidence"
         : "Read the brief";
       const text = renderBrief(payload.answer, (n) => {
         renderEvidence(payload, question);
@@ -221,7 +236,7 @@
       const restored = document.createElement("p");
       restored.className = "pw-draft-warning";
       restored.textContent =
-        "Restored from your conversation. SIG is disconnected: you can keep asking about this area while its evidence is under an hour old, but sign in again to gather it anew.";
+        "Restored from your conversation. Global Risk is disconnected: you can keep asking about this area while its evidence is under an hour old, but sign in again to gather it anew.";
       bubble.querySelector(".pw-bubble__label").before(restored);
     }
     scrollDown();
@@ -229,12 +244,12 @@
 
   const STEP_LABELS = {
     understand_question: "Understood the question",
-    assemble_pack: "Gathered SIG flood evidence",
-    assemble_pack_reused: "Reused SIG evidence",
+    assemble_pack: "Gathered Global Risk flood evidence",
+    assemble_pack_reused: "Reused Global Risk evidence",
     grp_baseline_evidence: "Added GRP figures",
     draft: "Wrote the brief",
-    publish_answer: "SIG source check and receipt",
-    hazard_map: "Loaded SIG flood map",
+    publish_answer: "Global Risk source check and receipt",
+    hazard_map: "Loaded Global Risk flood map",
   };
 
   const seconds = (ms) => `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} s`;
@@ -250,20 +265,18 @@
     const steps = publish
       ? [
           { label: "Checking the exact brief you reviewed", after: 0 },
-          { label: "Creating the public receipt if SIG accepts it", after: 5000 },
-          { label: "Loading SIG's receipt-bound hazard map", after: 12000 },
+          { label: "Creating the public receipt if Global Risk accepts it", after: 5000 },
+          { label: "Loading Global Risk's receipt-bound hazard map", after: 12000 },
         ]
       : [
           { label: "Understanding your question", after: 0 },
-          { label: "Finding the district and flood evidence on SIG (usually 20–90 s)", after: 4000 },
-          { label: "Checking SIG used the real district boundary", after: 30000 },
+          { label: "Finding the district and flood evidence on Global Risk (usually 20–90 s)", after: 4000 },
+          { label: "Checking Global Risk used the real district boundary", after: 30000 },
           { label: "Writing the brief from the evidence", after: 45000 },
         ];
     const row = document.createElement("div");
     row.className = "pw-msg pw-msg--assistant";
-    const avatar = document.createElement("span");
-    avatar.className = "pw-avatar";
-    avatar.textContent = "AI";
+    const avatar = globeAvatar();
     const bubble = document.createElement("div");
     bubble.className = "pw-bubble pw-progress-card";
     const head = document.createElement("div");
@@ -424,18 +437,18 @@
     const intro = welcome.querySelector("p");
     intro.textContent =
       "District boundaries, the available RP100 flood layer and evacuation-centre locations are " +
-      "shown immediately. Ask in your own words for SIG flood, risk or population information.";
+      "shown immediately. Ask in your own words for Global Risk flood, risk or population information.";
     const box = $("[data-suggestions]");
     box.replaceChildren();
     [
       area
-        ? ["Show information for this district", `Flood, centres and SIG evidence for ${area}`,
+        ? ["Show information for this district", `Flood, centres and Global Risk evidence for ${area}`,
           `Show the available flood and population information for ${area}.`]
-        : ["Use my current district", "Find your Thailand district before asking SIG",
+        : ["Use my current district", "Find your Thailand district before asking Global Risk",
           null],
       ["Explain what the map shows", "Use the visible layers and their sources",
         "Explain the flood and evacuation-centre data shown on the map."],
-      ["Check SIG flood exposure", "Schools, hospitals and roads for a Thailand district",
+      ["Check Global Risk flood exposure", "Schools, hospitals and roads for a Thailand district",
         "Which schools and hospitals in Mueang Nan District, Nan are exposed to flooding?"],
     ].forEach(([title, detail, prompt]) => {
       const button = document.createElement("button");
@@ -464,8 +477,8 @@
     coming.append(
       strong,
       document.createTextNode(
-        "Thailand district boundaries, RP100 flood depth, evacuation-centre locations, and SIG " +
-          "hazard, risk and population values when SIG returns them.",
+        "Thailand district boundaries, RP100 flood depth, evacuation-centre locations, and Global Risk " +
+          "hazard, risk and population values when Global Risk returns them.",
       ),
     );
   };
@@ -744,8 +757,8 @@
             chipButton("What evacuation centres are here?", askSig(
               `What evacuation centres are recorded in ${place}, and what kind of places are they?`,
             )),
-            chipButton("What does SIG add?", askSig(
-              `Show the available SIG flood, risk and population information for ${place}.`,
+            chipButton("What does Global Risk add?", askSig(
+              `Show the available Global Risk flood, risk and population information for ${place}.`,
             )),
           ],
         },
@@ -1604,7 +1617,7 @@
         "Thailand",
       ].filter(Boolean).join(", ");
       return send(
-        `Show supporting SIG flood, population, schools, hospitals and roads information for ${place}.`,
+        `Show supporting Global Risk flood, population, schools, hospitals and roads information for ${place}.`,
         { confirmedPlace: place },
       );
     };
@@ -1706,10 +1719,10 @@
     $("[data-sig-meta]").textContent = `${place}${receiptId ? ` · receipt ${receiptId}` : ""}`;
     const risk = mapKind === "sig_vulnerability_weighted_flood_risk";
     $("[data-sig-title]").textContent = risk
-      ? "SIG vulnerability-weighted flood risk"
+      ? "Global Risk vulnerability-weighted flood risk"
       : "Flood hazard and asset exposure";
     $("[data-sig-help]").textContent = risk
-      ? "Shows SIG risk classes calculated with the approved recipe recorded below. It supports screening and does not certify that a location is safe."
+      ? "Shows Global Risk's risk classes calculated with the approved recipe recorded below. It supports screening and does not certify that a location is safe."
       : "Shows assets intersecting mapped flood-hazard classes. It is not a vulnerability-weighted risk score and does not certify that a location is safe.";
     sigPanel.hidden = false;
   };
@@ -1856,7 +1869,7 @@
       const where = [area.name, area.name_th].filter(Boolean).join(" · ")
         + (area.province_name ? `, ${area.province_name}` : "");
       const intro = document.createElement("p");
-      intro.textContent = `${where} — from the GRP data library, no SIG lookup needed.`;
+      intro.textContent = `${where} — from the GRP data library, no Global Risk lookup needed.`;
       box.append(intro);
 
       if (profile.population) {
@@ -1920,14 +1933,14 @@
       .filter(([, value]) => typeof value === "number");
     if (sigValues.length) {
       const sub = document.createElement("h4");
-      sub.textContent = "SIG district population evidence";
+      sub.textContent = "Global Risk district population evidence";
       box.append(sub);
       if (state.sigPopulationSource) box.append(peopleNote(state.sigPopulationSource));
       box.append(peopleStatGrid(
         sigValues.map(([name, value]) => [value, name.replaceAll("_", " ")]),
       ));
       box.append(peopleNote(
-        "These are cited district-level aggregates from SIG. They are not linked to a specific "
+        "These are cited district-level aggregates from Global Risk. They are not linked to a specific "
         + "evacuation centre, household or map point, and categories may overlap.",
       ));
     }
@@ -2013,7 +2026,7 @@
     renderGaps([
       "Centre capacity and essential services are not included in this source.",
       "Route accessibility and travel safety have not been assessed.",
-      "District population evidence, when available from SIG, is not tied to individual centres.",
+      "District population evidence, when available from Global Risk, is not tied to individual centres.",
     ]);
     ensureAreaProfile(state.selected);
     renderVulnerablePeople();
@@ -2166,20 +2179,20 @@
     $("[data-summary-coverage-title]").textContent = "Available information";
     $("[data-summary-coverage-intro]").textContent =
       "The map and evidence panel show each available source directly.";
-    $("[data-ev-eyebrow]").textContent = "Planning summary · SIG screening";
+    $("[data-ev-eyebrow]").textContent = "Planning summary · Global Risk screening";
     $("[data-summary-status]").textContent = evidence.receipt
       ? `Source-checked · receipt ${evidence.receipt.receipt_id}`
       : payload.answer_source === "deterministic_fallback"
         ? "Deterministic evidence summary · not publishable"
         : "Unverified screening draft";
     $("[data-summary-title]").textContent = hasRisk
-      ? "SIG flood-risk information"
-      : "SIG flood information";
+      ? "Global Risk flood-risk information"
+      : "Global Risk flood information";
     $("[data-summary-lead]").textContent = payload.answer_source === "deterministic_fallback"
       ? "The AI brief failed formatting checks, so GRP is showing only numbered findings copied from the structured evidence pack."
       : hasRisk
-        ? `SIG returned hazard, exposure and vulnerability-weighted risk using recipe ${evidence.risk_recipe.version}.`
-        : "SIG returned flood-hazard and asset-exposure information for the confirmed district.";
+        ? `Global Risk returned hazard, exposure and vulnerability-weighted risk using recipe ${evidence.risk_recipe.version}.`
+        : "Global Risk returned flood-hazard and asset-exposure information for the confirmed district.";
     $("[data-summary-movement]").replaceChildren(summaryNotice(
       "Flood and evacuation-centre layers are visible",
       "Use Layers to turn the national RP100 flood layer, district boundaries and evacuation-centre locations on or off.",
@@ -2191,14 +2204,14 @@
         label: "Vulnerability-weighted risk",
         status: hasRisk ? "available" : "partial",
         detail: hasRisk
-          ? `SIG recipe ${evidence.risk_recipe.version}; exact source values remain in Evidence`
-          : "SIG generic screening may be present; no approved recipe is recorded",
+          ? `Global Risk recipe ${evidence.risk_recipe.version}; exact source values remain in Evidence`
+          : "Global Risk generic screening may be present; no approved recipe is recorded",
       },
       ...(Object.keys((evidence.stats && evidence.stats.population_by_age) || {}).length
         ? [{ label: "Population by age", status: "available", detail: "Values are shown in the Evidence tab" }]
         : []),
       ...(evidence.warnings || []).map((warning) => ({
-        label: "SIG metadata consistency",
+        label: "Global Risk metadata consistency",
         status: "blocked",
         detail: warning,
       })),
@@ -2233,11 +2246,11 @@
     const lines = [
       `Question: ${evidence.question}`,
       `Area: ${evidence.place}`,
-      `SIG pack: ${evidence.pack_id || "-"}`,
+      `Evidence pack: ${evidence.pack_id || "-"}`,
       `Assembled at: ${evidence.assembled_at || "-"} (${evidence.gather_ms ?? "-"} ms)`,
       `Receipt: ${evidence.receipt ? evidence.receipt.receipt_id : "none (not published)"}`,
       "",
-      "SIG platform steps:",
+      "Global Risk platform steps:",
       ...evidence.sig_trace.map((line, i) => `  ${i + 1}. ${line}`),
       "",
       "GRP steps:",
@@ -2270,7 +2283,7 @@
           : openEvidencePayload?.answer_source === "deterministic_fallback"
             ? "deterministic evidence summary (not publishable)"
             : "unverified draft (no receipt)";
-        const header = `# ${evidence.question}\n\nArea: ${evidence.place}\nSIG pack: ${evidence.pack_id}\n` +
+        const header = `# ${evidence.question}\n\nArea: ${evidence.place}\nEvidence pack: ${evidence.pack_id}\n` +
           `Status: ${answerStatus}\n\n` +
           "_SIG generic evidence. Not a GRP assessment and not a decision that any place is safe._\n\n";
         downloadFile(`${base}-brief.md`, header + answer, "text/markdown");
@@ -2358,7 +2371,7 @@
       `${counts.sources} sources · ${counts.pulled_live} pulled live · ${counts.computed} computed · ${counts.declared_gaps} declared gap(s)`;
     const area = $("[data-ev-area]");
     area.textContent = evidence.area && evidence.area.sig_area
-      ? `SIG analysis area: ${evidence.area.sig_area}`
+      ? `Global Risk analysis area: ${evidence.area.sig_area}`
       : "";
 
     const numbers = $("[data-ev-numbers]");
@@ -2382,13 +2395,13 @@
       const strong = document.createElement("strong");
       const span = document.createElement("span");
       strong.textContent = value.toLocaleString();
-      span.textContent = `${name.replaceAll("_", " ")} · SIG demographic evidence`;
+      span.textContent = `${name.replaceAll("_", " ")} · Global Risk demographic evidence`;
       tile.append(strong, span);
       numbers.append(tile);
     });
     state.sigPopulation = (evidence.stats && evidence.stats.population_by_age) || null;
     state.sigPopulationSource =
-      "Population values returned by the current SIG district evidence pack.";
+      "Population values returned by the current Global Risk district evidence pack.";
     ensureAreaProfile(state.selected);
     renderVulnerablePeople();
     if (evidence.risk_recipe) {
@@ -2398,7 +2411,7 @@
       const span = document.createElement("span");
       const weights = evidence.risk_recipe.weights;
       strong.textContent = evidence.risk_recipe.version;
-      span.textContent = `Approved SIG recipe · population ${Math.round(weights.population * 100)}% · buildings ${Math.round(weights.building_density * 100)}% · roads ${Math.round(weights.road_distance * 100)}%`;
+      span.textContent = `Approved Global Risk recipe · population ${Math.round(weights.population * 100)}% · buildings ${Math.round(weights.building_density * 100)}% · roads ${Math.round(weights.road_distance * 100)}%`;
       tile.append(strong, span);
       numbers.append(tile);
     }
@@ -2428,7 +2441,7 @@
       }),
     );
     $("[data-ev-exec]").textContent =
-      `Pack ${evidence.pack_id || "-"} assembled ${evidence.assembled_at ? GRP.formatTime(evidence.assembled_at) : "-"} (Bangkok); SIG gathering ${evidence.gather_ms ? seconds(evidence.gather_ms) : "-"}; whole answer ${evidence.total_ms ? seconds(evidence.total_ms) : "-"}.`;
+      `Pack ${evidence.pack_id || "-"} assembled ${evidence.assembled_at ? GRP.formatTime(evidence.assembled_at) : "-"} (Bangkok); Global Risk gathering ${evidence.gather_ms ? seconds(evidence.gather_ms) : "-"}; whole answer ${evidence.total_ms ? seconds(evidence.total_ms) : "-"}.`;
 
     const mapButton = $("[data-ev-map]");
     const mapUrl = safeHttps(payload.map_url);
@@ -2439,9 +2452,9 @@
     if (evidence.receipt) {
       mapButton.textContent = mapUrl
         ? payload.map_kind === "sig_vulnerability_weighted_flood_risk"
-          ? "Show SIG risk map"
+          ? "Show Global Risk's risk map"
           : "Show hazard & exposure map"
-        : "SIG embedded map unavailable";
+        : "Global Risk embedded map unavailable";
       mapButton.disabled = !mapUrl;
       mapButton.onclick = () => mapUrl && showSigMap(mapUrl, evidence, payload.map_kind);
       const receiptUrl = safeHttps(evidence.receipt.public_url);
@@ -2452,11 +2465,11 @@
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = `Public receipt ${evidence.receipt.receipt_id}`;
-        $("[data-ev-foot]").append("Passed SIG's source check · ", link);
+        $("[data-ev-foot]").append("Passed Global Risk's source check · ", link);
       }
       if (!mapUrl) {
         $("[data-ev-foot]").append(
-          `${receiptUrl ? " · " : ""}${payload.map_note || "The answer is available, but SIG did not return a verified flood-hazard map."}`,
+          `${receiptUrl ? " · " : ""}${payload.map_note || "The answer is available, but Global Risk did not return a verified flood-hazard map."}`,
         );
       }
     } else {
@@ -2474,14 +2487,14 @@
           });
         };
         $("[data-ev-foot]").textContent =
-          "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
+          "Unverified draft: not yet checked by Global Risk. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
       } else if (needsFreshEvidence(payload)) {
         mapButton.textContent = "Gather fresh evidence to publish";
         mapButton.onclick = () => send(message, {
           echo: false, confirmedPlace: evidence.place, refresh: true,
         });
         $("[data-ev-foot]").textContent =
-          `This brief uses SIG evidence gathered ${evidenceGathered(payload) || "earlier"}. A public receipt needs evidence gathered in the last 5 minutes, so gather it again from SIG first. That takes a few minutes.`;
+          `This brief uses Global Risk evidence gathered ${evidenceGathered(payload) || "earlier"}. A public receipt needs evidence gathered in the last 5 minutes, so gather it again from Global Risk first. That takes a few minutes.`;
       } else {
         mapButton.textContent = "Retry AI brief";
         mapButton.onclick = () => send(message, {
@@ -2528,7 +2541,7 @@
   const needsFreshEvidence = (payload) =>
     Boolean(payload.publish_needs_fresh_evidence || (payload.publish_token && !livePublishToken(payload)));
 
-  const gatherAgain = (payload, question, text = "Gather again from SIG") => {
+  const gatherAgain = (payload, question, text = "Gather again from Global Risk") => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "link-button pw-status__again";
@@ -2594,8 +2607,8 @@
       const reuse = document.createElement("span");
       reuse.className = "pw-status__reuse";
       reuse.append(reused
-        ? `SIG evidence gathered ${gathered} · reused, no new SIG call.`
-        : `SIG evidence gathered ${gathered}.`);
+        ? `Global Risk evidence gathered ${gathered} · reused, no new Global Risk lookup.`
+        : `Global Risk evidence gathered ${gathered}.`);
       reuse.append(gatherAgain(payload, question));
       card.append(reuse);
     }
@@ -2697,7 +2710,7 @@
         if (echo) addMessage("user", message);
         input.value = "";
         autosize();
-        addMessage("assistant", `I found ${candidateName}. Confirm it as your map location before using SIG evidence.`, {
+        addMessage("assistant", `I found ${candidateName}. Confirm it as your map location before using Global Risk evidence.`, {
           label: "Confirm your location.",
           actions: [chipButton(`Use ${candidateName} and answer`, async (button) => {
             // Confirming the district is the explicit area choice; then answer the
@@ -2790,7 +2803,7 @@
           mapButton.textContent = "Retry brief generation";
           mapButton.onclick = () => send(message, { echo: false, confirmedPlace: payload.area?.requested });
           $("[data-ev-foot]").textContent =
-            "SIG refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
+            "Global Risk refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
         }
         addMessage("assistant", payload.answer, {
           label: payload.label,
@@ -2833,7 +2846,7 @@
     const statusPath = `/api/v1/planning/lookups/${started.job_id}`;
     GRP.jobs.track({
       id: started.job_id,
-      label: "SIG evidence lookup",
+      label: "Global Risk evidence lookup",
       statusPath,
       href: "/planning.html",
       ownerPath: "/planning.html",
@@ -2844,7 +2857,7 @@
         const status = await GRP.request(statusPath);
         if (status.state === "succeeded") return status.answer;
         if (status.state === "failed") {
-          const failure = new Error(status.error || "The SIG lookup could not be completed.");
+          const failure = new Error(status.error || "The Global Risk lookup could not be completed.");
           failure.code = status.error_code;
           throw failure;
         }
@@ -2968,7 +2981,7 @@
     const chip = $("[data-place-chip]");
     chip.replaceChildren();
     if (!name) {
-      chip.textContent = "This map location is for orientation only. Choose a Thailand district before requesting SIG evidence.";
+      chip.textContent = "This map location is for orientation only. Choose a Thailand district before requesting Global Risk evidence.";
       chip.hidden = false;
       return;
     }
@@ -2978,11 +2991,11 @@
       `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
     ));
     if (storedSigAnswer(name)) {
-      chip.append(chipButton("Show the SIG evidence I already have", () =>
+      chip.append(chipButton("Show the Global Risk evidence I already have", () =>
         showStoredSigAnswer(name)));
     }
     chip.append(chipButton(
-      storedSigAnswer(name) ? "Gather it again from SIG" : "Check SIG flood exposure",
+      storedSigAnswer(name) ? "Gather it again from Global Risk" : "Check Global Risk flood exposure",
       () => send(
         `Check flood exposure for schools, hospitals and roads in ${name}.`,
         { confirmedPlace: name, refresh: Boolean(storedSigAnswer(name)) },
@@ -3031,18 +3044,18 @@
         addMessage(
           "assistant",
           reuse
-            ? `${name} is selected. SIG evidence for this district was already gathered in this `
+            ? `${name} is selected. Global Risk evidence for this district was already gathered in this `
               + "session, so it can be shown again without another lookup."
-            : `${name} is selected from the map for SIG flood evidence.`,
+            : `${name} is selected from the map for Global Risk flood evidence.`,
           {
             label: reuse ? "Already gathered this session." : "Map location selected.",
             actions: [
               ...(reuse
-                ? [chipButton("Show the SIG evidence I already have", () =>
+                ? [chipButton("Show the Global Risk evidence I already have", () =>
                     showStoredSigAnswer(name))]
                 : []),
               chipButton(
-                reuse ? "Gather it again from SIG" : "Check SIG flood exposure",
+                reuse ? "Gather it again from Global Risk" : "Check Global Risk flood exposure",
                 () => send(
                   `Check flood exposure for schools, hospitals and roads in ${name}.`,
                   { confirmedPlace: name, refresh: Boolean(reuse) },
@@ -3055,7 +3068,7 @@
       return;
     }
     chip.textContent = outsideThailand
-      ? "GRP's SIG lookup covers Thailand districts only. Click inside Thailand or search for a district."
+      ? "GRP's Global Risk lookup covers Thailand districts only. Click inside Thailand or search for a district."
       : "No administrative district was found for that point. Click nearer a town, or search for a district by name.";
   };
 
@@ -3090,9 +3103,9 @@
       if (!place) throw new Error("CURRENT_LOCATION_NO_DISTRICT");
       pickPlace(place, { currentLocation: true });
       const name = externalPlaceName(place);
-      addMessage("assistant", `Your district is ${name}. Available local map layers are shown, and SIG information can be added.`, {
+      addMessage("assistant", `Your district is ${name}. Available local map layers are shown, and Global Risk information can be added.`, {
         label: "Current district confirmed.",
-        actions: [chipButton("Check SIG flood exposure", () => send(
+        actions: [chipButton("Check Global Risk flood exposure", () => send(
           `Check flood exposure for schools, hospitals and roads in ${name}.`,
           { confirmedPlace: name },
         ))],
@@ -3101,7 +3114,7 @@
       const message = error.code === 1
         ? "Location permission was not granted. Search for a Thailand district instead."
         : error.message === "CURRENT_LOCATION_NOT_THAILAND"
-        ? "GRP’s current SIG lookup is limited to Thailand districts."
+        ? "GRP’s current Global Risk lookup is limited to Thailand districts."
         : error.message === "CURRENT_LOCATION_NO_DISTRICT"
         ? "I found your position but no administrative district there. Click your district on the map, or search for it by name."
         : "I could not identify a district from your location. Search for a Thailand district instead.";
@@ -3326,8 +3339,8 @@
       return;
     }
     banner.textContent = expiringSoon
-      ? `SIG evidence stays connected for about ${Math.max(1, Math.round(remaining / 60))} more minutes. `
-      : "SIG evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run. ";
+      ? `Global Risk evidence stays connected for about ${Math.max(1, Math.round(remaining / 60))} more minutes. `
+      : "Global Risk evidence needs a fresh sign-in. Existing evidence may be restored from this browser tab, but a new lookup cannot run. ";
     banner.append(signInAgainLink());
     banner.dataset.notice = "sig-connection";
     banner.hidden = false;
