@@ -970,8 +970,8 @@
 
   const showCentresOnMap = (centres) => {
     if (!centres.length) return;
-    centresLayer.addTo(map);
-    centersToggle.checked = true;
+    centersLayer.addTo(map);
+    $('[data-layer="centers"]').checked = true;
     const points = centres
       .filter((center) => typeof center.lat === "number" && typeof center.lon === "number")
       .map((center) => [center.lat, center.lon]);
