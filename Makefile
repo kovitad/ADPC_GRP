@@ -4,7 +4,7 @@ COMPOSE = docker compose --env-file .env -f deploy/compose.yml
 .PHONY: install test lint format migrate compose-config up down
 
 install:
-	$(PYTHON) -m pip install -e ".[dev]"
+	$(PYTHON) -m pip install -e ".[dev,gis]"
 
 test:
 	$(PYTHON) -m pytest

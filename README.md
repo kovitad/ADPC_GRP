@@ -42,7 +42,7 @@ Python 3.12 is required.
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,gis]"
 python -m pytest
 .\scripts\run-local.ps1 -RegisterSigClient
 ```

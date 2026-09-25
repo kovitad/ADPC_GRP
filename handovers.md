@@ -222,9 +222,14 @@ seconds. Prune cache only; leave images, volumes and the database alone.
 
 **Recommended next work, smallest first:**
 
-1. **Prove the rename on Linux.** The `grp` to `grpcli` rename has never been verified on an
-   interpreter where `grp` is built in, because Windows has no stdlib `grp`. One `pytest` run on
-   Linux settles it; say which interpreter in the pull request.
+1. ~~**Prove the rename on Linux.**~~ **Done 25 September at `417e1d6`.** In a clean
+   `python:3.12-slim` container (CPython 3.12.14, glibc, stdlib `grp` loaded from
+   `lib-dynload/grp.cpython-312-x86_64-linux-gnu.so`), `import grpcli` resolved to the repo,
+   `python -m grpcli.bootstrap --help` ran, and the suite gave **548 passed, 2 skipped**, the same
+   as win32. Two setup facts it exposed: the fast tier needs the `gis` extra as well as `dev`
+   (`pip install -e ".[dev,gis]"`, because `core/gis.py` imports numpy and rasterio at module
+   level), and a `-slim` image needs `apt-get install libexpat1` for rasterio's wheel. To repeat:
+   `git archive HEAD | docker run --rm -i python:3.12-slim sh -c '...'`.
 2. **Send the data owner two asks in one message:** confirm the four village population columns
    (with the 385 identity violations and the fifteen implausible rows), and confirm whether any age
    or disability breakdown exists anywhere in the delivery. Both are in
@@ -1017,8 +1022,8 @@ matrix coverage, fail closed).
 2 skipped. `python -m ruff check .`: clean. The two skips are
 `tests/contract/test_postgres_data_import.py`, which needs `GRP_POSTGRES_TEST_URL_FILE`. A green
 Windows suite does **not** prove the `grp` to `grpcli` rename, because Windows has no standard
-library `grp` module. The rename has not been re-proved on a Linux interpreter where `grp` is built
-in; state which interpreter proved it in the pull request.
+library `grp` module. It was re-proved on Linux CPython 3.12.14 on 25 September; see Section 0,
+recommended work item 1.
 
 **`next-action-for-codex.md` is stale and should not be worked from as written.** It is an untracked
 review note from 21 September against `codex/sig-embedded-flood-map`. Its whole Slice 1 is already

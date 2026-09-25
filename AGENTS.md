@@ -13,7 +13,7 @@ The implementation follows the approved GRP boundaries. `api/` contains FastAPI 
 Use Python 3.12. Common commands are:
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,gis]"
 python -m pytest
 python -m ruff check .
 python -m uvicorn api.main:app --reload
