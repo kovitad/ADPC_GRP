@@ -22,7 +22,7 @@ import api.planning
 from api.dependencies import database_session
 from api.main import app
 from api.mcp_client import McpToolResult, SigMcpClient
-from api.planning_cache import planning_answer_cache
+from api.planning_cache import planning_answer_cache, sig_pack_cache
 from api.rate_limits import limiter
 from api.sessions import CSRF_COOKIE, set_session_cookie
 from api.settings import Settings
@@ -452,11 +452,13 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
     app.dependency_overrides[database_session] = test_session
     limiter.reset()
     planning_answer_cache.clear()
+    sig_pack_cache.clear()
     try:
         yield {"settings": settings, "engine": engine, "users": users, "replies": replies,
                "boundary_id": boundary_id, "monkeypatch": monkeypatch}
     finally:
         planning_answer_cache.clear()
+        sig_pack_cache.clear()
         app.dependency_overrides.clear()
 
 
@@ -1289,3 +1291,81 @@ def test_a_brief_that_cites_nothing_is_still_replaced(planning) -> None:
     assert body["answer_source"] == "deterministic_fallback"
     assert "Everything is fine" not in body["answer"]
     assert "does not support" in body["label"]
+
+
+def test_a_second_question_about_one_place_reuses_the_assembled_pack(planning) -> None:
+    """Owner: the assistant "try to connect to sig everytime". assemble_pack is 149 s of 200 s."""
+
+    FakeMcp.pack = {
+        **PACK,
+        "target": {"place": "Kanthararom District, Si Sa Ket, Thailand", "hazard": "flood"},
+        "trace": ["aoi[Kanthararom District] 41 km2 via admin boundary ~41 km²"],
+    }
+    client = _client(planning, "planner@example.test")
+    place = "Kanthararom District, Si Sa Ket, Thailand"
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]",
+        '{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n9 [1]",
+    ]
+
+    first = _ask(client, message="Which schools are exposed?", place=place).json()
+    # A different question about the same place: the answer cache keys on the message, so this is a
+    # miss there and would previously have assembled a second pack.
+    second = _ask(client, message="Where could people move?", place=place).json()
+
+    assert first["mode"] == "sig_evidence" and second["mode"] == "sig_evidence"
+    assert [name for name, _ in FakeMcp.calls].count("assemble_pack") == 1
+    steps = [item["step"] for item in second["trace"]]
+    assert "assemble_pack_reused" in steps
+    assert "assemble_pack" not in steps
+
+
+def test_refresh_assembles_a_new_pack(planning) -> None:
+    FakeMcp.pack = {
+        **PACK,
+        "target": {"place": "Kanthararom District, Si Sa Ket, Thailand", "hazard": "flood"},
+        "trace": ["aoi[Kanthararom District] 41 km2 via admin boundary ~41 km²"],
+    }
+    client = _client(planning, "planner@example.test")
+    place = "Kanthararom District, Si Sa Ket, Thailand"
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]",
+        '{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]",
+    ]
+
+    _ask(client, message="Which schools are exposed?", place=place)
+    response = client.post(
+        "/api/v1/planning/chat",
+        json={"message": "Which schools are exposed?", "place": place, "hub_code": "adpc",
+              "refresh": True},
+    ).json()
+
+    assert [name for name, _ in FakeMcp.calls].count("assemble_pack") == 2
+    assert "assemble_pack" in [item["step"] for item in response["trace"]]
+
+
+def test_the_brief_is_given_the_conversation_so_far(planning) -> None:
+    """Owner: "llm has no context history now". Only the router used to receive it."""
+
+    prompts: list[str] = []
+
+    async def capturing(settings, *, instructions, prompt, hub_code):
+        prompts.append(prompt)
+        return planning["replies"].pop(0), "test-model", 50, 20
+
+    planning["monkeypatch"].setattr(api.ai_gateway, "call_openai", capturing)
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+
+    _ask(
+        _client(planning, "planner@example.test"),
+        message="And the hospitals?",
+        place="Mueang Nan District, Nan, Thailand",
+        history=[
+            {"role": "user", "text": "Which schools are exposed?"},
+            {"role": "assistant", "text": "Three of nine schools are in the extent."},
+        ],
+    )
+
+    draft_prompt = prompts[-1]
+    assert "earlier_turns" in draft_prompt
+    assert "Three of nine schools" in draft_prompt
