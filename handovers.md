@@ -113,18 +113,18 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24-25 September 2026, `main` at `2d87f43`)
+## 0. Start here (sessions of 24-25 September 2026, `main` at `6a76e05`)
 
 Read this section, then `AGENTS.md`, then Section 7. **Ignore `next-action-for-codex.md`** — it is an
 untracked note from 21 September whose whole Slice 1 and Slice 3 are already delivered. Details and
 evidence are in Section 7.
 
-**State:** `main` at `2d87f43`, pushed. 531 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
+**State:** `main` at `6a76e05`, pushed. 548 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
 **win32 Python 3.12**. Alembic head `20260924_0018`, and the running desktop database is at the same
 revision. The stack was rebuilt and verified after every change below. Working tree clean apart from
 two untracked user-owned planning notes, which must be left alone.
 
-**Four things that will waste your time if you do not know them.**
+**Five things that will waste your time if you do not know them.**
 
 1. **Never run pytest through a pipe before committing.** `python -m pytest -q | tail -3` returns
    `tail`'s exit code, so a `&&` chain pushes a red suite. That happened once this session (`5a1d4a4`,
@@ -133,12 +133,16 @@ two untracked user-owned planning notes, which must be left alone.
    `tests/fast/test_auth_entry.py` asserts the exact `?v=` of `planning.js`, `planning.css`,
    `assessments.js` and `styles.css`. Editing one of those files without bumping its query string in
    the HTML *and* the assertion means a browser keeps the old file, which looks exactly like a change
-   that did not work. Current: `?v=20260925b`.
+   that did not work. Current: `?v=20260925f` for `planning.js`.
 3. **Restart with `.\scripts\docker-desktop.ps1`, never bare `docker compose up`** — see 0.2 below.
 4. **The fast tier runs on SQLite and cannot catch every SQL defect.** A `GROUP BY` over a
    `func.substr(...)` expression passed every fast test and failed on PostgreSQL, because SQLAlchemy
    binds the arguments separately in `SELECT` and `GROUP BY`. Any new aggregate query must be run
    against the desktop database before you believe it.
+5. **Do not recreate the API while the owner is using it.** A SIG lookup takes about 200 s and
+   `SessionTokenStore` keeps upstream tokens in process memory by design, so a restart kills the
+   in-flight request ("Failed to fetch", with no trace, because the trace lives in the response) and
+   drops every SIG token, forcing a SERVIR re-login. Ask first, or deploy when they are idle.
 
 **Epic U (planner workspace UX) is complete**, U1-U5, all five raised by the Product Owner on
 25 September. `docs/backlog.md` has each item struck through with its commit. The owner has **not yet
@@ -151,6 +155,29 @@ re-tested U3, U4 and U5** — treat their next report as the acceptance check, n
 | U3 | Assessment history states the outcome in words, one action per row, latest five with a toggle | `1c55d83` |
 | U4 | `.button--compact` at 2.2rem for utility actions; exactly one primary per page | `2d87f43` |
 | U5 | Assessment → Planning resolves the area across levels, drops the stale selection, aligns the return period, and states the carry-over | `2d87f43` |
+
+**After Epic U the owner reported four more things, all fixed on 25 September.** These are the
+answers to "the assistant does not remember", "it calls SIG every time", "it has no history" and
+"we don't have key-value pairs intelligent enough to show an answer on the map".
+
+| What | Why it happened | Commit |
+| --- | --- | --- |
+| Every chat message loaded 8,365 boundaries with full GeoJSON: **8,778 ms**, now **205 ms** with `load_only` | A place-name match never needed geometry. Deferred, not dropped, so a missed `.geom` access still returns the right value | `7f28681` |
+| A SIG pack is reused for five minutes per session and place | `assemble_pack` was **149 s of a 200 s** answer and ran again for every question about the same district, because the answer cache keys on exact message text and each chip phrases it differently | `7f28681` |
+| The brief now receives the last six turns | Only the router got history, so the brief restated everything every time | `7f28681` |
+| An answer's named centres resolve to feature ids | Name-string matching fails on a truncated or reworded name. GRP issues a ref per centre, the model marks them, `core/answer_references.py` resolves and validates | `6a76e05` |
+| "Unable to assess" reads **N/A** everywhere a planner sees it | The phrase was on every pin, in the legend, the filter, the metric card and the chat. The stored status keeps its approved name | `23db1a0` |
+| The chat panel is draggable, the area popup folds, an explanation can point at the centres it names | The popup stacked three tables and grew past the viewport; the panel was a fixed 360-440 px | `9bcd028` |
+| A brief is no longer discarded for a missing heading | Any single preflight issue replaced it with a bullet dump. Only a brief that is **ungrounded** is replaced now; a badly structured one is shown and still refused a receipt | `5e4163f` |
+
+Three of these changed a prompt, so the prompt versions moved: `DRAFT_VERSION` to `planning-draft-v3`
+and `EXPLAIN_VERSION` to `result-explain-v2`. `llm_usage` records the version, so **bump it whenever
+you change an instruction string** or two different prompts end up attributed to one version.
+
+**The owner is planning a golden-question evaluation** (facts and evidence by code, meaning by a
+judge model). `docs/backlog.md` Epic V records what the platform already exposes for the code lanes,
+so the harness is not built around parsing prose: `focus.centers` and `focus.unresolved_references`
+for facts, `_draft_issues` and the `trace` for evidence. Keep the judge out of those two lanes.
 
 **Rebuild before testing.** The desktop image is `grp-api:desktop` and the `migrate` service
 carries the build, so `docker compose -f deploy/compose.desktop.yml build api` reports "no services
@@ -352,6 +379,46 @@ Not done, and not started:
 - `web/planning.js` is past 3,100 lines and `api/planning.py` past 1,200. Both were already flagged
   for splitting; this session made both longer.
 - U2 left the sub-district picker optional and unsearchable: the type-ahead indexes districts only.
+
+## 0.1.3 How to test the 25 September assistant changes
+
+```powershell
+.\scripts\docker-desktop.ps1 -AdminEmail kovitad.janlakhon@adpc.net
+```
+
+Use the script, not `docker compose up`: it exports `SERVIR_AUTH_CLIENT_ID` from `.local\` and
+without it sign-in fails closed. Then sign in to GRP **and to SERVIR** again, because the restart
+cleared the in-memory SIG tokens.
+
+**Speed, which is the change you feel first.** Ask anything at all, even "what is hazard". Before,
+every message paid 8.8 s to load boundary geometry it never used. Compare `Understood the question`
+in the Trace tab: it should now be about a second rather than eight.
+
+**The SIG pack is reused.** Ask a district question, wait for the answer, then ask a *different*
+question about the **same** district. The second answer should take roughly 40 s rather than 200 s,
+and its Trace tab should show **`assemble_pack_reused`** instead of `assemble_pack`. A pack lives
+five minutes; the **Gather it again from SIG** chip forces a fresh one, and its trace shows
+`assemble_pack` again. If the trace still says `assemble_pack`, either five minutes passed or the
+place string differed.
+
+**History.** After that second answer, ask a follow-up like "and the hospitals?". It should answer
+the new question and refer back, not restate the whole brief.
+
+**Map linking.** Open an assessment with centres, then ask "which centres could not be assessed?".
+The answer should offer **Show these N centres on the map**, and the matching rows in the centre list
+should be outlined. The link is by feature id: if the model names a centre without its marker there
+is simply no chip, which is the intended failure.
+
+**N/A.** Click an evacuation-centre pin. It should read N/A with no reason sentence, and no pin should
+say "Unable to assess" anywhere.
+
+**Layout.** Drag the divider between the chat and the map, or focus it and use the arrow keys;
+double-click resets it. Reload and the width should persist. Click a district: the popup should be one
+headline line with **Detail and caveats** folded.
+
+**What cannot be checked offline.** Whether a brief now opens with `## In short` and reads as an
+answer needs a real SIG call under a real session. The tests pin the prompt and the fallback split,
+not the prose.
 
 ## 0.2 The flood layer has no dry value (measured, 24 September 2026)
 
