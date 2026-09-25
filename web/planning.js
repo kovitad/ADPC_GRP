@@ -43,6 +43,12 @@
     areaProfile: null,
     // Which area areaProfile belongs to, so a first selection is not mistaken for a cached one.
     areaProfileId: null,
+    // idle | loading | ready | none | error. The People tab renders from this rather than from
+    // whatever the last caller happened to pass, so it cannot contradict itself (backlog U1).
+    areaProfileState: "idle",
+    // Population returned by the current SIG evidence pack, shown beside GRP's, never instead.
+    sigPopulation: null,
+    sigPopulationSource: "",
     // SIG answers already obtained this session, keyed by place. A SIG lookup costs minutes, so
     // re-selecting a district offers the answer we already have instead of asking to run it again.
     sigAnswers: new Map(),
@@ -589,21 +595,48 @@
     );
   };
 
-  // Fetched once per area and reused for both the popup and the People tab, so selecting the same
-  // district again costs nothing and the tab never has to say "run something first".
-  const loadAreaProfile = async (boundary) => {
-    let profile = areaProfiles.get(boundary.id);
-    if (profile === undefined) {
-      try {
-        profile = await GRP.request(`/api/v1/catalog/areas/${boundary.id}/profile`);
-      } catch (error) {
-        profile = null;
+  const profileHasFigures = (profile) => Boolean(
+    profile && (profile.population || profile.flood_exposure
+      || (profile.evacuation_centers && profile.evacuation_centers.total)),
+  );
+
+  // Fetched once per area and reused by the popup and the People tab. Idempotent and safe to call
+  // from every panel render: a cached area resolves without a request but still re-renders, which
+  // is what stopped the tab reverting to the raster page on a later render (backlog U1).
+  const ensureAreaProfile = async (boundary) => {
+    if (!boundary) return null;
+    const cached = areaProfiles.get(boundary.id);
+    const mine = () => state.selected && state.selected.id === boundary.id;
+    if (cached !== undefined) {
+      if (mine()) {
+        state.areaProfile = cached;
+        state.areaProfileId = boundary.id;
+        state.areaProfileState = cached === null
+          ? "error"
+          : profileHasFigures(cached) ? "ready" : "none";
+        renderVulnerablePeople();
       }
-      areaProfiles.set(boundary.id, profile);
+      return cached;
     }
-    if (state.selected && state.selected.id === boundary.id) {
+    if (mine()) {
+      state.areaProfileId = boundary.id;
+      state.areaProfileState = "loading";
+      state.areaProfile = null;
+      renderVulnerablePeople();
+    }
+    let profile = null;
+    try {
+      profile = await GRP.request(`/api/v1/catalog/areas/${boundary.id}/profile`);
+    } catch (error) {
+      profile = null;
+    }
+    areaProfiles.set(boundary.id, profile);
+    if (mine()) {
       state.areaProfile = profile;
-      renderVulnerablePeople({}, "", state.localContext);
+      state.areaProfileState = profile === null
+        ? "error"
+        : profileHasFigures(profile) ? "ready" : "none";
+      renderVulnerablePeople();
     }
     return profile;
   };
@@ -612,7 +645,7 @@
     layer
       .bindPopup(`<div class="pw-area-pop"><strong>${boundary.name}</strong><br>Loading…</div>`)
       .openPopup();
-    layer.setPopupContent(areaProfileHtml(boundary, await loadAreaProfile(boundary)));
+    layer.setPopupContent(areaProfileHtml(boundary, await ensureAreaProfile(boundary)));
   };
 
   const selectBoundary = (
@@ -631,11 +664,15 @@
     state.selected = boundary;
     state.explicitSelection = explicit;
     if (state.areaProfileId !== boundary.id) {
-      // Clear first so the People tab cannot show the previous district's numbers, then fill.
+      // Clear first so the People tab cannot show the previous area's numbers, then fill. SIG's
+      // population belongs to the answer for the previous area, so it goes too.
       state.areaProfile = null;
+      state.areaProfileState = "loading";
       state.areaProfileId = boundary.id;
-      loadAreaProfile(boundary);
+      state.sigPopulation = null;
+      state.sigPopulationSource = "";
     }
+    ensureAreaProfile(boundary);
     if (
       !state.centersVersion
       || Boolean(state.centersVersion.synthetic) !== Boolean(boundary.synthetic)
@@ -1051,6 +1088,12 @@
     state.areaLevel = nextLevel;
     state.boundaries = payload.boundaries;
     state.selected = null;
+    // Nothing is selected at the new level, so the People tab must go back to its prompt rather
+    // than keep the previous level's figures on screen (backlog U1).
+    state.areaProfile = null;
+    state.areaProfileId = null;
+    state.areaProfileState = "idle";
+    renderVulnerablePeople();
     drawDistricts();
     $("[data-boundary-layer-title]").textContent = nextLevel === "subdistrict"
       ? `Sub-district boundaries in ${priorDistrict.name}`
@@ -1524,6 +1567,7 @@
   });
 
   const setPanelMode = (mode) => {
+    const previous = document.querySelector('[data-ev-tab][aria-selected="true"]');
     evidencePanel.dataset.mode = mode;
     $("[data-ev-actions]").hidden = mode !== "sig";
     $("[data-ev-foot]").hidden = mode !== "sig";
@@ -1531,7 +1575,10 @@
       tab.hidden = (tab.dataset.evTab === "evidence" || tab.dataset.evTab === "trace")
         && mode !== "sig";
     });
-    document.querySelector('[data-ev-tab="summary"]').click();
+    // Keep the tab the planner chose if it still applies. Forcing Summary on every panel render
+    // threw them off People mid-read, which looked like the tab losing its contents (backlog U1).
+    const keep = previous && !previous.hidden ? previous : null;
+    (keep || document.querySelector('[data-ev-tab="summary"]')).click();
   };
 
   const summaryNotice = (title, text, modifier = "") => {
@@ -1571,136 +1618,137 @@
     }));
   };
 
-  const renderVulnerablePeople = (population = {}, source = "", local = state.localContext) => {
+  const peopleStatGrid = (cards) => {
+    const grid = document.createElement("div");
+    grid.className = "pw-people-grid";
+    cards.forEach(([value, label]) => {
+      const card = document.createElement("article");
+      card.className = "pw-people-stat";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      strong.textContent = value === null || value === undefined
+        ? "unknown"
+        : Number(value).toLocaleString();
+      span.textContent = label;
+      card.append(strong, span);
+      grid.append(card);
+    });
+    return grid;
+  };
+
+  const peopleNote = (text) => {
+    const note = document.createElement("p");
+    note.className = "pw-people-note";
+    note.textContent = text;
+    return note;
+  };
+
+  // Renders only from state, so every panel mode shows the same thing for the same area and a
+  // later re-render cannot replace real figures with the indicator-map fallback (backlog U1).
+  const renderVulnerablePeople = () => {
     const box = $("[data-vulnerable-content]");
     box.replaceChildren();
     const heading = document.createElement("h3");
     heading.textContent = "Vulnerable people";
-    // GRP's own figures for the selected district come first. Before this the tab showed only
-    // three raster titles and a disclaimer, which told a planner nothing about their district.
+    box.append(heading);
+
     const profile = state.areaProfile;
-    const grpCards = [];
-    if (profile && profile.population) {
-      const p = profile.population;
-      grpCards.push(
-        [p.total_population, "people (registered)"],
-        [p.male, "male"],
-        [p.female, "female"],
-        [p.households, "households"],
-        [p.village_count, "villages"],
-      );
+    const indicators = state.localContext?.vulnerability || [];
+
+    if (state.areaProfileState === "loading") {
+      box.append(peopleNote("Loading this area's figures from the GRP data library…"));
+      return;
     }
-    if (profile && profile.flood_exposure) {
-      const e = profile.flood_exposure;
-      grpCards.push(
-        [e.people_in_zone, `people inside the RP${e.return_period_years} extent`],
-        [e.villages_in_zone, `villages inside the RP${e.return_period_years} extent`],
-      );
-    }
-    if (profile && profile.evacuation_centers && profile.evacuation_centers.total) {
-      grpCards.push([profile.evacuation_centers.total, "recorded evacuation centres"]);
-    }
-    if (grpCards.length) {
+
+    if (state.areaProfileState === "ready" && profile) {
       const area = profile.area || {};
+      const where = [area.name, area.name_th].filter(Boolean).join(" · ")
+        + (area.province_name ? `, ${area.province_name}` : "");
       const intro = document.createElement("p");
-      intro.textContent =
-        `${[area.name, area.name_th].filter(Boolean).join(" · ")}`
-        + `${area.province_name ? `, ${area.province_name}` : ""}`
-        + " — from the GRP data library, no SIG lookup needed.";
-      const grid = document.createElement("div");
-      grid.className = "pw-people-grid";
-      grpCards.forEach(([value, label]) => {
-        const card = document.createElement("article");
-        card.className = "pw-people-stat";
-        const strong = document.createElement("strong");
-        const span = document.createElement("span");
-        strong.textContent = value === null || value === undefined
-          ? "unknown"
-          : Number(value).toLocaleString();
-        span.textContent = label;
-        card.append(strong, span);
-        grid.append(card);
-      });
-      box.append(heading, intro, grid);
-      if (profile.evacuation_centers && profile.evacuation_centers.by_type.length) {
-        const kinds = document.createElement("p");
-        kinds.className = "pw-people-note";
-        kinds.textContent =
-          "Recorded centres by kind of place: "
-          + profile.evacuation_centers.by_type
-              .map((item) => `${Number(item.count).toLocaleString()} ${item.label.toLowerCase()}`)
-              .join(", ")
-          + ".";
-        box.append(kinds);
+      intro.textContent = `${where} — from the GRP data library, no SIG lookup needed.`;
+      box.append(intro);
+
+      if (profile.population) {
+        const p = profile.population;
+        box.append(peopleStatGrid([
+          [p.total_population, "people (registered)"],
+          [p.male, "male"],
+          [p.female, "female"],
+          [p.households, "households"],
+          [p.village_count, "villages"],
+        ]));
+        if (profile.source) {
+          box.append(peopleNote(`${profile.source.label}. ${profile.source.caveat}`));
+        }
+      } else {
+        box.append(peopleNote("No registered population record is held for this area."));
       }
-      const caveat = document.createElement("p");
-      caveat.className = "pw-people-note";
-      caveat.textContent =
-        (profile.source ? `${profile.source.label}. ${profile.source.caveat} ` : "")
-        + (profile.flood_exposure ? profile.flood_exposure.caveat : "");
-      box.append(caveat);
-      const indicators = local?.vulnerability || [];
-      if (indicators.length) {
-        const note = document.createElement("p");
-        note.className = "pw-people-note";
-        note.textContent =
-          `${indicators.length} source-native vulnerability indicator map(s) can be turned on in `
-          + "Layers for spatial context. They are not people counts.";
-        box.append(note);
+
+      if (profile.flood_exposure) {
+        const e = profile.flood_exposure;
+        const sub = document.createElement("h4");
+        sub.textContent = `Inside the RP${e.return_period_years} modelled flood extent`;
+        box.append(sub, peopleStatGrid([
+          [e.people_in_zone, "people"],
+          [e.villages_in_zone, "villages"],
+          [e.households_in_zone, "households"],
+        ]));
+        box.append(peopleNote(e.caveat));
       }
-      return;
+
+      const centres = profile.evacuation_centers;
+      if (centres && centres.total) {
+        const sub = document.createElement("h4");
+        sub.textContent = "Recorded evacuation centres";
+        box.append(sub, peopleStatGrid(
+          [[centres.total, "recorded centres"]].concat(
+            centres.by_type.map((item) => [item.count, item.label.toLowerCase()]),
+          ),
+        ));
+        box.append(peopleNote(centres.caveat));
+      }
+    } else if (state.areaProfileState === "none") {
+      box.append(peopleNote(
+        "The GRP data library holds no population, flood-exposure or evacuation-centre record for "
+        + "this area. That is a gap in the delivered data, not a count of zero.",
+      ));
+    } else if (state.areaProfileState === "error") {
+      box.append(peopleNote(
+        "This area's figures could not be read. It may not be a supported area. Choose a district "
+        + "or sub-district from the area list and try again.",
+      ));
+    } else {
+      box.append(peopleNote(
+        "Select a district or sub-district on the map to see its registered population, the people "
+        + "inside the modelled flood extent, and the evacuation centres recorded for it.",
+      ));
     }
-    const values = Object.entries(population).filter(([, value]) => typeof value === "number");
-    if (!values.length) {
-      const indicators = local?.vulnerability || [];
-      if (!indicators.length) {
-        const empty = document.createElement("p");
-        empty.textContent =
-          "No approved district population breakdown is included here. Centre capacity and individual or household needs are not inferred.";
-        box.append(heading, empty);
-        return;
-      }
-      const intro = document.createElement("p");
-      intro.textContent =
-        "Thailand Hub has the following source-native vulnerability indicator maps. Turn one on in Layers to inspect its spatial pattern.";
-      const grid = document.createElement("div");
-      grid.className = "pw-people-grid";
-      indicators.forEach((indicator) => {
-        const card = document.createElement("article");
-        card.className = "pw-people-stat";
-        const strong = document.createElement("strong");
-        const label = document.createElement("span");
-        strong.textContent = indicator.title_th || indicator.title;
-        label.textContent = indicator.meaning || "Display-only source indicator";
-        card.append(strong, label);
-        grid.append(card);
-      });
-      const note = document.createElement("p");
-      note.className = "pw-people-note";
-      note.textContent =
-        "These rasters are map context, not people counts and not part of the locked flood calculation. An approved method is required before combining them into a risk score.";
-      box.append(heading, intro, grid, note);
-      return;
+
+    // SIG's own population is shown beside GRP's, never instead of it.
+    const sigValues = Object.entries(state.sigPopulation || {})
+      .filter(([, value]) => typeof value === "number");
+    if (sigValues.length) {
+      const sub = document.createElement("h4");
+      sub.textContent = "SIG district population evidence";
+      box.append(sub);
+      if (state.sigPopulationSource) box.append(peopleNote(state.sigPopulationSource));
+      box.append(peopleStatGrid(
+        sigValues.map(([name, value]) => [value, name.replaceAll("_", " ")]),
+      ));
+      box.append(peopleNote(
+        "These are cited district-level aggregates from SIG. They are not linked to a specific "
+        + "evacuation centre, household or map point, and categories may overlap.",
+      ));
     }
-    const intro = document.createElement("p");
-    intro.textContent = source;
-    const grid = document.createElement("div");
-    grid.className = "pw-people-grid";
-    values.forEach(([name, value]) => {
-      const card = document.createElement("article");
-      card.className = "pw-people-stat";
-      const strong = document.createElement("strong");
-      const label = document.createElement("span");
-      strong.textContent = value.toLocaleString();
-      label.textContent = name.replaceAll("_", " ");
-      card.append(strong, label);
-      grid.append(card);
-    });
-    const note = document.createElement("p");
-    note.className = "pw-people-note";
-    note.textContent =
-      "These are cited district-level aggregates from SIG. They are not linked to a specific evacuation centre, household or map point, and categories may overlap.";
-    box.append(heading, intro, grid, note);
+
+    // Always last, and always one line: map context, never a substitute for the figures above.
+    if (indicators.length) {
+      box.append(peopleNote(
+        `${indicators.length} source-native vulnerability indicator map(s) can be turned on in `
+        + "Layers for spatial pattern. They are rasters, not people counts, and are not part of "
+        + "the locked flood calculation.",
+      ));
+    }
   };
 
   const localCoverage = () => {
@@ -1776,7 +1824,8 @@
       "Route accessibility and travel safety have not been assessed.",
       "District population evidence, when available from SIG, is not tied to individual centres.",
     ]);
-    renderVulnerablePeople({}, "", state.localContext);
+    ensureAreaProfile(state.selected);
+    renderVulnerablePeople();
     openEvidence();
   };
 
@@ -1791,7 +1840,8 @@
       ...(result.limits || []),
       "Local preparedness points and vulnerability maps are current planning context; they are not pinned inputs to this locked centre-flood result.",
     ]);
-    renderVulnerablePeople({}, "", state.localContext);
+    ensureAreaProfile(state.selected);
+    renderVulnerablePeople();
     const hero = $("[data-summary-hero]");
     const movementSection = $("[data-summary-movement-section]");
     const fundingSection = $("[data-summary-funding-section]");
@@ -2145,10 +2195,11 @@
       tile.append(strong, span);
       numbers.append(tile);
     });
-    renderVulnerablePeople(
-      (evidence.stats && evidence.stats.population_by_age) || {},
-      "Population values returned by the current SIG district evidence pack.",
-    );
+    state.sigPopulation = (evidence.stats && evidence.stats.population_by_age) || null;
+    state.sigPopulationSource =
+      "Population values returned by the current SIG district evidence pack.";
+    ensureAreaProfile(state.selected);
+    renderVulnerablePeople();
     if (evidence.risk_recipe) {
       const tile = document.createElement("div");
       tile.className = "pw-number";

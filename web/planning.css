@@ -894,6 +894,7 @@
 .pw-centre-row__text strong { overflow-wrap: anywhere; font-size: 0.79rem; }
 .pw-centre-row__text span { color: var(--pw-muted); font-size: 0.69rem; line-height: 1.35; }
 .pw-centre-row__view { color: var(--pw-forest); font-size: 0.68rem; font-weight: 700; }
+.pw-people h4 { margin: 1rem 0 0.5rem; color: var(--pw-ink); font-size: 0.82rem; }
 .pw-people-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
 .pw-people-stat { padding: 0.7rem; border-radius: 10px; background: #f5f3ff; }
 .pw-people-stat strong { display: block; color: #5b2c83; font-size: 1.05rem; }
