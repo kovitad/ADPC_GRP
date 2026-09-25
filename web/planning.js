@@ -39,6 +39,7 @@
     centerVersions: [],
     supportingLayers: [],
     vulnerabilityLayers: [],
+    centreIndicators: [],
     localContext: null,
     // The selected area's GRP figures, fetched once and reused by the popup and the People tab.
     // null means "loading or none for this area"; undefined means "not asked for yet".
@@ -934,6 +935,25 @@
     return node;
   };
 
+  // ADR-0030: the source value at the centre, as context. Never used to sort, filter or classify.
+  const INDICATOR_NAMES = {
+    child_sensitivity: "Child sensitivity",
+    elderly_sensitivity: "Older-person sensitivity",
+  };
+  const centreIndicatorLine = (center) => {
+    const values = center.indicators;
+    if (!values) return null;
+    const parts = state.centreIndicators
+      .filter(({ indicator_key: key }) => key in values)
+      .map(({ indicator_key: key, title }) => {
+        const name = INDICATOR_NAMES[key] || title;
+        const value = values[key];
+        if (value === null) return `${name}: outside its coverage`;
+        return value === 0 ? `${name} 0 (lowest)` : `${name} ${Number(value).toFixed(2)}`;
+      });
+    return parts.length ? `${parts.join(" · ")} (relative index, 0 to 1; not a count)` : null;
+  };
+
   const statusDetail = (center) => {
     // A bare "N/A" under a centre's name read as a broken record to planners. The grey pin, the
     // legend, the filter and the result summary already mark these centres as N/A,
@@ -953,6 +973,8 @@
     if (center.capacity !== null && center.capacity !== undefined) {
       lines.push(`Reported capacity ${Number(center.capacity).toLocaleString()} people`);
     }
+    const indicators = centreIndicatorLine(center);
+    if (indicators) lines.push(indicators);
     if (center.supporting_unit) lines.push(`Supporting unit ${center.supporting_unit}`);
     if (center.village) lines.push(`Village ${center.village}`);
     if (center.subdistrict) lines.push(`Sub-district ${center.subdistrict}`);
@@ -1058,6 +1080,27 @@
       : "No evacuation-centre records were returned for this district.";
     $("[data-centre-source]").textContent = source || "";
     renderCenterList();
+    loadCentreIndicators(rows);
+  };
+
+  const loadCentreIndicators = async (rows) => {
+    const ids = rows.map((row) => row.feature_id).filter(Boolean);
+    if (!ids.length || !state.hubCode) return;
+    let body = null;
+    try {
+      body = await GRP.request("/api/v1/maps/centres/indicator-values", {
+        method: "POST",
+        body: { hub_code: state.hubCode, feature_ids: ids.slice(0, 2000) },
+      });
+    } catch (_error) {
+      return;  // Context only: the list and pins are complete without it.
+    }
+    if (state.centerRows !== rows) return;  // Another area was selected meanwhile.
+    state.centreIndicators = body.indicators || [];
+    rows.forEach((row) => {
+      row.indicators = (body.values || {})[row.feature_id] || null;
+    });
+    renderCenterList();
   };
 
   const drawCenterMarkers = (centers) => {
@@ -1073,7 +1116,7 @@
         fillColor: assessed ? STATUS_COLOR[center.status] : "#fff",
         fillOpacity: 0.95,
       })
-        .bindPopup(popup(center.name, statusDetail(center)))
+        .bindPopup(() => popup(center.name, statusDetail(center)))
         .on("click", () => activateCenter(center.feature_id, { moveMap: false }))
         .addTo(centersLayer);
       centerMarkers.set(center.feature_id, marker);

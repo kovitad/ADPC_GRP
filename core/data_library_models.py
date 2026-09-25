@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -232,6 +233,38 @@ class AreaFloodExposure(Base):
     # In-zone villages whose population was unusable, so people_in_zone understates them.
     villages_in_zone_without_population: Mapped[int] = mapped_column(Integer, nullable=False)
     depth_bands: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
+    )
+
+
+class CentreIndicatorValue(Base):
+    """A sensitivity indicator's source value at one evacuation centre (ADR-0030).
+
+    Sampled outside the request by ``python -m grpcli.sensitivity build``, because a web request
+    must never read a national 12.5 m raster. Display context only: nothing may use this value to
+    classify, sort, filter or score a centre, and it never enters an assessment or an AI prompt.
+    ``value`` is None where the centre lies outside the indicator's coverage.
+    """
+
+    __tablename__ = "centre_indicator_value"
+    __table_args__ = (
+        UniqueConstraint(
+            "feature_id", "vulnerability_version_id", name="uq_centre_indicator_value"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    feature_id: Mapped[UUID] = mapped_column(
+        ForeignKey("feature.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    centers_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    vulnerability_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("dataset_version.id", ondelete="CASCADE"), nullable=False
+    )
+    value: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now(), nullable=False
     )

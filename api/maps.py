@@ -4,7 +4,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
+from sqlalchemy.orm import aliased
 
 from api.dependencies import DatabaseSession
 from api.errors import not_found
@@ -12,6 +14,7 @@ from api.permissions import SignedInMember
 from api.planning_access import planner_membership
 from api.settings import get_settings
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
+from core.data_library_models import CentreIndicatorValue
 from core.hazard_overlay import legend
 from core.storage import LocalStorage
 
@@ -339,3 +342,58 @@ def dataset_features(
             for feature in features
         ],
     }
+
+
+class CentreIndicatorRequest(BaseModel):
+    hub_code: str | None = Field(default=None, max_length=64)
+    # A district's centres, from either the source list or an assessment's rows.
+    feature_ids: list[UUID] = Field(default_factory=list, max_length=2000)
+
+
+@router.post(
+    "/centres/indicator-values",
+    summary="Sensitivity indicator values at the given evacuation centres (ADR-0030)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def centre_indicator_values(
+    payload: CentreIndicatorRequest, principal: SignedInMember, session: DatabaseSession
+) -> dict[str, object]:
+    """Display context only: the source value at each centre, never a score or a count.
+
+    Only indicators shown to planners are returned, and only for centres in a dataset this Hub can
+    see, so an id from another Hub's upload returns nothing rather than leaking its value.
+    """
+
+    hub = planner_membership(principal, payload.hub_code)
+    if not payload.feature_ids:
+        return {"indicators": [], "values": {}}
+    indicator = aliased(DatasetVersion)
+    indicator_dataset = aliased(Dataset)
+    rows = session.execute(
+        select(CentreIndicatorValue.feature_id, CentreIndicatorValue.value, indicator.meta,
+               indicator.id, indicator_dataset.title)
+        .join(Feature, Feature.id == CentreIndicatorValue.feature_id)
+        .join(DatasetVersion, DatasetVersion.id == Feature.dataset_version_id)
+        .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+        .join(indicator, indicator.id == CentreIndicatorValue.vulnerability_version_id)
+        .join(indicator_dataset, indicator_dataset.id == indicator.dataset_id)
+        .where(
+            CentreIndicatorValue.feature_id.in_(payload.feature_ids),
+            or_(Dataset.hub_id.is_(None), Dataset.hub_id == hub.hub_id),
+            indicator.is_current,
+        )
+    ).all()
+    indicators: dict[str, dict[str, object]] = {}
+    values: dict[str, dict[str, float | None]] = {}
+    for feature_id, value, meta, version_id, title in rows:
+        key = str(meta.get("indicator_key") or "")
+        if _planner_status(key)["planner_status"] != "shown":
+            continue
+        indicators.setdefault(key, {
+            "indicator_key": key,
+            "version_id": str(version_id),
+            "title": title,
+            "title_th": meta.get("title_th"),
+        })
+        values.setdefault(str(feature_id), {})[key] = value
+    return {"indicators": list(indicators.values()), "values": values}

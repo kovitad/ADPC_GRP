@@ -95,6 +95,8 @@ MATRIX = {
     # role reads its own; a Platform Admin with no planning membership has none to read.
     "read_conversation": (401, 200, 200, 200, 403),
     "clear_conversation": (401, 200, 200, 200, 403),
+    # ADR-0030: centre sensitivity values are planning display context, like the map layers.
+    "centre_indicator_values": (401, 200, 200, 200, 403),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -151,6 +153,7 @@ MATRIX_OPERATION_IDS = {
     "dataset_features": "dataset_features_api_v1_maps_datasets__version_id__features_get",
     "read_conversation": "read_conversation_api_v1_planning_conversation_get",
     "clear_conversation": "clear_conversation_api_v1_planning_conversation_delete",
+    "centre_indicator_values": "centre_indicator_values_api_v1_maps_centres_indicator_values_post",
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
@@ -429,6 +432,11 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "dataset_features": ("GET", f"/api/v1/maps/datasets/{user_id}/features", None),
         "read_conversation": ("GET", "/api/v1/planning/conversation", None),
         "clear_conversation": ("DELETE", "/api/v1/planning/conversation", None),
+        "centre_indicator_values": (
+            "POST",
+            "/api/v1/maps/centres/indicator-values",
+            {"feature_ids": [str(user_id)]},
+        ),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)
