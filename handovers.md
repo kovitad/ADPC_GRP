@@ -113,16 +113,44 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (session of 24 September 2026, `main` at `d841729`)
+## 0. Start here (sessions of 24-25 September 2026, `main` at `2d87f43`)
 
 Read this section, then `AGENTS.md`, then Section 7. **Ignore `next-action-for-codex.md`** — it is an
 untracked note from 21 September whose whole Slice 1 and Slice 3 are already delivered. Details and
 evidence are in Section 7.
 
-**State:** `main` at `d841729`, pushed. 516 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
+**State:** `main` at `2d87f43`, pushed. 531 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
 **win32 Python 3.12**. Alembic head `20260924_0018`, and the running desktop database is at the same
-revision. The stack was rebuilt, re-imported and verified after every change below. Working tree
-clean apart from two untracked user-owned planning notes, which must be left alone.
+revision. The stack was rebuilt and verified after every change below. Working tree clean apart from
+two untracked user-owned planning notes, which must be left alone.
+
+**Four things that will waste your time if you do not know them.**
+
+1. **Never run pytest through a pipe before committing.** `python -m pytest -q | tail -3` returns
+   `tail`'s exit code, so a `&&` chain pushes a red suite. That happened once this session (`5a1d4a4`,
+   fixed in `acabeef`). Run it bare and read the summary.
+2. **The web assets are cache-busted and the versions are pinned by a test.**
+   `tests/fast/test_auth_entry.py` asserts the exact `?v=` of `planning.js`, `planning.css`,
+   `assessments.js` and `styles.css`. Editing one of those files without bumping its query string in
+   the HTML *and* the assertion means a browser keeps the old file, which looks exactly like a change
+   that did not work. Current: `?v=20260925b`.
+3. **Restart with `.\scripts\docker-desktop.ps1`, never bare `docker compose up`** — see 0.2 below.
+4. **The fast tier runs on SQLite and cannot catch every SQL defect.** A `GROUP BY` over a
+   `func.substr(...)` expression passed every fast test and failed on PostgreSQL, because SQLAlchemy
+   binds the arguments separately in `SELECT` and `GROUP BY`. Any new aggregate query must be run
+   against the desktop database before you believe it.
+
+**Epic U (planner workspace UX) is complete**, U1-U5, all five raised by the Product Owner on
+25 September. `docs/backlog.md` has each item struck through with its commit. The owner has **not yet
+re-tested U3, U4 and U5** — treat their next report as the acceptance check, not these notes.
+
+| Item | What changed | Commit |
+| --- | --- | --- |
+| U1 | People tab is a pure function of state, so it cannot flap between real figures and the raster fallback | `3652ad6` |
+| U2 | Area picker is province → district → sub-district with a type-ahead; the catalogue call went from 63,180,918 to 384,708 bytes | `622f0f8` |
+| U3 | Assessment history states the outcome in words, one action per row, latest five with a toggle | `1c55d83` |
+| U4 | `.button--compact` at 2.2rem for utility actions; exactly one primary per page | `2d87f43` |
+| U5 | Assessment → Planning resolves the area across levels, drops the stale selection, aligns the return period, and states the carry-over | `2d87f43` |
 
 **Rebuild before testing.** The desktop image is `grp-api:desktop` and the `migrate` service
 carries the build, so `docker compose -f deploy/compose.desktop.yml build api` reports "no services
@@ -295,6 +323,35 @@ select importer_version, is_current, readiness from dataset_version v
 **If an exposure figure disappears**, the table is keyed on the hazard and village version pair and
 an activation can supersede it without rebuilding. Grep the API log for `grp.local_evidence`: it
 logs a warning naming the area, then re-run `python -m grpcli.exposure build` in the worker.
+
+## 0.1.2 Where the UX work landed, and what is deliberately unfinished
+
+All five Epic U items are frontend only: no migration, no API behaviour change except two additive
+query parameters and one new read route (`GET /api/v1/catalog/provinces`, matrixed as
+`(401, 200, 200, 200, 403)`).
+
+Three decisions a next agent should not reverse without asking:
+
+- **Provinces are derived from supported districts, never from the province boundary rows.** Those 77
+  province polygons exist with `is_supported = false` and must stay that way: a province is not
+  something an assessment runs on. Deriving the list from districts also guarantees every province
+  offered contains a district a planner can pick.
+- **The assessment history refuses to imply safety.** Where `unable_to_assess == in_scope` the row
+  says "None of N centres could be assessed — no modelled flood depth there" rather than
+  "0 of N may be exposed", because the delivered layer records a depth only where it floods (0.2).
+  Do not "simplify" that back to the raw count.
+- **The People tab shows GRP and SIG population side by side.** Earlier code let whichever rendered
+  last win, and GRP silently suppressed SIG. Same bug class as the deterministic summary dropping GRP.
+
+Not done, and not started:
+
+- No JS test harness exists in this repo, so the UX behaviour is pinned only by string assertions in
+  `tests/fast/test_auth_entry.py` (`test_assessment_to_planning_handoff_is_explicit`,
+  `test_utility_buttons_do_not_use_the_hero_button_scale`). They catch deletion, not regression in
+  behaviour. A real harness is the obvious next investment if this page keeps changing.
+- `web/planning.js` is past 3,100 lines and `api/planning.py` past 1,200. Both were already flagged
+  for splitting; this session made both longer.
+- U2 left the sub-district picker optional and unsearchable: the type-ahead indexes districts only.
 
 ## 0.2 The flood layer has no dry value (measured, 24 September 2026)
 
