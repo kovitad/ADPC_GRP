@@ -13,6 +13,7 @@ second API instance cannot see the first one's. Dev only, as the whole planner c
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -20,6 +21,10 @@ from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import Any
 from uuid import uuid4
+
+from api.errors import GrpError
+
+logger = logging.getLogger("grp.sig_jobs")
 
 MAX_JOBS = 200
 # A lookup holds a database connection for its whole run, and a run is minutes. The default
@@ -188,6 +193,7 @@ def run_in_background(job_id: str, work: Any) -> None:
                 sig_lookups.mark_running(job_id)
                 answer = await asyncio.wait_for(work, GIVE_UP_AFTER.total_seconds())
         except TimeoutError:
+            logger.warning("lookup %s gave up after %s", job_id, GIVE_UP_AFTER)
             sig_lookups.fail(
                 job_id,
                 "LOOKUP_TIMED_OUT",
@@ -202,8 +208,15 @@ def run_in_background(job_id: str, work: Any) -> None:
             message = (
                 getattr(error, "message", None) or "The Global Risk lookup could not be completed."
             )
+            # The browser reads the failure from memory, so without this line a failed lookup left
+            # no trace anywhere an operator could look (a 7-minute failure on 25 Sep had none).
+            logger.warning(
+                "lookup %s failed: %s: %s (cause: %r)", job_id, code, message, error.__cause__,
+                exc_info=not isinstance(error, GrpError),
+            )
             sig_lookups.fail(job_id, str(code), str(message))
         else:
+            logger.info("lookup %s succeeded (%s)", job_id, answer.get("mode"))
             sig_lookups.succeed(job_id, answer)
 
     task = asyncio.create_task(guarded())

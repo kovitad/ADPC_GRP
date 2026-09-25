@@ -277,8 +277,27 @@ window.GRP = (() => {
     }
   };
 
+  // One polling loop per page. track() used to start another timer each time it was called, so
+  // two lookups plus the page-load check polled every job three times over.
+  let checking = false;
+  const scheduleCheck = () => {
+    window.clearTimeout(jobTimer);
+    jobTimer = window.setTimeout(checkJobs, JOB_POLL_MS);
+  };
+
   const checkJobs = async () => {
     window.clearTimeout(jobTimer);
+    if (checking) return;
+    checking = true;
+    try {
+      await checkJobsOnce();
+    } finally {
+      checking = false;
+    }
+    if (readJobs().length) scheduleCheck();
+  };
+
+  const checkJobsOnce = async () => {
     const jobs = readJobs();
     if (!jobs.length) {
       showJobCount();
@@ -303,7 +322,6 @@ window.GRP = (() => {
     );
     if (finished.size) writeJobs(readJobs().filter((job) => !finished.has(job.id)));
     showJobCount();
-    if (readJobs().length) jobTimer = window.setTimeout(checkJobs, JOB_POLL_MS);
   };
 
   const jobs = {
@@ -314,7 +332,7 @@ window.GRP = (() => {
       if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission().catch(() => {});
       }
-      jobTimer = window.setTimeout(checkJobs, JOB_POLL_MS);
+      scheduleCheck();
     },
     done(id) {
       writeJobs(readJobs().filter((item) => item.id !== id));
