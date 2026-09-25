@@ -19,6 +19,7 @@ import api.access
 import api.ai_gateway
 import api.permissions
 import api.planning
+import api.planning_memory
 from api.dependencies import database_session
 from api.main import app
 from api.mcp_client import McpToolResult, SigMcpClient
@@ -1578,3 +1579,38 @@ def test_starting_over_forgets_the_conversation_and_the_evidence(planning) -> No
     assert _pack_calls() == 2
     with Session(planning["engine"]) as session:
         assert session.scalar(select(func.count()).select_from(PlanningChatMessage)) == 2
+
+
+def test_an_open_draft_cannot_publish_once_its_evidence_is_old(planning) -> None:
+    """The token lives 15 minutes; the evidence it certifies may only be 5 minutes old."""
+
+    planning["replies"] += SIG_TURN
+    client = _client(planning, "planner@example.test")
+    draft = _ask(client, message="Which schools are exposed?", place=NAN).json()
+    assert draft["publish_token"]
+    planning["monkeypatch"].setattr(api.planning_memory, "PACK_PUBLISH_MAX_AGE_SECONDS", -1)
+
+    response = _ask(client, message="Which schools are exposed?", publish_receipt=True,
+                    publish_token=draft["publish_token"])
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PUBLISH_NEEDS_FRESH_EVIDENCE"
+    assert "publish_answer" not in [name for name, _ in FakeMcp.calls]
+
+
+def test_a_restored_draft_says_it_must_be_gathered_again_to_publish(planning) -> None:
+    planning["replies"] += SIG_TURN
+    client = _client(planning, "planner@example.test")
+    assert _ask(client, message="Which schools are exposed?", place=NAN).json()["publish_token"]
+
+    stored = client.get("/api/v1/planning/conversation").json()["messages"][-1]["payload"]
+
+    assert "publish_token" not in stored
+    assert stored["publish_needs_fresh_evidence"] is True
+
+
+def test_starting_over_needs_the_csrf_header(planning) -> None:
+    client = _client(planning, "planner@example.test")
+    del client.headers["X-CSRF-Token"]
+
+    assert client.delete("/api/v1/planning/conversation").status_code == 403

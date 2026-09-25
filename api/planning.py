@@ -617,6 +617,20 @@ async def _publish_reviewed_draft(
             "Sign in with SERVIR again to connect to SIG evidence.",
         )
 
+    # The token outlives the publish window, so the evidence age is checked again here. A draft
+    # the person has had open for a while must not certify evidence older than the window.
+    try:
+        claim_assembled = datetime.fromisoformat(str(claims.get("assembled_at")))
+    except ValueError:
+        claim_assembled = None
+    if claim_assembled is None or not publishable_age(claim_assembled):
+        raise GrpError(
+            409,
+            "PUBLISH_NEEDS_FRESH_EVIDENCE",
+            "This evidence was gathered more than 5 minutes ago. Gather it again from SIG, then "
+            "publish the new draft.",
+        )
+
     request_started = perf_counter()
     evidence = dict(claims["evidence"])
     recipe = active_risk_recipe(session, create_default=False)
@@ -1248,6 +1262,7 @@ async def _answer_chat(
                 "area": area_payload,
                 "evidence": evidence,
                 "note": fallback_note,
+                "assembled_at": assembled_at.isoformat(),
             },
         )
         if len(publish_token) > PUBLISH_TOKEN_MAX_CHARS:

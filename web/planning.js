@@ -2460,21 +2460,22 @@
         );
       }
     } else {
-      if (payload.publish_token) {
+      const publishToken = livePublishToken(payload);
+      if (publishToken) {
         mapButton.textContent = "Verify & create public receipt";
         mapButton.onclick = () => { publishConfirm.hidden = false; };
         publishConfirmButton.onclick = () => {
           publishConfirmButton.disabled = true;
           send(message, {
             publish: true,
-            publishToken: payload.publish_token,
+            publishToken,
             echo: false,
             confirmedPlace: evidence.place,
           });
         };
         $("[data-ev-foot]").textContent =
           "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
-      } else if (payload.publish_needs_fresh_evidence) {
+      } else if (needsFreshEvidence(payload)) {
         mapButton.textContent = "Gather fresh evidence to publish";
         mapButton.onclick = () => send(message, {
           echo: false, confirmedPlace: evidence.place, refresh: true,
@@ -2513,6 +2514,20 @@
     return when;
   };
 
+  // Mirrors PACK_PUBLISH_MAX_AGE_SECONDS. A card left open keeps its token for 15 minutes, but the
+  // evidence it would certify may only be 5 minutes old; the server refuses anything older.
+  const PUBLISH_MAX_AGE_MS = 5 * 60 * 1000;
+  const livePublishToken = (payload) => {
+    if (!payload.publish_token) return null;
+    const at = payload.evidence_assembled_at ? new Date(payload.evidence_assembled_at) : null;
+    if (at && !Number.isNaN(at.getTime()) && Date.now() - at.getTime() > PUBLISH_MAX_AGE_MS) {
+      return null;
+    }
+    return payload.publish_token;
+  };
+  const needsFreshEvidence = (payload) =>
+    Boolean(payload.publish_needs_fresh_evidence || (payload.publish_token && !livePublishToken(payload)));
+
   const gatherAgain = (payload, question, text = "Gather again from SIG") => {
     const button = document.createElement("button");
     button.type = "button";
@@ -2542,9 +2557,9 @@
       ? `Receipt ${evidence.receipt.receipt_id}`
       : payload.answer_source === "deterministic_fallback"
         ? "Deterministic summary · not publishable"
-        : payload.publish_token
+        : livePublishToken(payload)
           ? "Unverified draft"
-          : payload.publish_needs_fresh_evidence ? "Gather again to publish" : "Evidence only";
+          : needsFreshEvidence(payload) ? "Gather again to publish" : "Evidence only";
     card.append(title);
     if (payload.note) {
       const note = document.createElement("span");
@@ -2574,10 +2589,13 @@
       card.append(timing);
     }
     const gathered = evidenceGathered(payload);
-    if (gathered && (payload.evidence_reused || payload.cached || restoring)) {
+    const reused = payload.evidence_reused || payload.cached;
+    if (gathered && (reused || restoring)) {
       const reuse = document.createElement("span");
       reuse.className = "pw-status__reuse";
-      reuse.append(`SIG evidence gathered ${gathered} · reused, no new SIG call.`);
+      reuse.append(reused
+        ? `SIG evidence gathered ${gathered} · reused, no new SIG call.`
+        : `SIG evidence gathered ${gathered}.`);
       reuse.append(gatherAgain(payload, question));
       card.append(reuse);
     }
@@ -2791,6 +2809,7 @@
     } catch (error) {
       typing.remove();
       addMessage("assistant", error.message, { label: error.code, error: true });
+      if (error.code === "PUBLISH_NEEDS_FRESH_EVIDENCE") hidePublishConfirm();
       if (error.code === "SIG_REAUTH_REQUIRED") {
         window.setTimeout(() => window.location.assign("/api/v1/auth/login"), 1500);
       }

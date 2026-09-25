@@ -126,6 +126,9 @@ def forget(session: Session, *, user_id: UUID, hub_id: UUID) -> None:
 
 def _stored_payload(response: dict[str, Any]) -> dict[str, Any] | None:
     payload = {k: v for k, v in response.items() if k not in SESSION_BOUND_FIELDS}
+    if response.get("publish_token"):
+        # Without its token a restored draft can only be published after gathering again.
+        payload["publish_needs_fresh_evidence"] = True
     try:
         encoded = json.dumps(payload, ensure_ascii=False, default=str)
     except (TypeError, ValueError):

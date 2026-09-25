@@ -5,6 +5,10 @@
 Accepted and implemented on 25 September 2026 (migration `20260925_0019`). Verified by fast tests,
 the permission matrix, and a direct check of the new queries against the desktop PostgreSQL.
 
+**Amends ADR-0004**, whose "Records" line said "Chat text is not stored". It is now stored, per
+person and Hub, as set out below. ADR-0002 and ADR-0017 are unchanged: no SIG access or refresh
+token is persisted. Only the evidence SIG returned is stored, never the credential that fetched it.
+
 ## Context
 
 The Product Owner asked for the assistant to remember context, so that asking the same question
@@ -26,7 +30,10 @@ second job forced the first to be short.
    (`PACK_REUSE_SECONDS`). A public receipt is offered only when the pack was gathered within the
    last 5 minutes (`PACK_PUBLISH_MAX_AGE_SECONDS`). An older pack still produces a brief, but
    carries no publish token, and the response sets `publish_needs_fresh_evidence`, so the evidence
-   panel offers "Gather fresh evidence to publish" instead.
+   panel offers "Gather fresh evidence to publish" instead. The publish token lives 15 minutes,
+   longer than the window, so it carries the evidence's `assembled_at` and the publish step checks
+   the age again (`PUBLISH_NEEDS_FRESH_EVIDENCE`). The browser applies the same rule to a card left
+   open, but the server has the final say.
 2. **Packs are stored in `planning_sig_pack`, one row per person, Hub and place.** They survive an
    API restart, a new sign-in and a closed tab. A reused pack needs no SIG token and opens no MCP
    connection, so a planner can keep asking about an area after a restart while SERVIR is
@@ -68,3 +75,6 @@ second job forced the first to be short.
   publishing requires fresh evidence, so nothing public rests on it.
 - A new answer about a place still costs about 40 s of model time, even when no SIG call is made.
   Only an identical question in the same sign-in is instant.
+- Known gap: a restored "Confirm the district" message comes back as plain text, without its
+  confirm button, because the server does not know whether it was already confirmed. Asking again
+  produces a fresh one.
