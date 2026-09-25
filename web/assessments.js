@@ -3,7 +3,8 @@
   const STATUS_TEXT = {
     potentially_exposed: "Potentially exposed under this scenario",
     not_exposed_under_scenario: "Not exposed under this scenario",
-    unable_to_assess: "Unable to assess",
+    // Shown as N/A; the stored status keeps its approved name. See web/planning.js.
+    unable_to_assess: "N/A",
   };
   const STATUS_COLOR = {
     potentially_exposed: "#c2410c",
@@ -289,7 +290,7 @@
     const parts = [`${s.potentially_exposed.toLocaleString()} of `
       + `${s.in_scope.toLocaleString()} centres may be exposed`];
     if (s.unable_to_assess) {
-      parts.push(`${s.unable_to_assess.toLocaleString()} could not be assessed`);
+      parts.push(`${s.unable_to_assess.toLocaleString()} N/A`);
     }
     return parts.join(" · ");
   };
@@ -310,9 +311,8 @@
     if (resultText(a) === "N/A") {
       const s = a.summary || {};
       resultCell.title = s.in_scope
-        ? `None of ${s.in_scope} recorded centres could be assessed: the flood layer holds no `
-          + "modelled depth there. Not a finding that they are safe."
-        : "No evacuation centres are recorded in this area.";
+        ? `${s.in_scope} centres, no flood depth recorded at any of them.`
+        : "No evacuation centres recorded in this area.";
     }
     GRP.cell(row, GRP.formatTime(a.submitted_at));
     GRP.cell(row, SHARING_TEXT[a.sharing_state] || a.sharing_state);
@@ -438,7 +438,7 @@
       ["Centers in area", result.summary.in_scope],
       ["Potentially exposed", result.summary.potentially_exposed],
       ["Not exposed under this scenario", result.summary.not_exposed_under_scenario],
-      ["Unable to assess", result.summary.unable_to_assess],
+      ["N/A — no data", result.summary.unable_to_assess],
     ].forEach(([label, value]) => {
       const card = document.createElement("article");
       const name = document.createElement("span");

@@ -224,7 +224,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925d" in page
+    assert "/planning.js?v=20260925e" in page
     assert "/planning.css?v=20260925d" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
@@ -241,7 +241,7 @@ def test_assessments_and_planning_share_compatible_result_context() -> None:
 
     assert 'data-open-planning' in assessment_page
     assert 'data-incompatible' in assessment_page
-    assert "/assessments.js?v=20260925c" in assessment_page
+    assert "/assessments.js?v=20260925e" in assessment_page
     assert "Boolean(dataset.synthetic) === Boolean(boundary.synthetic)" in assessment_script
     assert "Real district: synthetic test inputs are excluded." in assessment_script
     assert "/planning.html?assessment_id=" in assessment_script
@@ -310,3 +310,21 @@ def test_the_planning_workspace_is_adjustable_and_does_not_cover_the_map() -> No
     assert "const centresNamedIn = (text)" in script
     assert "const showCentresOnMap = (centres)" in script
     assert 'payload.mode === "explain_result"' in script
+
+
+def test_the_planner_ui_says_n_a_not_unable_to_assess() -> None:
+    """Owner report, 25 Sep: the phrase was on every map pin and read as nagging.
+
+    The stored status keeps its approved name (`unable_to_assess` is the method's value and the key
+    the API and golden cases use); only the wording a planner reads changes.
+    """
+
+    for name in ("planning.js", "planning.html", "assessments.js", "assessments.html"):
+        text = (WEB_ROOT / name).read_text(encoding="utf-8")
+        assert "Unable to assess" not in text, name
+        assert "could not be assessed" not in text, name
+    planning = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+    assert 'unable_to_assess: "N/A"' in planning
+    assert 'unable_to_assess: "N/A"' in (WEB_ROOT / "assessments.js").read_text(encoding="utf-8")
+    # The per-pin reason text is suppressed for that status: every pin in a district repeats it.
+    assert 'center.reason_meaning && center.status !== "unable_to_assess"' in planning

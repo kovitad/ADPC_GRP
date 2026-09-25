@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/planning.css?v=20260925d" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/planning.js?v=20260925d" defer></script>
+    <script src="/planning.js?v=20260925e" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -118,7 +118,7 @@
           <div class="pw-legend" data-assessment-legend hidden>
             <span><i class="pw-dot" style="--c:#c2410c"></i>Potentially exposed</span>
             <span><i class="pw-dot" style="--c:#0f766e"></i>Not exposed under this scenario</span>
-            <span><i class="pw-dot" style="--c:#6b7280"></i>Unable to assess</span>
+            <span><i class="pw-dot" style="--c:#6b7280"></i>N/A — no data</span>
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
           <div data-supporting-layer-controls></div>
@@ -285,7 +285,7 @@
                 <button type="button" data-centre-filter="not_assessed">Not assessed</button>
                 <button type="button" data-centre-filter="not_exposed_under_scenario">Lower exposure</button>
                 <button type="button" data-centre-filter="potentially_exposed">Potentially exposed</button>
-                <button type="button" data-centre-filter="unable_to_assess">Unable to assess</button>
+                <button type="button" data-centre-filter="unable_to_assess">N/A</button>
               </div>
               <p class="pw-centre-list__count" data-centre-list-count></p>
               <div class="pw-centre-list" data-centre-list></div>

@@ -4,7 +4,9 @@
     not_assessed: "Not assessed yet",
     potentially_exposed: "Potentially exposed under this scenario",
     not_exposed_under_scenario: "Lower mapped flood exposure",
-    unable_to_assess: "Unable to assess",
+    // Shown as N/A: the stored status stays unable_to_assess, which is the method's approved value
+    // and the key the API and golden cases use. Only the wording a planner reads changes.
+    unable_to_assess: "N/A",
   };
   const STATUS_COLOR = {
     not_assessed: "#64748b",
@@ -909,7 +911,12 @@
     if (center.flood_depth_m !== null && center.flood_depth_m !== undefined) {
       lines.push(`Mapped flood depth ${center.flood_depth_m} m`);
     }
-    if (center.reason_meaning) lines.push(center.reason_meaning);
+    // The method's reason text spells out why a centre has no depth. On a map pin, where most
+    // centres in a district share the same reason, repeating it on every one is noise: the status
+    // already says N/A. Kept for the two statuses where it adds something.
+    if (center.reason_meaning && center.status !== "unable_to_assess") {
+      lines.push(center.reason_meaning);
+    }
     if (center.capacity !== null && center.capacity !== undefined) {
       lines.push(`Reported capacity ${Number(center.capacity).toLocaleString()} people`);
     }
@@ -1565,7 +1572,7 @@
       ["", result.summary.in_scope, "Centers in area"],
       ["pw-stat--exposed", result.summary.potentially_exposed, "Potentially exposed"],
       ["pw-stat--not", result.summary.not_exposed_under_scenario, "Not exposed"],
-      ["pw-stat--unable", result.summary.unable_to_assess, "Unable to assess"],
+      ["pw-stat--unable", result.summary.unable_to_assess, "N/A"],
     ].forEach(([modifier, value, label]) => {
       const tile = document.createElement("div");
       tile.className = `pw-stat ${modifier}`;
@@ -1634,12 +1641,12 @@
         `(${result.support_ref}) is on the map, and the area and scenario above now match it. ` +
         `${result.summary.potentially_exposed} of ${result.summary.in_scope} evacuation centers may be exposed, ` +
         `${result.summary.not_exposed_under_scenario} are not exposed under this scenario, and ` +
-        `${result.summary.unable_to_assess} could not be assessed.`,
+        `${result.summary.unable_to_assess} are N/A: the flood layer has no depth there.`,
       {
         label: result.synthetic ? "Synthetic test data — not a scientific result." : "From the locked assessment result.",
         actions: [
           chipButton("Where could people move?", () => send("Which evacuation centers are not exposed, where people could move?")),
-          chipButton("Why unable to assess?", () => send("Which centers could not be assessed, and why?")),
+          chipButton("Why N/A?", () => send("Which centers are N/A, and why?")),
         ],
       },
     );
@@ -2049,7 +2056,7 @@
     $("[data-summary-lead]").textContent =
       `${result.summary.potentially_exposed} centre(s) may be exposed, ` +
       `${result.summary.not_exposed_under_scenario} have lower mapped exposure, and ` +
-      `${result.summary.unable_to_assess} could not be assessed. Red shading on the map shows ` +
+      `${result.summary.unable_to_assess} are N/A. Red shading on the map shows ` +
       "flood depth from lighter to deeper red; it is not a risk or safety rating.";
 
     const candidates = centers.filter(
@@ -2108,7 +2115,7 @@
     }
     if (unable.length) {
       cautions.append(summaryNotice(
-        `${unable.length} centre(s) unable to assess`,
+        `${unable.length} centre(s) N/A`,
         centerNames(unable),
         "is-unable",
       ));
