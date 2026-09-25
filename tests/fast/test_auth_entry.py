@@ -224,7 +224,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925a" in page
+    assert "/planning.js?v=20260925b" in page
     assert "/planning.css?v=20260925a" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
@@ -241,10 +241,45 @@ def test_assessments_and_planning_share_compatible_result_context() -> None:
 
     assert 'data-open-planning' in assessment_page
     assert 'data-incompatible' in assessment_page
-    assert "/assessments.js?v=20260925a" in assessment_page
+    assert "/assessments.js?v=20260925b" in assessment_page
     assert "Boolean(dataset.synthetic) === Boolean(boundary.synthetic)" in assessment_script
     assert "Real district: synthetic test inputs are excluded." in assessment_script
     assert "/planning.html?assessment_id=" in assessment_script
     assert 'get("assessment_id")' in planning_script
     assert "/assessments.html?assessment_id=" in planning_script
     assert "data-incompatible-result" in (WEB_ROOT / "planning.html").read_text(encoding="utf-8")
+
+
+def test_assessment_to_planning_handoff_is_explicit() -> None:
+    """Backlog U5: the transition must not leave another area selected or a mismatched scenario."""
+
+    script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+    # The assessment's area is resolved even when it is not in the level currently loaded, rather
+    # than silently skipped by a find() that returns undefined.
+    assert "const resolveAssessmentArea = async (detail)" in script
+    assert "const boundary = await resolveAssessmentArea(result.area_detail);" in script
+    assert 'params.set("parent_admin_code"' in script
+    # Arriving with an assessment_id drops the area this browser last used.
+    assert "state.pendingAssessmentId = requestedAssessmentId;" in script
+    # The map's return period is aligned to the one the assessment was run against.
+    assert "const alignFloodScenario = (returnPeriodYears)" in script
+    assert "alignFloodScenario(result.scenario.return_period_years);" in script
+    # And the planner is told what carried over, including when the outline could not be drawn.
+    assert "now match it" in script
+    assert "Area outline unavailable." in script
+
+
+def test_utility_buttons_do_not_use_the_hero_button_scale() -> None:
+    """Backlog U4: one primary per view; utility actions use the compact scale."""
+
+    styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+    page = (WEB_ROOT / "assessments.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "assessments.js").read_text(encoding="utf-8")
+    assert ".button--compact {" in styles
+    assert ".link-button {" in styles
+    # Refresh and the history toggle are utilities, not calls to action.
+    assert 'data-refresh-recent>Refresh</button>' in page
+    assert page.count("button--compact") == 3
+    # Run assessment stays the one primary on the page.
+    assert page.count("button--primary") == 1
+    assert 'view.className = "button button--secondary button--compact";' in script

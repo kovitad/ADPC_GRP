@@ -499,6 +499,23 @@ textarea {
   background: var(--sand-50);
 }
 
+/* Utility scale. `.button` is a 3.2rem hero CTA: correct for "Run assessment", far too heavy for
+   Refresh, a table row or a card heading, where it dwarfed the content it acted on (backlog U4).
+   Planning's own toolbar already works at 2.2rem, so this matches the workspace rather than
+   inventing a third size. */
+.button--compact {
+  min-height: 2.2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.button--compact:hover {
+  transform: none;
+}
+
 /* A demoted row action: readable, but it must not compete with the row's one real button. */
 .link-button {
   display: inline-block;
@@ -1519,6 +1536,13 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
   font-weight: 700;
 }
 .assessment-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* The area finder is a shortcut across the whole form, not one field beside another, so it spans
+   and is separated from the three selects it fills in (backlog U4). */
+.assessment-form label:has([data-area-search]) {
+  grid-column: 1 / -1;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
 .assessment-result-actions { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
 .metric-row {
   display: grid;

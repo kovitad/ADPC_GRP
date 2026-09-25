@@ -721,6 +721,49 @@
     return state.floodLayers.find((layer) => layer.id === selectedId) || null;
   };
 
+  // Show the same return period the assessment was run against, so the depth on the map and the
+  // numbers in the panel describe one scenario (backlog U5). Silent when that scenario is not
+  // imported: the locked result stays valid either way.
+  const alignFloodScenario = (returnPeriodYears) => {
+    const scenario = state.floodScenarios.find(
+      (item) => item.return_period_years === returnPeriodYears && item.available,
+    );
+    if (!scenario) return false;
+    const select = $("[data-flood-scenario]");
+    if (select.value === scenario.layer_id) return true;
+    select.value = scenario.layer_id;
+    loadFloodOverlay(selectedFloodLayer());
+    return true;
+  };
+
+  // The assessment's area may not be in the list currently loaded: the level selector may be on
+  // districts while the result is for a sub-district, or the other way round. Look in memory, then
+  // fetch that one area, switching the level list so the outline can actually be drawn.
+  const resolveAssessmentArea = async (detail) => {
+    if (!detail || !detail.id) return null;
+    const known = state.boundaries.find((item) => item.id === detail.id);
+    if (known) return known;
+    const level = detail.admin_level === "subdistrict" ? "subdistrict" : "district";
+    const params = new URLSearchParams({ hub_code: state.hubCode, level });
+    if (level === "subdistrict") {
+      params.set("parent_admin_code", String(detail.admin_code).slice(0, 4));
+    }
+    try {
+      const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
+      const found = payload.boundaries.find((item) => item.id === detail.id);
+      if (!found) return null;
+      // Replace the visible list so the level selector, the map and the panel agree.
+      state.areaLevel = level;
+      state.boundaries = payload.boundaries;
+      const levelSelect = $("[data-area-level]");
+      if (levelSelect) levelSelect.value = level;
+      drawDistricts();
+      return found;
+    } catch (error) {
+      return null;
+    }
+  };
+
   const configureFloodScenarios = (scenarios) => {
     state.floodScenarios = scenarios || [];
     const select = $("[data-flood-scenario]");
@@ -1442,17 +1485,35 @@
     url.searchParams.set("assessment_id", id);
     window.history.replaceState({}, "", url);
     renderContext();
-    const boundary = state.boundaries.find((b) => b.id === result.area_detail.id);
+    const boundary = await resolveAssessmentArea(result.area_detail);
     if (boundary) {
       selectBoundary(boundary, { explicit: true, preserveAssessment: true });
+      alignFloodScenario(result.scenario.return_period_years);
       await enableRecommendedSupportingLayers();
+    } else {
+      // Never leave a different district selected while the panel describes this result. Clearing
+      // is worse than useless only if we say nothing, so say it (backlog U5).
+      state.selected = null;
+      state.explicitSelection = false;
+      state.areaProfile = null;
+      state.areaProfileId = null;
+      state.areaProfileState = "idle";
+      renderVulnerablePeople();
+      drawDistricts();
+      addMessage(
+        "assistant",
+        `This result is for ${result.area}, which is not in the area list currently loaded, so its `
+        + "outline is not on the map. The locked numbers below are unaffected.",
+        { label: "Area outline unavailable.", error: true },
+      );
     }
     saveState();
     if (quiet) return;
     renderAssessmentSummary(result, assessedCenters);
     addMessage(
       "assistant",
-      `The ${result.scenario.return_period_years}-year flood screening for ${result.area} is on the map. ` +
+      `The ${result.scenario.return_period_years}-year flood screening for ${result.area} ` +
+        `(${result.support_ref}) is on the map, and the area and scenario above now match it. ` +
         `${result.summary.potentially_exposed} of ${result.summary.in_scope} evacuation centers may be exposed, ` +
         `${result.summary.not_exposed_under_scenario} are not exposed under this scenario, and ` +
         `${result.summary.unable_to_assess} could not be assessed.`,
@@ -3085,10 +3146,19 @@
       ownerEmail = identity.email;
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
       if (requestedAssessmentId) {
+        // Arriving from Flood assessment. restoreState has just re-selected whatever area this
+        // browser last used, which is usually not the assessment's, so drop it rather than show a
+        // different district while the assessment loads (backlog U5).
+        state.selected = null;
+        state.explicitSelection = false;
+        state.areaProfile = null;
+        state.areaProfileId = null;
+        state.areaProfileState = "idle";
         state.assessmentId = null;
         state.pendingAssessmentId = requestedAssessmentId;
         state.runBusy = true;
         syncRunPanel();
+        renderVulnerablePeople();
         showProgress("Loading assessment");
         saveState();
         watch(requestedAssessmentId);

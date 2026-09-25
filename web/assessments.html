@@ -7,10 +7,10 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Flood assessment | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="/styles.css?v=20260925a" />
+    <link rel="stylesheet" href="/styles.css?v=20260925b" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260920a" defer></script>
-    <script src="/assessments.js?v=20260925a" defer></script>
+    <script src="/assessments.js?v=20260925b" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -82,7 +82,7 @@
             <h2 id="result-heading" data-result-title>Assessment</h2>
           </div>
           <div class="assessment-result-actions">
-            <a class="button button--secondary" data-open-planning href="/planning.html" hidden>Open in Planning</a>
+            <a class="button button--secondary button--compact" data-open-planning href="/planning.html" hidden>Open in Planning</a>
             <span class="status-pill" data-state-pill>…</span>
           </div>
         </div>
@@ -120,7 +120,7 @@
             <p class="eyebrow">Your Hub</p>
             <h2 id="recent-heading">Recent assessments</h2>
           </div>
-          <button class="button button--secondary" type="button" data-refresh-recent>Refresh</button>
+          <button class="button button--secondary button--compact" type="button" data-refresh-recent>Refresh</button>
         </div>
         <div class="member-table-wrap">
           <table class="member-table">
@@ -137,7 +137,7 @@
           </table>
         </div>
         <p class="assignment-status" data-recent-note hidden></p>
-        <button class="button button--secondary" type="button" data-recent-more hidden></button>
+        <button class="button button--secondary button--compact" type="button" data-recent-more hidden></button>
       </section>
     </main>
   </body>

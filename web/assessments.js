@@ -317,9 +317,11 @@
     const done = a.state === "succeeded";
     // One prominent action per row. Opening the locked result is what a planner does next; the
     // others are demoted so the row reads as a single choice rather than three equal buttons.
+    // Compact and secondary on purpose. "Run assessment" is the page's one primary action; five
+    // filled rows would give the table five competing primaries (backlog U4).
     const view = document.createElement("button");
     view.type = "button";
-    view.className = done ? "button button--primary" : "button button--secondary";
+    view.className = "button button--secondary button--compact";
     view.textContent = done ? "Open result" : "Open";
     view.addEventListener("click", () => {
       setAssessmentUrl(a.assessment_id);
