@@ -31,10 +31,22 @@ own value, every current evacuation centre (10,303) was sampled on 25 September:
 Centres sit in settled areas, so the national share of zeros does not carry over to them, and a
 point value is representative of its 250 m neighbourhood. No radius or smoothing method is needed.
 
+**Correction found while preparing the contribution:** the source writes **0, not NaN, over the sea
+and most of Myanmar and Cambodia** inside its rectangle. The "59% of cells exactly 0" figure is
+mostly that padding. Inside the Thailand outline, averaged to 0.0025 degrees, only 1.9% (child) and
+2.2% (older-person) of cells are 0. Anything built from these rasters must clip to Thailand first.
+
+**Second finding: the index is one value per sub-district.** In each of Kanthararom's 16
+sub-districts a single value covers 95-100% of cells; the remainder are border cells of neighbouring
+sub-districts. The 12.5 m grid is a painted sub-district table. So a centre's value is its
+sub-district's value, the map shows "which sub-districts", and the legend and centre line say
+"sub-district" rather than implying local detail.
+
 ## Decision
 
 1. **Child and older-person sensitivity are shown as relative indicators.**
-   - Legend: "Lower to higher, relative index. Not a number of people. About 1.4 km per pixel."
+   - Legend: "Lower to higher, relative index, one value per sub-district. Not a number of
+     people."
    - A mask dims everything outside the selected district. The mask sits above sensitivity and below
      flood and the centre markers, each in its own Leaflet pane.
 2. **Each centre shows the source value at its location, as context only.** The values come from

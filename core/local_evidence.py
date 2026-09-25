@@ -316,7 +316,8 @@ def sensitivity_citation(session: Session, question: str) -> dict[str, Any] | No
         "title": "Vulnerability indicator maps in the GRP data library",
         "text": (
             f"The GRP map shows {' and '.join(shown)} as relative indices from the ADPC data "
-            "delivery. They show where sensitivity is relatively higher or lower. They are not "
+            "delivery, one value per sub-district. They show which sub-districts are relatively "
+            "more or less sensitive. They are not "
             "counts: the GRP data library holds no count of children, older people or people with "
             "disabilities. A disability indicator is withheld until the data owner explains its "
             "classes."

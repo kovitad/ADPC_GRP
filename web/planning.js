@@ -937,8 +937,8 @@
 
   // ADR-0030: the source value at the centre, as context. Never used to sort, filter or classify.
   const INDICATOR_NAMES = {
-    child_sensitivity: "Child sensitivity",
-    elderly_sensitivity: "Older-person sensitivity",
+    child_sensitivity: "child sensitivity",
+    elderly_sensitivity: "older-person sensitivity",
   };
   const centreIndicatorLine = (center) => {
     const values = center.indicators;
@@ -951,7 +951,10 @@
         if (value === null) return `${name}: outside its coverage`;
         return value === 0 ? `${name} 0 (lowest)` : `${name} ${Number(value).toFixed(2)}`;
       });
-    return parts.length ? `${parts.join(" · ")} (relative index, 0 to 1; not a count)` : null;
+    // The source paints one value per sub-district, so this describes the centre's area.
+    return parts.length
+      ? `Sub-district ${parts.join(" · ")} (relative index, 0 to 1; not a count)`
+      : null;
   };
 
   const statusDetail = (center) => {

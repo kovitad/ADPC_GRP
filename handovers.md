@@ -115,6 +115,54 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
+### 0.000 Sensitivity indicators on the map (ADR-0030, 25 September, late)
+
+The owner asked what the three vulnerability layers contain and chose "Full map treatment" and
+"Prepare, you approve submit". Measured facts that drove it:
+
+- Child and older-person sensitivity are continuous 0-1 **indices** with no nodata declared. The
+  source writes **0 over the sea and neighbouring countries**; inside Thailand only about 2% of
+  cells are 0. Clip to Thailand before using them for anything.
+- **The index is one value per sub-district**, painted onto the 12.5 m grid: in each of
+  Kanthararom's 16 sub-districts one value covers 95-100% of cells. A centre's value is its
+  sub-district's value, and the UI says "Sub-district child sensitivity 0.40 · older-person
+  sensitivity 0.45". A cleaner contribution may be a table keyed by sub-district code; ask the data
+  owner whether that table exists. Disability is an ordinal class 1-4 and is **class 1 in all but
+  1,234 of 40,951,275 sampled cells**, so it drew as one flat colour (preview stretch 1.0-1.000005).
+- At the 10,303 current centres, 0.4% are NaN, 3.3% / 1.5% are exactly 0, and the point value
+  agrees with the 250 m mean to 0.02 at every quartile. So a point sample is honest and needs no
+  smoothing method.
+
+| Commit | What |
+| --- | --- |
+| `679038b` | ADR-0030; Leaflet panes (`grpSensitivity` 350, `grpSensitivityMask` 380, flood and pins above); a mask dimming everything outside the selected district; a legend "lower to higher, relative index, not a number of people, about 1.4 km per pixel"; disability `planner_status: "withheld"` with its reason from `/maps/layers` |
+| `a2d1678` | A question about children, older people, disability or vulnerability (English or Thai) carries one digit-free GRP citation saying which indicators exist and that no count exists. A plain flood question does not get it, so it keeps its receipt |
+| `d259cb6` and the commit after it | Migration `20260925_0020` `centre_indicator_value`; `python -m grpcli.sensitivity build`; `POST /api/v1/maps/centres/indicator-values` (in the permission matrix); the centre list and popup show "Child sensitivity 0.42 · Older-person sensitivity 0.51 (relative index, 0 to 1; not a count)" |
+
+**Rules a next agent must keep (ADR-0030 decision 3):** the per-centre value is display context. It
+never enters an assessment, a centre status, sorting, filtering, a score or an AI prompt.
+`test_no_assessment_chat_or_ai_path_reads_centre_values` fails if any other module reads the table.
+This does **not** amend ADR-0015 or DEP-07.
+
+**Done on the desktop stack** (10,261 of 10,303 centres have a value; rerun is idempotent at 20,606 rows). **After any future deploy,** run `docker compose -f deploy/compose.desktop.yml exec -T worker python -m
+grpcli.sensitivity build` once, and again whenever a new centre or sensitivity version becomes
+current. Until then the centre popups simply show no sensitivity line.
+
+**Global Risk contribution: prepared, not submitted.** Two derived GeoTIFFs (EPSG:4326, 0.0025
+degrees by area average, nodata -9999, COG with DEFLATE) plus `report.json` (SHA-256, size, bounds,
+value range) and `manifest-draft.json` are in `.local/contrib/`, which is git-ignored. Both are
+clipped to the Thailand outline, because the source's 0 padding would otherwise claim "lowest
+sensitivity" for the sea, Myanmar and Cambodia. Child SHA-256 `ba888015...`, 7.8 MB; older-person
+`7e9e0b5a...`, 7.3 MB. Disability
+was not prepared. **To submit:** the owner hosts both files at a public direct-download URL (no
+login, no HTML interstitial), confirms or corrects the licence and vintage in the draft, and says
+go. Then `contribute_submit(kind="raster", manifest=...)` once per layer; it lands **staged**
+(only the contributor and reviewers see it, and it can be withdrawn with `contribute_status(action=
+"withdraw")` until a reviewer approves). Test it with `assemble_pack` before asking for review. Do
+not retry a timed-out submit: list with `contribute_status` first. Global Risk's embedded
+`hazard_map` is not known to draw a contributed vulnerability layer, so the overlay with flood stays
+on GRP's own map.
+
 ### Session of 25 September (evening): where things stand
 
 `main` at `32bd818` plus this note, pushed; CI green through `22110e1`. 573 tests pass, 2 skip,

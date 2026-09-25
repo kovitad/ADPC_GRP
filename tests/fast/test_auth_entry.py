@@ -224,7 +224,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Global Risk metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925n" in page
+    assert "/planning.js?v=20260925o" in page
     assert "/planning.css?v=20260925h" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
