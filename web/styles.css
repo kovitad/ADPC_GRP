@@ -499,6 +499,29 @@ textarea {
   background: var(--sand-50);
 }
 
+/* A demoted row action: readable, but it must not compete with the row's one real button. */
+.link-button {
+  display: inline-block;
+  padding: 0.2rem 0;
+  margin-left: 0.6rem;
+  border: 0;
+  background: none;
+  color: var(--auth-blue-dark);
+  font: inherit;
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: none;
+}
+
+.link-button:disabled {
+  color: var(--ink-muted, #6b7280);
+  cursor: default;
+}
+
 .provider-note {
   display: grid;
   grid-template-columns: auto 1fr;

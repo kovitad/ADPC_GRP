@@ -258,50 +258,130 @@
     return Number((text.match(/RP(\d+)/) || [])[1]);
   };
 
-  const showRecent = async () => {
-    const payload = await GRP.request(`/api/v1/assessments?hub_code=${encodeURIComponent(hubCode)}`);
-    const body = $("[data-recent]");
-    body.replaceChildren();
-    payload.assessments.forEach((a) => {
-      const row = document.createElement("tr");
-      GRP.cell(row, GRP.formatTime(a.submitted_at));
-      GRP.cell(row, `${a.area} · RP${a.scenario.return_period_years}`);
-      GRP.cell(row, a.state);
-      GRP.cell(row, a.support_ref);
-      const action = GRP.cell(row, "");
-      const view = document.createElement("button");
-      view.type = "button";
-      view.className = "button button--secondary";
-      view.textContent = "Open";
-      view.addEventListener("click", () => {
-        setAssessmentUrl(a.assessment_id);
-        watch(a.assessment_id);
-      });
-      action.append(view);
+  // How many rows to show before the planner asks for more. The table was the tallest thing on
+  // the page and most of it was history nobody was acting on (backlog U3).
+  const RECENT_VISIBLE = 5;
+  let recentExpanded = false;
+
+  const SHARING_TEXT = {
+    private: "Private",
+    shared: "Shared with SIG",
+    sig_unavailable: "SIG unavailable",
+    receipt_issued: "Public receipt issued",
+    unshared: "Withdrawn",
+  };
+
+  // One line a planner can act on: what the run concluded, or why there is nothing to read yet.
+  const resultText = (a) => {
+    if (a.state === "queued") return "Waiting to start";
+    if (a.state === "running") return "Running…";
+    if (a.state === "cancelled") return "Cancelled";
+    if (a.state === "failed") return ERROR_TEXT[a.error_code] || "Failed";
+    const s = a.summary || {};
+    if (typeof s.potentially_exposed !== "number" || typeof s.in_scope !== "number") {
+      return "Completed";
+    }
+    if (!s.in_scope) return "No evacuation centres are recorded in this area";
+    // The delivered flood layer records a depth only where it floods, so an unassessed centre is
+    // not a safe one. Where nothing could be assessed, say that rather than "0 may be exposed",
+    // which reads as an all-clear (see handovers.md 0.2).
+    if (!s.potentially_exposed && s.unable_to_assess === s.in_scope) {
+      return `None of ${s.in_scope.toLocaleString()} centres could be assessed `
+        + "— no modelled flood depth there";
+    }
+    const parts = [`${s.potentially_exposed.toLocaleString()} of `
+      + `${s.in_scope.toLocaleString()} centres may be exposed`];
+    if (s.unable_to_assess) {
+      parts.push(`${s.unable_to_assess.toLocaleString()} could not be assessed`);
+    }
+    return parts.join(" · ");
+  };
+
+  const recentRow = (a) => {
+    const row = document.createElement("tr");
+
+    const area = GRP.cell(row, "");
+    const areaName = document.createElement("strong");
+    areaName.textContent = `${a.area} · RP${a.scenario.return_period_years}`;
+    area.append(areaName);
+    const ref = document.createElement("div");
+    ref.className = "assignment-status";
+    ref.textContent = `${a.support_ref}${a.synthetic ? " · synthetic test data" : ""}`;
+    area.append(ref);
+
+    GRP.cell(row, resultText(a));
+    GRP.cell(row, GRP.formatTime(a.submitted_at));
+    GRP.cell(row, SHARING_TEXT[a.sharing_state] || a.sharing_state);
+
+    const action = GRP.cell(row, "");
+    const done = a.state === "succeeded";
+    // One prominent action per row. Opening the locked result is what a planner does next; the
+    // others are demoted so the row reads as a single choice rather than three equal buttons.
+    const view = document.createElement("button");
+    view.type = "button";
+    view.className = done ? "button button--primary" : "button button--secondary";
+    view.textContent = done ? "Open result" : "Open";
+    view.addEventListener("click", () => {
+      setAssessmentUrl(a.assessment_id);
+      watch(a.assessment_id);
+    });
+    action.append(view);
+
+    if (done) {
       const planning = document.createElement("a");
-      planning.className = "button button--secondary";
+      planning.className = "link-button";
       planning.textContent = "Open in Planning";
       planning.href = `/planning.html?assessment_id=${encodeURIComponent(a.assessment_id)}`;
       action.append(planning);
-      if (a.state === "queued" || a.state === "running") {
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.className = "button button--secondary";
-        cancel.textContent = "Cancel";
-        cancel.addEventListener("click", async () => {
-          cancel.disabled = true;
-          try {
-            await GRP.request(`/api/v1/assessments/${a.assessment_id}/cancel`, { method: "POST" });
-          } catch (error) {
-            $("[data-submit-status]").textContent = error.message;
-          }
-          showRecent();
-        });
-        action.append(cancel);
-      }
-      body.append(row);
-    });
-    if (payload.assessments.length === 0) GRP.emptyRow(body, 5, "No assessments yet.");
+    }
+
+    if (a.state === "queued" || a.state === "running") {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "link-button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", async () => {
+        cancel.disabled = true;
+        try {
+          await GRP.request(`/api/v1/assessments/${a.assessment_id}/cancel`, { method: "POST" });
+        } catch (error) {
+          $("[data-submit-status]").textContent = error.message;
+        }
+        showRecent();
+      });
+      action.append(cancel);
+    }
+    return row;
+  };
+
+  const showRecent = async () => {
+    const payload = await GRP.request(`/api/v1/assessments?hub_code=${encodeURIComponent(hubCode)}`);
+    const body = $("[data-recent]");
+    const note = $("[data-recent-note]");
+    const more = $("[data-recent-more]");
+    body.replaceChildren();
+    const all = payload.assessments;
+    if (!all.length) {
+      GRP.emptyRow(body, 5, "No assessments yet. Pick an area above and run one.");
+      note.hidden = true;
+      more.hidden = true;
+      return;
+    }
+    const visible = recentExpanded ? all : all.slice(0, RECENT_VISIBLE);
+    visible.forEach((a) => body.append(recentRow(a)));
+    const running = all.filter((a) => a.state === "queued" || a.state === "running").length;
+    note.textContent = running
+      ? `${all.length} assessment(s) in this Hub · ${running} still running.`
+      : `${all.length} assessment(s) in this Hub.`;
+    note.hidden = false;
+    if (all.length > RECENT_VISIBLE) {
+      more.hidden = false;
+      more.textContent = recentExpanded
+        ? `Show only the latest ${RECENT_VISIBLE}`
+        : `Show all ${all.length}`;
+    } else {
+      more.hidden = true;
+    }
   };
 
   const fillList = (selector, values) => {
@@ -475,6 +555,10 @@
     }
   });
   $("[data-refresh-recent]").addEventListener("click", () => showRecent());
+  $("[data-recent-more]").addEventListener("click", () => {
+    recentExpanded = !recentExpanded;
+    showRecent();
+  });
 
   GRP.bindSignOut();
 
