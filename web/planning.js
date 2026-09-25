@@ -922,13 +922,18 @@
   };
 
   const statusDetail = (center) => {
-    const lines = [STATUS_TEXT[center.status] || center.status];
+    // A bare "N/A" under a centre's name read as a broken record to planners. The grey pin, the
+    // legend, the filter and the result summary already mark these centres as N/A,
+    // so the row and popup say nothing about it rather than repeat it on every one.
+    const lines = center.status === "unable_to_assess"
+      ? []
+      : [STATUS_TEXT[center.status] || center.status];
     if (center.flood_depth_m !== null && center.flood_depth_m !== undefined) {
       lines.push(`Mapped flood depth ${center.flood_depth_m} m`);
     }
     // The method's reason text spells out why a centre has no depth. On a map pin, where most
-    // centres in a district share the same reason, repeating it on every one is noise: the status
-    // already says N/A. Kept for the two statuses where it adds something.
+    // centres in a district share the same reason, repeating it on every one is noise. Kept for
+    // the two statuses where it adds something.
     if (center.reason_meaning && center.status !== "unable_to_assess") {
       lines.push(center.reason_meaning);
     }
@@ -1020,7 +1025,8 @@
       const detail = document.createElement("span");
       name.textContent = center.name;
       detail.textContent = statusDetail(center).join(" · ");
-      text.append(name, detail);
+      text.append(name);
+      if (detail.textContent) text.append(detail);
       const view = document.createElement("span");
       view.className = "pw-centre-row__view";
       view.textContent = "View";
