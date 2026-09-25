@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 
 from api.dependencies import DatabaseSession
 from api.errors import not_found
@@ -26,11 +26,23 @@ def boundaries(
     hub_code: str | None = Query(default=None, max_length=64),
     level: str = Query(default="district", pattern="^(district|subdistrict)$"),
     parent_admin_code: str | None = Query(default=None, max_length=64),
+    province_code: str | None = Query(default=None, max_length=8),
+    include_geometry: bool = Query(default=True),
 ) -> dict[str, object]:
+    """List the supported areas at one level.
+
+    ``include_geometry=false`` omits the polygons. A picker only needs names, and sending 928
+    district outlines to build a dropdown made the assessment page slow to load (backlog U2).
+    ``province_code`` narrows by the leading digits of the Thai administrative code, so a planner
+    can choose a province first instead of scrolling every district in the country.
+    """
+
     planner_membership(principal, hub_code)
     statement = select(Boundary).where(Boundary.is_supported, Boundary.admin_level == level)
     if level == "subdistrict" and parent_admin_code:
         statement = statement.where(Boundary.admin_code.like(f"{parent_admin_code[:4]}%"))
+    if province_code:
+        statement = statement.where(Boundary.admin_code.like(f"{province_code[:2]}%"))
     rows = session.scalars(statement.order_by(Boundary.name)).all()
     return {
         "boundaries": [
@@ -46,9 +58,59 @@ def boundaries(
                 "source": row.source,
                 "edition": row.edition,
                 "synthetic": "synthetic" in row.source.casefold(),
-                "geometry": row.geom,
+                **({"geometry": row.geom} if include_geometry else {}),
             }
             for row in rows
+        ]
+    }
+
+
+@router.get(
+    "/provinces",
+    summary="Provinces that contain a supported area",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def provinces(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """Provinces derived from the supported districts, never from the province boundaries.
+
+    The province rows in ``boundary`` are not supported areas and must not become selectable: a
+    province is not something an assessment runs on. Deriving the list from supported districts
+    also guarantees every province offered contains at least one district a planner can pick.
+    """
+
+    planner_membership(principal, hub_code)
+    # Group by the province name and take the code as an aggregate. Every district in a province
+    # shares the same two leading digits, so min() is exact, and it avoids grouping by a substr
+    # expression: SQLAlchemy binds its arguments separately in SELECT and GROUP BY, which SQLite
+    # accepts and PostgreSQL rejects as a different expression.
+    rows = session.execute(
+        select(
+            func.min(func.substr(Boundary.admin_code, 1, 2)).label("code"),
+            Boundary.province_name,
+            func.min(Boundary.province_name_th).label("name_th"),
+            func.count(Boundary.id).label("districts"),
+        )
+        .where(
+            Boundary.is_supported,
+            Boundary.admin_level == "district",
+            Boundary.province_name.is_not(None),
+        )
+        .group_by(Boundary.province_name)
+        .order_by(Boundary.province_name)
+    ).all()
+    return {
+        "provinces": [
+            {
+                "code": code,
+                "name": name,
+                "name_th": name_th,
+                "district_count": int(districts),
+            }
+            for code, name, name_th, districts in rows
         ]
     }
 

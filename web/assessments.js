@@ -45,8 +45,42 @@
     window.history.replaceState({}, "", url);
   };
 
+  // The chosen area is the sub-district when one is picked, otherwise the district. One helper, so
+  // the map outline, the dataset compatibility check and the submitted id cannot disagree.
+  const selectedAreaId = () => {
+    const sub = $("[data-subdistrict]");
+    return (sub && !sub.disabled && sub.value) || $("[data-boundary]").value || "";
+  };
+
+  const selectedArea = () => boundaries.find((item) => item.id === selectedAreaId()) || null;
+
+  // A past result can be for an area outside the province currently loaded in the picker, so its
+  // outline is fetched on demand rather than assumed to be in memory (backlog U2).
+  const outlineCache = new Map();
+  const areaOutline = async (detail) => {
+    if (!detail || !detail.id) return null;
+    const known = boundaries.find((item) => item.id === detail.id);
+    if (known && known.geometry) return known;
+    if (outlineCache.has(detail.id)) return outlineCache.get(detail.id);
+    const params = new URLSearchParams({ hub_code: hubCode, level: detail.admin_level });
+    if (detail.admin_level === "subdistrict") {
+      params.set("parent_admin_code", String(detail.admin_code).slice(0, 4));
+    } else {
+      params.set("province_code", String(detail.admin_code).slice(0, 2));
+    }
+    let found = null;
+    try {
+      const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
+      found = payload.boundaries.find((item) => item.id === detail.id) || null;
+    } catch (error) {
+      found = null;
+    }
+    outlineCache.set(detail.id, found);
+    return found;
+  };
+
   const showCompatibleDatasets = () => {
-    const boundary = boundaries.find((item) => item.id === $("[data-boundary]").value);
+    const boundary = selectedArea();
     const hazard = $("[data-hazard]");
     const centers = $("[data-centers]");
     hazard.replaceChildren();
@@ -100,21 +134,119 @@
     layers = window.L.layerGroup().addTo(map);
   };
 
+  // Districts without geometry, only for the type-ahead. Outlines are fetched one province at a
+  // time, because sending 928 polygons just to fill a dropdown made this page slow (backlog U2).
+  let searchIndex = [];
+
+  const areaLabel = (area) => {
+    const thai = area.name_th ? ` · ${area.name_th}` : "";
+    return `${area.name}${thai}${area.synthetic ? " (synthetic)" : ""}`;
+  };
+
+  const fillSubdistricts = async (district) => {
+    const field = $("[data-subdistrict-field]");
+    const select = $("[data-subdistrict]");
+    select.replaceChildren();
+    select.disabled = true;
+    field.hidden = true;
+    if (!district || district.synthetic) return;
+    const payload = await GRP.request(
+      `/api/v1/catalog/boundaries?hub_code=${encodeURIComponent(hubCode)}`
+      + `&level=subdistrict&parent_admin_code=${encodeURIComponent(district.admin_code)}`,
+    );
+    if (!payload.boundaries.length) return;
+    // Merge so selectedArea() can find a sub-district, and keep its outline for the map.
+    boundaries = boundaries
+      .filter((item) => item.admin_level !== "subdistrict")
+      .concat(payload.boundaries);
+    option(select, "", `Whole district (${district.name})`);
+    payload.boundaries.forEach((item) => option(select, item.id, areaLabel(item)));
+    select.disabled = false;
+    field.hidden = false;
+  };
+
+  const fillDistricts = async (provinceCode, { select: preselect = null } = {}) => {
+    const boundarySelect = $("[data-boundary]");
+    boundarySelect.replaceChildren();
+    if (!provinceCode) return;
+    const payload = await GRP.request(
+      `/api/v1/catalog/boundaries?hub_code=${encodeURIComponent(hubCode)}`
+      + `&level=district&province_code=${encodeURIComponent(provinceCode)}`,
+    );
+    boundaries = payload.boundaries.slice();
+    payload.boundaries.forEach((item) => option(boundarySelect, item.id, areaLabel(item)));
+    if (preselect && payload.boundaries.some((item) => item.id === preselect)) {
+      boundarySelect.value = preselect;
+    }
+    await fillSubdistricts(selectedArea());
+    showCompatibleDatasets();
+  };
+
   const loadCatalog = async () => {
     const query = `?hub_code=${encodeURIComponent(hubCode)}`;
-    const [areas, datasetPayload, methods] = await Promise.all([
-      GRP.request(`/api/v1/catalog/boundaries${query}`),
+    const [provincePayload, index, datasetPayload, methods] = await Promise.all([
+      GRP.request(`/api/v1/catalog/provinces${query}`),
+      GRP.request(`/api/v1/catalog/boundaries${query}&include_geometry=false`),
       GRP.request(`/api/v1/catalog/datasets${query}`),
       GRP.request(`/api/v1/catalog/methods${query}`),
     ]);
-    boundaries = areas.boundaries;
     datasets = datasetPayload.datasets;
-    const boundarySelect = $("[data-boundary]");
-    boundaries.forEach((b) =>
-      option(boundarySelect, b.id, `${b.name} (${b.admin_level}${b.synthetic ? ", synthetic" : ""})`),
-    );
-    boundarySelect.addEventListener("change", showCompatibleDatasets);
-    showCompatibleDatasets();
+    searchIndex = index.boundaries;
+
+    const provinceSelect = $("[data-province]");
+    const provinceCodes = new Set(provincePayload.provinces.map((item) => item.code));
+    provincePayload.provinces.forEach((item) => option(
+      provinceSelect,
+      item.code,
+      `${item.name}${item.name_th ? ` · ${item.name_th}` : ""} (${item.district_count})`,
+    ));
+    // The synthetic test district carries no real province code, so it gets its own entry rather
+    // than being hidden behind a province a planner would never think to open.
+    const synthetic = searchIndex.filter((item) => item.synthetic);
+    synthetic.forEach((item) => {
+      const code = item.admin_code.slice(0, 2);
+      if (provinceCodes.has(code)) return;
+      provinceCodes.add(code);
+      option(provinceSelect, code, `${item.name} (test data)`);
+    });
+
+    const searchBox = $("[data-area-search]");
+    const datalist = $("#area-search-options");
+    searchIndex.forEach((item) => {
+      const entry = document.createElement("option");
+      entry.value = areaLabel(item);
+      entry.dataset.id = item.id;
+      datalist.append(entry);
+    });
+    const jumpToSearch = async () => {
+      const wanted = searchBox.value.trim().toLowerCase();
+      if (!wanted) return;
+      const match = searchIndex.find((item) => areaLabel(item).toLowerCase() === wanted)
+        || searchIndex.find((item) => item.name.toLowerCase() === wanted)
+        || searchIndex.find((item) => item.name.toLowerCase().includes(wanted));
+      if (!match) {
+        $("[data-compatibility-note]").textContent =
+          `No supported district matches "${searchBox.value.trim()}".`;
+        return;
+      }
+      provinceSelect.value = match.admin_code.slice(0, 2);
+      await fillDistricts(provinceSelect.value, { select: match.id });
+    };
+    searchBox.addEventListener("change", jumpToSearch);
+    searchBox.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      // This input sits inside the run form; Enter means "find that area", not "run".
+      event.preventDefault();
+      jumpToSearch();
+    });
+
+    provinceSelect.addEventListener("change", () => fillDistricts(provinceSelect.value));
+    $("[data-boundary]").addEventListener("change", async () => {
+      await fillSubdistricts(boundaries.find((item) => item.id === $("[data-boundary]").value));
+      showCompatibleDatasets();
+    });
+    $("[data-subdistrict]").addEventListener("change", showCompatibleDatasets);
+    await fillDistricts(provinceSelect.value);
     methods.methods.forEach((m) => option($("[data-method]"), `${m.key}@${m.version}`,
       `${m.key} ${m.version}${m.status === "approved" ? "" : " (draft, not approved)"}`));
     $("[data-new-card]").hidden = false;
@@ -247,7 +379,7 @@
     table.replaceChildren();
     ensureMap();
     layers.clearLayers();
-    const boundary = boundaries.find((b) => b.id === result.area_detail.id);
+    const boundary = await areaOutline(result.area_detail);
     let bounds = null;
     if (boundary) {
       const outline = window.L.geoJSON(boundary.geometry, {
@@ -318,7 +450,7 @@
         idempotencyKey: crypto.randomUUID(),
         body: {
           hub_code: hubCode,
-          boundary_id: $("[data-boundary]").value,
+          boundary_id: selectedAreaId(),
           hazard: { type: "flood", return_period_years: hazardYears(), dataset_version_id: $("[data-hazard]").value },
           evacuation_centers_dataset_version_id: $("[data-centers]").value,
           vulnerability_dataset_version_id: null,

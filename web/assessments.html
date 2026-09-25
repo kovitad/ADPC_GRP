@@ -34,8 +34,22 @@
         </p>
         <form class="assignment-form assessment-form" data-submit-form>
           <label>
-            Area
+            Find an area
+            <input type="search" data-area-search list="area-search-options"
+                   placeholder="Type a district or sub-district name" autocomplete="off">
+            <datalist id="area-search-options"></datalist>
+          </label>
+          <label>
+            Province
+            <select data-province required></select>
+          </label>
+          <label>
+            District
             <select data-boundary required></select>
+          </label>
+          <label data-subdistrict-field hidden>
+            Sub-district <span class="assignment-status">optional</span>
+            <select data-subdistrict></select>
           </label>
           <label>
             Flood scenario
