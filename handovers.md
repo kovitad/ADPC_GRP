@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 25 September 2026 (`main` at `32bd818` plus this handover, pushed; the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
+**Updated:** 25 September 2026 (`main` at the sensitivity-mask fix after `27a900d`, pushed; 586 tests pass; ADR-0030 sensitivity indicators; earlier: the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -152,8 +152,9 @@ current. Until then the centre popups simply show no sensitivity line.
 degrees by area average, nodata -9999, COG with DEFLATE) plus `report.json` (SHA-256, size, bounds,
 value range) and `manifest-draft.json` are in `.local/contrib/`, which is git-ignored. Both are
 clipped to the Thailand outline, because the source's 0 padding would otherwise claim "lowest
-sensitivity" for the sea, Myanmar and Cambodia. Child SHA-256 `ba888015...`, 7.8 MB; older-person
-`7e9e0b5a...`, 7.3 MB. Disability
+sensitivity" for the sea, Myanmar and Cambodia. Child SHA-256 `acbb0d1a...`, 6.5 MB; older-person
+`fbe09c44...`, 6.4 MB. Checked against the source at 3,000 random cells: 100% identical overall and
+99.6% at coast and border cells (the rest are sub-pixel projection edges). Disability
 was not prepared. **To submit:** the owner hosts both files at a public direct-download URL (no
 login, no HTML interstitial), confirms or corrects the licence and vintage in the draft, and says
 go. Then `contribute_submit(kind="raster", manifest=...)` once per layer; it lands **staged**
@@ -162,6 +163,15 @@ go. Then `contribute_submit(kind="raster", manifest=...)` once per layer; it lan
 not retry a timed-out submit: list with `contribute_status` first. Global Risk's embedded
 `hazard_map` is not known to draw a contributed vulnerability layer, so the overlay with flood stays
 on GRP's own map.
+
+The files were first built by area average, which blended the source's 0 padding into coastal and
+border cells; they were rebuilt with the nearest source cell and clipped on cell centres, and the
+SHA-256 values in `report.json` and `manifest-draft.json` are the rebuilt ones.
+
+**Two silent-failure lessons from this slice.** (1) Each district on the map is an `L.geoJSON`
+group with no `getLatLngs`, so the first mask read nothing and never drew; it now reads
+`state.selected.geometry`. (2) The map previews carry the unclipped wash outside Thailand (known gap,
+ADR-0030). Neither the mask nor the legend nor the centre line has been viewed in a browser yet.
 
 ### Session of 25 September (evening): where things stand
 

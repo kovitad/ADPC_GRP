@@ -65,8 +65,10 @@ sub-district's value, the map shows "which sub-districts", and the legend and ce
    indicators are on the map and that no count of vulnerable people exists. The citation carries no
    digits, so `cited_local_numbers` cannot turn it into a withheld receipt.
 6. **Contribution to Global Risk is prepared, not submitted.** Child and older-person sensitivity
-   are converted to EPSG:4326 GeoTIFFs with nodata declared, averaged to a stated coarser
-   resolution, with a manifest that says GRP derived them. Submission waits for the Product Owner to
+   are converted to EPSG:4326 GeoTIFFs at 0.0025 degrees with nodata declared, taking the
+   nearest source cell (the source is constant per sub-district, and averaging would blend its 0
+   padding into coastal and border cells), clipped to Thailand on cell centres, with a manifest
+   that says GRP derived them. Submission waits for the Product Owner to
    host the files at a public URL and say go. Disability is not prepared.
 
 ## Consequences
@@ -74,5 +76,9 @@ sub-district's value, the map shows "which sub-districts", and the legend and ce
 - Planners can see where sensitivity is relatively higher and read it at a centre, but nothing tells
   them how many vulnerable people are there, because nothing can.
 - A future method under DEP-07 would replace decision 3, and would need its own ADR.
+- **Known gap:** the stored map previews were rendered from the unclipped rasters, so with no
+  district selected the sea, Myanmar and Cambodia carry a faint "lower" wash. The previews belong to
+  immutable versions and are not rewritten in place; a new vulnerability importer version should
+  clip to Thailand. The district mask hides it once an area is selected.
 - The preview stays at about 1.4 km per pixel. A sharper per-district render is a separate
   worker-side job if planners need it.

@@ -1311,13 +1311,17 @@
 
   // Each outer ring of the selected area becomes a hole in a world-sized polygon, so everything
   // outside the district is dimmed and the relative pattern inside it reads on its own.
+  // Read from the GeoJSON itself: each district on the map is an L.geoJSON group, which has no
+  // getLatLngs, so asking the layer silently returned nothing and the mask never drew.
   const selectedRings = () => {
-    if (!state.selected) return [];
-    const layer = districtLayer.getLayers().find((item) => item.boundaryId === state.selected.id);
-    if (!layer || typeof layer.getLatLngs !== "function") return [];
-    const latlngs = layer.getLatLngs();
-    const parts = window.L.LineUtil.isFlat(latlngs[0]) ? [latlngs] : latlngs;
-    return parts.map((part) => part[0]).filter((ring) => ring && ring.length > 2);
+    const geometry = state.selected && state.selected.geometry;
+    if (!geometry) return [];
+    const polygons = geometry.type === "Polygon"
+      ? [geometry.coordinates]
+      : geometry.type === "MultiPolygon" ? geometry.coordinates : [];
+    return polygons
+      .map((polygon) => (polygon[0] || []).map(([lon, lat]) => [lat, lon]))
+      .filter((ring) => ring.length > 2);
   };
 
   const syncSensitivityView = () => {
