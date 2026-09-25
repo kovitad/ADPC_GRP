@@ -368,6 +368,61 @@ def test_explain_uses_only_stored_result_and_counts_tokens(world) -> None:
         assert forbidden not in text
 
 
+def test_an_explanation_names_centres_by_reference_so_a_map_can_show_them(world) -> None:
+    """The ids are issued by GRP and validated on the way back, never matched from prose."""
+
+    client = _client(world, "planner@example.test")
+    seed = world["seed"]
+    submitted = client.post(
+        "/api/v1/assessments",
+        headers={"Idempotency-Key": str(uuid4())},
+        json={
+            "hub_code": "adpc",
+            "boundary_id": seed.boundary_id,
+            "hazard": {
+                "type": "flood",
+                "return_period_years": 100,
+                "dataset_version_id": seed.hazard_version_id,
+            },
+            "evacuation_centers_dataset_version_id": seed.centers_version_id,
+            "method": {"key": "center-flood-overlay", "version": "1.0.0"},
+        },
+    ).json()
+    assessment_id = submitted["assessment_id"]
+    with Session(world["engine"]) as session:
+        process_job(session, world["storage"], claim_next_job(session, lease_minutes=15))
+    prompts: list[str] = []
+
+    async def provider(settings, *, instructions, prompt, hub_code):
+        prompts.append(prompt)
+        # Two real refs and one the model invented.
+        return (
+            "Consider the first [[C1]] and the second [[C2]], not [[C99]].",
+            "test-model",
+            300,
+            40,
+        )
+
+    world["monkeypatch"].setattr(api.ai_gateway, "call_openai", provider)
+
+    body = client.post(
+        f"/api/v1/assessments/{assessment_id}/explain",
+        json={"question": "Which centers could not be assessed?"},
+    ).json()
+
+    sent = json.loads(prompts[0])
+    refs = [centre["ref"] for centre in sent["result"]["centers"]]
+    assert refs[:2] == ["C1", "C2"]
+    # The answer a planner reads carries no markers.
+    assert "[[" not in body["answer"]
+    # Two resolved to real feature ids; the invented one was dropped and counted.
+    centers = client.get(f"/api/v1/assessments/{assessment_id}/centers?size=200").json()
+    valid = {row["feature_id"] for row in centers["centers"]}
+    assert len(body["focus"]["centers"]) == 2
+    assert set(body["focus"]["centers"]) <= valid
+    assert body["focus"]["unresolved_references"] == 1
+
+
 def _router_then(world: dict, *replies: str) -> list[str]:
     queue = list(replies)
     prompts: list[str] = []

@@ -940,14 +940,17 @@
     if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
-  // An answer that names centres should be able to point at them. The names are matched against
-  // our own centre records, never parsed out of the text, so a miss simply offers nothing.
-  const centresNamedIn = (text) => {
-    const haystack = String(text || "");
-    if (!haystack) return [];
-    return state.centerRows.filter(
-      (center) => center.name && haystack.includes(center.name),
-    );
+  // An answer that names centres should be able to point at them. The server resolves the model's
+  // reference markers against the ids it issued and returns that list, so this is an exact id
+  // lookup rather than the name matching it replaced: a truncated or reworded name no longer
+  // breaks the link, and a reference GRP did not issue never arrives here at all.
+  const centresNamedIn = (payload) => {
+    const ids = payload && payload.focus && Array.isArray(payload.focus.centers)
+      ? payload.focus.centers
+      : [];
+    if (!ids.length) return [];
+    const byId = new Map(state.centerRows.map((center) => [center.feature_id, center]));
+    return ids.map((id) => byId.get(id)).filter(Boolean);
   };
 
   const showCentresOnMap = (centres) => {
@@ -2692,7 +2695,7 @@
       } else if (payload.mode === "explain_result") {
         // The answer names centres; offer to show exactly those on the map, which is what a
         // planner asks next when a brief lists seven places they cannot locate.
-        const named = centresNamedIn(payload.answer);
+        const named = centresNamedIn(payload);
         if (named.length) {
           actions = [chipButton(
             named.length === 1

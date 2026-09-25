@@ -224,7 +224,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925e" in page
+    assert "/planning.js?v=20260925f" in page
     assert "/planning.css?v=20260925d" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
@@ -307,7 +307,7 @@ def test_the_planning_workspace_is_adjustable_and_does_not_cover_the_map() -> No
     assert "max-height: 45vh" in styles
 
     # An explanation that names centres can point at them on the map.
-    assert "const centresNamedIn = (text)" in script
+    assert "const centresNamedIn = (payload)" in script
     assert "const showCentresOnMap = (centres)" in script
     assert 'payload.mode === "explain_result"' in script
 

@@ -869,7 +869,7 @@ async def planning_chat(
                 "label": "No result to explain yet.",
                 "usage": _usage(session, settings, principal),
             }
-        answer = await explain_stored_result(
+        answer, references = await explain_stored_result(
             session,
             settings,
             principal,
@@ -883,6 +883,7 @@ async def planning_chat(
             "mode": "explain_result",
             "answer": answer.text,
             "label": answer.label,
+            "focus": references.payload,
             "assessment_id": str(current.id),
             "usage": _usage(session, settings, principal),
         }

@@ -20,7 +20,37 @@ more than a missing feature. Ordered so the top item is the next one to pick up.
 | ~~U4~~ | ~~**Buttons are oversized and inconsistent with the rest of the workspace.** Owner: "the button very bug and uglis". Align the assessment page controls with the Planning workspace button scale and hierarchy: one primary action per view, secondary actions demoted~~ — **done 25 Sep**, commit `2d87f43`: `.button--compact` at 2.2rem matching Planning's toolbar, one primary per page | S | — | The page uses the shared button styles; only the primary action is visually prominent |
 | ~~U5~~ | ~~**Switching from an assessment to Planning gives an unpredictable result.** Owner: "swich to planning unpredicable the result". Define and implement what carries across: the selected area, the pinned scenario, and whether the locked result stays on the map. Today the transition depends on which panel rendered last and whether `preserveAssessment` was passed~~ — **done 25 Sep**, commit `2d87f43`: the area is fetched and the level switched so the outline can be drawn, the previously selected area is dropped on arrival, the return period is aligned, and the carry-over is stated | M | U1 | Moving between Flood assessment and Planning keeps the selected area and states plainly on screen whether the locked result is still shown |
 
+| U6 | ~~**An answer cannot be linked to the map.**~~ Owner: "we dont have key value pair intelligent enough to do this". An explanation named seven centres a planner could not locate; the first attempt matched names as strings, which fails on a truncated or reworded name~~ — **done 25 Sep**: GRP issues a short ref per centre, the model marks the ones it names, and `core/answer_references.py` resolves them back to feature ids, dropping any ref GRP did not issue. The API returns `focus: {centers, unresolved_references}` | M | — | An explanation's named centres appear on the map by id, and an invented reference is dropped and counted |
+
 > **Epic U is complete** (U1-U5, 25 September 2026). The owner has not yet re-tested U3-U5; treat their next report as the acceptance check.
+
+## Epic V — Golden question and golden answer evaluation (owner PoC, planned)
+
+The Product Owner is planning an evaluation harness: a golden question runs through GRP, and the
+actual answer is scored on three lanes — **facts** and **evidence** by code, **meaning** by a
+judge model. Nothing here is built yet; this records what the platform already offers it, so the
+harness is not designed around prose parsing.
+
+Machine-checkable today, without reading the answer text:
+
+| Lane | What to assert | Where it comes from |
+| --- | --- | --- |
+| Facts | The counts in the locked result | `summary` in the assessment payload; invariants already enforced by `core/result_rules.py` |
+| Facts | The centres an answer names | `focus.centers` — validated feature ids (U6), plus `focus.unresolved_references`, which must be 0 for a passing answer |
+| Evidence | Every paragraph carries a citation, and cites only this pack | `_draft_issues`, already split into groundedness versus structure by `_split_draft_issues` |
+| Evidence | Which citations were GRP's own rather than SIG's | `_grp_local_citation_numbers` on the pack |
+| Evidence | Whether the evidence was freshly pulled | the `trace` steps, including `assemble_pack_reused` |
+| Meaning | Everything else | the judge model |
+
+| # | Item | Size | Blocked by | Done when |
+|---|---|---|---|---|
+| V1 | A golden-question fixture format, and a runner that drives the chat endpoint with a stubbed provider so a case is deterministic | M | — | One golden question runs offline and reports per-lane results |
+| V2 | Fact assertions over `summary` and `focus.centers`; a case fails if `unresolved_references` is not 0 | S | V1 | A regression in centre linking fails a golden case, not a human review |
+| V3 | Evidence assertions over `_draft_issues` and the trace | S | V1 | A brief that cites evidence outside its pack fails |
+| V4 | The judge lane, kept separate so a meaning failure never masks a fact failure | M | V1 | A run reports facts, evidence and meaning independently |
+
+> Keep the judge out of the fact and evidence lanes. The point of the split is that a numeric or
+> citation regression is caught by code that cannot be talked round.
 
 ## Epic A — Prove and load the real data
 
