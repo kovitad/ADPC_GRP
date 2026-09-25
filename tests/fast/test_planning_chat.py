@@ -319,7 +319,9 @@ def test_deterministic_summary_reports_findings_hidden_by_display_limit() -> Non
         pack, movement_unavailable=False
     )
 
-    assert "Plus 4 more numbered finding(s) in the Evidence tab" in answer
+    # Three are shown and the remaining seven are pointed to, so the digest stays a digest.
+    assert "Plus 7 more numbered finding(s) in the Evidence tab" in answer
+    assert answer.count("- Computed finding") == 3
 
 
 def test_sig_mcp_client_initializes_then_calls_tool() -> None:
@@ -1220,3 +1222,70 @@ def test_a_pack_with_no_grp_rows_has_no_grp_section() -> None:
 
     assert "GRP data library" not in summary
     assert summary.startswith("## Available data")
+
+
+def test_only_an_ungrounded_brief_is_replaced_by_the_digest() -> None:
+    """A missing heading must not discard a brief whose every number is cited."""
+
+    fatal, cosmetic = api.planning._split_draft_issues([
+        "Missing required heading: What the numbers show",
+        "A paragraph has no evidence citation",
+        "The brief must not add its own Sources section",
+        "The brief cites evidence that is not in this pack",
+    ])
+
+    assert fatal == [
+        "A paragraph has no evidence citation",
+        "The brief cites evidence that is not in this pack",
+    ]
+    assert cosmetic == [
+        "Missing required heading: What the numbers show",
+        "The brief must not add its own Sources section",
+    ]
+
+
+def test_an_unapproved_risk_level_is_always_fatal() -> None:
+    fatal, cosmetic = api.planning._split_draft_issues([
+        "The brief includes an unapproved vulnerability-weighted risk level",
+    ])
+
+    assert fatal and not cosmetic
+
+
+def test_a_structurally_incomplete_brief_is_shown_but_not_publishable(planning) -> None:
+    # The draft cites evidence 1 but omits the required heading, which used to replace it with a
+    # bullet list of SIG's raw citation texts.
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## In short\nThree of nine schools are in the flood extent [1].",
+    ]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    assert body["answer_source"] == "ai_draft"
+    assert "Three of nine schools" in body["answer"]
+    # Still unpublishable, and the reason is stated.
+    assert body["publish_token"] is None
+    assert any("Missing required heading" in issue for issue in body["draft_issues"])
+    assert "cannot be published as a receipt" in body["label"]
+
+
+def test_a_brief_that_cites_nothing_is_still_replaced(planning) -> None:
+    planning["replies"] += [
+        '{"mode": "sig_flood", "reply": ""}',
+        "## What the numbers show\nEverything is fine and no source is given.",
+    ]
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="Which schools are exposed?",
+        place="Mueang Nan District, Nan, Thailand",
+    ).json()
+
+    assert body["answer_source"] == "deterministic_fallback"
+    assert "Everything is fine" not in body["answer"]
+    assert "does not support" in body["label"]

@@ -281,14 +281,11 @@
     if (typeof s.potentially_exposed !== "number" || typeof s.in_scope !== "number") {
       return "Completed";
     }
-    if (!s.in_scope) return "No evacuation centres are recorded in this area";
-    // The delivered flood layer records a depth only where it floods, so an unassessed centre is
-    // not a safe one. Where nothing could be assessed, say that rather than "0 may be exposed",
-    // which reads as an all-clear (see handovers.md 0.2).
-    if (!s.potentially_exposed && s.unable_to_assess === s.in_scope) {
-      return `None of ${s.in_scope.toLocaleString()} centres could be assessed `
-        + "— no modelled flood depth there";
-    }
+    if (!s.in_scope) return "N/A";
+    // Nothing could be assessed. "0 of N may be exposed" would read as an all-clear, because the
+    // delivered layer records a depth only where it floods (handovers.md 0.2), so the cell says
+    // N/A and the reason is on hover rather than spelled out in the row.
+    if (!s.potentially_exposed && s.unable_to_assess === s.in_scope) return "N/A";
     const parts = [`${s.potentially_exposed.toLocaleString()} of `
       + `${s.in_scope.toLocaleString()} centres may be exposed`];
     if (s.unable_to_assess) {
@@ -309,7 +306,14 @@
     ref.textContent = `${a.support_ref}${a.synthetic ? " · synthetic test data" : ""}`;
     area.append(ref);
 
-    GRP.cell(row, resultText(a));
+    const resultCell = GRP.cell(row, resultText(a));
+    if (resultText(a) === "N/A") {
+      const s = a.summary || {};
+      resultCell.title = s.in_scope
+        ? `None of ${s.in_scope} recorded centres could be assessed: the flood layer holds no `
+          + "modelled depth there. Not a finding that they are safe."
+        : "No evacuation centres are recorded in this area.";
+    }
     GRP.cell(row, GRP.formatTime(a.submitted_at));
     GRP.cell(row, SHARING_TEXT[a.sharing_state] || a.sharing_state);
 

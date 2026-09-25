@@ -704,14 +704,28 @@
       });
     }
     if (announce && !state.busy) {
-      addMessage("assistant", `${boundary.name} is selected. The available flood and evacuation-centre layers are shown on the map.`, {
-        actions: [chipButton("Show SIG information", () => {
-          const place = canonicalSigPlace(boundary);
-          return send(`Show the available flood, risk and population information for ${place}.`, {
-            confirmedPlace: place,
-          });
-        })],
-      });
+      // Name what the planner gets, not the system it comes from. "Show SIG information" described
+      // a call; these describe an answer, and the first two need no SIG lookup at all.
+      const place = canonicalSigPlace(boundary);
+      const askSig = (question) => () => send(question, { confirmedPlace: place });
+      addMessage(
+        "assistant",
+        `${boundary.name} is selected. Its flood and evacuation-centre layers are on the map, and `
+        + "its population and centre counts are in the People tab. Ask a question, or pick one:",
+        {
+          actions: [
+            chipButton("How many people live here?", askSig(
+              `How many people live in ${place}, and how many are inside the flood extent?`,
+            )),
+            chipButton("What evacuation centres are here?", askSig(
+              `What evacuation centres are recorded in ${place}, and what kind of places are they?`,
+            )),
+            chipButton("What does SIG add?", askSig(
+              `Show the available SIG flood, risk and population information for ${place}.`,
+            )),
+          ],
+        },
+      );
     }
     syncRunPanel();
   };

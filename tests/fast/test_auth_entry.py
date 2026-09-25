@@ -224,7 +224,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925b" in page
+    assert "/planning.js?v=20260925c" in page
     assert "/planning.css?v=20260925a" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
@@ -241,7 +241,7 @@ def test_assessments_and_planning_share_compatible_result_context() -> None:
 
     assert 'data-open-planning' in assessment_page
     assert 'data-incompatible' in assessment_page
-    assert "/assessments.js?v=20260925b" in assessment_page
+    assert "/assessments.js?v=20260925c" in assessment_page
     assert "Boolean(dataset.synthetic) === Boolean(boundary.synthetic)" in assessment_script
     assert "Real district: synthetic test inputs are excluded." in assessment_script
     assert "/planning.html?assessment_id=" in assessment_script
