@@ -112,6 +112,12 @@
   const supportingMapLayers = new Map();
   const supportingCollections = new Map();
   const vulnerabilityMapLayers = new Map();
+  // ADR-0030: explicit panes, because image overlays and vectors otherwise share overlayPane and
+  // stack by insertion order, which would let the district mask dim the flood layer and the pins.
+  map.createPane("grpSensitivity").style.zIndex = "350";
+  map.createPane("grpSensitivityMask").style.zIndex = "380";
+  map.getPane("grpSensitivityMask").style.pointerEvents = "none";
+  let sensitivityMask = null;
   const centerRenderer = window.L.canvas({ padding: 0.35 });
   const centerMarkers = new Map();
   let centerFilter = "all";
@@ -736,6 +742,7 @@
     placeLayer.clearLayers();
     $("[data-place-chip]").hidden = true;
     districtLayer.eachLayer((layer) => layer.setStyle(boundaryStyle(layer.boundaryId === boundary.id)));
+    syncSensitivityView();
     const layer = districtLayer.getLayers().find((item) => item.boundaryId === boundary.id);
     if (layer) map.flyToBounds(layer.getBounds(), { padding: [60, 60], duration: 0.6 });
     renderContext();
@@ -1166,7 +1173,10 @@
     state.localContext = {
       boundaryId,
       supporting,
-      vulnerability: state.vulnerabilityLayers.filter((item) => item.available),
+      // A withheld indicator (ADR-0030) is not counted as available to the planner.
+      vulnerability: state.vulnerabilityLayers.filter(
+        (item) => item.available && item.planner_status !== "withheld",
+      ),
     };
     return state.localContext;
   };
@@ -1215,6 +1225,13 @@
     const vulnerability = $("[data-vulnerability-layer-controls]");
     vulnerability.replaceChildren();
     state.vulnerabilityLayers.forEach((source) => {
+      if (source.planner_status === "withheld") {
+        const withheld = document.createElement("p");
+        withheld.className = "pw-muted pw-withheld";
+        withheld.textContent = `${source.title}: ${source.withheld_reason}`;
+        vulnerability.append(withheld);
+        return;
+      }
       const label = document.createElement("label");
       label.className = "pw-toggle";
       const toggle = document.createElement("input");
@@ -1230,15 +1247,50 @@
           overlay = window.L.imageOverlay(URL.createObjectURL(await response.blob()), source.bounds, {
             opacity: 0.62,
             interactive: false,
+            pane: "grpSensitivity",
           });
           vulnerabilityMapLayers.set(source.version_id, overlay);
         }
         if (toggle.checked) overlay?.addTo(map);
         else overlay?.remove();
+        syncSensitivityView();
       });
       label.append(toggle, title);
       vulnerability.append(label);
     });
+  };
+
+  const sensitivityShown = () =>
+    Array.from(vulnerabilityMapLayers.values()).some((overlay) => map.hasLayer(overlay));
+
+  // Each outer ring of the selected area becomes a hole in a world-sized polygon, so everything
+  // outside the district is dimmed and the relative pattern inside it reads on its own.
+  const selectedRings = () => {
+    if (!state.selected) return [];
+    const layer = districtLayer.getLayers().find((item) => item.boundaryId === state.selected.id);
+    if (!layer || typeof layer.getLatLngs !== "function") return [];
+    const latlngs = layer.getLatLngs();
+    const parts = window.L.LineUtil.isFlat(latlngs[0]) ? [latlngs] : latlngs;
+    return parts.map((part) => part[0]).filter((ring) => ring && ring.length > 2);
+  };
+
+  const syncSensitivityView = () => {
+    const shown = sensitivityShown();
+    $("[data-sensitivity-legend]").hidden = !shown;
+    if (sensitivityMask) {
+      sensitivityMask.remove();
+      sensitivityMask = null;
+    }
+    const rings = shown ? selectedRings() : [];
+    if (!rings.length) return;
+    const world = [[-89, -179.9], [-89, 179.9], [89, 179.9], [89, -179.9]];
+    sensitivityMask = window.L.polygon([world, ...rings], {
+      pane: "grpSensitivityMask",
+      stroke: false,
+      fillColor: "#f4f6f5",
+      fillOpacity: 0.72,
+      interactive: false,
+    }).addTo(map);
   };
 
   $("[data-centre-search]").addEventListener("input", renderCenterList);

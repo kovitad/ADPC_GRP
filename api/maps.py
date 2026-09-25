@@ -171,6 +171,7 @@ def map_layers(
             "display_only": True,
             "meaning": version.meta.get("meaning"),
             "display_range": version.meta.get("display_range"),
+            **_planner_status(version.meta.get("indicator_key")),
         }
         for version, dataset in rows
         if dataset.type == "vulnerability" and version.is_current
@@ -184,6 +185,24 @@ def map_layers(
         "vulnerability": vulnerability,
         "note": "Available source layers are displayed directly; an assessment is optional.",
     }
+
+
+# ADR-0030: an indicator a planner cannot read is withheld with the reason, not silently dropped.
+# The disability layer is class 1 in all but 1,234 of 40,951,275 sampled cells and its classes are
+# undocumented, so it draws as one flat colour. Admins still see it in the data library.
+WITHHELD_INDICATORS = {
+    "disability_support": (
+        "Waiting for the data owner: this layer is class 1 almost everywhere and its four classes "
+        "are not yet explained."
+    ),
+}
+
+
+def _planner_status(indicator_key: object) -> dict[str, object]:
+    reason = WITHHELD_INDICATORS.get(str(indicator_key or ""))
+    if reason:
+        return {"planner_status": "withheld", "withheld_reason": reason}
+    return {"planner_status": "shown", "withheld_reason": None}
 
 
 @router.get(

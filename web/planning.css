@@ -93,6 +93,23 @@
   font-weight: 700;
   white-space: nowrap;
 }
+/* ADR-0030: the colours match _render_vulnerability_preview's stretch, low to high. */
+.pw-sensitivity-legend { margin: 0.35rem 0 0.5rem; }
+.pw-sensitivity-legend__bar {
+  display: block;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(75, 75, 120, 0.14), rgba(160, 35, 225, 0.71));
+}
+.pw-sensitivity-legend__ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.15rem;
+  color: var(--pw-muted);
+  font-size: 0.72rem;
+}
+.pw-sensitivity-legend p { margin: 0.25rem 0 0; font-size: 0.72rem; line-height: 1.4; }
+.pw-withheld { font-size: 0.74rem; line-height: 1.4; }
 .pw-pill { display: inline-flex; align-items: center; gap: 0.3rem; }
 .pw-pill svg {
   width: 14px;
