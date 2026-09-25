@@ -1,10 +1,26 @@
 # GRP backlog
 
-**Updated:** 18 September 2026. Ordered so the top item is always the next sensible one to pick up.
+**Updated:** 25 September 2026. Ordered so the top item is always the next sensible one to pick up.
 
 How to read this: **S** is about a day, **M** two to four days, **L** a week or more, for one developer who has read `handovers.md`. "Blocked by" names another team; do not start those without the answer. Every item must meet the definition of done in [`development-plan.md`](development-plan.md). The cross-cutting baseline/import/Hub-override design is in [`data-library-sig-assessment-design.md`](data-library-sig-assessment-design.md). ADR-0008 closes the P0 design choices for the bounded local baseline; execute [`baseline-data-library-implementation-plan.md`](baseline-data-library-implementation-plan.md) in order. Browser upload and server rollout remain gated by the senior review.
 
 ---
+
+## Epic U — Planner workspace UX (owner report, 25 September 2026) — **do first**
+
+Raised by the Product Owner while testing the Planning and Flood assessment pages. These are not
+cosmetic: an inconsistent panel makes a planner distrust numbers that are correct, and that costs
+more than a missing feature. Ordered so the top item is the next one to pick up.
+
+| # | Item | Size | Blocked by | Done when |
+|---|---|---|---|---|
+| U1 | **People tab flaps between the real figures and the old raster page.** Owner: "sometimes people tab show stat sometime show the old page ... for some district or even from assessment then click". Five causes, diagnosed 25 Sep: the area profile is requested only inside `selectBoundary` and only when the id changes, so any panel render without a fresh selection shows the fallback; the load is fire-and-forget so a later re-render does not re-request it and the stale page sticks; the three panel modes pass different arguments so which data wins depends on call order; `setPanelMode` force-clicks the Summary tab on every mode change, throwing the user off People; and pending, empty and 404 states all fall through to the raster page. Fix by making the tab a pure function of `state.areaProfile` / `state.sigPopulation` / `state.areaProfileState`, showing GRP and SIG sections together rather than either-or, adding an idempotent `ensureAreaProfile()` called from all three panel modes, giving loading and unavailable their own honest text, demoting the rasters to a permanent one-line footer, and preserving the active tab across re-renders | M | — | Clicking any district, any sub-district, or opening an assessment then clicking, shows the same tab content and leaves the user on the tab they chose; no state shows the raster page as a stand-in for data |
+| U2 | **Flood assessment "Pick an area" loads every district into one select.** Owner: "the page is heavy need to load all district and put one drop down box ... not good ux". Replace with province → district → sub-district cascading pickers plus a type-ahead search, fetching each level on demand instead of shipping 928 districts (and 7,436 sub-districts) to the browser. `/api/v1/catalog/boundaries` already takes `level` and `parent_admin_code`, so the server side exists | M | — | The page loads without fetching every area; a planner can find an area by typing part of its name; picking a province narrows the district list |
+| U3 | **Assessment history table is large and gives the planner nothing to do.** Owner: "the assssment history table is big and not sure what to do the". Decide the two or three actions a planner actually takes from a past assessment (reopen on the map, compare, publish receipt), show those as row actions, and collapse or paginate the rest | S | U2 helps but not required | Each row offers a clear next action; the table does not dominate the page |
+| U4 | **Buttons are oversized and inconsistent with the rest of the workspace.** Owner: "the button very bug and uglis". Align the assessment page controls with the Planning workspace button scale and hierarchy: one primary action per view, secondary actions demoted | S | — | The page uses the shared button styles; only the primary action is visually prominent |
+| U5 | **Switching from an assessment to Planning gives an unpredictable result.** Owner: "swich to planning unpredicable the result". Define and implement what carries across: the selected area, the pinned scenario, and whether the locked result stays on the map. Today the transition depends on which panel rendered last and whether `preserveAssessment` was passed | M | U1 | Moving between Flood assessment and Planning keeps the selected area and states plainly on screen whether the locked result is still shown |
+
+> U1 is first because the other four are judged against a panel that currently contradicts itself.
 
 ## Epic A — Prove and load the real data
 
