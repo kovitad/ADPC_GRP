@@ -55,6 +55,7 @@ from core.local_evidence import (
     attach_local_citations,
     cited_local_numbers,
     local_area_citations,
+    sensitivity_citation,
 )
 from core.models import AssessmentState
 from core.risk_recipe import RiskRecipe, active_risk_recipe, recipe_payload
@@ -1151,6 +1152,9 @@ async def _answer_chat(
             if local_boundary is not None
             else []
         )
+        # ADR-0030: only for questions about vulnerable people; see sensitivity_citation.
+        if (indicators := sensitivity_citation(session, payload.message)) is not None:
+            local_records.append(indicators)
         pack = attach_local_citations(pack, local_records)
         trace.append(
             {

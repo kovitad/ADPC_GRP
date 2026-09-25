@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -1615,3 +1616,52 @@ def test_starting_over_needs_the_csrf_header(planning) -> None:
     del client.headers["X-CSRF-Token"]
 
     assert client.delete("/api/v1/planning/conversation").status_code == 403
+
+
+# --- sensitivity indicators in the brief (ADR-0030) --------------------------------------
+
+
+INDICATOR_CITATION_TITLE = "Vulnerability indicator maps in the GRP data library"
+
+
+def _add_sensitivity_layers(world: dict) -> None:
+    with Session(world["engine"]) as session:
+        for key, title in (("child_sensitivity", "Child sensitivity"),
+                           ("elderly_sensitivity", "Older-person sensitivity")):
+            dataset = Dataset(id=uuid4(), type="vulnerability", owner_kind="platform",
+                              title=title, provider="ADPC Data Science delivery")
+            session.add(dataset)
+            session.add(DatasetVersion(id=uuid4(), dataset_id=dataset.id, sha256="d" * 64,
+                                       meta={"indicator_key": key}, readiness="technically_valid",
+                                       is_current=True))
+        session.commit()
+
+
+def test_a_question_about_vulnerable_people_is_told_what_the_map_can_say(planning) -> None:
+    _add_sensitivity_layers(planning)
+    planning["replies"] += SIG_TURN
+    body = _ask(_client(planning, "planner@example.test"),
+                message="How many children and older people are exposed?", place=NAN).json()
+
+    notes = [c for c in body["citations"] if c["title"] == INDICATOR_CITATION_TITLE]
+    assert len(notes) == 1
+    assert "not counts" in notes[0]["text"]
+    assert not re.search(r"\d", notes[0]["text"])
+
+
+def test_a_plain_flood_question_keeps_its_receipt_when_indicators_exist(planning) -> None:
+    _add_sensitivity_layers(planning)
+    planning["replies"] += SIG_TURN
+    body = _ask(_client(planning, "planner@example.test"),
+                message="Which schools are exposed?", place=NAN).json()
+
+    assert not [c for c in body["citations"] if c["title"] == INDICATOR_CITATION_TITLE]
+    assert body["publish_token"]
+
+
+def test_managed_is_not_read_as_aged() -> None:
+    from core.local_evidence import VULNERABLE_QUESTION
+
+    assert not VULNERABLE_QUESTION.search("How is the evacuation managed here?")
+    assert VULNERABLE_QUESTION.search("ผู้สูงอายุอยู่ที่ไหน")
+    assert VULNERABLE_QUESTION.search("Where do elderly people live?")

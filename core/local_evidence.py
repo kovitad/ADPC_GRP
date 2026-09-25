@@ -16,6 +16,7 @@ Two deliberate constraints:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from sqlalchemy import func, select
@@ -275,6 +276,56 @@ def local_area_citations(session: Session, boundary: Boundary) -> list[dict[str,
 
     builders = (_population_citation, _exposure_citation, _shelter_citation)
     return [record for builder in builders if (record := builder(session, boundary)) is not None]
+
+
+# ADR-0030: a question about who is vulnerable gets told what the map can and cannot say. English
+# and Thai, because planners ask in both.
+VULNERABLE_QUESTION = re.compile(
+    # A leading word boundary on the English stems, so "managed" never reads as "aged".
+    r"\b(?:child|kid|elder|older|aged|senior|disab|vulnerab|mobility)"
+    r"|เด็ก|ผู้สูงอายุ|คนชรา|พิการ|เปราะบาง",
+    re.IGNORECASE,
+)
+
+
+def sensitivity_citation(session: Session, question: str) -> dict[str, Any] | None:
+    """One GRP citation naming the relative sensitivity indicators, for questions that need it.
+
+    Deliberately free of digits: it tells the brief what exists and what does not, and gives it no
+    figure to quote. Attached only to questions about vulnerable people, because any cited GRP
+    record withholds the SIG receipt (``cited_local_numbers``), and a plain flood question must
+    keep its receipt.
+    """
+
+    if not VULNERABLE_QUESTION.search(question or ""):
+        return None
+    keys = set(
+        session.scalars(
+            select(DatasetVersion.meta["indicator_key"].as_string())
+            .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+            .where(Dataset.type == "vulnerability", DatasetVersion.is_current)
+        )
+    )
+    shown = [label for key, label in (
+        ("child_sensitivity", "child sensitivity"),
+        ("elderly_sensitivity", "older-person sensitivity"),
+    ) if key in keys]
+    if not shown:
+        return None
+    return {
+        "title": "Vulnerability indicator maps in the GRP data library",
+        "text": (
+            f"The GRP map shows {' and '.join(shown)} as relative indices from the ADPC data "
+            "delivery. They show where sensitivity is relatively higher or lower. They are not "
+            "counts: the GRP data library holds no count of children, older people or people with "
+            "disabilities. A disability indicator is withheld until the data owner explains its "
+            "classes."
+        ),
+        "source": "GRP data library: ADPC sensitivity indicators",
+        "retrieval": RETRIEVAL,
+        "validation": "Display-only source indicators (ADR-0015, ADR-0030).",
+        "kind": "grp_sensitivity_indicators",
+    }
 
 
 def attach_local_citations(
