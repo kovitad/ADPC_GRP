@@ -221,7 +221,7 @@
       const restored = document.createElement("p");
       restored.className = "pw-draft-warning";
       restored.textContent =
-        "Restored evidence from this browser tab. SIG is currently disconnected; sign in again before refreshing it.";
+        "Restored from your conversation. SIG is disconnected: you can keep asking about this area while its evidence is under an hour old, but sign in again to gather it anew.";
       bubble.querySelector(".pw-bubble__label").before(restored);
     }
     scrollDown();
@@ -230,6 +230,8 @@
   const STEP_LABELS = {
     understand_question: "Understood the question",
     assemble_pack: "Gathered SIG flood evidence",
+    assemble_pack_reused: "Reused SIG evidence",
+    grp_baseline_evidence: "Added GRP figures",
     draft: "Wrote the brief",
     publish_answer: "SIG source check and receipt",
     hazard_map: "Loaded SIG flood map",
@@ -2472,6 +2474,13 @@
         };
         $("[data-ev-foot]").textContent =
           "Unverified draft: not yet checked by SIG. Publishing checks this exact text and creates a shareable public receipt only if it passes.";
+      } else if (payload.publish_needs_fresh_evidence) {
+        mapButton.textContent = "Gather fresh evidence to publish";
+        mapButton.onclick = () => send(message, {
+          echo: false, confirmedPlace: evidence.place, refresh: true,
+        });
+        $("[data-ev-foot]").textContent =
+          `This brief uses SIG evidence gathered ${evidenceGathered(payload) || "earlier"}. A public receipt needs evidence gathered in the last 5 minutes, so gather it again from SIG first. That takes a few minutes.`;
       } else {
         mapButton.textContent = "Retry AI brief";
         mapButton.onclick = () => send(message, {
@@ -2487,6 +2496,34 @@
     if (evidence.receipt && mapUrl) {
       showSigMap(mapUrl, evidence, payload.map_kind);
     }
+  };
+
+  // ADR-0029: evidence is reused for an hour, so any card that is not freshly gathered says when
+  // it was, beside the "pulled live" count that would otherwise read as live now.
+  const evidenceGathered = (payload) => {
+    const at = payload.evidence_assembled_at ? new Date(payload.evidence_assembled_at) : null;
+    if (!at || Number.isNaN(at.getTime())) return "";
+    const minutes = Math.max(0, Math.round((Date.now() - at.getTime()) / 60000));
+    const sameDay = at.toDateString() === new Date().toDateString();
+    const when = sameDay
+      ? at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : at.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+    if (minutes < 1) return `${when}, just now`;
+    if (minutes < 120) return `${when}, ${minutes} min ago`;
+    return when;
+  };
+
+  const gatherAgain = (payload, question, text = "Gather again from SIG") => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "link-button pw-status__again";
+    button.textContent = text;
+    button.addEventListener("click", () => send(question, {
+      echo: false,
+      confirmedPlace: payload.area?.requested || payload.evidence?.place,
+      refresh: true,
+    }));
+    return button;
   };
 
   const statusCard = (payload, question) => {
@@ -2505,7 +2542,9 @@
       ? `Receipt ${evidence.receipt.receipt_id}`
       : payload.answer_source === "deterministic_fallback"
         ? "Deterministic summary · not publishable"
-        : payload.publish_token ? "Unverified draft" : "Evidence only";
+        : payload.publish_token
+          ? "Unverified draft"
+          : payload.publish_needs_fresh_evidence ? "Gather again to publish" : "Evidence only";
     card.append(title);
     if (payload.note) {
       const note = document.createElement("span");
@@ -2525,7 +2564,7 @@
     if (payload.cached) {
       const timing = document.createElement("span");
       timing.className = "pw-status__timing";
-      timing.textContent = "Loaded immediately from this login’s 10-minute cache.";
+      timing.textContent = "Answered immediately: you asked this earlier in this sign-in.";
       card.append(timing);
     } else if (evidence.total_ms || steps.length) {
       const timing = document.createElement("span");
@@ -2533,6 +2572,14 @@
       const parts = steps.map((step) => `${STEP_LABELS[step.step] || step.step} ${seconds(step.duration_ms)}`);
       timing.textContent = `Took ${seconds(evidence.total_ms || 0)} · ${parts.join(" · ")}`;
       card.append(timing);
+    }
+    const gathered = evidenceGathered(payload);
+    if (gathered && (payload.evidence_reused || payload.cached || restoring)) {
+      const reuse = document.createElement("span");
+      reuse.className = "pw-status__reuse";
+      reuse.append(`SIG evidence gathered ${gathered} · reused, no new SIG call.`);
+      reuse.append(gatherAgain(payload, question));
+      card.append(reuse);
     }
     card.append(badge);
     return card;
@@ -2666,6 +2713,7 @@
         publish_receipt: publish,
         publish_token: publishToken,
         refresh,
+        echo,
         history: state.history.slice(-8),
       });
       typing.remove();
@@ -3116,6 +3164,74 @@
     });
   });
 
+  // A new tab, a closed tab or a new sign-in has nothing in sessionStorage. The server keeps the
+  // conversation (ADR-0029), so it is drawn from there rather than starting blank.
+  const conversationPath = () =>
+    `/api/v1/planning/conversation?hub_code=${encodeURIComponent(state.hubCode)}`;
+
+  const restoreConversation = async () => {
+    if (!state.chatAvailable || !state.hubCode) return;
+    let stored = null;
+    try {
+      stored = await GRP.request(conversationPath());
+    } catch (_error) {
+      return;
+    }
+    if (!stored.messages || !stored.messages.length) return;
+    restoring = true;
+    try {
+      stored.messages.forEach((entry) => {
+        if (entry.kind === "evidence" && entry.payload && entry.payload.evidence) {
+          const record = { kind: "evidence", payload: entry.payload, question: entry.question || "" };
+          transcript.push(record);
+          addEvidenceMessage(record.payload, record.question);
+        } else {
+          transcript.push({
+            kind: "message", role: entry.role, text: entry.text, label: entry.label || null, error: false,
+          });
+          addMessage(entry.role, entry.text, { label: entry.label, record: false });
+        }
+      });
+      state.history = stored.history || [];
+    } finally {
+      restoring = false;
+      saveState();
+    }
+  };
+
+  const welcomeTemplate = $("[data-welcome]").cloneNode(true);
+  let clearArmed = null;
+
+  const startOver = async (button) => {
+    // Two clicks, not a browser dialog: the first says what will be forgotten.
+    if (!clearArmed) {
+      button.textContent = "Forget chat and evidence?";
+      clearArmed = window.setTimeout(() => {
+        clearArmed = null;
+        button.textContent = "New conversation";
+      }, 4000);
+      return;
+    }
+    window.clearTimeout(clearArmed);
+    clearArmed = null;
+    button.disabled = true;
+    try {
+      await GRP.request(conversationPath(), { method: "DELETE" });
+      transcript.length = 0;
+      state.history = [];
+      state.sigAnswers.clear();
+      openEvidencePayload = null;
+      thread.replaceChildren(welcomeTemplate.cloneNode(true));
+      renderWelcome();
+      saveState();
+    } catch (error) {
+      addMessage("assistant", error.message, { label: error.code, error: true, record: false });
+    } finally {
+      button.disabled = false;
+      button.textContent = "New conversation";
+    }
+  };
+
   const restoreState = async ({ skipAssessment = false } = {}) => {
     let saved = null;
     try {
@@ -3123,9 +3239,12 @@
     } catch (_error) {
       saved = null;
     }
-    if (!saved) return;
-    if (saved.owner !== ownerEmail) {
+    if (saved && saved.owner !== ownerEmail) {
       sessionStorage.removeItem(STORE_KEY);
+      saved = null;
+    }
+    if (!saved) {
+      await restoreConversation();
       return;
     }
     restoring = true;
@@ -3285,6 +3404,9 @@
       renderWelcome();
       initChatResize();
       ownerEmail = identity.email;
+      const clearButton = $("[data-clear-chat]");
+      clearButton.hidden = !state.chatAvailable;
+      clearButton.addEventListener("click", () => startOver(clearButton));
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
       if (requestedAssessmentId) {
         // Arriving from Flood assessment. restoreState has just re-selected whatever area this

@@ -26,6 +26,7 @@ import api.data_library
 import api.integrations.sig
 import api.maps
 import api.permissions
+import api.planning
 import api.platform
 import api.uploads
 from api.dependencies import database_session
@@ -90,6 +91,10 @@ MATRIX = {
     "hazard_overlay": (401, 404, 404, 404, 403),
     "vulnerability_overlay": (401, 404, 404, 404, 403),
     "dataset_features": (401, 404, 404, 404, 403),
+    # ADR-0029: a planning conversation is its owner's, in a Hub they plan for. Every planning
+    # role reads its own; a Platform Admin with no planning membership has none to read.
+    "read_conversation": (401, 200, 200, 200, 403),
+    "clear_conversation": (401, 200, 200, 200, 403),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -144,6 +149,8 @@ MATRIX_OPERATION_IDS = {
         "vulnerability_overlay_api_v1_maps_vulnerability__version_id__overlay_png_get"
     ),
     "dataset_features": "dataset_features_api_v1_maps_datasets__version_id__features_get",
+    "read_conversation": "read_conversation_api_v1_planning_conversation_get",
+    "clear_conversation": "clear_conversation_api_v1_planning_conversation_delete",
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
@@ -213,11 +220,13 @@ def world(tmp_path_factory) -> Iterator[dict]:
         data_in_root=data_in,
         storage_root=tmp_path_factory.mktemp("managed-data"),
         shelter_browser_upload_enabled=True,
+        planning_chat_enabled=True,
     )
     patch = pytest.MonkeyPatch()
     for module in (
         api.access, api.admin, api.ai, api.auth, api.integrations.sig,
-        api.permissions, api.platform, api.data_inspector, api.data_library, api.maps, api.uploads,
+        api.permissions, api.planning, api.platform, api.data_inspector, api.data_library,
+        api.maps, api.uploads,
     ):
         patch.setattr(module, "get_settings", lambda: settings)
 
@@ -418,6 +427,8 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             None,
         ),
         "dataset_features": ("GET", f"/api/v1/maps/datasets/{user_id}/features", None),
+        "read_conversation": ("GET", "/api/v1/planning/conversation", None),
+        "clear_conversation": ("DELETE", "/api/v1/planning/conversation", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)

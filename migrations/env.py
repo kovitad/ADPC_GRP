@@ -9,6 +9,7 @@ from core import (  # noqa: F401
     assessment_models,
     data_library_models,
     inspection_models,
+    planning_memory_models,
 )
 from core.db import Base, get_database_url
 

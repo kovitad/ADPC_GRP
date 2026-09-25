@@ -3,7 +3,7 @@
 import asyncio
 import json
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -22,7 +22,7 @@ import api.planning
 from api.dependencies import database_session
 from api.main import app
 from api.mcp_client import McpToolResult, SigMcpClient
-from api.planning_cache import planning_answer_cache, sig_pack_cache
+from api.planning_cache import PlanningAnswerCache, planning_answer_cache
 from api.rate_limits import limiter
 from api.sessions import CSRF_COOKIE, set_session_cookie
 from api.settings import Settings
@@ -34,6 +34,7 @@ from core.ai_models import LlmUsage
 from core.assessment_models import Boundary, Dataset, DatasetVersion
 from core.data_library_models import AreaPopulationSummary
 from core.identity import IdentityLinkResult
+from core.planning_memory_models import PlanningChatMessage, PlanningSigPack
 from core.risk_recipe import RiskRecipe
 from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
 
@@ -452,13 +453,11 @@ def planning(tmp_path, monkeypatch) -> Iterator[dict]:
     app.dependency_overrides[database_session] = test_session
     limiter.reset()
     planning_answer_cache.clear()
-    sig_pack_cache.clear()
     try:
         yield {"settings": settings, "engine": engine, "users": users, "replies": replies,
                "boundary_id": boundary_id, "monkeypatch": monkeypatch}
     finally:
         planning_answer_cache.clear()
-        sig_pack_cache.clear()
         app.dependency_overrides.clear()
 
 
@@ -1369,3 +1368,213 @@ def test_the_brief_is_given_the_conversation_so_far(planning) -> None:
     draft_prompt = prompts[-1]
     assert "earlier_turns" in draft_prompt
     assert "Three of nine schools" in draft_prompt
+
+
+# --- durable memory: reused evidence and the conversation (ADR-0029) ----------------------
+
+NAN = "Mueang Nan District, Nan, Thailand"
+SIG_TURN = ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+
+
+def _pack_calls() -> int:
+    return [name for name, _ in FakeMcp.calls].count("assemble_pack")
+
+
+def _age_packs(world: dict, *, by: timedelta, expire: bool = False) -> None:
+    with Session(world["engine"]) as session:
+        for row in session.scalars(select(PlanningSigPack)):
+            row.assembled_at = row.assembled_at - by
+            if expire:
+                row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        session.commit()
+
+
+def test_reused_evidence_needs_no_sig_sign_in(planning) -> None:
+    """Owner: "if I ask the same question it should not look up MCP again". After an API restart
+    the SIG token is gone, but the evidence is not."""
+
+    planning["replies"] += SIG_TURN + SIG_TURN
+    _ask(_client(planning, "planner@example.test"), message="Which schools are exposed?",
+         place=NAN)
+    # FakeMcp asserts the SIG token, so constructing a client at all would fail this test.
+    disconnected = _client(planning, "planner@example.test", sig_token=False)
+    response = _ask(disconnected, message="Where could people move?", place=NAN)
+
+    body = response.json()
+    assert response.status_code == 200, body
+    assert body["mode"] == "sig_evidence"
+    assert body["evidence_reused"] is True
+    assert _pack_calls() == 1
+
+
+def test_evidence_outlives_the_login_and_the_answer_cache(planning) -> None:
+    planning["replies"] += SIG_TURN + SIG_TURN
+    client = _client(planning, "planner@example.test")
+    first = _ask(client, message="Which schools are exposed?", place=NAN).json()
+    # A new login evicts the in-memory answer cache; a restart empties it.
+    planning_answer_cache.clear()
+    again = _ask(client, message="Which schools are exposed?", place=NAN).json()
+
+    assert first["evidence_reused"] is False
+    assert again.get("cached") is None
+    assert again["evidence_reused"] is True
+    assert again["evidence_assembled_at"] == first["evidence_assembled_at"]
+    assert _pack_calls() == 1
+
+
+def test_old_evidence_answers_but_cannot_be_published_until_refreshed(planning) -> None:
+    planning["replies"] += SIG_TURN + SIG_TURN + SIG_TURN
+    client = _client(planning, "planner@example.test")
+    fresh = _ask(client, message="Which schools are exposed?", place=NAN).json()
+    assert fresh["publish_token"] and fresh["publish_needs_fresh_evidence"] is False
+
+    _age_packs(planning, by=timedelta(minutes=20))
+    old = _ask(client, message="Where could people move?", place=NAN).json()
+    assert old["evidence_reused"] is True
+    assert old["publish_token"] is None
+    assert old["publish_needs_fresh_evidence"] is True
+    assert old["evidence_age_seconds"] >= 20 * 60
+    assert _pack_calls() == 1
+
+    renewed = _ask(client, message="Where could people move?", place=NAN, refresh=True).json()
+    assert renewed["evidence_reused"] is False
+    assert renewed["publish_token"]
+    assert _pack_calls() == 2
+
+
+def test_expired_evidence_is_gathered_again(planning) -> None:
+    planning["replies"] += SIG_TURN + SIG_TURN
+    client = _client(planning, "planner@example.test")
+    _ask(client, message="Which schools are exposed?", place=NAN)
+    _age_packs(planning, by=timedelta(hours=2), expire=True)
+
+    again = _ask(client, message="Where could people move?", place=NAN).json()
+
+    assert again["evidence_reused"] is False
+    assert _pack_calls() == 2
+    with Session(planning["engine"]) as session:
+        assert session.scalar(select(func.count()).select_from(PlanningSigPack)) == 1
+
+
+def test_a_cached_answer_loses_its_publish_token_once_the_evidence_is_old() -> None:
+    cache = PlanningAnswerCache()
+    key = {"user_id": "u", "session_id": "s", "hub_id": "h", "message": "q", "place": None}
+    old = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
+    cache.put(**key, value={"publish_token": "t", "evidence_assembled_at": old})
+    answer = cache.get(**key)
+    assert answer["publish_token"] is None and answer["publish_needs_fresh_evidence"] is True
+
+    cache.put(**key, value={"publish_token": "t",
+                            "evidence_assembled_at": datetime.now(UTC).isoformat()})
+    assert cache.get(**key)["publish_token"] == "t"
+
+
+def test_the_conversation_is_kept_and_can_be_restored(planning) -> None:
+    planning["replies"] += ['{"mode": "chat", "reply": "Hazard is not risk."}'] + SIG_TURN
+    client = _client(planning, "planner@example.test")
+    _ask(client, message="What is hazard?", hub_code="adpc")
+    _ask(client, message="Which schools are exposed?", place=NAN, hub_code="adpc")
+
+    response = client.get("/api/v1/planning/conversation", params={"hub_code": "adpc"})
+    body = response.json()
+
+    assert response.status_code == 200, body
+    assert [(m["role"], m["kind"]) for m in body["messages"]] == [
+        ("user", "message"), ("assistant", "message"),
+        ("user", "message"), ("assistant", "evidence"),
+    ]
+    evidence = body["messages"][-1]
+    assert evidence["question"] == "Which schools are exposed?"
+    assert evidence["payload"]["evidence"]["pack_id"]
+    assert "publish_token" not in evidence["payload"] and "usage" not in evidence["payload"]
+    assert body["history"][0] == {"role": "user", "text": "What is hazard?"}
+    # The restored history is accepted as-is by the next question.
+    planning["replies"].append('{"mode": "chat", "reply": "Yes."}')
+    assert _ask(client, message="And risk?", history=body["history"]).status_code == 200
+
+
+def test_a_restored_history_always_validates(planning) -> None:
+    long_brief = "## What the numbers show\n" + "Three schools [1]. " * 150
+    planning["replies"] += [SIG_TURN[0], long_brief]
+    client = _client(planning, "planner@example.test")
+    _ask(client, message="Which schools are exposed?", place=NAN)
+
+    history = client.get("/api/v1/planning/conversation").json()["history"]
+
+    assert history and all(1 <= len(turn["text"]) <= 1200 for turn in history)
+    planning["replies"].append('{"mode": "chat", "reply": "Yes."}')
+    assert _ask(client, message="And risk?", history=history).status_code == 200
+
+
+def test_a_resent_question_is_not_stored_twice(planning) -> None:
+    planning["replies"] += SIG_TURN + SIG_TURN
+    client = _client(planning, "planner@example.test")
+    _ask(client, message="Which schools are exposed?", place=NAN)
+    _ask(client, message="Which schools are exposed?", place=NAN, echo=False, refresh=True)
+
+    messages = client.get("/api/v1/planning/conversation").json()["messages"]
+
+    assert [m["role"] for m in messages] == ["user", "assistant", "assistant"]
+
+
+def test_a_lookup_is_remembered_like_a_chat(planning) -> None:
+    """The browser asks through /lookups, not /chat."""
+
+    planning["replies"].append('{"mode": "chat", "reply": "Hazard is not risk."}')
+    client = _client(planning, "planner@example.test")
+    job_id = client.post(
+        "/api/v1/planning/lookups", json={"message": "What is hazard?", "hub_code": "adpc"}
+    ).json()["job_id"]
+    assert client.get(f"/api/v1/planning/lookups/{job_id}").json()["state"] == "succeeded"
+
+    messages = client.get("/api/v1/planning/conversation").json()["messages"]
+
+    assert [m["text"] for m in messages] == ["What is hazard?", "Hazard is not risk."]
+
+
+def test_a_conversation_and_its_evidence_belong_to_one_person(planning) -> None:
+    with Session(planning["engine"]) as session:
+        assign_member(session, actor_email="owner@example.test", email="second@example.test",
+                      hub_code="adpc", role="planner")
+        planning["users"]["second@example.test"] = session.scalar(
+            select(AppUser.id).where(AppUser.email == "second@example.test")
+        )
+        session.commit()
+    planning["replies"] += SIG_TURN + SIG_TURN
+    _ask(_client(planning, "planner@example.test"), message="Which schools are exposed?",
+         place=NAN)
+    second = _client(planning, "second@example.test")
+
+    listed = second.get("/api/v1/planning/conversation")
+    assert listed.status_code == 200, listed.json()
+    assert listed.json()["messages"] == []
+    # A colleague asking about the same district gathers their own evidence.
+    reply = _ask(second, message="Which schools are exposed?", place=NAN).json()
+    assert reply["evidence_reused"] is False
+    assert _pack_calls() == 2
+
+
+def test_the_conversation_is_refused_outside_a_planning_membership(planning) -> None:
+    planner = _client(planning, "planner@example.test")
+    owner = _client(planning, "owner@example.test")
+
+    assert planner.get(
+        "/api/v1/planning/conversation", params={"hub_code": "other"}
+    ).status_code == 404
+    assert owner.get("/api/v1/planning/conversation").status_code == 403
+    assert owner.delete("/api/v1/planning/conversation").status_code == 403
+
+
+def test_starting_over_forgets_the_conversation_and_the_evidence(planning) -> None:
+    planning["replies"] += SIG_TURN + SIG_TURN
+    client = _client(planning, "planner@example.test")
+    _ask(client, message="Which schools are exposed?", place=NAN)
+
+    cleared = client.delete("/api/v1/planning/conversation", params={"hub_code": "adpc"})
+    again = _ask(client, message="Which schools are exposed?", place=NAN).json()
+
+    assert cleared.status_code == 200 and cleared.json()["cleared"] is True
+    assert again.get("cached") is None and again["evidence_reused"] is False
+    assert _pack_calls() == 2
+    with Session(planning["engine"]) as session:
+        assert session.scalar(select(func.count()).select_from(PlanningChatMessage)) == 2

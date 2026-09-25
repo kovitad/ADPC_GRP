@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -27,7 +28,16 @@ from api.langfuse import send_ai_call
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
-from api.planning_cache import planning_answer_cache, sig_pack_cache
+from api.planning_cache import planning_answer_cache
+from api.planning_memory import (
+    conversation,
+    forget,
+    pack_age_seconds,
+    publishable_age,
+    record_exchange,
+    store_pack,
+    stored_pack,
+)
 from api.planning_publish import decode_publish_token, encode_publish_token
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
@@ -162,6 +172,9 @@ class PlanningChat(BaseModel):
     assessment_id: UUID | None = None
     boundary_id: UUID | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=8)
+    # False when the browser re-sends a question it already showed (area confirmation, retry), so
+    # the stored conversation does not repeat it.
+    echo: bool = True
 
 
 def _audit(
@@ -765,6 +778,26 @@ async def planning_chat(
     session: DatabaseSession,
     background: BackgroundTasks,
 ) -> dict[str, Any]:
+    response = await _answer_chat(payload, principal, session, background)
+    # Only an answer is remembered. A refusal raised above (no access, SIG down) was never shown
+    # as part of the conversation.
+    hub = planner_membership(principal, payload.hub_code)
+    record_exchange(
+        session,
+        user_id=principal.user_id,
+        hub_id=hub.hub_id,
+        question=payload.message if payload.echo and not payload.publish_receipt else None,
+        response=response,
+    )
+    return response
+
+
+async def _answer_chat(
+    payload: PlanningChat,
+    principal: CurrentPrincipal,
+    session: Session,
+    background: BackgroundTasks,
+) -> dict[str, Any]:
     settings = get_settings()
     if not planning_chat_available(settings):
         raise not_found()
@@ -998,13 +1031,23 @@ async def planning_chat(
             "label": "More detail needed.",
             "usage": _usage(session, settings, principal),
         }
-    access_token = await sig_access_token(settings, principal.session_id)
-    if not access_token:
-        raise GrpError(
-            401,
-            "SIG_REAUTH_REQUIRED",
-            "Sign in with SERVIR again to connect to SIG evidence.",
-        )
+    # Evidence already gathered for this place is reused before anything else, so a follow-up
+    # needs neither a SIG connection nor a SIG sign-in: after an API restart the person can keep
+    # asking about the area while SERVIR is disconnected. ``refresh`` always gathers anew.
+    reused_pack = (
+        None
+        if payload.refresh
+        else stored_pack(session, user_id=principal.user_id, hub_id=hub.hub_id, place=place)
+    )
+    access_token = None
+    if reused_pack is None:
+        access_token = await sig_access_token(settings, principal.session_id)
+        if not access_token:
+            raise GrpError(
+                401,
+                "SIG_REAUTH_REQUIRED",
+                "Sign in with SERVIR again to connect to SIG evidence.",
+            )
 
     def elapsed_ms(since: float) -> int:
         return round((perf_counter() - since) * 1000)
@@ -1015,134 +1058,125 @@ async def planning_chat(
     ]
     risk_recipe = active_risk_recipe(session)
     step_started = perf_counter()
-    # A second question about the same district reuses the evidence already assembled for it, so
-    # only the brief is rewritten. ``refresh`` forces a new pack, and the reuse is recorded in the
-    # trace so a planner can see the evidence was not pulled again for this answer.
-    reused_pack = (
-        None
-        if payload.refresh
-        else sig_pack_cache.get(
-            user_id=str(principal.user_id),
-            session_id=principal.session_id,
-            hub_id=str(hub.hub_id),
-            place=place,
-        )
-    )
     try:
-        async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
-            if reused_pack is not None:
-                pack, assembled_at = reused_pack
-                trace.append({
-                    "step": "assemble_pack_reused",
-                    "detail": f"{pack.get('pack_id', '')} assembled {assembled_at.isoformat()}",
-                    "duration_ms": elapsed_ms(step_started),
-                })
-            else:
+        if reused_pack is not None:
+            # The reuse is recorded in the trace so a planner can see the evidence was not pulled
+            # again for this answer, and how old it is.
+            pack, assembled_at = reused_pack
+            trace.append({
+                "step": "assemble_pack_reused",
+                "detail": f"{pack.get('pack_id', '')} assembled {assembled_at.isoformat()}",
+                "duration_ms": elapsed_ms(step_started),
+            })
+        else:
+            async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
                 pack_result = await mcp.call_tool(
                     "assemble_pack",
                     {"pack": "risk", "place": place, "hazard": "flood", "focus": payload.message},
                 )
-                pack = tool_payload(pack_result)
-                if pack_result.is_error or pack.get("status") not in {None, "ok"}:
-                    raise SigMcpError("SIG could not assemble evidence for that place")
-                sig_pack_cache.put(
-                    user_id=str(principal.user_id),
-                    session_id=principal.session_id,
-                    hub_id=str(hub.hub_id),
-                    place=place,
-                    pack=pack,
-                )
-                trace.append({"step": "assemble_pack", "detail": str(pack.get("pack_id", "")),
-                              "duration_ms": elapsed_ms(step_started)})
-            step_started = perf_counter()
-
-            area = check_area(place, pack)
-            area_payload = {
-                "requested": area.requested,
-                "sig_place": area.sig_place,
-                "sig_area": area.sig_area,
-                "verified": area.verified,
-                "reason": area.reason,
-            }
-            if not area.verified:
-                _audit(
-                    session,
-                    principal,
-                    hub,
-                    "planning_sig_area_rejected",
-                    {"pack_id": pack.get("pack_id"), "place": place, "result": "denied",
-                     "reason": area.reason},
-                )
-                return {
-                    **base,
-                    "mode": "area_rejected",
-                    "answer": (
-                        f"I stopped: {area.reason}. No evidence is shown, because it may describe "
-                        "the wrong area. Try the full district name, for example "
-                        "'Mueang Nan District, Nan, Thailand'."
-                    ),
-                    "label": "Stopped safely. No evidence shown.",
-                    "area": area_payload,
-                    "trace": trace,
-                    "usage": _usage(session, settings, principal),
-                }
-
-            pack = _screen_pack_for_mvp1(pack, risk_recipe)
-            # GRP's own figures for the same area, so the brief can cite them beside SIG's
-            # (ADR-0028). _match_boundary demands an exact place match, so an ambiguous or
-            # unknown area attaches nothing rather than borrowing another district's numbers.
-            local_boundary = _match_boundary(list(boundaries), place)
-            local_records = (
-                local_area_citations(session, local_boundary)
-                if local_boundary is not None
-                else []
-            )
-            pack = attach_local_citations(pack, local_records)
-            trace.append(
-                {
-                    "step": "grp_baseline_evidence",
-                    "detail": f"{len(local_records)} GRP citation(s)",
-                    "duration_ms": elapsed_ms(step_started),
-                }
-            )
-
-            draft = await run_ai_call(
+            pack = tool_payload(pack_result)
+            if pack_result.is_error or pack.get("status") not in {None, "ok"}:
+                raise SigMcpError("SIG could not assemble evidence for that place")
+            assembled_at = datetime.now(UTC)
+            store_pack(
                 session,
-                settings,
                 user_id=principal.user_id,
                 hub_id=hub.hub_id,
-                hub_code=hub.hub_code,
-                instructions=_draft_instructions(
-                    risk_recipe, local_evidence=bool(local_records)
-                ),
-                prompt=json.dumps(
-                    {
-                        "question": payload.message,
-                        "place": area.sig_place or place,
-                        "required_sections": pack.get("required_sections", []),
-                        "citations": [
-                            {k: item.get(k) for k in ("n", "title", "text", "validation")}
-                            for item in pack.get("citations", [])
-                            if isinstance(item, dict)
-                        ],
-                        "declared_gaps": pack.get("gaps", []),
-                        # Earlier turns, so a follow-up can be read as a follow-up. Untrusted
-                        # content: the instructions already forbid taking direction from it.
-                        "earlier_turns": [
-                            turn.model_dump() for turn in payload.history
-                        ][-6:],
-                        "approved_risk_recipe": (
-                            recipe_payload(risk_recipe) if risk_recipe is not None else None
-                        ),
-                    },
-                    ensure_ascii=False,
-                ),
-                prompt_version=DRAFT_VERSION,
-                export=export,
+                place=place,
+                pack=pack,
+                now=assembled_at,
             )
-            trace.append({"step": "draft", "detail": f"{draft.model}",
+            trace.append({"step": "assemble_pack", "detail": str(pack.get("pack_id", "")),
                           "duration_ms": elapsed_ms(step_started)})
-            step_started = perf_counter()
+        step_started = perf_counter()
+
+        area = check_area(place, pack)
+        area_payload = {
+            "requested": area.requested,
+            "sig_place": area.sig_place,
+            "sig_area": area.sig_area,
+            "verified": area.verified,
+            "reason": area.reason,
+        }
+        if not area.verified:
+            _audit(
+                session,
+                principal,
+                hub,
+                "planning_sig_area_rejected",
+                {"pack_id": pack.get("pack_id"), "place": place, "result": "denied",
+                 "reason": area.reason},
+            )
+            return {
+                **base,
+                "mode": "area_rejected",
+                "answer": (
+                    f"I stopped: {area.reason}. No evidence is shown, because it may describe "
+                    "the wrong area. Try the full district name, for example "
+                    "'Mueang Nan District, Nan, Thailand'."
+                ),
+                "label": "Stopped safely. No evidence shown.",
+                "area": area_payload,
+                "trace": trace,
+                "usage": _usage(session, settings, principal),
+            }
+
+        pack = _screen_pack_for_mvp1(pack, risk_recipe)
+        # GRP's own figures for the same area, so the brief can cite them beside SIG's
+        # (ADR-0028). _match_boundary demands an exact place match, so an ambiguous or
+        # unknown area attaches nothing rather than borrowing another district's numbers.
+        local_boundary = _match_boundary(list(boundaries), place)
+        local_records = (
+            local_area_citations(session, local_boundary)
+            if local_boundary is not None
+            else []
+        )
+        pack = attach_local_citations(pack, local_records)
+        trace.append(
+            {
+                "step": "grp_baseline_evidence",
+                "detail": f"{len(local_records)} GRP citation(s)",
+                "duration_ms": elapsed_ms(step_started),
+            }
+        )
+
+        draft = await run_ai_call(
+            session,
+            settings,
+            user_id=principal.user_id,
+            hub_id=hub.hub_id,
+            hub_code=hub.hub_code,
+            instructions=_draft_instructions(
+                risk_recipe, local_evidence=bool(local_records)
+            ),
+            prompt=json.dumps(
+                {
+                    "question": payload.message,
+                    "place": area.sig_place or place,
+                    "required_sections": pack.get("required_sections", []),
+                    "citations": [
+                        {k: item.get(k) for k in ("n", "title", "text", "validation")}
+                        for item in pack.get("citations", [])
+                        if isinstance(item, dict)
+                    ],
+                    "declared_gaps": pack.get("gaps", []),
+                    # Earlier turns, so a follow-up can be read as a follow-up. Untrusted
+                    # content: the instructions already forbid taking direction from it.
+                    "earlier_turns": [
+                        turn.model_dump() for turn in payload.history
+                    ][-6:],
+                    "approved_risk_recipe": (
+                        recipe_payload(risk_recipe) if risk_recipe is not None else None
+                    ),
+                },
+                ensure_ascii=False,
+            ),
+            prompt_version=DRAFT_VERSION,
+            export=export,
+        )
+        trace.append({"step": "draft", "detail": f"{draft.model}",
+                      "duration_ms": elapsed_ms(step_started)})
+        step_started = perf_counter()
 
     except SigMcpError as error:
         message = str(error)
@@ -1197,7 +1231,10 @@ async def planning_chat(
             "The brief is shown, but no public receipt can be issued for it."
         ]
     publish_token = None
-    if not issues:
+    # Reused evidence can inform an answer for an hour, but a receipt certifies it as current, so
+    # it is only offered on a pack gathered within the publish window.
+    needs_fresh_evidence = not publishable_age(assembled_at)
+    if not issues and not needs_fresh_evidence:
         publish_token = encode_publish_token(
             settings,
             user_id=str(principal.user_id),
@@ -1249,6 +1286,10 @@ async def planning_chat(
         "map_note": None,
         "publish_token": publish_token,
         "draft_issues": issues,
+        "evidence_reused": reused_pack is not None,
+        "evidence_assembled_at": assembled_at.isoformat(),
+        "evidence_age_seconds": round(pack_age_seconds(assembled_at)),
+        "publish_needs_fresh_evidence": needs_fresh_evidence and not issues,
         "trace": trace,
         "evidence": evidence,
         "usage": _usage(session, settings, principal),
@@ -1509,3 +1550,37 @@ async def planning_status(
         "sig_expires_in_seconds": connection.expires_in_seconds,
         "usage": _usage(session, settings, principal),
     }
+
+
+@router.get(
+    "/conversation",
+    summary="This person's planning conversation in one Hub, to restore it after a tab closes",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_conversation(
+    principal: SignedInMember, session: DatabaseSession, hub_code: str | None = None
+) -> dict[str, Any]:
+    if not planning_chat_available(get_settings()):
+        raise not_found()
+    hub = planner_membership(principal, hub_code)
+    return {
+        "hub_code": hub.hub_code,
+        **conversation(session, user_id=principal.user_id, hub_id=hub.hub_id),
+    }
+
+
+@router.delete(
+    "/conversation",
+    summary="Start over: forget this person's conversation and reusable SIG evidence in one Hub",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def clear_conversation(
+    principal: SignedInMember, session: DatabaseSession, hub_code: str | None = None
+) -> dict[str, Any]:
+    if not planning_chat_available(get_settings()):
+        raise not_found()
+    hub = planner_membership(principal, hub_code)
+    forget(session, user_id=principal.user_id, hub_id=hub.hub_id)
+    # The answer cache would otherwise hand back an answer from the conversation just cleared.
+    planning_answer_cache.delete_session(principal.session_id)
+    return {"hub_code": hub.hub_code, "cleared": True}

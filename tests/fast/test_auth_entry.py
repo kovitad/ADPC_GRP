@@ -197,7 +197,7 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
         not in script
     )
     assert "districtToggle.checked = state.boundaries.length > 0" in script
-    assert "Loaded immediately from this login’s 10-minute cache." in script
+    assert "Answered immediately: you asked this earlier in this sign-in." in script
     assert "Explore the available flood information" in script
     assert "Display-first MVP 1" in script
     assert "Available data:" in script
@@ -224,8 +224,8 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925f" in page
-    assert "/planning.css?v=20260925d" in page
+    assert "/planning.js?v=20260925g" in page
+    assert "/planning.css?v=20260925e" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
     assert "Synthetic demo" in script

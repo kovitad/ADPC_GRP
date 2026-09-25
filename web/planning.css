@@ -81,6 +81,8 @@
 }
 .pw-chat__top h1 { margin: 0; font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
 .pw-chat__top p { margin: 0.1rem 0 0; color: var(--pw-muted); font-size: 0.78rem; }
+.pw-chat__tools { display: flex; flex: none; align-items: center; gap: 0.5rem; }
+.pw-chat__tools [hidden] { display: none; }
 .pw-pill {
   flex: none;
   padding: 0.3rem 0.65rem;
@@ -1012,6 +1014,9 @@
 
 /* Status timing, brief formatting, citations */
 .pw-status__timing { color: #52645f !important; font-size: 0.72rem !important; }
+/* ADR-0029: reused evidence says when it was gathered and offers to gather it again. */
+.pw-status__reuse { color: #52645f !important; font-size: 0.72rem !important; line-height: 1.45; }
+.pw-status__reuse .pw-status__again { margin-left: 0.4rem; padding: 0; font-size: 0.72rem; }
 .pw-status__source-note { color: #6a5933 !important; font-size: 0.72rem !important; line-height: 1.4; }
 .pw-brief__text { white-space: normal; }
 .pw-brief__text h4 { margin: 0.8rem 0 0.25rem; font-size: 0.84rem; color: var(--pw-forest); }
