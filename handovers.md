@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 24 September 2026 (`main` at `ec3672a`, pushed; Thailand baseline active, SIG place country fixed, village encoding fixed, per-area population imported and shown on click). **Next agent: read Section 0 first.**
+**Updated:** 25 September 2026 (`main` at `241313b` plus this handover, pushed; the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -113,15 +113,58 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24-25 September 2026, `main` at `6a76e05`)
+## 0. Start here (sessions of 24-25 September 2026, `main` at `241313b`)
+
+### 0.0 Latest: the assistant remembers (ADR-0029, `241313b`, 25 September)
+
+The owner asked: "the chat AI remember the context of user yet .. i ask same question he should not
+look up mcp again?" Before this change it forgot after 5-10 minutes, on an API restart, on a new
+sign-in and when the tab closed. Now:
+
+| Situation | SIG called? | What the planner sees |
+| --- | --- | --- |
+| Identical question, same sign-in, within 60 min | No | Instant answer, "Answered immediately" |
+| Any question about a place gathered in the last 60 min, even after a restart or a new sign-in, even with SERVIR disconnected | No, and no MCP connection is opened | ~40 s (brief only). The card says "SIG evidence gathered HH:MM, N min ago · reused, no new SIG call · Gather again from SIG" |
+| Evidence older than 5 min | No | The brief is shown, but the badge reads "Gather again to publish" and the evidence panel offers "Gather fresh evidence to publish" instead of a receipt |
+| New tab, closed tab, new sign-in | — | The conversation is drawn back from the server (newest 60 messages, 30 days) |
+| "New conversation" (chat header, click twice) | — | Forgets the conversation **and** the reusable evidence for this person in this Hub |
+
+Where it lives: `api/planning_memory.py` (constants, reuse and publish rules), `core/planning_memory_models.py`,
+migration `20260925_0019`, and `GET/DELETE /api/v1/planning/conversation` in `api/planning.py`, both in
+the permission matrix rather than `KNOWN_UNCOVERED`. The identical-question cache in
+`api/planning_cache.py` stays in process memory because its answers carry a session-bound publish
+token.
+
+Verified: **570 passed, 2 skipped**, Ruff clean. The desktop stack was rebuilt with
+`.\scripts\docker-desktop.ps1` and is at Alembic `20260925_0019`. The upsert, the aware-datetime age
+check, the insert race (the savepoint rolls back and the session stays usable), expiry and pruning
+were run directly against the desktop PostgreSQL and cleaned up. **Not yet verified in a browser
+by the owner.** The restart dropped the in-memory SIG tokens, so the owner must sign in with SERVIR
+again before testing.
+
+**Owner acceptance test**, in order:
+
+1. Sign in, ask a flood question about a district (about 3 minutes, one SIG gather).
+2. Ask a *different* question about the same district. It should answer in under a minute, and the
+   card should say "reused, no new SIG call".
+3. Close the tab, open `/planning.html` again. The conversation should come back.
+4. Wait more than 5 minutes, open the evidence panel: "Gather fresh evidence to publish" instead of
+   "Verify & create public receipt".
+5. "New conversation" twice: the chat empties, and the next question gathers from SIG again.
+
+**If it misbehaves, look here first:** a card with no "gathered" line means `planning.js` is cached,
+so check that `?v=20260925g` is served. A 422 on the first question after a restore means the
+restored `history` broke `ChatTurn` validation, which `test_a_restored_history_always_validates`
+should have caught. For a SIG call where reuse was expected, compare `place_key`: the pack is keyed on
+the canonical SIG place, so a differently spelled place is a different key by design.
 
 Read this section, then `AGENTS.md`, then Section 7. **Ignore `next-action-for-codex.md`** — it is an
 untracked note from 21 September whose whole Slice 1 and Slice 3 are already delivered. Details and
 evidence are in Section 7.
 
-**State:** `main` at `6a76e05`, pushed. 548 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
-**win32 Python 3.12**. Alembic head `20260924_0018`, and the running desktop database is at the same
-revision. The stack was rebuilt and verified after every change below. Working tree clean apart from
+**State:** `main` at `241313b`, pushed. 570 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
+**win32 Python 3.12** and (at `417e1d6`) on **Linux CPython 3.12.14**. Alembic head
+`20260925_0019`, and the running desktop database is at the same revision. The stack was rebuilt and verified after every change below. Working tree clean apart from
 two untracked user-owned planning notes, which must be left alone.
 
 **Five things that will waste your time if you do not know them.**
@@ -133,7 +176,7 @@ two untracked user-owned planning notes, which must be left alone.
    `tests/fast/test_auth_entry.py` asserts the exact `?v=` of `planning.js`, `planning.css`,
    `assessments.js` and `styles.css`. Editing one of those files without bumping its query string in
    the HTML *and* the assertion means a browser keeps the old file, which looks exactly like a change
-   that did not work. Current: `?v=20260925f` for `planning.js`.
+   that did not work. Current: `?v=20260925g` for `planning.js`, `?v=20260925e` for `planning.css`.
 3. **Restart with `.\scripts\docker-desktop.ps1`, never bare `docker compose up`** — see 0.2 below.
 4. **The fast tier runs on SQLite and cannot catch every SQL defect.** A `GROUP BY` over a
    `func.substr(...)` expression passed every fast test and failed on PostgreSQL, because SQLAlchemy
@@ -163,7 +206,7 @@ answers to "the assistant does not remember", "it calls SIG every time", "it has
 | What | Why it happened | Commit |
 | --- | --- | --- |
 | Every chat message loaded 8,365 boundaries with full GeoJSON: **8,778 ms**, now **205 ms** with `load_only` | A place-name match never needed geometry. Deferred, not dropped, so a missed `.geom` access still returns the right value | `7f28681` |
-| A SIG pack is reused for five minutes per session and place | `assemble_pack` was **149 s of a 200 s** answer and ran again for every question about the same district, because the answer cache keys on exact message text and each chip phrases it differently | `7f28681` |
+| A SIG pack is reused for five minutes per session and place (**superseded by ADR-0029**: 60 minutes, per person, in the database) | `assemble_pack` was **149 s of a 200 s** answer and ran again for every question about the same district, because the answer cache keys on exact message text and each chip phrases it differently | `7f28681`, `241313b` |
 | The brief now receives the last six turns | Only the router got history, so the brief restated everything every time | `7f28681` |
 | An answer's named centres resolve to feature ids | Name-string matching fails on a truncated or reworded name. GRP issues a ref per centre, the model marks them, `core/answer_references.py` resolves and validates | `6a76e05` |
 | "Unable to assess" reads **N/A** everywhere a planner sees it | The phrase was on every pin, in the legend, the filter, the metric card and the chat. The stored status keeps its approved name | `23db1a0` |
