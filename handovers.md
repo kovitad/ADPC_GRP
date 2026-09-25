@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 25 September 2026 (`main` at `7a3ae55` plus this handover, pushed; the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
+**Updated:** 25 September 2026 (`main` at `32bd818` plus this handover, pushed; the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -114,6 +114,41 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
+
+### Session of 25 September (evening): where things stand
+
+`main` at `32bd818` plus this note, pushed; CI green through `22110e1`. 573 tests pass, 2 skip,
+Ruff clean. Desktop stack rebuilt after every change, Alembic `20260925_0019`, serving
+`planning.js?v=20260925k` and `planning.css?v=20260925f`. **Every redeploy drops the in-memory
+SIG tokens, so the owner must sign in with SERVIR again before testing.**
+
+| Commit | What | Owner said |
+| --- | --- | --- |
+| `3b221b2` | `grp` to `grpcli` rename proved on Linux CPython 3.12.14 (548 passed); install docs say `.[dev,gis]` like CI | — |
+| `241313b`, `7a3ae55` | Durable assistant memory, ADR-0029 (Section 0.0) | "i ask same question he should not look up mcp again?" |
+| `22110e1` | Planners see "Global Risk", not "SIG"; globe avatar instead of "AI" (Section 0.00) | "I dont like the word SIG call" |
+| `cb00886` | "Show these N centres on the map" did nothing: the handler called an undefined `centresLayer` and an out-of-scope `centersToggle` | "when i click show these 2 cnters on the map .. it is nothing happen" |
+| `32bd818` | The centre list and popup no longer print a bare "N/A" under an unassessed centre's name; pin, legend, filter and summary still mark it | "remove N/A from the tail of evacuation center name ... look like defect" |
+
+**Owner has not yet re-tested any of these.** Their next report is the acceptance check. The
+five-step memory test is in Section 0.0.
+
+**How the map-button bug was found, and how to stop the next one.** The fast tier never executes
+browser JavaScript, so an undefined name only fails when someone clicks. ESLint `no-undef`, with
+browser globals plus `GRP` and `L` (Leaflet) declared, flags both names in the old file and finds
+nothing across all eleven `web/*.js` today. It was run from a throwaway install outside the repo.
+**Recommended next step, about 15 minutes:** add that check to CI. It needs a small Node step,
+which is why it was not added without asking.
+
+**Open questions for the owner:**
+
+1. Should the sign-in and registration pages also say Global Risk? They still say "SIG account",
+   because that is the account people sign in with.
+2. Should the "AI ..." allowance pill in the chat header also become a globe?
+
+**Still next, from the list above:** the data-owner questions (longest lead time), the G-16
+approval record, `KNOWN_UNCOVERED` burn-down, and splitting `web/planning.js` (about 3,400 lines,
+which is where the map-button bug hid).
 
 ### 0.00 Naming: planners see "Global Risk", not "SIG" (25 September)
 
