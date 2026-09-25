@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 25 September 2026 (`main` at `241313b` plus this handover, pushed; the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
+**Updated:** 25 September 2026 (`main` at `7a3ae55` plus this handover, pushed; the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -113,9 +113,9 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24-25 September 2026, `main` at `241313b`)
+## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
-### 0.0 Latest: the assistant remembers (ADR-0029, `241313b`, 25 September)
+### 0.0 Latest: the assistant remembers (ADR-0029, `241313b` and `7a3ae55`, 25 September)
 
 The owner asked: "the chat AI remember the context of user yet .. i ask same question he should not
 look up mcp again?" Before this change it forgot after 5-10 minutes, on an API restart, on a new
@@ -135,7 +135,7 @@ the permission matrix rather than `KNOWN_UNCOVERED`. The identical-question cach
 `api/planning_cache.py` stays in process memory because its answers carry a session-bound publish
 token.
 
-Verified: **570 passed, 2 skipped**, Ruff clean. The desktop stack was rebuilt with
+Verified: **573 passed, 2 skipped**, Ruff clean. The desktop stack was rebuilt with
 `.\scripts\docker-desktop.ps1` and is at Alembic `20260925_0019`. The upsert, the aware-datetime age
 check, the insert race (the savepoint rolls back and the session stays usable), expiry and pruning
 were run directly against the desktop PostgreSQL and cleaned up. **Not yet verified in a browser
@@ -148,12 +148,19 @@ again before testing.
 2. Ask a *different* question about the same district. It should answer in under a minute, and the
    card should say "reused, no new SIG call".
 3. Close the tab, open `/planning.html` again. The conversation should come back.
-4. Wait more than 5 minutes, open the evidence panel: "Gather fresh evidence to publish" instead of
-   "Verify & create public receipt".
+4. Wait more than 5 minutes after the first gather, then open that card's evidence panel (or ask
+   another question and open the new one). It should offer "Gather fresh evidence to publish"
+   instead of "Verify & create public receipt", and the badge should read "Gather again to
+   publish". The server also refuses a stale draft at publish time (`PUBLISH_NEEDS_FRESH_EVIDENCE`).
 5. "New conversation" twice: the chat empties, and the next question gathers from SIG again.
 
+**Behaviour change to tell the owner:** the conversation now survives sign-out and is kept on the
+server for up to 30 days. Only that person can see it, and "New conversation" deletes it. This amends
+ADR-0004's "chat text is not stored". A restored "Confirm the district" message comes back without
+its button (known gap, ADR-0029).
+
 **If it misbehaves, look here first:** a card with no "gathered" line means `planning.js` is cached,
-so check that `?v=20260925g` is served. A 422 on the first question after a restore means the
+so check that `?v=20260925h` is served. A 422 on the first question after a restore means the
 restored `history` broke `ChatTurn` validation, which `test_a_restored_history_always_validates`
 should have caught. For a SIG call where reuse was expected, compare `place_key`: the pack is keyed on
 the canonical SIG place, so a differently spelled place is a different key by design.
@@ -162,7 +169,7 @@ Read this section, then `AGENTS.md`, then Section 7. **Ignore `next-action-for-c
 untracked note from 21 September whose whole Slice 1 and Slice 3 are already delivered. Details and
 evidence are in Section 7.
 
-**State:** `main` at `241313b`, pushed. 570 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
+**State:** `main` at `7a3ae55`, pushed. 573 tests pass, 2 PostgreSQL-only skip, Ruff clean, on
 **win32 Python 3.12** and (at `417e1d6`) on **Linux CPython 3.12.14**. Alembic head
 `20260925_0019`, and the running desktop database is at the same revision. The stack was rebuilt and verified after every change below. Working tree clean apart from
 two untracked user-owned planning notes, which must be left alone.
@@ -176,7 +183,7 @@ two untracked user-owned planning notes, which must be left alone.
    `tests/fast/test_auth_entry.py` asserts the exact `?v=` of `planning.js`, `planning.css`,
    `assessments.js` and `styles.css`. Editing one of those files without bumping its query string in
    the HTML *and* the assertion means a browser keeps the old file, which looks exactly like a change
-   that did not work. Current: `?v=20260925g` for `planning.js`, `?v=20260925e` for `planning.css`.
+   that did not work. Current: `?v=20260925h` for `planning.js`, `?v=20260925e` for `planning.css`.
 3. **Restart with `.\scripts\docker-desktop.ps1`, never bare `docker compose up`** — see 0.2 below.
 4. **The fast tier runs on SQLite and cannot catch every SQL defect.** A `GROUP BY` over a
    `func.substr(...)` expression passed every fast test and failed on PostgreSQL, because SQLAlchemy
