@@ -560,11 +560,32 @@
           : "") +
         `<p class="pw-area-pop__caveat">${exposure.caveat || ""}</p>`
       : "";
+    // A headline the popup can always show without covering the map. Everything else folds away:
+    // three stacked tables made the popup taller than the viewport on a district click.
+    const headline = [];
+    if (profile && profile.population) {
+      headline.push(`${numberText(profile.population.total_population)} people`);
+      headline.push(`${numberText(profile.population.village_count)} villages`);
+    }
+    if (exposure) {
+      headline.push(`${numberText(exposure.people_in_zone)} in the RP`
+        + `${numberText(exposure.return_period_years)} extent`);
+    }
+    if (centers && centers.total) {
+      headline.push(`${numberText(centers.total)} centres`);
+    }
+    const headlineRow = headline.length
+      ? `<p class="pw-area-pop__headline">${headline.join(" · ")}</p>`
+      : "";
+    const fold = (body) => (body
+      ? `<details class="pw-area-pop__more"><summary>Detail and caveats</summary>${body}</details>`
+      : "");
+    const tail = `<p class="pw-area-pop__foot">Full figures stay in the People tab.</p>`;
     if (!profile || !profile.population) {
       return (
-        `<div class="pw-area-pop">${head}` +
+        `<div class="pw-area-pop">${head}${headlineRow}` +
         `<p class="pw-area-pop__none">No population record for this area.</p>` +
-        `${exposureRows}${centerRows}</div>`
+        `${fold(`${exposureRows}${centerRows}`)}${tail}</div>`
       );
     }
     const p = profile.population;
@@ -586,13 +607,12 @@
       ? `<p class="pw-area-pop__note">${numberText(excluded)} village(s) excluded: the source ` +
         `figures do not add up or are implausible.</p>`
       : "";
-    return (
-      `<div class="pw-area-pop">${head}` +
+    const detail =
       `<table class="pw-area-pop__table"><tbody>${rows}</tbody></table>${note}` +
       `<p class="pw-area-pop__caveat">${source.label || "Registered village population"}` +
       (source.edition ? ` · edition ${source.edition}` : "") +
-      `. ${source.caveat || ""}</p>${exposureRows}${centerRows}</div>`
-    );
+      `. ${source.caveat || ""}</p>${exposureRows}${centerRows}`;
+    return `<div class="pw-area-pop">${head}${headlineRow}${fold(detail)}${tail}</div>`;
   };
 
   const profileHasFigures = (profile) => Boolean(
@@ -730,6 +750,56 @@
     syncRunPanel();
   };
 
+  // ---------- resizable assistant panel ----------
+  // The chat was a fixed 360-440px. A planner reading a long brief wants it wider; one studying the
+  // map wants it out of the way. Drag or arrow-key the divider; the width is remembered per browser.
+  const CHAT_WIDTH_KEY = "grp.planning.chatWidth";
+  const shell = document.querySelector(".pw-shell");
+
+  const setChatWidth = (px, { remember = true } = {}) => {
+    const width = Math.round(Math.min(Math.max(px, 300), window.innerWidth * 0.6));
+    shell.style.setProperty("--pw-chat-width", `${width}px`);
+    if (remember) {
+      try {
+        window.localStorage.setItem(CHAT_WIDTH_KEY, String(width));
+      } catch (error) {
+        // A browser with storage blocked still resizes; it just will not remember.
+      }
+    }
+    // Leaflet measures its container once, so it must be told the viewport changed.
+    if (map) map.invalidateSize();
+  };
+
+  const initChatResize = () => {
+    const handle = $("[data-chat-resize]");
+    if (!handle || !shell) return;
+    try {
+      const saved = Number(window.localStorage.getItem(CHAT_WIDTH_KEY));
+      if (saved) setChatWidth(saved, { remember: false });
+    } catch (error) {
+      // No stored width: the CSS default applies.
+    }
+    const onMove = (event) => setChatWidth(event.clientX - shell.getBoundingClientRect().left);
+    const stop = () => {
+      document.body.classList.remove("is-resizing");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", stop);
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      document.body.classList.add("is-resizing");
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", stop);
+    });
+    handle.addEventListener("keydown", (event) => {
+      const step = { ArrowLeft: -32, ArrowRight: 32 }[event.key];
+      if (!step) return;
+      event.preventDefault();
+      setChatWidth(document.querySelector(".pw-chat").getBoundingClientRect().width + step);
+    });
+    handle.addEventListener("dblclick", () => setChatWidth(400));
+  };
+
   const selectedFloodLayer = () => {
     const selectedId = $("[data-flood-scenario]").value;
     return state.floodLayers.find((layer) => layer.id === selectedId) || null;
@@ -861,6 +931,40 @@
     rows.forEach((row) => row.classList.toggle("is-active", row.dataset.featureId === featureId));
     const active = rows.find((row) => row.dataset.featureId === featureId);
     if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  // An answer that names centres should be able to point at them. The names are matched against
+  // our own centre records, never parsed out of the text, so a miss simply offers nothing.
+  const centresNamedIn = (text) => {
+    const haystack = String(text || "");
+    if (!haystack) return [];
+    return state.centerRows.filter(
+      (center) => center.name && haystack.includes(center.name),
+    );
+  };
+
+  const showCentresOnMap = (centres) => {
+    if (!centres.length) return;
+    centresLayer.addTo(map);
+    centersToggle.checked = true;
+    const points = centres
+      .filter((center) => typeof center.lat === "number" && typeof center.lon === "number")
+      .map((center) => [center.lat, center.lon]);
+    if (points.length === 1) {
+      activateCenter(centres[0].feature_id);
+      return;
+    }
+    if (points.length) {
+      map.fitBounds(window.L.latLngBounds(points), { padding: [50, 50], maxZoom: 14 });
+    }
+    // Flag them in the centre list too, so the panel and the map agree on what is being discussed.
+    const named = new Set(centres.map((center) => center.feature_id));
+    Array.from($("[data-centre-list]").children).forEach((row) => {
+      row.classList.toggle("is-named", named.has(row.dataset.featureId));
+    });
+    document.body.dataset.view = window.matchMedia("(max-width: 860px)").matches
+      ? "map"
+      : document.body.dataset.view;
   };
 
   const renderCenterList = () => {
@@ -2578,6 +2682,18 @@
         watch(payload.assessment_id);
       } else if (payload.mode === "sig_evidence") {
         actions = sigActions(payload, message);
+      } else if (payload.mode === "explain_result") {
+        // The answer names centres; offer to show exactly those on the map, which is what a
+        // planner asks next when a brief lists seven places they cannot locate.
+        const named = centresNamedIn(payload.answer);
+        if (named.length) {
+          actions = [chipButton(
+            named.length === 1
+              ? `Show ${named[0].name} on the map`
+              : `Show these ${named.length} centres on the map`,
+            () => showCentresOnMap(named),
+          )];
+        }
       } else if (payload.mode === "needs_area_confirmation" && payload.place) {
         const confirmation = { place: payload.place, message, publish };
         addMessage("assistant", payload.answer, {
@@ -3157,6 +3273,7 @@
       if (centersToggle.checked) centersLayer.addTo(map);
       if (floodOverlay && floodToggle.checked) floodOverlay.addTo(map);
       renderWelcome();
+      initChatResize();
       ownerEmail = identity.email;
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
       if (requestedAssessmentId) {

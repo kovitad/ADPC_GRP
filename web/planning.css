@@ -24,8 +24,43 @@
 .pw-shell {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(360px, 440px) 1fr;
+  /* Width is a CSS variable so the planner can drag the divider; the clamp keeps the chat usable
+     and always leaves the map a workable share, whatever is dragged or restored. */
+  --pw-chat-width: 400px;
+  grid-template-columns: clamp(300px, var(--pw-chat-width), 60vw) 6px 1fr;
   min-height: 0;
+}
+
+/* Drag handle between the chat and the map. */
+.pw-resize {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: var(--pw-line);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pw-resize::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 2.4rem;
+  border-radius: 2px;
+  background: #9bb3ae;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.pw-resize:hover, .pw-resize:focus-visible {
+  background: #cfe0dc;
+  outline: none;
+}
+
+.pw-body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* Chat */
@@ -635,7 +670,10 @@
     font-weight: 700;
   }
   .pw-switch button[aria-selected="true"] { background: var(--pw-forest); color: #fff; }
+  /* One column on a phone: the chat and map swap instead of sitting side by side, so there is
+     nothing to drag. */
   .pw-shell { grid-template-columns: 1fr; }
+  .pw-resize { display: none; }
   .pw-body[data-view="chat"] .pw-map, .pw-body[data-view="map"] .pw-chat { display: none; }
   .pw-stats { grid-template-columns: repeat(2, 1fr); }
   .pw-search { width: calc(100% - 140px); }
@@ -889,6 +927,8 @@
   cursor: pointer;
 }
 .pw-centre-row:hover, .pw-centre-row.is-active { border-color: #4c9ab8; background: #f0f8fb; }
+/* Named by the answer currently in the chat, so the list and the map agree on what is discussed. */
+.pw-centre-row.is-named { border-color: #7c3aed; background: #faf5ff; }
 .pw-centre-row__dot { width: 11px; height: 11px; margin-top: 0.2rem; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #8da7a1; }
 .pw-centre-row__text { display: grid; gap: 0.1rem; min-width: 0; }
 .pw-centre-row__text strong { overflow-wrap: anywhere; font-size: 0.79rem; }
@@ -1041,7 +1081,30 @@
 .pw-cite { font-weight: 600; }
 
 /* Area information shown when a planner clicks a district or sub-district on the map. */
-.pw-area-pop { min-width: 15rem; font-size: 0.78rem; line-height: 1.45; }
+/* The popup used to stack three tables and could grow taller than the map. It now shows a headline
+   and folds the rest away, and is capped so it can never cover the whole canvas. */
+.pw-area-pop {
+  min-width: 15rem;
+  max-width: 17rem;
+  max-height: 45vh;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.pw-area-pop__headline {
+  margin-top: 0.4rem;
+  color: var(--pw-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.pw-area-pop__more { margin-top: 0.5rem; }
+.pw-area-pop__more summary {
+  color: var(--pw-forest);
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.pw-area-pop__foot { margin-top: 0.5rem; color: #5b6b74; font-size: 0.7rem; }
 .pw-area-pop__level { color: #5b6b74; font-size: 0.72rem; }
 .pw-area-pop__table { width: 100%; margin-top: 0.5rem; border-collapse: collapse; }
 .pw-area-pop__table th { padding: 0.18rem 0.5rem 0.18rem 0; color: #5b6b74; font-weight: 500; text-align: left; }

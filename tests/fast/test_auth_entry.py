@@ -224,8 +224,8 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "SIG metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925c" in page
-    assert "/planning.css?v=20260925a" in page
+    assert "/planning.js?v=20260925d" in page
+    assert "/planning.css?v=20260925d" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
     assert "Synthetic demo" in script
@@ -283,3 +283,30 @@ def test_utility_buttons_do_not_use_the_hero_button_scale() -> None:
     # Run assessment stays the one primary on the page.
     assert page.count("button--primary") == 1
     assert 'view.className = "button button--secondary button--compact";' in script
+
+
+def test_the_planning_workspace_is_adjustable_and_does_not_cover_the_map() -> None:
+    """Owner report, 25 Sep: the popup covered the map and the chat could not be resized."""
+
+    page = (WEB_ROOT / "planning.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+    styles = (WEB_ROOT / "planning.css").read_text(encoding="utf-8")
+
+    # A draggable, keyboard-operable divider between the chat and the map.
+    assert "data-chat-resize" in page
+    assert 'role="separator"' in page
+    assert "const initChatResize = ()" in script
+    assert "initChatResize();" in script
+    assert "--pw-chat-width" in styles
+    # The remembered width still leaves the map usable.
+    assert "clamp(300px, var(--pw-chat-width), 60vw)" in styles
+
+    # The area popup folds its detail away and is capped, so it cannot fill the canvas.
+    assert "pw-area-pop__headline" in script
+    assert "<details class=\"pw-area-pop__more\">" in script
+    assert "max-height: 45vh" in styles
+
+    # An explanation that names centres can point at them on the map.
+    assert "const centresNamedIn = (text)" in script
+    assert "const showCentresOnMap = (centres)" in script
+    assert 'payload.mode === "explain_result"' in script
