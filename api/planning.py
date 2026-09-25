@@ -732,10 +732,12 @@ async def _publish_reviewed_draft(
     except SigMcpError as error:
         if "renewed" in str(error):
             raise GrpError(
-                401, "SIG_REAUTH_REQUIRED", "Sign in with SERVIR again to connect to SIG evidence."
+                401,
+                "SIG_REAUTH_REQUIRED",
+                "Sign in with SERVIR again to connect to Global Risk evidence.",
             ) from error
         raise GrpError(
-            503, "SIG_UNAVAILABLE", "SIG evidence is not available right now."
+            503, "SIG_UNAVAILABLE", "Global Risk evidence is not available right now."
         ) from error
 
     receipt = {
@@ -1200,10 +1202,12 @@ async def _answer_chat(
         message = str(error)
         if "renewed" in message:
             raise GrpError(
-                401, "SIG_REAUTH_REQUIRED", "Sign in with SERVIR again to connect to SIG evidence."
+                401,
+                "SIG_REAUTH_REQUIRED",
+                "Sign in with SERVIR again to connect to Global Risk evidence.",
             ) from error
         raise GrpError(
-            503, "SIG_UNAVAILABLE", "SIG evidence is not available right now."
+            503, "SIG_UNAVAILABLE", "Global Risk evidence is not available right now."
         ) from error
 
     _audit(

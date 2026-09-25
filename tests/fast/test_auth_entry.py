@@ -50,7 +50,7 @@ def test_sign_in_screen_uses_servir_without_local_password() -> None:
     assert "does not create or store a" in page
     assert "separate password" in page
     assert 'href="/register.html"' in page
-    assert "Register with an existing SIG account" in page
+    assert "Register with an existing Global Risk account" in page
 
 
 def test_sign_in_screen_explains_admin_membership_assignment() -> None:
@@ -67,9 +67,9 @@ def test_registration_requires_an_existing_sig_account() -> None:
     page = (WEB_ROOT / "register.html").read_text(encoding="utf-8")
     script = (WEB_ROOT / "register.js").read_text(encoding="utf-8")
 
-    assert "Existing SIG account required" in page
+    assert "Existing Global Risk account required" in page
     assert 'href="/api/v1/auth/login?intent=register"' in page
-    assert "does not create a SIG account or GRP password" in page
+    assert "does not create a Global Risk account or GRP password" in page
     assert "Registration request received" in script
     assert 'type="password"' not in page
     assert "<form" not in page
@@ -224,8 +224,8 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Global Risk metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260925k" in page
-    assert "/planning.css?v=20260925f" in page
+    assert "/planning.js?v=20260925l" in page
+    assert "/planning.css?v=20260925g" in page
     assert "Local upload" in script
     assert "Platform baseline" in script
     assert "Synthetic demo" in script

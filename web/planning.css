@@ -93,6 +93,15 @@
   font-weight: 700;
   white-space: nowrap;
 }
+.pw-pill { display: inline-flex; align-items: center; gap: 0.3rem; }
+.pw-pill svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
 .pw-pill.is-low { background: #fff1d6; color: #8a5300; }
 .pw-pill.is-off { background: #eef1f1; color: #5b6a68; }
 .pw-notice {

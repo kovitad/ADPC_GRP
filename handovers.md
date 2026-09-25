@@ -119,7 +119,7 @@ RP20/RP50 rasters and methods exist.
 
 `main` at `32bd818` plus this note, pushed; CI green through `22110e1`. 573 tests pass, 2 skip,
 Ruff clean. Desktop stack rebuilt after every change, Alembic `20260925_0019`, serving
-`planning.js?v=20260925k` and `planning.css?v=20260925f`. **Every redeploy drops the in-memory
+`planning.js?v=20260925l` and `planning.css?v=20260925g`. **Every redeploy drops the in-memory
 SIG tokens, so the owner must sign in with SERVIR again before testing.**
 
 | Commit | What | Owner said |
@@ -140,11 +140,10 @@ nothing across all eleven `web/*.js` today. It was run from a throwaway install 
 **Recommended next step, about 15 minutes:** add that check to CI. It needs a small Node step,
 which is why it was not added without asking.
 
-**Open questions for the owner:**
-
-1. Should the sign-in and registration pages also say Global Risk? They still say "SIG account",
-   because that is the account people sign in with.
-2. Should the "AI ..." allowance pill in the chat header also become a globe?
+**Both owner questions are answered and done:** the sign-in, registration and admin sign-in pages
+now say Global Risk too, and the chat header's allowance pill shows a globe instead of "AI" (its
+spoken label is still "AI allowance"). `admin-login.js` and `register.js` had no `?v=`, so a browser
+could keep the old text; both are now `?v=20260925a`.
 
 **Still next, from the list above:** the data-owner questions (longest lead time), the G-16
 approval record, `KNOWN_UNCOVERED` burn-down, and splitting `web/planning.js` (about 3,400 lines,
@@ -156,10 +155,11 @@ The owner asked for "Global Risk" instead of "SIG", and a globe instead of the l
 assistant's avatar. Every planner-visible string on the Planning page, and the API text that reaches
 the chat (labels, errors, area and map checks, lookup failures), now says Global Risk. The router and
 brief prompts tell the model to use the name too, so their versions moved to `planning-router-v2` and
-`planning-draft-v4`. **Unchanged on purpose:** identifiers (`sig_*`, the `sig_flood` mode), error codes
-such as `SIG_REAUTH_REQUIRED`, audit action names, comments, docstrings, OpenAPI summaries, and pages
-other than Planning (sign-in and registration still say "SIG account", because that is the account the
-person signs in with). Asset versions are now `planning.js?v=20260925k` and `planning.css?v=20260925f`.
+`planning-draft-v4`. The sign-in, registration and admin sign-in pages followed on the owner's
+request, as did two chat error messages the first pass missed ("connect to SIG evidence", "SIG
+evidence is not available"). **Unchanged on purpose:** identifiers (`sig_*`, the `sig_flood` mode),
+error codes such as `SIG_REAUTH_REQUIRED`, audit action names, comments, docstrings, OpenAPI
+summaries, and the admin/platform pages' AI settings wording. Asset versions are now `planning.js?v=20260925l` and `planning.css?v=20260925g`.
 
 ### 0.0 Latest: the assistant remembers (ADR-0029, `241313b` and `7a3ae55`, 25 September)
 
@@ -206,7 +206,7 @@ ADR-0004's "chat text is not stored". A restored "Confirm the district" message 
 its button (known gap, ADR-0029).
 
 **If it misbehaves, look here first:** a card with no "gathered" line means `planning.js` is cached,
-so check that `?v=20260925k` is served. A 422 on the first question after a restore means the
+so check that `?v=20260925l` is served. A 422 on the first question after a restore means the
 restored `history` broke `ChatTurn` validation, which `test_a_restored_history_always_validates`
 should have caught. For a SIG call where reuse was expected, compare `place_key`: the pack is keyed on
 the canonical SIG place, so a differently spelled place is a different key by design.
@@ -229,7 +229,7 @@ two untracked user-owned planning notes, which must be left alone.
    `tests/fast/test_auth_entry.py` asserts the exact `?v=` of `planning.js`, `planning.css`,
    `assessments.js` and `styles.css`. Editing one of those files without bumping its query string in
    the HTML *and* the assertion means a browser keeps the old file, which looks exactly like a change
-   that did not work. Current: `?v=20260925k` for `planning.js`, `?v=20260925f` for `planning.css`.
+   that did not work. Current: `?v=20260925l` for `planning.js`, `?v=20260925g` for `planning.css`.
 3. **Restart with `.\scripts\docker-desktop.ps1`, never bare `docker compose up`** — see 0.2 below.
 4. **The fast tier runs on SQLite and cannot catch every SQL defect.** A `GROUP BY` over a
    `func.substr(...)` expression passed every fast test and failed on PostgreSQL, because SQLAlchemy

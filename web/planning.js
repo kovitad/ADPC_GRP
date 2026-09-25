@@ -140,12 +140,10 @@
 
   // The assistant speaks for Global Risk, so its avatar is a globe rather than the letters "AI".
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const globeAvatar = () => {
-    const avatar = document.createElement("span");
-    avatar.className = "pw-avatar";
-    avatar.setAttribute("aria-hidden", "true");
+  const globeIcon = () => {
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
     [
       ["circle", { cx: "12", cy: "12", r: "9" }],
       ["ellipse", { cx: "12", cy: "12", rx: "4", ry: "9" }],
@@ -155,7 +153,13 @@
       Object.entries(attributes).forEach(([name, value]) => shape.setAttribute(name, value));
       svg.append(shape);
     });
-    avatar.append(svg);
+    return svg;
+  };
+  const globeAvatar = () => {
+    const avatar = document.createElement("span");
+    avatar.className = "pw-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.append(globeIcon());
     return avatar;
   };
 
@@ -401,12 +405,14 @@
     pill.classList.toggle("is-low", GRP.isLow(usage));
     pill.classList.toggle("is-off", usage.status !== "active");
     pill.title = GRP.allowanceMessage(usage);
-    pill.textContent =
-      usage.status === "active"
-        ? `AI ${GRP.tokens(usage.tokens_remaining)} tokens left`
-        : usage.status === "limit_reached"
-          ? "AI limit reached"
-          : "AI off";
+    const text = usage.status === "active"
+      ? `${GRP.tokens(usage.tokens_remaining)} tokens left`
+      : usage.status === "limit_reached"
+        ? "Limit reached"
+        : "Off";
+    // A globe, like the assistant's avatar, instead of the word "AI"; the spoken label keeps it.
+    pill.replaceChildren(globeIcon(), document.createTextNode(text));
+    pill.setAttribute("aria-label", `AI allowance: ${text}`);
   };
 
   const renderContext = () => {

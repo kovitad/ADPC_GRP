@@ -10,7 +10,7 @@
       message: "The SERVIR connection is not configured or cannot be reached. Contact the platform administrator.",
     },
     failed: {
-      title: "Existing SIG account could not be verified",
+      title: "Existing Global Risk account could not be verified",
       message: "No access request was created. Try again with your existing SERVIR account.",
     },
     pending: {

@@ -7,15 +7,15 @@
   const states = {
     unavailable: {
       title: "Administrator sign-in is unavailable",
-      message: "The SIG authentication service is not configured or cannot be reached.",
+      message: "The Global Risk authentication service is not configured or cannot be reached.",
     },
     failed: {
       title: "Administrator identity could not be verified",
-      message: "No GRP administrator session was created. Please try SIG sign-in again.",
+      message: "No GRP administrator session was created. Please try Global Risk sign-in again.",
     },
     pending: {
       title: "GRP administrator provisioning required",
-      message: "SIG verified this email, but it has not been provisioned for GRP access.",
+      message: "Global Risk verified this email, but it has not been provisioned for GRP access.",
     },
     not_admin: {
       title: "Administrator authority required",
