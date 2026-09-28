@@ -272,10 +272,23 @@
       transcript.push({ kind: "evidence", payload, question });
       saveState();
     }
+    const actions = [chipButton(payload.map_url ? "Open summary, map & evidence" : "Open planning summary", () => renderEvidence(payload, question))];
+    const mapLink = !payload.map_url && safeHttps(payload.map_link);
+    if (mapLink) {
+      // ADR-0031: Global Risk's own map for the receipt, opened there and labelled unverified.
+      const open = document.createElement("a");
+      open.className = "pw-chip-button";
+      open.href = mapLink;
+      open.target = "_blank";
+      open.rel = "noopener noreferrer";
+      open.title = MAP_LINK_CAVEAT;
+      open.textContent = "Open Global Risk map ↗";
+      actions.push(open);
+    }
     const row = addMessage("assistant", "", {
       label: payload.label,
       record: false,
-      actions: [chipButton(payload.map_url ? "Open summary, map & evidence" : "Open planning summary", () => renderEvidence(payload, question))],
+      actions,
     });
     const bubble = row.querySelector(".pw-bubble");
     const slot = row.querySelector(".pw-bubble__body");
@@ -2452,6 +2465,77 @@
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const MAP_LINK_CAVEAT =
+    "Global Risk's own view of this receipt. GRP could not confirm which layer its colours show " +
+    "(flood depth or vulnerability-weighted risk), so it opens on Global Risk.";
+
+  const mapLinkShareText = (evidence, link) => [
+    `Global Risk map: ${(evidence.area && evidence.area.sig_place) || evidence.place}`,
+    link,
+    evidence.receipt && evidence.receipt.public_url ? `Receipt: ${evidence.receipt.public_url}` : "",
+    MAP_LINK_CAVEAT,
+  ].filter(Boolean).join("\n");
+
+  const csvCell = (value) => {
+    const text = value === null || value === undefined ? "" : String(value);
+    // A leading = + - @ would run as a formula when the file is opened in a spreadsheet.
+    const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+
+  // The figures the panel shows (exposed of total, never the unapproved risk fields) and the
+  // citations behind them, for a spreadsheet.
+  const evidenceTable = (evidence) => {
+    const rows = [
+      ["Area", (evidence.area && evidence.area.sig_place) || evidence.place],
+      ["Question", evidence.question],
+      ["Evidence pack", evidence.pack_id || ""],
+      ["Assembled at", evidence.assembled_at || ""],
+      ["Receipt", evidence.receipt ? evidence.receipt.receipt_id : "none (not published)"],
+      [],
+      ["Item", "Exposed", "Total", "Unit"],
+    ];
+    Object.entries((evidence.stats && evidence.stats.counts) || {}).forEach(([name, value]) => {
+      if (!value || typeof value !== "object") return;
+      if (typeof value.exposed === "number") rows.push([name, value.exposed, value.total ?? "", "count"]);
+      else if (typeof value.exposed_km === "number") rows.push([name, value.exposed_km, value.total_km ?? "", "km"]);
+    });
+    rows.push([], ["Citation", "Kind", "Title", "Source", "Validation", "Retrieval", "Method"]);
+    (evidence.citations || []).forEach((item) => {
+      rows.push([item.n, item.kind, item.title, item.source, item.validation, item.retrieval, item.method]);
+    });
+    rows.push([], ["Declared gaps"], ...(evidence.gaps || []).map((gap) => [gap]));
+    return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  };
+
+  const escapeHtml = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+
+  // A small page that opens the live map: never a frozen copy, so the verdict resolves on view.
+  const mapLinkPage = (evidence, link) => {
+    const place = escapeHtml((evidence.area && evidence.area.sig_place) || evidence.place);
+    const receipt = evidence.receipt || {};
+    const receiptLink = safeHttps(receipt.public_url);
+    return [
+      "<!doctype html>",
+      '<html lang="en"><head><meta charset="utf-8">',
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+      `<title>Global Risk map · ${place}</title>`,
+      "<style>body{margin:0;font:15px/1.5 system-ui,sans-serif;color:#1c2a33;background:#f4f7f8}",
+      "main{max-width:760px;margin:0 auto;padding:32px 16px}a.button{display:inline-block;padding:10px 16px;",
+      "border-radius:10px;background:#1b678f;color:#fff;text-decoration:none;font-weight:600}",
+      "p.note{color:#5b6b74;font-size:13px}</style></head><body><main>",
+      `<h1>Global Risk map · ${place}</h1>`,
+      `<p>Receipt ${escapeHtml(receipt.receipt_id || "-")} · evidence pack ${escapeHtml(evidence.pack_id || "-")}` +
+        ` · saved ${escapeHtml(new Date().toISOString().slice(0, 10))} from GRP.</p>`,
+      `<p><a class="button" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Open the live map on Global Risk</a></p>`,
+      receiptLink ? `<p><a href="${escapeHtml(receiptLink)}" target="_blank" rel="noopener noreferrer">Public receipt</a></p>` : "",
+      `<p class="note">${escapeHtml(MAP_LINK_CAVEAT)} The map is live: it resolves from Global Risk each time it opens.</p>`,
+      "</main></body></html>",
+    ].join("\n");
+  };
+
   const slug = (text) =>
     String(text || "evidence").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 
@@ -2500,6 +2584,12 @@
           `Status: ${answerStatus}\n\n` +
           "_SIG generic evidence. Not a GRP assessment and not a decision that any place is safe._\n\n";
         downloadFile(`${base}-brief.md`, header + answer, "text/markdown");
+      } else if (button.dataset.download === "table") {
+        // A byte-order mark so Excel opens Thai place names correctly.
+        downloadFile(`${base}-evidence.csv`, `\ufeff${evidenceTable(evidence)}`, "text/csv");
+      } else if (button.dataset.download === "map-link") {
+        const link = safeHttps(openEvidencePayload && openEvidencePayload.map_link);
+        if (link) downloadFile(`${base}-global-risk-map.html`, mapLinkPage(evidence, link), "text/html");
       } else if (button.dataset.download === "evidence") {
         downloadFile(`${base}-evidence.json`, JSON.stringify({ ...evidence, brief: answer }, null, 2), "application/json");
       } else {
@@ -2658,6 +2748,7 @@
 
     const mapButton = $("[data-ev-map]");
     const mapUrl = safeHttps(payload.map_url);
+    $("[data-needs-map-link]").hidden = !safeHttps(payload.map_link);
     hidePublishConfirm();
     mapButton.disabled = false;
     mapButton.classList.remove("is-warning");
@@ -2684,6 +2775,32 @@
         $("[data-ev-foot]").append(
           `${receiptUrl ? " · " : ""}${payload.map_note || "The answer is available, but Global Risk did not return a verified flood-hazard map."}`,
         );
+      }
+      const mapLink = safeHttps(payload.map_link);
+      if (mapLink && !mapUrl) {
+        // ADR-0031: Global Risk's own map for this receipt, opened on Global Risk. GRP could not
+        // confirm which layer it colours, so it is a labelled link, never drawn inside GRP.
+        const box = document.createElement("span");
+        box.className = "pw-maplink";
+        const open = document.createElement("a");
+        open.className = "pw-chip-button";
+        open.href = mapLink;
+        open.target = "_blank";
+        open.rel = "noopener noreferrer";
+        open.textContent = "Open Global Risk map ↗";
+        const copy = chipButton("Copy link", async (button) => {
+          try {
+            await navigator.clipboard.writeText(mapLinkShareText(evidence, mapLink));
+            button.textContent = "Link copied";
+          } catch (_error) {
+            button.textContent = "Copy failed";
+          }
+          window.setTimeout(() => { button.textContent = "Copy link"; }, 1600);
+        });
+        const note = document.createElement("small");
+        note.textContent = MAP_LINK_CAVEAT;
+        box.append(open, copy, note);
+        $("[data-ev-foot]").append(box);
       }
     } else {
       const publishToken = livePublishToken(payload);

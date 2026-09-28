@@ -1,6 +1,6 @@
 # ADR-0014: Gate SIG risk levels and verify the embedded map layer
 
-**Status:** Superseded for approved recipes by ADR-0015; remains the fail-closed fallback
+**Status:** Superseded for approved recipes by ADR-0015; remains the fail-closed fallback. ADR-0031 offers an unverified map as a labelled outside link only.
 **Date:** 22 September 2026
 
 ## Context

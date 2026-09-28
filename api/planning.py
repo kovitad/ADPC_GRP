@@ -43,7 +43,7 @@ from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import Settings, get_settings, planning_chat_available
 from api.sig_connection import sig_access_token, sig_connection
-from api.sig_evidence import check_area, tool_payload, verified_hazard_embed
+from api.sig_evidence import check_area, embed_url, tool_payload, verified_hazard_embed
 from api.sig_jobs import app_session, run_in_background, sig_lookups
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
@@ -727,9 +727,21 @@ async def _publish_reviewed_draft(
                     embed,
                     urlparse(settings.sig_mcp_base_url).hostname,
                     allow_risk=bool(pinned_recipe),
+                    receipt_id=str(published["receipt_id"]),
                 )
             )
             map_url = embed_check.url if embed_check and embed_check.verified else None
+            # ADR-0031: the live embed never names its layer, so it stays out of the page, but
+            # its receipt-bound link is offered to open on Global Risk, labelled unverified.
+            map_link = (
+                None
+                if embed.is_error
+                else embed_url(
+                    embed,
+                    urlparse(settings.sig_mcp_base_url).hostname,
+                    str(published["receipt_id"]),
+                )
+            )
             map_note = (
                 "Global Risk could not provide the embedded map."
                 if embed.is_error
@@ -741,6 +753,8 @@ async def _publish_reviewed_draft(
                     "detail": (
                         f"embedded {embed_check.displayed_layer}"
                         if map_url and embed_check
+                        else "withheld: displayed layer not verified; link offered unverified"
+                        if map_link
                         else "withheld: displayed layer not verified"
                     ),
                     "duration_ms": round((perf_counter() - step_started) * 1000),
@@ -792,6 +806,8 @@ async def _publish_reviewed_draft(
         "citations": evidence.get("citations", []),
         "receipt": receipt,
         "map_url": map_url,
+        "map_link": map_url or map_link,
+        "map_link_verified": bool(map_url),
         "map_kind": (
             "sig_vulnerability_weighted_flood_risk"
             if map_url and embed_check and embed_check.layer_kind == "risk"

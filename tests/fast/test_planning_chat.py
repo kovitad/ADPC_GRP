@@ -670,6 +670,7 @@ def test_publish_checkbox_issues_receipt_and_map(planning) -> None:
     assert body["map_url"] == "https://sig.example/embed/hazard_map/r1"
     assert body["map_kind"] == "flood_hazard_and_asset_exposure"
     assert body["map_note"] == "Displayed flood-hazard layer verified."
+    assert body["map_link"] == body["map_url"] and body["map_link_verified"] is True
     with Session(planning["engine"]) as session:
         assert "sig_receipt_published" in set(session.scalars(select(AuditEvent.action)))
 
@@ -1702,3 +1703,62 @@ def test_an_evidence_word_alone_does_not_start_a_lookup(planning, message) -> No
 
     assert body["mode"] == "cannot"
     assert FakeMcp.calls == []
+
+
+# The ui_embed answer as Global Risk returned it on 28 Sep 2026, with the receipt filled in.
+LIVE_EMBED_SRC = "https://sig.example/?embed=hazard_map&receipt_id=receipt-1"
+
+
+def _live_embed(src: str = LIVE_EMBED_SRC) -> McpToolResult:
+    return McpToolResult(
+        content=[],
+        structured_content={
+            "status": "ok",
+            "component": "hazard_map",
+            "binds": "receipt_id",
+            "renders": "AOI, severity-tagged assets and the clipped hazard layer",
+            "src": src,
+            "html": f'<iframe src="{src}" title="hazard_map"></iframe>',
+        },
+        is_error=False,
+    )
+
+
+def test_embed_url_accepts_the_live_query_form_bound_to_the_receipt() -> None:
+    assert embed_url(_live_embed(), "sig.example", "receipt-1") == LIVE_EMBED_SRC
+    assert embed_url(_live_embed(), "sig.example", "receipt-2") is None
+    # The unfilled template and other components are not links to a map.
+    template = "https://sig.example/?embed=hazard_map&receipt_id={receipt_id}"
+    assert embed_url(_live_embed(template), "sig.example") is None
+    other = "https://sig.example/?embed=provenance_graph&receipt_id=receipt-1"
+    assert embed_url(_live_embed(other), "sig.example") is None
+    assert embed_url(_live_embed(LIVE_EMBED_SRC.replace("sig.", "evil.")), "sig.example") is None
+
+
+def test_the_live_embed_is_offered_as_an_unverified_link_not_embedded(planning) -> None:
+    # ADR-0031: the live answer names no displayed layer, so ADR-0014 still withholds the iframe.
+    planning["replies"] += ['{"mode": "sig_flood", "reply": ""}', "## What the numbers show\n3 [1]"]
+    client = _client(planning, "planner@example.test")
+    draft = _ask(
+        client, message="Which schools are exposed?", place="Mueang Nan District, Nan, Thailand"
+    ).json()
+    original = FakeMcp.call_tool
+
+    async def live_call_tool(self, name, arguments):
+        if name == "ui_embed":
+            FakeMcp.calls.append((name, arguments))
+            return _live_embed()
+        return await original(self, name, arguments)
+
+    planning["monkeypatch"].setattr(FakeMcp, "call_tool", live_call_tool)
+    body = _ask(
+        client,
+        message="Which schools are exposed?",
+        publish_receipt=True,
+        publish_token=draft["publish_token"],
+    ).json()
+
+    assert body["map_url"] is None
+    assert body["map_link"] == LIVE_EMBED_SRC
+    assert body["map_link_verified"] is False
+    assert "did not identify the layer" in body["map_note"]

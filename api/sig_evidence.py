@@ -11,7 +11,7 @@ import json
 import re
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from api.mcp_client import McpToolResult, SigMcpError
 
@@ -97,11 +97,33 @@ def check_area(requested_place: str, pack: dict[str, Any]) -> AreaCheck:
     return AreaCheck(True, requested_place, sig_place, aoi_line, "Admin boundary matched")
 
 
-def embed_url(result: McpToolResult, allowed_host: str | None) -> str | None:
+def _is_hazard_map_link(parsed, receipt_id: str | None) -> bool:
+    """Both link forms SIG has used. The live one (28 Sep 2026) is
+    ``/?embed=hazard_map&receipt_id=<id>``; the documented one was ``/embed/hazard_map/<id>``,
+    whose segment is a receipt-bound id rather than the receipt itself. With a receipt given, the
+    live form must name exactly that receipt."""
+
+    if HAZARD_MAP_PATH.fullmatch(parsed.path):
+        return True
+    if parsed.path not in {"", "/"}:
+        return False
+    query = parse_qs(parsed.query)
+    receipts = query.get("receipt_id", [])
+    return (
+        query.get("embed") == ["hazard_map"]
+        and len(receipts) == 1
+        and "{" not in receipts[0]
+        and (receipt_id is None or receipts[0] == receipt_id)
+    )
+
+
+def embed_url(
+    result: McpToolResult, allowed_host: str | None, receipt_id: str | None = None
+) -> str | None:
     """Return the receipt-bound hazard-map URL from a SIG ``ui_embed`` result.
 
     The MCP result can contain prose and arbitrary links.  Treat it as untrusted and
-    accept only the documented HTTPS component path on the configured SIG host.
+    accept only a hazard-map component link on the configured SIG host.
     """
 
     candidates: list[str] = []
@@ -125,7 +147,7 @@ def embed_url(result: McpToolResult, allowed_host: str | None) -> str | None:
             and parsed.hostname == allowed_host
             and parsed.username is None
             and parsed.password is None
-            and HAZARD_MAP_PATH.fullmatch(parsed.path)
+            and _is_hazard_map_link(parsed, receipt_id)
         ):
             return parsed.geturl()
     return None
@@ -173,7 +195,11 @@ def _displayed_layers(value: object) -> list[str]:
 
 
 def verified_hazard_embed(
-    result: McpToolResult, allowed_host: str | None, *, allow_risk: bool = False
+    result: McpToolResult,
+    allowed_host: str | None,
+    *,
+    allow_risk: bool = False,
+    receipt_id: str | None = None,
 ) -> EmbedCheck:
     """Accept an embed only when SIG explicitly identifies the displayed hazard layer.
 
@@ -183,7 +209,7 @@ def verified_hazard_embed(
     flood-hazard layer. Risk layers remain hidden until the science owner signs the recipe (G-16).
     """
 
-    url = embed_url(result, allowed_host)
+    url = embed_url(result, allowed_host, receipt_id)
     if url is None:
         return EmbedCheck(
             None, None, None, False, "Global Risk did not return an allowed hazard-map URL."

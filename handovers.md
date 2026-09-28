@@ -115,6 +115,27 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
+### 0.000000 Global Risk map link and downloads (ADR-0031, 28 September, latest)
+
+The owner asked to use the `ui_embed` link so planners can click and download it. A live
+`ui_embed(hazard_map)` call showed the link is `/?embed=hazard_map&receipt_id=<id>`, which GRP's
+`/embed/hazard_map/<id>` rule rejected, so **no real map link had ever reached a planner**. It also
+names no displayed layer, so ADR-0014 still withholds the in-page embed (G-17: `severity` may be
+risk). The owner chose "Link, labelled unverified":
+
+- `embed_url` accepts the live form only when it names the receipt just published. The publish
+  response adds `map_link` and `map_link_verified`; `map_url` (the embed) is unchanged.
+- The chat answer and the evidence panel show "Open Global Risk map ↗" (new tab) with the caveat,
+  plus Copy link. The Download menu adds **Evidence table (.csv)** (exposed of total, citations,
+  gaps; no risk fields; spreadsheet-formula cells neutralised) and **Global Risk map link
+  (.html)** (a small page that opens the live map).
+- A map image is impossible from GRP. **Ask Global Risk** for a typed `displayed_layer` in
+  `ui_embed` and a PNG or GeoTIFF export per receipt.
+- `planning.js?v=20260928c`, `planning.css?v=20260928b`. 592 passed, 2 skipped. Stack rebuilt.
+  **Not yet seen with a real receipt**: none has ever been published from this stack. To test,
+  sign in with SERVIR, ask a district question, then "Verify & create public receipt" (this
+  creates a public record on Global Risk).
+
 ### 0.00000 Conversational chat layout (28 September, later)
 
 The owner said the chat looked "very dummy" and asked for something like Claude Cowork.

@@ -1367,3 +1367,8 @@
   .pw-followups { margin-left: 0; }
   .pw-msg--user .pw-bubble { max-width: 90%; }
 }
+
+/* ADR-0031: Global Risk's own map for a receipt, as a labelled outside link */
+.pw-maplink { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.55rem; }
+.pw-maplink small { flex-basis: 100%; color: var(--pw-muted); font-size: 0.7rem; line-height: 1.4; }
+a.pw-chip-button { display: inline-block; }
