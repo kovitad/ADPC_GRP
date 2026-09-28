@@ -143,6 +143,8 @@
   const hideWelcome = () => {
     const welcome = $("[data-welcome]");
     if (welcome) welcome.remove();
+    // Suggested follow-ups belong to the latest answer only.
+    thread.querySelectorAll(".pw-followups").forEach((node) => node.remove());
   };
 
   // The assistant speaks for Global Risk, so its avatar is a globe rather than the letters "AI".
@@ -170,18 +172,62 @@
     return avatar;
   };
 
-  const addMessage = (role, text, { label, actions = [], error = false, record = true, confirmation = null } = {}) => {
+  const iconButton = (text, title, onClick) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pw-tool";
+    button.title = title;
+    button.textContent = text;
+    button.addEventListener("click", () => onClick(button));
+    return button;
+  };
+
+  const copyButton = (getText) => iconButton("Copy", "Copy this answer", async (button) => {
+    try {
+      await navigator.clipboard.writeText(getText());
+      button.textContent = "Copied";
+    } catch (_error) {
+      button.textContent = "Copy failed";
+    }
+    window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
+  });
+
+  // "Worked for 40 s": only real timings, never the simulated progress steps.
+  const workedLine = (text) => {
+    const line = document.createElement("div");
+    line.className = "pw-worked";
+    line.textContent = text;
+    return line;
+  };
+
+  const addMessage = (role, text, {
+    label, actions = [], error = false, record = true, confirmation = null,
+    elapsedMs = null, retry = null,
+  } = {}) => {
     hideWelcome();
     if (record && !restoring) {
       transcript.push({ kind: "message", role, text, label: label || null, error, confirmation });
       saveState();
     }
     const row = document.createElement("div");
-    row.className = `pw-msg pw-msg--${role}${error ? " pw-msg--error" : ""}`;
+    row.className = `pw-msg pw-msg--${role}${error ? " pw-msg--error" : ""}${restoring ? "" : " is-new"}`;
     if (role === "assistant") row.append(globeAvatar());
     const bubble = document.createElement("div");
     bubble.className = "pw-bubble";
-    bubble.textContent = text;
+    if (role === "assistant" && typeof elapsedMs === "number") {
+      bubble.append(workedLine(`Answered in ${seconds(elapsedMs)}`));
+    }
+    // Evidence messages put their status card and brief here, above the label and actions.
+    const slot = document.createElement("div");
+    slot.className = "pw-bubble__body";
+    if (role === "assistant" && !error && text) {
+      // Replies are Markdown: shown as text, **bold** and "- " lists appeared as raw symbols.
+      slot.append(renderBrief(text, null));
+    } else {
+      slot.classList.add("is-plain");
+      slot.textContent = text;
+    }
+    bubble.append(slot);
     if (label) {
       const small = document.createElement("small");
       small.className = "pw-bubble__label";
@@ -193,6 +239,14 @@
       bar.className = "pw-actions";
       actions.forEach((action) => bar.append(action));
       bubble.append(bar);
+    }
+    if (role === "assistant") {
+      const tools = document.createElement("div");
+      tools.className = "pw-msg__tools";
+      tools.append(copyButton(() => row.dataset.copyText || slot.innerText || text));
+      // Retry only after a failure: on a success it costs allowance or starts another long lookup.
+      if (error && retry) tools.append(iconButton("Retry", "Ask this again", retry));
+      bubble.append(tools);
     }
     row.append(bubble);
     thread.append(row);
@@ -224,33 +278,37 @@
       actions: [chipButton(payload.map_url ? "Open summary, map & evidence" : "Open planning summary", () => renderEvidence(payload, question))],
     });
     const bubble = row.querySelector(".pw-bubble");
+    const slot = row.querySelector(".pw-bubble__body");
     row.dataset.packId = packId;
     row.dataset.receipt = payload.receipt ? "yes" : "no";
+    row.dataset.copyText = payload.answer || "";
     bubble.classList.add("pw-bubble--evidence");
-    bubble.prepend(statusCard(payload, question));
+    slot.append(statusCard(payload, question));
     if (payload.answer && payload.answer.trim()) {
-      const brief = document.createElement("details");
+      // The brief is the answer, so it is shown, not folded behind "Read the brief".
+      const brief = document.createElement("div");
       brief.className = "pw-brief";
-      brief.open = payload.answer_source === "deterministic_fallback";
-      const summary = document.createElement("summary");
-      summary.textContent = payload.answer_source === "deterministic_fallback"
-        ? "Key findings from Global Risk evidence"
-        : "Read the brief";
-      const text = renderBrief(payload.answer, (n) => {
+      if (payload.answer_source === "deterministic_fallback") {
+        const title = document.createElement("div");
+        title.className = "pw-brief__title";
+        title.textContent = "Key findings from Global Risk evidence";
+        brief.append(title);
+      }
+      brief.append(renderBrief(payload.answer, (n) => {
         renderEvidence(payload, question);
         focusCitation(n);
-      });
-      brief.append(summary, text);
-      bubble.querySelector(".pw-bubble__label").before(brief);
+      }));
+      slot.append(brief);
     }
     if (restoring && !state.sigConnected) {
       const restored = document.createElement("p");
       restored.className = "pw-draft-warning";
       restored.textContent =
         "Restored from your conversation. Global Risk is disconnected: you can keep asking about this area while its evidence is under an hour old, but sign in again to gather it anew.";
-      bubble.querySelector(".pw-bubble__label").before(restored);
+      slot.append(restored);
     }
     scrollDown();
+    return row;
   };
 
   const STEP_LABELS = {
@@ -269,8 +327,9 @@
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
   };
 
-  // Live progress while one request runs. The API answers in one go, so the steps advance
-  // on typical timings and are replaced by the real step durations when the answer arrives.
+  // Live progress while one request runs. The lookup status carries no current step, so these
+  // advance on typical timings and are worded for any request, not only a Global Risk lookup.
+  // The real step durations appear on the answer instead.
   const addProgress = ({ publish = false } = {}) => {
     hideWelcome();
     const steps = publish
@@ -280,36 +339,44 @@
           { label: "Loading Global Risk's receipt-bound hazard map", after: 12000 },
         ]
       : [
-          { label: "Understanding your question", after: 0 },
-          { label: "Finding the district and flood evidence on Global Risk (usually 20–90 s)", after: 4000 },
-          { label: "Checking Global Risk used the real district boundary", after: 30000 },
-          { label: "Writing the brief from the evidence", after: 45000 },
+          { label: "Reading your question", after: 0 },
+          { label: "Looking up the district and its data", after: 4000 },
+          { label: "Still gathering: a Global Risk lookup can take 1–3 minutes", after: 30000 },
+          { label: "Writing the answer", after: 60000 },
         ];
     const row = document.createElement("div");
-    row.className = "pw-msg pw-msg--assistant";
+    row.className = "pw-msg pw-msg--assistant is-new";
     const avatar = globeAvatar();
+    avatar.classList.add("is-working");
     const bubble = document.createElement("div");
     bubble.className = "pw-bubble pw-progress-card";
-    const head = document.createElement("div");
+    const head = document.createElement("button");
+    head.type = "button";
     head.className = "pw-progress-card__head";
-    const title = document.createElement("strong");
-    title.textContent = "Working on it";
+    head.setAttribute("aria-expanded", "false");
+    const title = document.createElement("span");
+    title.className = "pw-shimmer";
     const timer = document.createElement("span");
     timer.className = "pw-timer";
     timer.textContent = "0:00";
-    head.append(title, timer);
+    const caret = document.createElement("span");
+    caret.className = "pw-caret";
+    caret.setAttribute("aria-hidden", "true");
+    head.append(title, timer, caret);
     const list = document.createElement("ol");
     list.className = "pw-steps";
+    list.hidden = true;
+    head.addEventListener("click", () => {
+      list.hidden = !list.hidden;
+      head.setAttribute("aria-expanded", String(!list.hidden));
+    });
     const items = steps.map((step) => {
       const item = document.createElement("li");
       item.textContent = step.label;
       list.append(item);
       return item;
     });
-    const bar = document.createElement("div");
-    bar.className = "pw-progress";
-    bar.append(document.createElement("span"));
-    bubble.append(head, list, bar);
+    bubble.append(head, list);
     row.append(avatar, bubble);
     thread.append(row);
     scrollDown();
@@ -321,6 +388,7 @@
       steps.forEach((step, index) => {
         if (ms >= step.after) current = index;
       });
+      title.textContent = steps[current].label;
       items.forEach((item, index) => {
         item.className = index < current ? "is-done" : index === current ? "is-active" : "";
       });
@@ -345,19 +413,21 @@
       const line = raw.trim();
       if (!line || /^#{1,6}\s*$/.test(line)) return;
       const heading = line.match(/^#{1,4}\s+(.*)$/);
-      const bullet = line.match(/^[-*]\s+(.*)$/);
+      const bullet = line.match(/^[-*•]\s+(.*)$/);
+      const numbered = line.match(/^\d+[.)]\s+(.*)$/);
       let node;
       if (heading) {
         list = null;
         node = document.createElement("h4");
         appendInline(node, heading[1], onCite);
-      } else if (bullet) {
-        if (!list) {
-          list = document.createElement("ul");
+      } else if (bullet || numbered) {
+        const tag = numbered ? "OL" : "UL";
+        if (!list || list.tagName !== tag) {
+          list = document.createElement(tag.toLowerCase());
           box.append(list);
         }
         node = document.createElement("li");
-        appendInline(node, bullet[1], onCite);
+        appendInline(node, (bullet || numbered)[1], onCite);
         list.append(node);
         return;
       } else {
@@ -378,7 +448,10 @@
   const appendInline = (parent, text, onCite) => {
     text.split(/(\[\d+\](?:\[\d+\])*|\*\*[^*]+\*\*)/g).forEach((part) => {
       if (!part) return;
-      if (/^\[\d+\]/.test(part)) {
+      if (/^\[\d+\]/.test(part) && !onCite) {
+        // A plain reply has no evidence panel to open, so a citation stays text.
+        parent.append(document.createTextNode(part));
+      } else if (/^\[\d+\]/.test(part)) {
         part.match(/\d+/g).forEach((n) => {
           const cite = document.createElement("button");
           cite.type = "button";
@@ -439,15 +512,33 @@
 
   const updateSend = () => {
     sendButton.disabled = state.busy || !state.hubCode || !input.value.trim();
+    sendButton.classList.toggle("is-busy", state.busy);
+    input.placeholder = transcript.length
+      ? "Ask a follow-up…"
+      : "Ask about a district, flood layer, population or map data…";
   };
+
+  // A floating "jump to latest" arrow once the planner scrolls up to read an earlier answer.
+  const jumpButton = $("[data-jump]");
+  thread.addEventListener("scroll", () => {
+    jumpButton.hidden = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 160;
+  });
+  jumpButton.addEventListener("click", () => {
+    thread.scrollTop = thread.scrollHeight;
+  });
 
   // ---------- welcome ----------
   const renderWelcome = () => {
     const welcome = $("[data-welcome]");
     if (!welcome) return;
     const area = state.selected ? state.selected.name : null;
+    const hour = new Date().getHours();
+    const greeting = welcome.querySelector(".pw-welcome__greeting");
+    if (greeting) {
+      greeting.textContent = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    }
     welcome.querySelector("h2").textContent = "Explore the available flood information";
-    const intro = welcome.querySelector("p");
+    const intro = welcome.querySelector("p:not(.pw-welcome__greeting)");
     intro.textContent =
       "District boundaries, the available RP100 flood layer and evacuation-centre locations are " +
       "shown immediately. Ask in your own words for Global Risk flood, risk or population information.";
@@ -2681,8 +2772,7 @@
     const counts = evidence.summary;
     const card = document.createElement("div");
     card.className = "pw-status";
-    const title = document.createElement("strong");
-    title.textContent = question;
+    card.title = question;
     const line = document.createElement("span");
     line.textContent =
       `${counts.sources} sources · ${counts.pulled_live} pulled live · ${counts.computed} computed · ${counts.declared_gaps} declared gap(s)`;
@@ -2695,33 +2785,48 @@
         : livePublishToken(payload)
           ? "Unverified draft"
           : needsFreshEvidence(payload) ? "Gather again to publish" : "Evidence only";
-    card.append(title);
+    // One folded line in place of five grey ones: what was gathered and how long it took, with
+    // the real step durations inside. The badge and the warnings below stay visible.
+    const work = document.createElement("details");
+    work.className = "pw-work";
+    const workSummary = document.createElement("summary");
+    const steps = (evidence.grp_trace || []).filter((step) => typeof step.duration_ms === "number");
+    const place = (evidence.area && evidence.area.sig_place) || evidence.place || "";
+    workSummary.textContent = [
+      `Global Risk evidence${place ? ` · ${place}` : ""}`,
+      `${counts.sources} sources`,
+      payload.cached ? "answered immediately" : evidence.total_ms ? `worked for ${seconds(evidence.total_ms)}` : "",
+    ].filter(Boolean).join(" · ");
+    work.append(workSummary, line);
+    if (payload.cached) {
+      const timing = document.createElement("span");
+      timing.className = "pw-status__timing";
+      timing.textContent = "Answered immediately: you asked this earlier in this sign-in.";
+      work.append(timing);
+    } else if (steps.length) {
+      const list = document.createElement("ol");
+      list.className = "pw-steps pw-steps--done";
+      steps.forEach((step) => {
+        const item = document.createElement("li");
+        item.className = "is-done";
+        item.textContent = `${STEP_LABELS[step.step] || step.step} · ${seconds(step.duration_ms)}`;
+        list.append(item);
+      });
+      work.append(list);
+    }
+    card.append(work);
     if (payload.note) {
       const note = document.createElement("span");
       note.className = "pw-status__note";
       note.textContent = payload.note;
       card.append(note);
     }
-    card.append(line);
     if (counts.pulled_live === 0) {
       const sourceNote = document.createElement("span");
       sourceNote.className = "pw-status__source-note";
       sourceNote.textContent =
         "No source was pulled live in this run; computed exposure is not a report of current flooding.";
       card.append(sourceNote);
-    }
-    const steps = (evidence.grp_trace || []).filter((step) => typeof step.duration_ms === "number");
-    if (payload.cached) {
-      const timing = document.createElement("span");
-      timing.className = "pw-status__timing";
-      timing.textContent = "Answered immediately: you asked this earlier in this sign-in.";
-      card.append(timing);
-    } else if (evidence.total_ms || steps.length) {
-      const timing = document.createElement("span");
-      timing.className = "pw-status__timing";
-      const parts = steps.map((step) => `${STEP_LABELS[step.step] || step.step} ${seconds(step.duration_ms)}`);
-      timing.textContent = `Took ${seconds(evidence.total_ms || 0)} · ${parts.join(" · ")}`;
-      card.append(timing);
     }
     const gathered = evidenceGathered(payload);
     const reused = payload.evidence_reused || payload.cached;
@@ -2734,8 +2839,36 @@
       reuse.append(gatherAgain(payload, question));
       card.append(reuse);
     }
-    card.append(badge);
+    card.prepend(badge);
     return card;
+  };
+
+  // Next questions under the latest answer. None uses the words that start an assessment run
+  // (EXPLICIT_ASSESSMENT_PATTERN in api/planning.py), so a click only ever asks for information.
+  const FOLLOWUPS = {
+    sig_evidence: [
+      "Which evacuation centres could people move to?",
+      "Explain what the map shows",
+      "What do these numbers leave out?",
+    ],
+    explain_result: [
+      "Which centres could not be checked, and why?",
+      "Show Global Risk evidence for this district",
+      "Explain what the map shows",
+    ],
+  };
+  const showFollowups = (mode) => {
+    const area = state.selected ? state.selected.name : null;
+    const questions = FOLLOWUPS[mode] || (area
+      ? [`Show Global Risk evidence for ${area}`, "Explain what the map shows"]
+      : ["Explain what the map shows"]);
+    const box = document.createElement("div");
+    box.className = "pw-followups";
+    questions.forEach((question) => {
+      box.append(chipButton(question, () => send(question)));
+    });
+    thread.append(box);
+    scrollDown();
   };
 
   const sigActions = (payload, message) => [
@@ -2869,6 +3002,7 @@
         echo,
         history: state.history.slice(-8),
       });
+      const elapsedMs = typing.elapsed();
       typing.remove();
       if (payload.usage) showAllowance(payload.usage);
       let actions = [];
@@ -2927,12 +3061,16 @@
           $("[data-ev-foot]").textContent =
             "Global Risk refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
         }
+        const failed = payload.mode === "area_rejected" || payload.mode === "gate_blocked";
         addMessage("assistant", payload.answer, {
           label: payload.label,
           actions,
-          error: payload.mode === "area_rejected" || payload.mode === "gate_blocked",
+          error: failed,
+          elapsedMs,
+          retry: failed ? () => send(message, { echo: false }) : null,
         });
       }
+      if (!publish && payload.mode !== "assessment_started") showFollowups(payload.mode);
       if (!publish) {
         state.history.push({ role: "user", text: message });
         if (payload.answer?.trim()) {
@@ -2943,7 +3081,11 @@
       return true;
     } catch (error) {
       typing.remove();
-      addMessage("assistant", error.message, { label: error.code, error: true });
+      addMessage("assistant", error.message, {
+        label: error.code,
+        error: true,
+        retry: error.code === "SIG_REAUTH_REQUIRED" ? null : () => send(message, { echo: false }),
+      });
       if (error.code === "PUBLISH_NEEDS_FRESH_EVIDENCE") hidePublishConfirm();
       if (error.code === "SIG_REAUTH_REQUIRED") {
         window.setTimeout(() => window.location.assign("/api/v1/auth/login"), 1500);
@@ -3403,7 +3545,11 @@
     }
     restoring = true;
     try {
-      (saved.transcript || []).forEach((entry) => {
+      // c5c3db6 saved "Cannot read properties of undefined (reading 'payload')" into tabs on every
+      // reload with no evidence panel open; that was a page fault, not part of the conversation.
+      (saved.transcript || []).filter((entry) => !(
+        entry.error && entry.text === "Cannot read properties of undefined (reading 'payload')"
+      )).forEach((entry) => {
         transcript.push(entry);
         if (entry.kind === "evidence") addEvidenceMessage(entry.payload, entry.question);
         else addMessage(entry.role, entry.text, {
@@ -3428,12 +3574,14 @@
         watch(saved.pendingAssessmentId);
       }
       const evidence = transcript[saved.evidenceIndex];
-      const evidenceArea = evidence && evidence.kind === "evidence"
-        && evidence.payload.evidence && evidence.payload.evidence.area;
-      const requested = evidenceArea && String(evidenceArea.requested || "").toLowerCase();
-      // Tabs saved before the panel closed on a district change can hold another district's evidence.
-      if (!requested || !boundary || requested === canonicalSigPlace(boundary).toLowerCase()) {
-        renderEvidence(evidence.payload, evidence.question);
+      if (evidence && evidence.kind === "evidence" && evidence.payload.evidence) {
+        const area = evidence.payload.evidence.area;
+        const requested = String((area && area.requested) || "").toLowerCase();
+        // Tabs saved before the panel closed on a district change can hold another district's
+        // evidence; reopen it only for the district now selected.
+        if (!requested || !boundary || requested === canonicalSigPlace(boundary).toLowerCase()) {
+          renderEvidence(evidence.payload, evidence.question);
+        }
       }
     } finally {
       restoring = false;

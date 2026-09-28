@@ -115,6 +115,30 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
+### 0.00000 Conversational chat layout (28 September, later)
+
+The owner said the chat looked "very dummy" and asked for something like Claude Cowork.
+`planning.js?v=20260928b`, `planning.css?v=20260928a`, `styles.css?v=20260928a` on every page.
+
+- Plain assistant replies were set with `textContent`, so `**bold**` and `- ` lists showed as raw
+  symbols. They now go through `renderBrief` (numbered lists added; `[n]` stays text when there is
+  no evidence to open). Replies have no bubble; user messages are soft right-hand bubbles.
+- Evidence answers show the brief directly. Counts and the real `grp_trace` step times fold into one
+  `details.pw-work` line. The badge, the no-live-source note, the restored warning and the label
+  stay visible (governance signals).
+- The live progress steps are **simulated** (the lookup status has no current step), so they are
+  worded neutrally and never become a "worked for" record; only real timings do.
+- Copy on every reply; Retry only on error rows. Follow-up chips on the latest answer only, and never
+  with words matching `EXPLICIT_ASSESSMENT_PATTERN`. Restored messages get no animations or chips.
+- **Bug from `c5c3db6`:** restore called `renderEvidence(undefined.payload)` when no panel was open,
+  saving "Cannot read properties of undefined (reading 'payload')" into the tab on each reload.
+  Fixed, and restore filters those saved rows.
+- **Shared top bar:** a later `.grp-topbar { height: 56px }` in `styles.css` overrode the ≤900 px
+  `height: auto`, so the wrapped menu overlapped the page on every screen. The owner's browser
+  zoom (viewport 617 px) puts them in the phone layout, so check that layout first.
+- Browser-checked on the desktop stack at both widths with one router-only question. A fresh Global
+  Risk answer in the new layout is **not yet seen** (SERVIR was signed out).
+
 ### 0.0000 Evidence panel follows the district (28 September)
 
 The owner selected Bang Kapi and still saw "Global Risk analysis area: aoi[Bang Phli District]

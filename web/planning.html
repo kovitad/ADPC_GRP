@@ -7,11 +7,11 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-    <link rel="stylesheet" href="/styles.css?v=20260925b" />
-    <link rel="stylesheet" href="/planning.css?v=20260925h" />
+    <link rel="stylesheet" href="/styles.css?v=20260928a" />
+    <link rel="stylesheet" href="/planning.css?v=20260928a" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260925a" defer></script>
-    <script src="/planning.js?v=20260928a" defer></script>
+    <script src="/planning.js?v=20260928b" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -43,7 +43,10 @@
 
         <div class="pw-thread" data-thread aria-live="polite">
           <div class="pw-welcome" data-welcome>
-            <div class="pw-welcome__icon" aria-hidden="true">≈</div>
+            <div class="pw-welcome__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="4" ry="9" /><path d="M3 12h18M4.6 7.5h14.8M4.6 16.5h14.8" /></svg>
+            </div>
+            <p class="pw-welcome__greeting">Hello</p>
             <h2>How can I help with flood planning?</h2>
             <p>Available district, flood and evacuation-centre data is already shown on the map.</p>
             <div class="pw-suggestions" data-suggestions></div>
@@ -51,18 +54,23 @@
         </div>
 
         <form class="pw-composer" data-composer>
-          <div class="pw-context" data-context></div>
+          <button class="pw-jump" type="button" data-jump hidden aria-label="Jump to the latest message">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+          </button>
           <div class="pw-composer__box">
             <textarea
               data-input
-              rows="1"
+              rows="2"
               maxlength="1000"
               placeholder="Ask about a district, flood layer, population or map data…"
               aria-label="Message"
             ></textarea>
-            <button class="pw-send" type="submit" data-send aria-label="Send message" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z" /></svg>
-            </button>
+            <div class="pw-composer__bar">
+              <div class="pw-context" data-context></div>
+              <button class="pw-send" type="submit" data-send aria-label="Send message" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+              </button>
+            </div>
           </div>
           <p class="pw-composer__hint">
             Enter to send · Shift + Enter for a new line · Don't share private Hub data

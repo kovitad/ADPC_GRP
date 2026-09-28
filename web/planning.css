@@ -1151,3 +1151,219 @@
 .pw-area-pop__note { margin-top: 0.45rem; color: #8a5a00; font-size: 0.72rem; }
 .pw-area-pop__none { margin-top: 0.45rem; color: #5b6b74; }
 .pw-area-pop__caveat { margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px solid #e2e8eb; color: #5b6b74; font-size: 0.7rem; }
+
+/* ---------- Chat, conversational layout (28 Sep) ----------
+   Assistant replies read as a page, not a boxed bubble; the person's own messages are soft
+   right-hand bubbles; tools, warnings and folded detail sit quietly around the answer. */
+.pw-thread { padding: 1.1rem 1.25rem 0.75rem; scroll-behavior: smooth; }
+.pw-msg { gap: 0.7rem; margin: 1.1rem 0; animation: none; }
+.pw-msg.is-new { animation: pw-in 0.22s ease-out; }
+.pw-avatar { width: 26px; height: 26px; margin-top: 0.1rem; }
+.pw-avatar.is-working svg { animation: pw-spin 2.4s linear infinite; }
+
+.pw-bubble { white-space: normal; font-size: 0.875rem; line-height: 1.62; }
+.pw-msg--assistant .pw-bubble {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  padding: 0.1rem 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.pw-msg--user .pw-bubble {
+  max-width: 82%;
+  padding: 0.6rem 0.95rem;
+  border-radius: 18px;
+  border-bottom-right-radius: 6px;
+  background: #e9f1f6;
+  color: var(--pw-ink);
+}
+.pw-bubble__body.is-plain { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pw-msg--error .pw-bubble {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #f3c7c0;
+  border-radius: 12px;
+  background: #fff6f4;
+}
+.pw-bubble--evidence,
+.pw-progress-card { width: auto; }
+.pw-bubble__label { margin-top: 0.55rem; font-size: 0.72rem; }
+
+/* Markdown replies */
+.pw-brief__text { margin: 0; font-size: 0.875rem; }
+.pw-brief__text > :first-child { margin-top: 0; }
+.pw-brief__text h4 { margin: 0.95rem 0 0.3rem; color: var(--pw-ink); font-size: 0.9rem; font-weight: 650; }
+.pw-brief__text p { margin: 0 0 0.6rem; }
+.pw-brief__text ul,
+.pw-brief__text ol { margin: 0 0 0.65rem; padding-left: 1.25rem; }
+.pw-brief__text li { margin: 0.2rem 0; }
+.pw-brief__text li::marker { color: var(--pw-muted); }
+.pw-brief__text strong { font-weight: 650; }
+.pw-brief { margin-top: 0.55rem; }
+.pw-brief__title { margin-bottom: 0.35rem; color: var(--pw-forest); font-size: 0.78rem; font-weight: 650; }
+/* New answers arrive block by block, which reads as the reply being written. */
+.pw-msg.is-new .pw-brief__text > * { animation: pw-in 0.35s ease-out both; }
+.pw-msg.is-new .pw-brief__text > :nth-child(2) { animation-delay: 0.06s; }
+.pw-msg.is-new .pw-brief__text > :nth-child(3) { animation-delay: 0.12s; }
+.pw-msg.is-new .pw-brief__text > :nth-child(4) { animation-delay: 0.18s; }
+.pw-msg.is-new .pw-brief__text > :nth-child(5) { animation-delay: 0.24s; }
+.pw-msg.is-new .pw-brief__text > :nth-child(n + 6) { animation-delay: 0.3s; }
+
+/* Copy / Retry, shown on hover or keyboard focus */
+.pw-msg__tools { display: flex; gap: 0.2rem; margin-top: 0.35rem; opacity: 0; transition: opacity 0.15s; }
+.pw-msg:hover .pw-msg__tools,
+.pw-msg:focus-within .pw-msg__tools,
+.pw-msg--error .pw-msg__tools { opacity: 1; }
+.pw-tool {
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pw-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pw-tool:hover { background: #eef3f5; color: var(--pw-ink); }
+@media (hover: none) { .pw-msg__tools { opacity: 1; } }
+
+.pw-worked { margin-bottom: 0.3rem; color: var(--pw-muted); font-size: 0.72rem; }
+
+/* Evidence status: badge, one folded line, then the warnings that must stay visible */
+.pw-status { gap: 0.35rem; margin-bottom: 0.15rem; }
+.pw-status__badge { margin-top: 0; font-size: 0.7rem; }
+.pw-work {
+  border: 1px solid var(--pw-line);
+  border-radius: 10px;
+  background: #fafcfd;
+  font-size: 0.76rem;
+}
+.pw-work summary {
+  padding: 0.45rem 0.7rem;
+  color: #3f525b;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.pw-work summary::-webkit-details-marker { display: none; }
+.pw-work summary::before { content: "\25B8"; display: inline-block; margin-right: 0.45rem; color: var(--pw-muted); transition: transform 0.15s; }
+.pw-work[open] summary::before { transform: rotate(90deg); }
+.pw-work > span,
+.pw-work > .pw-steps { display: block; margin: 0 0.7rem 0.5rem 1.55rem; }
+.pw-work > .pw-steps { display: grid; }
+.pw-steps--done { gap: 0.25rem; font-size: 0.74rem; }
+
+/* Working indicator: one live line, the steps on demand */
+.pw-progress-card { padding-top: 0.15rem; }
+.pw-progress-card__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.2rem 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+.pw-caret { width: 0.45rem; height: 0.45rem; border-right: 1.5px solid var(--pw-muted); border-bottom: 1.5px solid var(--pw-muted); transform: rotate(45deg) translateY(-2px); transition: transform 0.15s; }
+.pw-progress-card__head[aria-expanded="true"] .pw-caret { transform: rotate(225deg) translateY(-1px); }
+.pw-shimmer {
+  background: linear-gradient(90deg, #6b7f88 0%, #6b7f88 40%, #c9d6dc 50%, #6b7f88 60%, #6b7f88 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 600;
+  animation: pw-shimmer 1.8s linear infinite;
+}
+@keyframes pw-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.pw-progress-card .pw-steps { margin-top: 0.4rem; }
+.pw-progress-card .pw-steps[hidden] { display: none; }
+
+/* Suggested next questions under the latest answer */
+.pw-followups { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: -0.35rem 0 0.9rem 2.35rem; animation: pw-in 0.3s 0.25s ease-out both; }
+.pw-followups .pw-chip-button { border-color: var(--pw-line); background: #fff; color: #33505c; font-weight: 500; }
+.pw-followups .pw-chip-button:hover { border-color: #a9c7d4; background: #f5fafc; }
+
+/* Welcome */
+.pw-welcome { padding: 2rem 0.25rem 0.5rem; }
+.pw-welcome__icon { width: 40px; height: 40px; border-radius: 12px; }
+.pw-welcome__icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.pw-welcome p.pw-welcome__greeting { margin: 1rem 0 0; color: var(--pw-muted); font-size: 0.85rem; }
+.pw-welcome h2 { margin-top: 0.15rem; font-size: 1.3rem; letter-spacing: -0.015em; }
+.pw-suggestions { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.pw-suggestion { padding: 0.8rem 0.9rem; border-radius: 12px; }
+.pw-suggestion:hover { box-shadow: 0 4px 14px rgb(18 48 64 / 8%); }
+
+/* Composer: one card, the district chip and send button along its foot */
+.pw-chat { position: relative; }
+.pw-composer { position: relative; padding: 0.5rem 1.1rem 0.75rem; border-top: 0; background: #fff; }
+.pw-composer__box {
+  display: block;
+  padding: 0.65rem 0.65rem 0.5rem 0.95rem;
+  border-radius: 18px;
+  box-shadow: 0 2px 10px rgb(18 48 64 / 7%);
+}
+.pw-composer textarea { display: block; width: 100%; min-height: 2.6rem; padding: 0.15rem 0; font-size: 0.9rem; }
+.pw-composer__bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.3rem; }
+.pw-context { margin: 0; min-width: 0; }
+.pw-context:empty { display: block; }
+.pw-context span { background: #eef4f7; color: #33505c; }
+.pw-send { width: 32px; height: 32px; border-radius: 10px; }
+.pw-send svg { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.pw-send:disabled { opacity: 0.3; }
+.pw-send.is-busy { opacity: 1; }
+.pw-send.is-busy svg { display: none; }
+.pw-send.is-busy::after { content: ""; width: 12px; height: 12px; border-radius: 3px; background: #fff; animation: pw-blink 1.2s infinite ease-in-out; }
+.pw-composer__hint { margin-top: 0.35rem; font-size: 0.66rem; }
+
+.pw-jump {
+  position: absolute;
+  z-index: 5;
+  top: -2.4rem;
+  left: 50%;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--pw-line);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(18 48 64 / 14%);
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+.pw-jump[hidden] { display: none; }
+.pw-jump svg { width: 16px; height: 16px; fill: none; stroke: var(--pw-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pw-msg.is-new,
+  .pw-msg.is-new .pw-brief__text > *,
+  .pw-followups,
+  .pw-shimmer,
+  .pw-avatar.is-working svg,
+  .pw-send.is-busy::after { animation: none; }
+  .pw-shimmer { color: #52646c; background: none; }
+}
+
+/* A narrow chat column wraps its header instead of pushing the allowance pill off-screen. */
+.pw-chat__top { flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.pw-chat__tools { margin-left: auto; }
+@media (max-width: 860px) {
+  /* Give the conversation the room: on a phone the header, notice and composer took two thirds. */
+  .pw-chat__top { flex-wrap: nowrap; padding: 0.55rem 0.9rem; }
+  .pw-chat__top > div:first-child { flex: 1; min-width: 0; }
+  .pw-chat__top h1 { overflow: hidden; font-size: 0.88rem; text-overflow: ellipsis; white-space: nowrap; }
+  .pw-chat__top p { display: none; }
+  .pw-chat__tools .button--compact { padding: 0.3rem 0.65rem; font-size: 0.74rem; }
+  .pw-thread { padding: 0.75rem 0.9rem 0.5rem; }
+  .pw-composer { padding: 0.4rem 0.7rem 0.6rem; }
+  .pw-composer textarea { min-height: 1.6rem; }
+  .pw-composer__hint { display: none; }
+  .pw-followups { margin-left: 0; }
+  .pw-msg--user .pw-bubble { max-width: 90%; }
+}

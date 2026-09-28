@@ -1819,8 +1819,9 @@ h4, h5, h6, strong { font-weight: var(--weight-semibold); }
 .platform-admin-badge,
 .status-pill { font-weight: var(--weight-semibold); }
 
+/* No height here: the base rule already sets 56px, and repeating it after the phone media query
+   pinned the wrapped two-row bar to 56px, so its menu spilled over the page below. */
 .grp-topbar {
-  height: 56px;
   border-bottom-color: #e2e8eb;
   box-shadow: 0 1px 2px rgb(18 48 64 / 5%);
   font-family: var(--font-sans);
