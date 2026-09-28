@@ -1665,3 +1665,40 @@ def test_managed_is_not_read_as_aged() -> None:
     assert not VULNERABLE_QUESTION.search("How is the evacuation managed here?")
     assert VULNERABLE_QUESTION.search("ผู้สูงอายุอยู่ที่ไหน")
     assert VULNERABLE_QUESTION.search("Where do elderly people live?")
+
+
+def test_an_unplaced_evidence_request_gathers_for_the_selected_district(planning) -> None:
+    # The router called "show global patform evidence" cannot: it names no place and has a typo.
+    planning["replies"] += [
+        '{"mode": "cannot", "reply": "", "place": null}',
+        "## What the numbers show\n3 [1]",
+    ]
+    FakeMcp.pack = {
+        **PACK,
+        "stats": {"place": "Kanthararom District"},
+        "trace": ["aoi[Kanthararom District] 664 km2 via admin boundary ~664 km²"],
+    }
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message="show global patform evidence",
+        boundary_id=planning["boundary_id"],
+    ).json()
+
+    assert body["mode"] == "sig_evidence", body
+    assert FakeMcp.calls[0][1]["place"] == "KANTHARAROM District, SI SA KET, Thailand"
+
+
+@pytest.mark.parametrize("message", ["what is evidence?", "show global patform evidence"])
+def test_an_evidence_word_alone_does_not_start_a_lookup(planning, message) -> None:
+    # A general question, or no district selected: the server's own refusal, no Global Risk call.
+    planning["replies"].append('{"mode": "cannot", "reply": ""}')
+
+    body = _ask(
+        _client(planning, "planner@example.test"),
+        message=message,
+        **({"boundary_id": planning["boundary_id"]} if message.startswith("what") else {}),
+    ).json()
+
+    assert body["mode"] == "cannot"
+    assert FakeMcp.calls == []

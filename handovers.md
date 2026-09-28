@@ -122,9 +122,22 @@ The owner selected Bang Kapi and still saw "Global Risk analysis area: aoi[Bang 
 (ADR-0029, intended) but left open in the evidence panel after the district changed (the bug).
 Changing district now closes an open Global Risk evidence panel (the chat card stays and reopens
 it), and a tab restore only reopens evidence whose `area.requested` matches the selected district.
-`planning.js?v=20260928a`. Not yet viewed in a browser. **Open follow-ups:** "show global platform
-evidence" with a district selected gets the generic help reply instead of a gather; Bang Kapi has
-0 evacuation centres in scope, so check whether Bangkok has shelter records.
+`planning.js?v=20260928a`. Not yet viewed in a browser.
+
+**Follow-ups, done the same day:**
+
+- **256 of 929 supported districts have no shelter records** in the current version `61a17773`
+  (44 of Bangkok's 50; Bangkok has 8 records in all, Nakhon Ratchasima is missing 25 of 32
+  districts). That's a gap in the source data, not a bug. A finished result with `in_scope == 0` now
+  gets a fixed reply saying the data has no records there and that this isn't a finding of no
+  shelters. It points to Global Risk evidence and the data owner, and the model is never asked
+  about an empty result. **Ask the data owner** whether Bangkok (BMA) shelters exist in another list.
+- **"show global patform evidence"** with a district selected was routed `cannot`. Router
+  `planning-router-v3` is told about it, and a server rule (`EVIDENCE_REQUEST_PATTERN`: show, get,
+  gather, open, see or give, then evidence or Global Risk/platform) turns a placeless `cannot`
+  into `sig_flood` for the selected district. "what is evidence?" and a request with no district
+  selected are unchanged.
+- 590 passed, 2 skipped, Ruff clean. Desktop stack rebuilt, so SERVIR sign-in is needed again.
 
 ### 0.000 Sensitivity indicators on the map (ADR-0030, 25 September, late)
 

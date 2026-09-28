@@ -73,7 +73,8 @@ CANNOT_REPLY = (
 # Keep below the request field limit in PlanningChat.publish_token.
 PUBLISH_TOKEN_MAX_CHARS = 90_000
 # v2 names the evidence service "Global Risk" to the planner instead of "SIG".
-ROUTER_VERSION = "planning-router-v2"
+# v3 routes an unplaced evidence request to the selected district.
+ROUTER_VERSION = "planning-router-v3"
 # v2 asked the brief to open with a direct answer; v3 also carries the conversation so far. Bumped
 # on each change because llm_usage records the prompt version, and two prompts must not share one.
 # v4 names the evidence service "Global Risk" instead of "SIG".
@@ -87,6 +88,20 @@ EXPLICIT_ASSESSMENT_PATTERN = re.compile(
     r"\b(?:run|start|calculate|assess|assessment|classify|classification|screen|screening)\b",
     re.IGNORECASE,
 )
+# A request for Global Risk evidence that names no place ("show global platform evidence"). With a
+# district selected it means that district; the router called it "cannot" because none was named.
+EVIDENCE_REQUEST_PATTERN = re.compile(
+    r"\b(?:show|gather|get|fetch|open|see|give)\b[^.?!]*"
+    r"\b(?:evidence|global[\s-]*(?:risk|p\w*form))\b",
+    re.IGNORECASE,
+)
+NO_CENTRES_REPLY = (
+    "{area} has no evacuation-centre records in the current shelter data, so this result cannot "
+    "say where people could move. This is a gap in the data, not a finding that the district has "
+    "no shelters: many districts have no records in this delivery. Ask for Global Risk evidence "
+    "for {area} to see flood exposure for schools, hospitals, buildings and roads, or ask the data "
+    "owner for the district's shelter list."
+)
 ROUTER_INSTRUCTIONS = (
     "You route chat messages for the GRP flood planning assistant. Return ONLY a JSON object "
     'with keys "mode", "reply", "place" and "return_period_years". Modes: '
@@ -96,7 +111,8 @@ ROUTER_INSTRUCTIONS = (
     '"run_assessment" only when the user explicitly asks to run, calculate or classify a GRP '
     "assessment; "
     '"sig_flood" when the user asks to show or explain flood, risk, population, schools, '
-    "hospitals, buildings, roads or movement information for a named Thailand district; "
+    "hospitals, buildings, roads or movement information for a named Thailand district, or asks "
+    "for Global Risk evidence without naming a place while context.selected_area is set; "
     '"chat" for greetings and general explanations that need no data; '
     '"cannot" for anything else (other hazards, current conditions, access or role changes, '
     "safety certification, private data). Put the area the user mentioned in place, always "
@@ -908,6 +924,13 @@ async def _answer_chat(
         mode = "sig_flood"
     if mode == "cannot" and _asks_to_explain_result(payload.message):
         mode = "explain_result"
+    if (
+        mode == "cannot"
+        and not decision["place"]
+        and selected is not None
+        and EVIDENCE_REQUEST_PATTERN.search(payload.message)
+    ):
+        mode = "sig_flood"
     base = {"hub_code": hub.hub_code}
 
     example_area = (selected or (boundaries[0] if boundaries else None))
@@ -921,6 +944,16 @@ async def _answer_chat(
                 "answer": "There is no finished assessment on the map yet. Ask me to run one "
                 f"first, for example: \"Run a flood assessment for {example_area}\".",
                 "label": "No result to explain yet.",
+                "usage": _usage(session, settings, principal),
+            }
+        if (current.summary or {}).get("in_scope") == 0:
+            # Nothing to explain, and the model read "0 in scope" as a finding about the district.
+            return {
+                **base,
+                "mode": "explain_result",
+                "answer": NO_CENTRES_REPLY.format(area=current.inputs["boundary"]["name"]),
+                "label": "No evacuation-centre records in this district.",
+                "assessment_id": str(current.id),
                 "usage": _usage(session, settings, principal),
             }
         answer, references = await explain_stored_result(

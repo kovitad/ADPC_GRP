@@ -544,3 +544,31 @@ def test_confirmed_place_with_conflicting_province_does_not_start_grp_job(world)
         from core.assessment_models import Assessment
 
         assert session.scalars(select(Assessment)).all() == []
+
+
+def test_a_district_with_no_centre_records_is_reported_as_a_data_gap(world) -> None:
+    client = _client(world, "planner@example.test")
+    prompts = _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "", "place": "Synthetic Test District",'
+        ' "return_period_years": null}',
+        '{"mode": "explain_result", "reply": "", "place": null, "return_period_years": null}',
+    )
+    with Session(world["engine"]) as session:
+        # Every centre outside the district, as in 44 of Bangkok's 50 districts.
+        for feature in session.scalars(select(Feature)):
+            feature.lon, feature.lat = feature.lon + 20, feature.lat + 20
+        session.commit()
+
+    started = _chat(client, "Run a flood assessment for the synthetic test district").json()
+    with Session(world["engine"]) as session:
+        process_job(session, world["storage"], claim_next_job(session, lease_minutes=15))
+    explained = _chat(
+        client, "Where could people move?", assessment_id=started["assessment_id"]
+    ).json()
+
+    assert explained["mode"] == "explain_result"
+    assert explained["label"] == "No evacuation-centre records in this district."
+    assert "gap in the data" in explained["answer"]
+    # Only the router ran: nothing was asked of the model about an empty result.
+    assert len(prompts) == 2
