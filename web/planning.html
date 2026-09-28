@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260928a" />
-    <link rel="stylesheet" href="/planning.css?v=20260928b" />
+    <link rel="stylesheet" href="/planning.css?v=20260928c" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="/grp-common.js?v=20260928a" defer></script>
-    <script src="/planning.js?v=20260928d" defer></script>
+    <script src="/grp-common.js?v=20260928b" defer></script>
+    <script src="/planning.js?v=20260928e" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -36,6 +36,12 @@
               title="Forget this conversation and the Global Risk evidence gathered for it"
               hidden
             >New conversation</button>
+            <button
+              class="button button--secondary button--compact"
+              type="button"
+              data-summary-download
+              title="Everything GRP knows about the selected district as a Word document: map, centres, people, Global Risk evidence, gaps and sources"
+            >Download summary</button>
             <span class="pw-pill" data-allowance title="Your AI allowance this month" aria-label="AI allowance">…</span>
           </div>
         </div>
@@ -238,6 +244,8 @@
                 <button type="button" data-download="brief">Brief (.md)</button>
                 <button type="button" data-download="evidence">Evidence pack (.json)</button>
                 <button type="button" data-download="trace">Trace log (.txt)</button>
+                <button type="button" data-download="summary">Planning summary (.docx)</button>
+                <button type="button" data-download="centres">Evacuation centres (.csv)</button>
                 <button type="button" data-download="table">Evidence table (.csv)</button>
                 <button type="button" data-download="map-link" data-needs-map-link hidden>
                   Global Risk map link (.html)

@@ -18,6 +18,7 @@ from api import (
     health,
     maps,
     planning,
+    planning_summary,
     platform,
     uploads,
 )
@@ -42,6 +43,7 @@ for module in (
     admin,
     platform,
     planning,
+    planning_summary,
     contributions,
     maps,
     catalog,

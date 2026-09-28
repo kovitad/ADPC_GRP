@@ -103,6 +103,10 @@ MATRIX = {
     # rules where it is.
     "list_contributions": (401, 404, 404, 404, 404),
     "check_contribution": (401, 404, 404, 404, 404),
+    # ADR-0033: the district summary downloads need a planning role; an unknown district is not
+    # found, and a Platform Admin with no planning membership is refused first.
+    "summary_docx": (401, 404, 404, 404, 403),
+    "summary_centres_csv": (401, 404, 404, 404, 403),
     "read_contribution": (401, 404, 404, 404, 404),
     "refresh_contribution": (401, 404, 404, 404, 404),
 }
@@ -162,6 +166,8 @@ MATRIX_OPERATION_IDS = {
     "read_conversation": "read_conversation_api_v1_planning_conversation_get",
     "clear_conversation": "clear_conversation_api_v1_planning_conversation_delete",
     "centre_indicator_values": "centre_indicator_values_api_v1_maps_centres_indicator_values_post",
+    "summary_docx": "summary_docx_api_v1_planning_summary_docx_post",
+    "summary_centres_csv": "summary_centres_csv_api_v1_planning_summary_centres_csv_get",
     "list_contributions": "list_contributions_api_v1_contributions_get",
     "check_contribution": "create_contribution_api_v1_contributions_post",
     "read_contribution": "read_contribution_api_v1_contributions__contribution_id__get",
@@ -450,6 +456,12 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             "POST",
             "/api/v1/maps/centres/indicator-values",
             {"feature_ids": [str(user_id)]},
+        ),
+        "summary_docx": (
+            "POST", "/api/v1/planning/summary.docx", {"boundary_id": str(user_id)}
+        ),
+        "summary_centres_csv": (
+            "GET", f"/api/v1/planning/summary/centres.csv?boundary_id={user_id}", None
         ),
         "list_contributions": ("GET", "/api/v1/contributions", None),
         "check_contribution": (

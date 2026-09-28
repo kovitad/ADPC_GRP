@@ -572,3 +572,109 @@ def test_a_district_with_no_centre_records_is_reported_as_a_data_gap(world) -> N
     assert "gap in the data" in explained["answer"]
     # Only the router ran: nothing was asked of the model about an empty result.
     assert len(prompts) == 2
+
+
+# --- ADR-0033: the district summary download --------------------------------------------------
+
+
+def _tiny_png() -> str:
+    import base64
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    raw = b"\x00\xff\xff\xff\x00\x00\x00\xff"  # 2x1 RGB, one filter byte per row
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw[:7]))
+        + chunk(b"IEND", b"")
+    )
+    return "data:image/png;base64," + base64.b64encode(png).decode()
+
+
+def _finished_assessment(world, client) -> str:
+    _router_then(
+        world,
+        '{"mode": "run_assessment", "reply": "", "place": "Synthetic Test District",'
+        ' "return_period_years": null}',
+    )
+    started = _chat(client, "Run a flood assessment for the synthetic test district").json()
+    with Session(world["engine"]) as session:
+        process_job(session, world["storage"], claim_next_job(session, lease_minutes=15))
+    return started["assessment_id"]
+
+
+def test_the_district_summary_is_a_word_document_with_every_section(world) -> None:
+    from io import BytesIO
+
+    from docx import Document
+    from docx.oxml.ns import qn
+
+    client = _client(world, "planner@example.test")
+    assessment_id = _finished_assessment(world, client)
+
+    response = client.post(
+        "/api/v1/planning/summary.docx",
+        json={
+            "boundary_id": world["seed"].boundary_id,
+            "assessment_id": assessment_id,
+            "map_png": _tiny_png(),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert "wordprocessingml" in response.headers["content-type"]
+    assert "filename*=UTF-8''grp-flood-summary-" in response.headers["content-disposition"]
+    document = Document(BytesIO(response.content))
+    text = "\n".join(p.text for p in document.paragraphs)
+    cells = "\n".join(c.text for t in document.tables for r in t.rows for c in r.cells)
+    for heading in ("1. At a glance", "2. Map", "3. Evacuation centres",
+                    "Where people could move", "4. People", "5. Global Risk evidence",
+                    "6. What this cannot tell you", "7. Sources and versions"):
+        assert heading in text
+    assert "SYNTHETIC TEST DATA" in text
+    assert "does not certify that any place is safe" in text
+    assert "Potentially exposed" in cells
+    assert len(document.inline_shapes) == 1
+    # Thai names need the complex-script font slot, not only the Latin one.
+    fonts = document.styles["Normal"].element.rPr.find(qn("w:rFonts"))
+    assert fonts.get(qn("w:cs")) == "Leelawadee UI"
+    for forbidden in ("at_risk", "by_risk", "TEL", "EMAIL", "unable_to_assess"):
+        assert forbidden not in text and forbidden not in cells
+
+
+def test_the_summary_refuses_a_map_picture_that_is_not_a_png(world) -> None:
+    client = _client(world, "planner@example.test")
+
+    response = client.post(
+        "/api/v1/planning/summary.docx",
+        json={"boundary_id": world["seed"].boundary_id, "map_png": "PGh0bWw+"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "MAP_PICTURE_INVALID"
+
+
+def test_the_centre_table_downloads_as_csv_with_formulas_neutralised(world) -> None:
+    with Session(world["engine"]) as session:
+        feature = session.scalars(select(Feature)).first()
+        feature.name = "=HYPERLINK(1)"
+        session.commit()
+    client = _client(world, "planner@example.test")
+    assessment_id = _finished_assessment(world, client)
+
+    response = client.get(
+        "/api/v1/planning/summary/centres.csv",
+        params={"boundary_id": world["seed"].boundary_id, "assessment_id": assessment_id},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.content.decode("utf-8")
+    assert body.startswith("﻿Centre,Sub-district,Village,Capacity")
+    assert "'=HYPERLINK(1)" in body
+    assert "=HYPERLINK(1)," not in body.replace("'=HYPERLINK(1)", "")
+    assert "Potentially exposed" in body

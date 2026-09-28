@@ -1372,3 +1372,7 @@
 .pw-maplink { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.55rem; }
 .pw-maplink small { flex-basis: 100%; color: var(--pw-muted); font-size: 0.7rem; line-height: 1.4; }
 a.pw-chip-button { display: inline-block; }
+@media (max-width: 860px) {
+  /* Room for "Download summary" beside "New conversation" and the allowance on a phone. */
+  .pw-chat__tools { flex-wrap: wrap; justify-content: flex-end; gap: 0.35rem; }
+}

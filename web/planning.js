@@ -125,6 +125,7 @@
   let centerLoadRevision = 0;
   const placeLayer = window.L.featureGroup().addTo(map);
   let floodOverlay = null;
+  let floodPicture = null;
 
   const safeHttps = (value) => {
     try {
@@ -1011,10 +1012,14 @@
   const loadFloodOverlay = async (layer) => {
     if (floodOverlay) floodOverlay.remove();
     floodOverlay = null;
+    floodPicture = null;
     if (!layer || layer.available === false || !layer.bounds) return;
     const response = await fetch(layer.image_url, { credentials: "same-origin" });
     if (!response.ok) return;
     const url = URL.createObjectURL(await response.blob());
+    // Kept for the summary download's map picture (ADR-0033): a same-origin blob, so a canvas can
+    // draw it without being tainted.
+    floodPicture = { url, bounds: layer.bounds, years: layer.return_period_years };
     floodOverlay = window.L.imageOverlay(url, layer.bounds, { opacity: 0.8, interactive: false });
     if ($('[data-layer="flood"]').checked) floodOverlay.addTo(map);
     $("[data-flood-title]").textContent = `Flood depth · ${layer.return_period_years}-year`;
@@ -2454,6 +2459,241 @@
     }
   };
 
+  // ---------- summary download (ADR-0033) ----------
+  // The map picture is drawn from data on its own canvas, not captured from the live map: on a
+  // phone the map is hidden while the chat shows, and its view is whatever the planner last did.
+  const SUMMARY_MAP = { width: 1600, height: 1000, pad: 60 };
+  const STATUS_COLOURS = {
+    potentially_exposed: "#d7301f",
+    not_exposed_under_scenario: "#1a9850",
+    unable_to_assess: "#8c8c8c",
+    not_assessed: "#2c7fb8",
+  };
+  const STATUS_WORDS = {
+    potentially_exposed: "Potentially exposed",
+    not_exposed_under_scenario: "Not exposed under this scenario",
+    unable_to_assess: "N/A",
+    not_assessed: "Not assessed",
+  };
+
+  const loadPicture = (src, crossOrigin = false) => new Promise((resolve) => {
+    const image = new Image();
+    if (crossOrigin) image.crossOrigin = "anonymous";
+    const timer = window.setTimeout(() => resolve(null), 5000);
+    image.onload = () => { window.clearTimeout(timer); resolve(image); };
+    image.onerror = () => { window.clearTimeout(timer); resolve(null); };
+    image.src = src;
+  });
+
+  // Web Mercator in "world pixels" at zoom z, the same projection as the Leaflet map.
+  const mercator = (lat, lon, z) => {
+    const scale = 256 * 2 ** z;
+    const sin = Math.sin((Math.max(-85, Math.min(85, lat)) * Math.PI) / 180);
+    return [
+      ((lon + 180) / 360) * scale,
+      (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+    ];
+  };
+
+  const drawSummaryMap = async ({ basemap }) => {
+    const rings = selectedRings();
+    if (!rings.length) return null;
+    const lats = rings.flat().map(([lat]) => lat);
+    const lons = rings.flat().map(([, lon]) => lon);
+    const box = { south: Math.min(...lats), north: Math.max(...lats), west: Math.min(...lons), east: Math.max(...lons) };
+    const { width, height, pad } = SUMMARY_MAP;
+    // The largest zoom at which the district fits inside the padded canvas.
+    let z = 18;
+    for (; z > 3; z -= 0.25) {
+      const [x0, y0] = mercator(box.north, box.west, z);
+      const [x1, y1] = mercator(box.south, box.east, z);
+      if (x1 - x0 <= width - 2 * pad && y1 - y0 <= height - 2 * pad) break;
+    }
+    const [cx0, cy0] = mercator(box.north, box.west, z);
+    const [cx1, cy1] = mercator(box.south, box.east, z);
+    const originX = (cx0 + cx1) / 2 - width / 2;
+    const originY = (cy0 + cy1) / 2 - height / 2;
+    const point = (lat, lon) => {
+      const [x, y] = mercator(lat, lon, z);
+      return [x - originX, y - originY];
+    };
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#f4f7f8";
+    ctx.fillRect(0, 0, width, height);
+
+    let drewBasemap = false;
+    if (basemap) {
+      // OpenStreetMap tiles at the nearest whole zoom, scaled to the fractional one.
+      const tz = Math.min(17, Math.max(3, Math.round(z)));
+      const factor = 2 ** (z - tz);
+      const tileSize = 256 * factor;
+      const firstX = Math.floor(originX / tileSize);
+      const firstY = Math.floor(originY / tileSize);
+      const lastX = Math.floor((originX + width) / tileSize);
+      const lastY = Math.floor((originY + height) / tileSize);
+      if ((lastX - firstX + 1) * (lastY - firstY + 1) <= 40) {
+        const tiles = [];
+        for (let x = firstX; x <= lastX; x += 1) {
+          for (let y = firstY; y <= lastY; y += 1) {
+            tiles.push(loadPicture(`https://tile.openstreetmap.org/${tz}/${x}/${y}.png`, true)
+              .then((image) => ({ image, x, y })));
+          }
+        }
+        (await Promise.all(tiles)).forEach(({ image, x, y }) => {
+          if (!image) return;
+          ctx.drawImage(image, x * tileSize - originX, y * tileSize - originY, tileSize, tileSize);
+          drewBasemap = true;
+        });
+      }
+    }
+
+    if (floodPicture && floodPicture.bounds) {
+      const image = await loadPicture(floodPicture.url);
+      if (image) {
+        // The preview is a plain latitude/longitude grid: crop the part under the canvas.
+        const [[south, west], [north, east]] = floodPicture.bounds;
+        const [nwLat, nwLon] = [Math.min(north, box.north + 1), Math.max(west, box.west - 1)];
+        const [seLat, seLon] = [Math.max(south, box.south - 1), Math.min(east, box.east + 1)];
+        const sx = ((nwLon - west) / (east - west)) * image.width;
+        const sy = ((north - nwLat) / (north - south)) * image.height;
+        const sw = ((seLon - nwLon) / (east - west)) * image.width;
+        const sh = ((nwLat - seLat) / (north - south)) * image.height;
+        const [dx, dy] = point(nwLat, nwLon);
+        const [dx1, dy1] = point(seLat, seLon);
+        ctx.save();
+        ctx.globalAlpha = 0.75;
+        ctx.imageSmoothingEnabled = false;
+        if (sw > 0 && sh > 0) ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dx1 - dx, dy1 - dy);
+        ctx.restore();
+      }
+    }
+
+    // Dim everything outside the district, then outline it.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, width, height);
+    rings.forEach((ring) => {
+      ring.forEach(([lat, lon], index) => {
+        const [x, y] = point(lat, lon);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+    });
+    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.fill("evenodd");
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#1b678f";
+    ctx.stroke();
+    ctx.restore();
+
+    const counts = {};
+    state.centerRows.forEach((centre) => {
+      if (typeof centre.lat !== "number" || typeof centre.lon !== "number") return;
+      const [x, y] = point(centre.lat, centre.lon);
+      if (x < 0 || y < 0 || x > width || y > height) return;
+      counts[centre.status] = (counts[centre.status] || 0) + 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = STATUS_COLOURS[centre.status] || STATUS_COLOURS.not_assessed;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    });
+
+    // Title, legend and attribution, drawn into the picture so they travel with it.
+    ctx.font = "600 34px 'Leelawadee UI', 'Segoe UI', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    const title = `${state.selected.name}${floodPicture ? ` · RP${floodPicture.years} flood depth` : ""}`;
+    ctx.fillRect(20, 20, ctx.measureText(title).width + 32, 56);
+    ctx.fillStyle = "#1c2a33";
+    ctx.fillText(title, 36, 60);
+    const entries = Object.keys(STATUS_WORDS).filter((key) => counts[key]);
+    if (entries.length) {
+      ctx.font = "24px 'Leelawadee UI', 'Segoe UI', sans-serif";
+      const boxHeight = 24 + entries.length * 36;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.fillRect(20, height - boxHeight - 20, 520, boxHeight);
+      entries.forEach((key, index) => {
+        const y = height - boxHeight - 20 + 30 + index * 36;
+        ctx.beginPath();
+        ctx.arc(42, y - 8, 10, 0, Math.PI * 2);
+        ctx.fillStyle = STATUS_COLOURS[key];
+        ctx.fill();
+        ctx.fillStyle = "#1c2a33";
+        ctx.fillText(`${STATUS_WORDS[key]} (${counts[key]})`, 64, y);
+      });
+    }
+    if (drewBasemap) {
+      ctx.font = "20px 'Segoe UI', sans-serif";
+      const credit = "© OpenStreetMap contributors";
+      const creditWidth = ctx.measureText(credit).width;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.fillRect(width - creditWidth - 30, height - 40, creditWidth + 20, 30);
+      ctx.fillStyle = "#333";
+      ctx.fillText(credit, width - creditWidth - 20, height - 18);
+    }
+    try {
+      return { dataUrl: canvas.toDataURL("image/png"), basemap: drewBasemap };
+    } catch (_error) {
+      // A tile server without CORS taints the canvas: draw again without the base map.
+      return basemap ? drawSummaryMap({ basemap: false }) : null;
+    }
+  };
+
+  const summaryQuery = () => {
+    const params = new URLSearchParams({ boundary_id: state.selected.id });
+    if (state.hubCode) params.set("hub_code", state.hubCode);
+    if (state.assessmentId) params.set("assessment_id", state.assessmentId);
+    return params;
+  };
+
+  const downloadSummary = async (button) => {
+    if (!state.selected) {
+      addMessage("assistant", "Choose a district on the map first, then download its summary.", {
+        record: false,
+      });
+      return;
+    }
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = "Preparing…";
+    try {
+      const picture = await drawSummaryMap({ basemap: true }).catch(() => null);
+      await GRP.download("/api/v1/planning/summary.docx", {
+        method: "POST",
+        body: {
+          hub_code: state.hubCode,
+          boundary_id: state.selected.id,
+          assessment_id: state.assessmentId || null,
+          map_png: picture ? picture.dataUrl : null,
+          map_has_basemap: Boolean(picture && picture.basemap),
+        },
+        fallbackName: "grp-flood-summary.docx",
+      });
+    } catch (error) {
+      addMessage("assistant", error.message, { label: error.code, error: true, record: false });
+    } finally {
+      button.disabled = false;
+      button.textContent = label;
+    }
+  };
+
+  const downloadCentreTable = async () => {
+    if (!state.selected) return;
+    try {
+      await GRP.download(`/api/v1/planning/summary/centres.csv?${summaryQuery()}`, {
+        fallbackName: "grp-evacuation-centres.csv",
+      });
+    } catch (error) {
+      addMessage("assistant", error.message, { label: error.code, error: true, record: false });
+    }
+  };
+
   const downloadFile = (name, content, type) => {
     const url = URL.createObjectURL(new Blob([content], { type }));
     const link = document.createElement("a");
@@ -2571,6 +2811,15 @@
   document.querySelectorAll("[data-download]").forEach((button) => {
     button.addEventListener("click", () => {
       $("[data-ev-download]").hidden = true;
+      // The district summary and centre table need a district, not Global Risk evidence.
+      if (button.dataset.download === "summary") {
+        downloadSummary(button);
+        return;
+      }
+      if (button.dataset.download === "centres") {
+        downloadCentreTable();
+        return;
+      }
       if (!currentEvidence) return;
       const { evidence, answer } = currentEvidence;
       const base = `grp-${slug(evidence.place)}-${(evidence.pack_id || "pack").slice(0, 8)}`;
@@ -3832,6 +4081,8 @@
       const clearButton = $("[data-clear-chat]");
       clearButton.hidden = !state.chatAvailable;
       clearButton.addEventListener("click", () => startOver(clearButton));
+      const summaryButton = $("[data-summary-download]");
+      summaryButton.addEventListener("click", () => downloadSummary(summaryButton));
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
       // "Try it in Planning" from Share data: the question is put in the box, never sent unasked.
       const suggested = new URL(window.location.href).searchParams.get("ask");

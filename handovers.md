@@ -115,7 +115,26 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
-### 0.0000000 Share data with Global Risk (ADR-0032, 28 September, latest)
+### 0.00000000 District summary download (ADR-0033, 28 September, latest)
+
+The owner asked for everything about a district "in one docx" with a picture and the statistics
+tables. **Download summary** (chat header, and the evidence panel's Download menu) gives a Word
+document: at a glance, map, centres (where people could move and every centre), people, Global
+Risk evidence, limits, and sources. **Evacuation centres (.csv)** gives the full table.
+
+- `api/planning_summary.py` reads everything from the database via the page's own functions;
+  `core/summary_docx.py` renders. `python-docx` is now a runtime dependency (image rebuilt).
+- The map picture is drawn by the browser on a canvas from data (OSM tiles with CORS, flood
+  preview, outline, centres by status, legend), because the map is hidden on phones.
+- Only this district's own Global Risk evidence is included (canonical place match).
+- Checked: tests (golden docx, CSV, fast evidence-matching, permission matrix), real reports
+  generated in the container for Mueang Amnat Charoen and Bang Kapi, and the canvas drawing in a
+  throwaway page with real OSM tiles. **Not checked:** the button in the signed-in page and opening
+  the file in Word.
+- Follow-up: the flood preview is ~1.9 km per pixel. A sharp district flood map needs a worker job
+  that clips the full-resolution raster.
+
+### 0.0000000 Share data with Global Risk (ADR-0032, 28 September)
 
 The owner asked for planners to send data to Global Risk ("they will parse the Google Drive
 link") and be told whether it landed, then use it. They pointed to the runbook

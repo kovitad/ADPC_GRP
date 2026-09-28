@@ -43,6 +43,37 @@ window.GRP = (() => {
     return payload;
   };
 
+  // A file from the API (a report, a table): same headers and errors as request(), then saved.
+  const download = async (path, { method = "GET", body, fallbackName = "download" } = {}) => {
+    const headers = { ...csrfHeaders() };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const response = await fetch(path, {
+      method,
+      credentials: "same-origin",
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const error = new Error(
+        (payload.error && payload.error.message) || `Download failed (${response.status})`,
+      );
+      error.status = response.status;
+      error.code = payload.error && payload.error.code;
+      throw error;
+    }
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="([^"]+)"/);
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = match ? match[1] : fallbackName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const bindSignOut = () => {
     document.querySelectorAll("[data-sign-out]").forEach((button) => {
       button.addEventListener("click", async () => {
@@ -352,6 +383,7 @@ window.GRP = (() => {
     jobs,
     me,
     request,
+    download,
     bindSignOut,
     formatDate,
     formatTime,
