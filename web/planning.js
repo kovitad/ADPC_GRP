@@ -711,6 +711,11 @@
       window.history.replaceState({}, "", url);
       resultCard.hidden = true;
     }
+    if (changed && currentEvidence) {
+      // The open Global Risk evidence describes the previous district. Its card stays in the chat
+      // and reopens it; the panel must not sit beside a different district.
+      closeEvidence();
+    }
     state.selected = boundary;
     state.explicitSelection = explicit;
     if (state.areaProfileId !== boundary.id) {
@@ -1866,12 +1871,15 @@
     window.setTimeout(() => map.invalidateSize(), 0);
   };
 
-  $("[data-ev-close]").addEventListener("click", () => {
+  const closeEvidence = () => {
+    currentEvidence = null;
     openEvidencePayload = null;
     saveState();
     evidencePanel.hidden = true;
     document.body.classList.remove("has-evidence");
-  });
+  };
+
+  $("[data-ev-close]").addEventListener("click", closeEvidence);
 
   document.querySelectorAll("[data-ev-tab]").forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -3420,7 +3428,13 @@
         watch(saved.pendingAssessmentId);
       }
       const evidence = transcript[saved.evidenceIndex];
-      if (evidence && evidence.kind === "evidence") renderEvidence(evidence.payload, evidence.question);
+      const evidenceArea = evidence && evidence.kind === "evidence"
+        && evidence.payload.evidence && evidence.payload.evidence.area;
+      const requested = evidenceArea && String(evidenceArea.requested || "").toLowerCase();
+      // Tabs saved before the panel closed on a district change can hold another district's evidence.
+      if (!requested || !boundary || requested === canonicalSigPlace(boundary).toLowerCase()) {
+        renderEvidence(evidence.payload, evidence.question);
+      }
     } finally {
       restoring = false;
       saveState();

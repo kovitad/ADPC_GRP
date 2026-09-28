@@ -115,6 +115,17 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
+### 0.0000 Evidence panel follows the district (28 September)
+
+The owner selected Bang Kapi and still saw "Global Risk analysis area: aoi[Bang Phli District]
+225 km²". That was the 26 September Bang Phli evidence, restored from the saved conversation
+(ADR-0029, intended) but left open in the evidence panel after the district changed (the bug).
+Changing district now closes an open Global Risk evidence panel (the chat card stays and reopens
+it), and a tab restore only reopens evidence whose `area.requested` matches the selected district.
+`planning.js?v=20260928a`. Not yet viewed in a browser. **Open follow-ups:** "show global platform
+evidence" with a district selected gets the generic help reply instead of a gather; Bang Kapi has
+0 evacuation centres in scope, so check whether Bangkok has shelter records.
+
 ### 0.000 Sensitivity indicators on the map (ADR-0030, 25 September, late)
 
 The owner asked what the three vulnerability layers contain and chose "Full map treatment" and
