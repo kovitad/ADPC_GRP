@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 25 September 2026 (`main` at the sensitivity-mask fix after `27a900d`, pushed; 586 tests pass; ADR-0030 sensitivity indicators; earlier: the planning assistant now keeps its SIG evidence and conversation in the database, ADR-0029). **Next agent: read Section 0 first.**
+**Updated:** 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -14,7 +14,7 @@ layers**. Re-running the installer reuses completed imports and safely retries o
 unpublished jobs. The Data Library shows the activation state of every source. The assessment and
 Planning selectors now group one exact **Recommended · Ready** shelter version above clearly
 labelled previous versions, with bilingual title, record count and short immutable version ID.
-The current real shelter version is `61a17773` (`grp-shelters/5`, assessment-ready, 10,303 records).
+The current real shelter version is `a18b19dd` (`grp-shelters/7`, assessment-ready, 10,303 records); on 28 September the older identical copies, including `61a17773`, were deleted from the sandbox (Section 0).
 It correctly maps the delivered `สถา` column to facility name, `สถ_1` to supporting unit and `รอง`
 to capacity. A fresh Chiang Yuen assessment `01a0d226-8c97-7278-8b2e-f4f1cd947e71` completed with
 all nine real names, including `อบต.นาทอง`; older versions remain immutable for reproducibility.
@@ -113,7 +113,57 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
+## 0. Start here (sessions of 24-28 September 2026, `main` at `c907c34`)
+
+### Session of 28 September: where things stand
+
+Everything below is pushed. The desktop stack runs it at Alembic `20260928_0021`,
+`planning.js?v=20260928g`, `planning.css?v=20260928c`, `grp-common.js?v=20260928b`. **Every rebuild
+signs the owner out of SERVIR**; they must sign in again before testing. Almost none of today's work
+has been seen by the owner in a signed-in browser: their next report is the acceptance check.
+
+| Commit | What | Detail |
+| --- | --- | --- |
+| `c5c3db6` | Evidence panel closes when the district changes | 0.0000 |
+| `4a14119` | "No centre records" reply; "show global platform evidence" gathers for the selected district | 0.0000 |
+| `611b99b` | Conversational chat (Markdown replies, Copy/Retry, follow-ups, one-line progress); fixes a restore fault from `c5c3db6` and the phone top bar on every page | 0.00000 |
+| `cf45233` | Global Risk receipt map as a labelled unverified link; evidence CSV and map-link downloads (ADR-0031) | 0.000000 |
+| `20fcecd` | **Share data** page: contribute vector/raster/table/document/weights to Global Risk (ADR-0032) | 0.0000000 |
+| `16d4997` | **Download summary** (.docx) and centres CSV per district (ADR-0033) | 0.00000000 |
+| `8566250` | Province list grouped by NSO region, Bangkok first | below |
+| `c907c34` | Lookups survive leaving the page; clearer "no centres" wording; sandbox shelter clean-up | 0.000000000 |
+
+**Province order (`8566250`).** `/api/v1/catalog/provinces` returns `regions` and a `region` per
+province, sorted Bangkok, Central (incl. East 20-27 and West 70-77), North (50-67), Northeast
+(30-49), South (80-96), A-Z inside each; derived from the province code (`province_region` in
+`api/catalog.py`). Real data: 1/25/17/20/14. Assessments shows them as `<optgroup>`s.
+
+**Owner decisions today:** planners (not only Hub Admins) may contribute to Global Risk, including
+risk weights; Global Risk's map is offered as an unverified outside link; the sandbox keeps one
+shelter version.
+
+**Open, in priority order:**
+
+1. Owner browser acceptance of today's work. In particular: the lookup-resume steps (0.000000000),
+   Download summary opening in Word with Thai text and the map picture, the Share data flow, and
+   the chat layout on the phone-width view the owner uses (their browser zoom gives a 617 px
+   viewport).
+2. Withdraw Global Risk test layer `c66ade79bc2605ac` (`evacuation_centres_th_test`) before any
+   real centre upload: live for all Global Risk users, unreviewed, has the mislocated Bang Bua
+   Thong record.
+3. Data-owner questions: Bangkok (BMA) shelters and the other 256 districts with no records;
+   sensitivity index meaning; disability classes.
+4. Ask Global Risk for: a typed `displayed_layer` in `ui_embed`, a PNG/GeoTIFF export per receipt,
+   and the defects D-01 to D-11 in `docs/GRP_Test_Report_BangBuaThong_2026-09-24.docx` (owner's
+   file, untracked).
+5. Engineering: ESLint `no-undef` in CI (a throwaway run found 0 errors all day; every change was
+   checked that way); split `web/planning.js` (now about 4,100 lines); Playwright tests for the
+   Planning page; a worker job for a sharp district flood map (the summary uses the ~1.9 km per
+   pixel preview).
+
+**Untracked on purpose:** the owner's runbook, Bang Bua Thong test prompt and report, and three
+example JSON files in `docs/`. Ask before committing them.
+
 
 ### 0.000000000 One shelter version, and lookups survive leaving the page (28 September, latest)
 
@@ -240,7 +290,7 @@ it), and a tab restore only reopens evidence whose `area.requested` matches the 
 
 **Follow-ups, done the same day:**
 
-- **256 of 929 supported districts have no shelter records** in the current version `61a17773`
+- **256 of 929 supported districts have no shelter records** in the then-current shelter data (every version identical)
   (44 of Bangkok's 50; Bangkok has 8 records in all, Nakhon Ratchasima is missing 25 of 32
   districts). That's a gap in the source data, not a bug. A finished result with `in_scope == 0` now
   gets a fixed reply saying the data has no records there and that this isn't a finding of no
@@ -1551,7 +1601,7 @@ or deploy this feature to a server before its security gates pass.
   records and is reported as unknown, never as zero.
 - `tools/show_shelter_record.py` profiles any delivery or contribution candidate through the
   importer's own reader, which is how the numbers above were measured.
-- The current accepted version is `61a17773` (`grp-shelters/5`). A fresh Chiang Yuen assessment
+- (Historical, superseded 28 Sep: now `a18b19dd`.) The accepted version was `61a17773` (`grp-shelters/5`). A fresh Chiang Yuen assessment
   `01a0d226-8c97-7278-8b2e-f4f1cd947e71` proved its real names end to end. For a blank sandbox,
   the fastest full reset remains:
 
