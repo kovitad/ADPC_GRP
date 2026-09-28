@@ -7,6 +7,7 @@ from core import (  # noqa: F401
     access_models,
     ai_models,
     assessment_models,
+    contribution_models,
     data_library_models,
     inspection_models,
     planning_memory_models,

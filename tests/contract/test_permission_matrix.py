@@ -97,6 +97,14 @@ MATRIX = {
     "clear_conversation": (401, 200, 200, 200, 403),
     # ADR-0030: centre sensitivity values are planning display context, like the map layers.
     "centre_indicator_values": (401, 200, 200, 200, 403),
+    # ADR-0032: contributions use the SERVIR sign-in, which exists only where the planning chat
+    # runs (local development, ADR-0004). This fixture is not dev, so every signed-in caller is
+    # told the feature is not here; tests/fast/test_contributions.py covers the Hub and sender
+    # rules where it is.
+    "list_contributions": (401, 404, 404, 404, 404),
+    "check_contribution": (401, 404, 404, 404, 404),
+    "read_contribution": (401, 404, 404, 404, 404),
+    "refresh_contribution": (401, 404, 404, 404, 404),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -154,6 +162,12 @@ MATRIX_OPERATION_IDS = {
     "read_conversation": "read_conversation_api_v1_planning_conversation_get",
     "clear_conversation": "clear_conversation_api_v1_planning_conversation_delete",
     "centre_indicator_values": "centre_indicator_values_api_v1_maps_centres_indicator_values_post",
+    "list_contributions": "list_contributions_api_v1_contributions_get",
+    "check_contribution": "create_contribution_api_v1_contributions_post",
+    "read_contribution": "read_contribution_api_v1_contributions__contribution_id__get",
+    "refresh_contribution": (
+        "refresh_contribution_api_v1_contributions__contribution_id__refresh_post"
+    ),
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
@@ -437,6 +451,14 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             "/api/v1/maps/centres/indicator-values",
             {"feature_ids": [str(user_id)]},
         ),
+        "list_contributions": ("GET", "/api/v1/contributions", None),
+        "check_contribution": (
+            "POST",
+            "/api/v1/contributions",
+            {"hub_code": "adpc", "kind": "vector", "manifest": {}, "preview": True},
+        ),
+        "read_contribution": ("GET", f"/api/v1/contributions/{user_id}", None),
+        "refresh_contribution": ("POST", f"/api/v1/contributions/{user_id}/refresh", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)

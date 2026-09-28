@@ -1,0 +1,408 @@
+"""ADR-0032: send Hub data to Global Risk as a contribution, and follow it to the end."""
+
+import json
+from collections.abc import Iterator
+from datetime import UTC, datetime
+
+import httpx
+import pytest
+from fastapi import Response
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
+
+import api.access
+import api.contributions
+import api.permissions
+from api.dependencies import database_session
+from api.main import app
+from api.mcp_client import McpToolResult, SigMcpError
+from api.rate_limits import limiter
+from api.sessions import CSRF_COOKIE, set_session_cookie
+from api.settings import Settings
+from api.token_store import session_token_store
+from core.access_models import AppUser, AuditEvent, Base
+from core.contribution_models import SigContribution
+from core.contribution_rules import check_manifest, check_point_file, drive_download_url
+from core.identity import IdentityLinkResult
+from grpcli.admin import assign_member, bootstrap_platform_admin, ensure_hub
+
+FILE_ID = "1AbCdEfGhIjKlMnOpQrStUvWxYz012345"
+DIRECT = f"https://drive.google.com/uc?export=download&id={FILE_ID}"
+
+# Global Risk's gate, asked with an empty manifest on 28 Sep 2026 (problems only).
+DECLINED_VECTOR = {
+    "status": "declined",
+    "kind": "vector",
+    "problems": [
+        "missing required field 'layer'",
+        "missing required field 'license'",
+    ],
+}
+
+VECTOR = {
+    "layer": "evacuation_centres",
+    "url": f"https://drive.google.com/file/d/{FILE_ID}/view?usp=sharing",
+    "title": "Evacuation centres, Thailand (DDPM)",
+    "description": "One point per designated evacuation centre.",
+    "source": "Thailand DDPM, compiled by ADPC",
+    "license": "CC-BY-4.0",
+    "vintage": "2026-09",
+    "countries": "Thailand",
+    "name_field": "name",
+}
+
+
+def _points(properties: dict | None = None) -> bytes:
+    return json.dumps(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [100.5, 13.7]},
+                    "properties": properties or {"name": "Wat A", "capacity": 200},
+                }
+            ],
+        }
+    ).encode()
+
+
+# --- rules -----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        f"https://drive.google.com/file/d/{FILE_ID}/view?usp=sharing",
+        f"https://drive.google.com/open?id={FILE_ID}",
+        DIRECT,
+    ],
+)
+def test_a_drive_share_link_becomes_a_direct_download(link: str) -> None:
+    assert drive_download_url(link) == (DIRECT, None)
+
+
+def test_a_drive_folder_is_refused_and_other_hosts_are_left_alone() -> None:
+    url, problem = drive_download_url("https://drive.google.com/drive/folders/1xyzxyzxyzxyz")
+    assert problem and "folder" in problem
+    assert drive_download_url("https://example.org/a.tif") == ("https://example.org/a.tif", None)
+
+
+def test_every_required_field_is_named_before_anything_is_sent() -> None:
+    checked = check_manifest("raster", {"layer": "flood_depth", "url": "http://x.org/a.tif"})
+
+    assert {"title", "legend", "declared", "license", "vintage"} <= set(checked.problems)
+    assert "hazard_" in checked.problems["layer"]
+    assert "https" in checked.problems["url"]
+
+
+def test_a_population_grid_needs_no_legend() -> None:
+    checked = check_manifest(
+        "raster",
+        {
+            "layer": "population_worldpop_th", "url": DIRECT, "title": "t", "description": "d",
+            "source": "WorldPop", "license": "CC-BY-4.0", "vintage": "2020-01",
+            "declared": '{"dtype": "float32", "valid_min": 0, "valid_max": 200000}',
+        },
+    )
+
+    assert checked.problems == {}
+    assert checked.manifest["declared"]["dtype"] == "float32"
+
+
+@pytest.mark.parametrize(
+    ("weights", "fragment"),
+    [
+        ({"vulnerability_a": 0.5, "vulnerability_b": 0.4}, "add up to 0.900"),
+        ({"vulnerability_a": 1.2, "vulnerability_b": -0.2}, "negative"),
+        ({"population_worldpop_th": 1.0}, "cannot be weighted"),
+    ],
+)
+def test_weights_must_add_up_to_one_and_never_weight_a_count(weights, fragment) -> None:
+    checked = check_manifest("weights", {"hazard": "flood", "weights": weights, "rationale": "r"})
+
+    assert fragment in checked.problems["weights"]
+
+
+def test_unknown_fields_are_dropped_and_lists_are_split() -> None:
+    checked = check_manifest("vector", {**VECTOR, "secret_token": "x"})
+
+    assert checked.problems == {}
+    assert "secret_token" not in checked.manifest
+    assert checked.manifest["countries"] == ["Thailand"]
+    assert checked.manifest["url"] == DIRECT
+
+
+def test_a_point_file_with_contact_fields_is_refused() -> None:
+    checked = check_point_file(_points({"name": "Wat A", "TEL": "02", "e_mail": "a@b"}))
+
+    assert checked.problem and "TEL" in checked.problem and "e_mail" in checked.problem
+
+
+def test_a_drive_web_page_is_not_mistaken_for_the_file() -> None:
+    checked = check_point_file(b"<!DOCTYPE html><html>Virus scan warning</html>")
+
+    assert checked.problem and "web page" in checked.problem
+
+
+# --- route ------------------------------------------------------------------------------
+
+
+class FakeMcp:
+    calls: list[tuple[str, dict]] = []
+    submit: dict | Exception = {}
+    status: dict = {"status": "ok", "contributions": []}
+
+    def __init__(self, base_url: str, access_token: str, *, client=None) -> None:
+        assert access_token == "sig-token"
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return None
+
+    async def call_tool(self, name: str, arguments: dict) -> McpToolResult:
+        FakeMcp.calls.append((name, arguments))
+        if name == "contribute_submit":
+            if isinstance(FakeMcp.submit, Exception):
+                raise FakeMcp.submit
+            return McpToolResult([], FakeMcp.submit, False)
+        return McpToolResult([], FakeMcp.status, False)
+
+
+@pytest.fixture
+def world(tmp_path, monkeypatch) -> Iterator[dict]:
+    secret = tmp_path / "session_secret"
+    secret.write_text("contribution-session-secret-long-enough", encoding="utf-8")
+    settings = Settings(
+        _env_file=None,
+        grp_env="dev",
+        planning_chat_enabled=True,
+        session_secret_file=secret,
+        sig_mcp_base_url="https://sig.example/mcp",
+    )
+    for module in (api.access, api.permissions, api.contributions):
+        monkeypatch.setattr(module, "get_settings", lambda: settings)
+    monkeypatch.setattr(api.contributions, "SigMcpClient", FakeMcp)
+    fetched: dict = {"body": _points()}
+
+    async def fetch(url: str) -> bytes:
+        fetched["url"] = url
+        return fetched["body"]
+
+    monkeypatch.setattr(api.contributions, "_fetch_point_file", fetch)
+    FakeMcp.calls = []
+    FakeMcp.status = {"status": "ok", "contributions": []}
+    FakeMcp.submit = {
+        "status": "approved",
+        "contribution_id": "c0ffee0000000001",
+        "kind": "vector",
+        "decision_note": "auto-approved: this deployment lands contributions without review",
+        "reviewer_label": "auto-approve (GRP_AUTO_APPROVE on — no human reviewed this)",
+        "preview": {
+            "layer": "evacuation_centres",
+            "observed": {"features": 1, "bbox": [100.5, 13.7, 100.5, 13.7]},
+            "staged_file": "/opt/grp/cache/vectors/staged.geojson",
+            "how_to_test": "assemble_pack(pack='risk', place=..., hazard='flood')",
+        },
+    }
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        bootstrap_platform_admin(session, "owner@example.test")
+        ensure_hub(session, actor_email="owner@example.test", code="adpc", name="ADPC Hub")
+        ensure_hub(session, actor_email="owner@example.test", code="other", name="Other Hub")
+        for email, hub in (
+            ("planner@example.test", "adpc"),
+            ("colleague@example.test", "adpc"),
+            ("outsider@example.test", "other"),
+        ):
+            assign_member(session, actor_email="owner@example.test", email=email,
+                          hub_code=hub, role="planner")
+        session.commit()
+        users = {user.email: user.id for user in session.scalars(select(AppUser))}
+
+    def test_session() -> Iterator[Session]:
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[database_session] = test_session
+    limiter.reset()
+    try:
+        yield {"settings": settings, "engine": engine, "users": users, "fetched": fetched}
+    finally:
+        app.dependency_overrides.clear()
+
+
+def _client(world: dict, email: str, *, sig_token: bool = True) -> TestClient:
+    response = Response()
+    session_id = f"session-{email}"
+    set_session_cookie(
+        response,
+        world["settings"],
+        IdentityLinkResult(allowed=True, reason="allowed", user_id=world["users"][email]),
+        issued_at=int(datetime.now(UTC).timestamp()) - 5,
+        session_id=session_id,
+    )
+    if sig_token:
+        session_token_store.put(session_id, "sig-token", 3600)
+    else:
+        session_token_store.delete(session_id)
+    client = TestClient(app)
+    for header in response.headers.getlist("set-cookie"):
+        name, value = header.split(";", 1)[0].split("=", 1)
+        client.cookies.set(name, value)
+    client.headers["X-CSRF-Token"] = client.cookies[CSRF_COOKIE]
+    return client
+
+
+def _send(client: TestClient, manifest: dict, *, kind: str = "vector", preview: bool = False):
+    return client.post(
+        "/api/v1/contributions",
+        json={"hub_code": "adpc", "kind": kind, "manifest": manifest, "preview": preview},
+    )
+
+
+def _rows(world: dict) -> list[SigContribution]:
+    with Session(world["engine"]) as session:
+        return list(session.scalars(select(SigContribution)))
+
+
+def test_a_preview_shows_the_exact_manifest_and_sends_nothing(world) -> None:
+    body = _send(_client(world, "planner@example.test"), VECTOR, preview=True).json()
+
+    assert body["sent"] is False and body["problems"] == {}
+    assert body["manifest"]["url"] == DIRECT
+    assert "direct-download" in body["notes"][0]
+    assert FakeMcp.calls == [] and _rows(world) == []
+
+
+def test_a_confirmed_point_layer_is_checked_submitted_and_recorded(world) -> None:
+    client = _client(world, "planner@example.test")
+
+    started = _send(client, VECTOR).json()
+    polled = client.get(f"/api/v1/contributions/{started['contribution']['id']}").json()
+
+    assert started["sent"] is True
+    assert world["fetched"]["url"] == DIRECT
+    assert FakeMcp.calls[0][0] == "contribute_submit"
+    assert FakeMcp.calls[0][1]["manifest"]["url"] == DIRECT
+    assert polled["status"] == "approved" and polled["state"] == "succeeded"
+    assert polled["contribution_id"] == "c0ffee0000000001"
+    assert polled["feature_count"] == 1 and len(polled["file_sha256"]) == 64
+    assert "auto-approved" in polled["response"]["decision_note"]
+    assert "how_to_test" in polled["response"]
+    # Global Risk's own server paths are not kept.
+    assert "staged_file" not in json.dumps(polled["response"])
+    with Session(world["engine"]) as session:
+        actions = set(session.scalars(select(AuditEvent.action)))
+    assert {"sig_contribution_submitted", "sig_contribution_result"} <= actions
+
+
+def test_a_declined_contribution_names_the_fields_to_fix(world) -> None:
+    FakeMcp.submit = DECLINED_VECTOR
+    client = _client(world, "planner@example.test")
+
+    started = _send(client, VECTOR).json()
+    polled = client.get(f"/api/v1/contributions/{started['contribution']['id']}").json()
+
+    assert polled["status"] == "declined" and polled["state"] == "failed"
+    assert polled["field_problems"] == {
+        "layer": "Global Risk says this is required.",
+        "license": "Global Risk says this is required.",
+    }
+    assert polled["problems"] == DECLINED_VECTOR["problems"]
+
+
+def test_a_point_file_with_contact_fields_never_reaches_global_risk(world) -> None:
+    world["fetched"]["body"] = _points({"name": "Wat A", "phone": "02-000"})
+    client = _client(world, "planner@example.test")
+
+    started = _send(client, VECTOR).json()
+    polled = client.get(f"/api/v1/contributions/{started['contribution']['id']}").json()
+
+    assert polled["status"] == "failed" and polled["error_code"] == "FILE_CHECK_FAILED"
+    assert "phone" in polled["error"]
+    assert FakeMcp.calls == []
+
+
+def test_an_unanswered_submit_is_found_rather_than_sent_again(world) -> None:
+    FakeMcp.submit = SigMcpError("read timed out")
+    FakeMcp.status = {
+        "status": "ok",
+        "contributions": [
+            {
+                "contribution_id": "c0ffee0000000002",
+                "kind": "vector",
+                "status": "approved",
+                "title": "Evacuation centres, Thailand (DDPM) (evacuation_centres)",
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        ],
+    }
+    client = _client(world, "planner@example.test")
+
+    started = _send(client, VECTOR).json()
+    polled = client.get(f"/api/v1/contributions/{started['contribution']['id']}").json()
+
+    assert [name for name, _ in FakeMcp.calls] == ["contribute_submit", "contribute_status"]
+    assert polled["status"] == "approved"
+    assert polled["contribution_id"] == "c0ffee0000000002"
+
+
+def test_an_unanswered_submit_with_no_record_says_it_is_safe_to_send_again(world) -> None:
+    FakeMcp.submit = httpx.ReadTimeout("timed out")
+    client = _client(world, "planner@example.test")
+
+    started = _send(client, VECTOR).json()
+    polled = client.get(f"/api/v1/contributions/{started['contribution']['id']}").json()
+
+    assert polled["status"] == "failed" and polled["error_code"] == "SUBMIT_UNCONFIRMED"
+    assert "safe to submit it again" in polled["error"]
+
+
+def test_only_the_sender_can_refresh_and_another_hub_cannot_see_it(world) -> None:
+    FakeMcp.submit = {**FakeMcp.submit, "status": "staged"}
+    sender = _client(world, "planner@example.test")
+    row_id = _send(sender, VECTOR).json()["contribution"]["id"]
+
+    colleague = _client(world, "colleague@example.test")
+    outsider = _client(world, "outsider@example.test")
+    seen = colleague.get("/api/v1/contributions?hub_code=adpc").json()["contributions"]
+    refused = colleague.post(f"/api/v1/contributions/{row_id}/refresh")
+    hidden = outsider.get(f"/api/v1/contributions/{row_id}")
+
+    assert [row["id"] for row in seen] == [row_id] and seen[0]["mine"] is False
+    assert refused.status_code == 403
+    assert hidden.status_code == 404
+
+    FakeMcp.status = {"status": "ok", "contribution_id": "c0ffee0000000001",
+                      "kind": "vector", "status_detail": "", "decision_note": "approved by r"}
+    FakeMcp.status["status"] = "approved"
+    refreshed = sender.post(f"/api/v1/contributions/{row_id}/refresh").json()
+    assert refreshed["status"] == "approved"
+
+
+def test_sending_needs_a_servir_sign_in_and_a_complete_manifest(world) -> None:
+    signed_out = _send(_client(world, "planner@example.test", sig_token=False), VECTOR)
+    incomplete = _send(_client(world, "planner@example.test"), {"layer": "evacuation_centres"})
+
+    assert signed_out.status_code == 401
+    assert signed_out.json()["error"]["code"] == "SIG_REAUTH_REQUIRED"
+    assert incomplete.json()["sent"] is False and "title" in incomplete.json()["problems"]
+    assert _rows(world) == [] and FakeMcp.calls == []
+
+
+def test_a_hub_you_do_not_plan_for_cannot_be_sent_for(world) -> None:
+    response = _client(world, "outsider@example.test").post(
+        "/api/v1/contributions",
+        json={"hub_code": "adpc", "kind": "vector", "manifest": VECTOR, "preview": True},
+    )
+
+    assert response.status_code == 404

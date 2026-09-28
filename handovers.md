@@ -115,7 +115,34 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
-### 0.000000 Global Risk map link and downloads (ADR-0031, 28 September, latest)
+### 0.0000000 Share data with Global Risk (ADR-0032, 28 September, latest)
+
+The owner asked for planners to send data to Global Risk ("they will parse the Google Drive
+link") and be told whether it landed, then use it. They pointed to the runbook
+`docs/Adding your flood-preparedness sources — Runbook.html` and their Bang Bua Thong test
+(`docs/GRP_Capability_Test_Prompt_BangBuaThong_v1.0.md`, `docs/GRP_Test_Report_BangBuaThong_2026-09-24.docx`,
+untracked, owner's files). Owner choices: **planners too**, **include weights**.
+
+- New page `web/contribute.html` ("Share data" in the top bar), `api/contributions.py`,
+  `core/contribution_rules.py`, `core/contribution_models.py`, migration `20260928_0021`
+  (applied on the desktop stack).
+- Flow: Check (preview, nothing sent) → exact manifest + "public for every Global Risk user at
+  once" warning + tick box → Send → background job → top-bar notice. Drive share links are
+  converted to `uc?export=download&id=`; folders refused. Point files are downloaded from
+  Drive/GitHub only and refused if they have contact fields. An unanswered submit is reconciled via
+  `contribute_status`, never resent blindly.
+- Required fields came from Global Risk's gate: four empty-manifest submits (vector, raster,
+  table, document), all declined, no record left. A fifth for `weights` was blocked by the
+  permission check, so weights fields come from the runbook.
+- **Global Risk auto-approves right now**: a successful submit is live for everyone at once.
+- **Decide first:** withdraw test layer `c66ade79bc2605ac` (`evacuation_centres_th_test`,
+  live, unreviewed, has the mislocated Bang Bua Thong record) before uploading real centres.
+- 633 passed, 2 skipped. **No real contribution was sent.** Browser: page layout checked signed
+  out only; the send flow is covered by `tests/fast/test_contributions.py` with a fake Global Risk.
+- The sensitivity drafts in `.local/contrib/manifest-draft.json` do not fit the raster gate
+  (need `layer` `vulnerability_*`, `legend`, `declared`, classes 1-5, not 0-1 floats).
+
+### 0.000000 Global Risk map link and downloads (ADR-0031, 28 September)
 
 The owner asked to use the `ui_embed` link so planners can click and download it. A live
 `ui_embed(hazard_map)` call showed the link is `/?embed=hazard_map&receipt_id=<id>`, which GRP's

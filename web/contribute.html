@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Share data | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="/styles.css?v=20260928a" />
+    <link rel="stylesheet" href="/contribute.css?v=20260928a" />
+    <script src="/grp-common.js?v=20260928a" defer></script>
+    <script src="/contribute.js?v=20260928b" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header data-grp-topbar></header>
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <p class="eyebrow">Global Risk</p>
+      <h1>Share data with Global Risk</h1>
+      <p class="workspace-intro">
+        Add your Hub's layers, tables and reports to the Global Risk platform, so its answers can
+        count and cite them. Global Risk downloads the file itself, checks it against what you
+        declare, and tells GRP whether it landed.
+      </p>
+
+      <p class="cb-banner" data-banner hidden></p>
+
+      <section class="admin-card cb-card" aria-labelledby="cb-form-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow" data-hub-name>Loading your Hub…</p>
+            <h2 id="cb-form-heading">New contribution</h2>
+          </div>
+          <span class="status-pill" data-servir>Checking SERVIR sign-in</span>
+        </div>
+
+        <fieldset class="cb-kinds" data-kinds>
+          <legend>What are you sharing?</legend>
+        </fieldset>
+        <p class="cb-kind-help" data-kind-help></p>
+
+        <form class="cb-form" data-form novalidate>
+          <div class="cb-fields" data-fields></div>
+          <div class="cb-actions">
+            <button class="button button--primary" type="submit" data-check>Check</button>
+            <button class="button button--secondary" type="button" data-reset>Clear</button>
+          </div>
+        </form>
+
+        <section class="cb-confirm" data-confirm hidden aria-labelledby="cb-confirm-heading">
+          <h3 id="cb-confirm-heading">Send this to Global Risk?</h3>
+          <ul class="cb-notes" data-notes></ul>
+          <p class="cb-warning" data-warning></p>
+          <details class="cb-manifest" open>
+            <summary>Exactly what will be sent</summary>
+            <pre data-manifest></pre>
+          </details>
+          <label class="cb-agree">
+            <input type="checkbox" data-agree />
+            <span data-agree-text>I understand this becomes available to every Global Risk user.</span>
+          </label>
+          <div class="cb-actions">
+            <button class="button button--primary" type="button" data-send disabled>Send to Global Risk</button>
+            <button class="button button--secondary" type="button" data-edit>Edit</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="admin-card cb-card" aria-labelledby="cb-list-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">This Hub</p>
+            <h2 id="cb-list-heading">Contributions</h2>
+          </div>
+          <button class="button button--secondary button--compact" type="button" data-reload>Reload</button>
+        </div>
+        <p class="cb-empty" data-empty hidden>Nothing has been shared from this Hub yet.</p>
+        <ol class="cb-list" data-list></ol>
+      </section>
+    </main>
+  </body>
+</html>

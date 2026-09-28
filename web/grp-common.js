@@ -113,6 +113,7 @@ window.GRP = (() => {
   const NAV_ITEMS = [
     { key: "planning", label: "Planning", href: "/planning.html" },
     { key: "assessments", label: "Assessments", href: "/assessments.html" },
+    { key: "share", label: "Share data", href: "/contribute.html" },
     { key: "access", label: "My access", href: "/workspace.html" },
     { key: "admin", label: "Administration", href: "/workspace.html#admin-panel", attr: "data-admin-menu", hidden: true },
     { key: "data", label: "Source data", href: "/data-inspector.html", attr: "data-data-menu", hidden: true },
@@ -122,6 +123,7 @@ window.GRP = (() => {
   const PAGE_KEYS = {
     "/planning.html": "planning",
     "/assessments.html": "assessments",
+    "/contribute.html": "share",
     "/workspace.html": "access",
     "/platform.html": "platform",
     "/data-inspector.html": "data",

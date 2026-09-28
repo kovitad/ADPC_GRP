@@ -3833,6 +3833,17 @@
       clearButton.hidden = !state.chatAvailable;
       clearButton.addEventListener("click", () => startOver(clearButton));
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
+      // "Try it in Planning" from Share data: the question is put in the box, never sent unasked.
+      const suggested = new URL(window.location.href).searchParams.get("ask");
+      if (suggested && state.chatAvailable) {
+        input.value = suggested.slice(0, 1000);
+        autosize();
+        updateSend();
+        input.focus();
+        const url = new URL(window.location.href);
+        url.searchParams.delete("ask");
+        window.history.replaceState({}, "", url);
+      }
       if (requestedAssessmentId) {
         // Arriving from Flood assessment. restoreState has just re-selected whatever area this
         // browser last used, which is usually not the assessment's, so drop it rather than show a
