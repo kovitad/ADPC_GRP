@@ -303,7 +303,8 @@
     if (typeof s.potentially_exposed !== "number" || typeof s.in_scope !== "number") {
       return "Completed";
     }
-    if (!s.in_scope) return "N/A";
+    // A district the shelter delivery does not cover (a quarter of districts, most of Bangkok).
+    if (!s.in_scope) return "No centres in the data";
     // Nothing could be assessed. "0 of N may be exposed" would read as an all-clear, because the
     // delivered layer records a depth only where it floods (handovers.md 0.2), so the cell says
     // N/A and the reason is on hover rather than spelled out in the row.
@@ -329,7 +330,10 @@
     area.append(ref);
 
     const resultCell = GRP.cell(row, resultText(a));
-    if (resultText(a) === "N/A") {
+    if (resultText(a) === "No centres in the data") {
+      resultCell.title = "The shelter data has no evacuation centres in this district. It is a gap "
+        + "in the data, the same in every version, not a finding that there are none.";
+    } else if (resultText(a) === "N/A") {
       const s = a.summary || {};
       resultCell.title = s.in_scope
         ? `${s.in_scope} centres, no flood depth recorded at any of them.`

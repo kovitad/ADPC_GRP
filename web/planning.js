@@ -344,7 +344,8 @@
   // Live progress while one request runs. The lookup status carries no current step, so these
   // advance on typical timings and are worded for any request, not only a Global Risk lookup.
   // The real step durations appear on the answer instead.
-  const addProgress = ({ publish = false } = {}) => {
+  // `since` (epoch ms) resumes a card for a lookup started before this page loaded.
+  const addProgress = ({ publish = false, since = null } = {}) => {
     hideWelcome();
     const steps = publish
       ? [
@@ -394,7 +395,7 @@
     row.append(avatar, bubble);
     thread.append(row);
     scrollDown();
-    const started = performance.now();
+    const started = performance.now() - (since ? Math.max(0, Date.now() - since) : 0);
     const tick = () => {
       const ms = performance.now() - started;
       timer.textContent = clock(ms);
@@ -1194,7 +1195,11 @@
     state.activeCenterId = null;
     $("[data-centre-intro]").textContent = rows.length
       ? "Select a row to locate the same centre on the map. Repeated names are kept as separate source records."
-      : "No evacuation-centre records were returned for this district.";
+      // 256 of 929 districts (44 of Bangkok's 50) have no records in the delivery: a gap in the
+      // data, the same in every version, so switching versions does not help.
+      : "The shelter data has no evacuation centres in this district. This is a gap in the data "
+        + "(about a quarter of districts, most of Bangkok), not a finding that it has none, and "
+        + "every version holds the same list.";
     $("[data-centre-source]").textContent = source || "";
     renderCenterList();
     loadCentreIndicators(rows);
@@ -3356,7 +3361,7 @@
     updateSend();
     const typing = addProgress({ publish });
     try {
-      const payload = await askPlanning({
+      const jobId = await startLookup({
         message: requestMessage,
         place: confirmedPlace,
         hub_code: state.hubCode,
@@ -3367,96 +3372,16 @@
         refresh,
         echo,
         history: state.history.slice(-8),
-      });
+      }, { message, publish });
+      const payload = await waitForLookup(jobId);
+      GRP.jobs.done(jobId);
+      forgetPending(jobId);
       const elapsedMs = typing.elapsed();
       typing.remove();
-      if (payload.usage) showAllowance(payload.usage);
-      let actions = [];
-      if (payload.mode === "assessment_started") {
-        const boundary = state.boundaries.find((b) => b.id === payload.boundary_id);
-        if (boundary) selectBoundary(boundary, { explicit: true });
-        state.assessmentId = null;
-        await drawPendingCenters();
-        showProgress(boundary ? boundary.name : "Assessment");
-        state.pendingAssessmentId = payload.assessment_id;
-        state.runBusy = true;
-        syncRunPanel();
-        saveState();
-        GRP.jobs.track({
-          id: payload.assessment_id,
-          label: `Assessment for ${boundary ? boundary.name : "the chosen area"}`,
-          statusPath: `/api/v1/assessments/${payload.assessment_id}`,
-          href: "/planning.html",
-          ownerPath: "/planning.html",
-        });
-        document.body.dataset.view = window.matchMedia("(max-width: 860px)").matches ? "map" : document.body.dataset.view;
-        watch(payload.assessment_id);
-      } else if (payload.mode === "sig_evidence") {
-        actions = sigActions(payload, message);
-      } else if (payload.mode === "explain_result") {
-        // The answer names centres; offer to show exactly those on the map, which is what a
-        // planner asks next when a brief lists seven places they cannot locate.
-        const named = centresNamedIn(payload);
-        if (named.length) {
-          actions = [chipButton(
-            named.length === 1
-              ? `Show ${named[0].name} on the map`
-              : `Show these ${named.length} centres on the map`,
-            () => showCentresOnMap(named),
-          )];
-        }
-      } else if (payload.mode === "needs_area_confirmation" && payload.place) {
-        const confirmation = { place: payload.place, message, publish };
-        addMessage("assistant", payload.answer, {
-          label: payload.label,
-          actions: [confirmAreaAction(confirmation)],
-          confirmation,
-        });
-        return;
-      }
-      if (payload.mode === "sig_evidence" && payload.evidence) {
-        rememberSigAnswer(payload, message);
-        addEvidenceMessage(payload, message);
-        renderEvidence(payload, message);
-      } else {
-        if (payload.mode === "gate_blocked") {
-          hidePublishConfirm();
-          const mapButton = $("[data-ev-map]");
-          mapButton.textContent = "Retry brief generation";
-          mapButton.onclick = () => send(message, { echo: false, confirmedPlace: payload.area?.requested });
-          $("[data-ev-foot]").textContent =
-            "Global Risk refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
-        }
-        const failed = payload.mode === "area_rejected" || payload.mode === "gate_blocked";
-        addMessage("assistant", payload.answer, {
-          label: payload.label,
-          actions,
-          error: failed,
-          elapsedMs,
-          retry: failed ? () => send(message, { echo: false }) : null,
-        });
-      }
-      if (!publish && payload.mode !== "assessment_started") showFollowups(payload.mode);
-      if (!publish) {
-        state.history.push({ role: "user", text: message });
-        if (payload.answer?.trim()) {
-          state.history.push({ role: "assistant", text: payload.answer.slice(0, 1200) });
-        }
-        saveState();
-      }
-      return true;
+      return await showAnswer(payload, { message, publish, elapsedMs });
     } catch (error) {
       typing.remove();
-      addMessage("assistant", error.message, {
-        label: error.code,
-        error: true,
-        retry: error.code === "SIG_REAUTH_REQUIRED" ? null : () => send(message, { echo: false }),
-      });
-      if (error.code === "PUBLISH_NEEDS_FRESH_EVIDENCE") hidePublishConfirm();
-      if (error.code === "SIG_REAUTH_REQUIRED") {
-        window.setTimeout(() => window.location.assign("/api/v1/auth/login"), 1500);
-      }
-      GRP.request("/api/v1/me/ai-usage").then(showAllowance).catch(() => {});
+      showLookupError(error, message);
       return false;
     } finally {
       state.busy = false;
@@ -3465,23 +3390,232 @@
     }
   };
 
+  const showLookupError = (error, message) => {
+    addMessage("assistant", error.message, {
+      label: error.code,
+      error: true,
+      retry: error.code === "SIG_REAUTH_REQUIRED" || error.code === "LOOKUP_STILL_RUNNING"
+        ? null : () => send(message, { echo: false }),
+    });
+    if (error.code === "PUBLISH_NEEDS_FRESH_EVIDENCE") hidePublishConfirm();
+    if (error.code === "SIG_REAUTH_REQUIRED") {
+      window.setTimeout(() => window.location.assign("/api/v1/auth/login"), 1500);
+    }
+    GRP.request("/api/v1/me/ai-usage").then(showAllowance).catch(() => {});
+  };
+
+  // One answer, however it arrived: from this page's own request or from a lookup resumed after
+  // the planner left and came back. Returns true when the question was answered.
+  const showAnswer = async (payload, { message, publish = false, elapsedMs = null }) => {
+    if (payload.usage) showAllowance(payload.usage);
+    let actions = [];
+    if (payload.mode === "assessment_started") {
+      const boundary = state.boundaries.find((b) => b.id === payload.boundary_id);
+      if (boundary) selectBoundary(boundary, { explicit: true });
+      state.assessmentId = null;
+      await drawPendingCenters();
+      showProgress(boundary ? boundary.name : "Assessment");
+      state.pendingAssessmentId = payload.assessment_id;
+      state.runBusy = true;
+      syncRunPanel();
+      saveState();
+      GRP.jobs.track({
+        id: payload.assessment_id,
+        label: `Assessment for ${boundary ? boundary.name : "the chosen area"}`,
+        statusPath: `/api/v1/assessments/${payload.assessment_id}`,
+        href: "/planning.html",
+        ownerPath: "/planning.html",
+      });
+      document.body.dataset.view = window.matchMedia("(max-width: 860px)").matches ? "map" : document.body.dataset.view;
+      watch(payload.assessment_id);
+    } else if (payload.mode === "sig_evidence") {
+      actions = sigActions(payload, message);
+    } else if (payload.mode === "explain_result") {
+      // The answer names centres; offer to show exactly those on the map, which is what a
+      // planner asks next when a brief lists seven places they cannot locate.
+      const named = centresNamedIn(payload);
+      if (named.length) {
+        actions = [chipButton(
+          named.length === 1
+            ? `Show ${named[0].name} on the map`
+            : `Show these ${named.length} centres on the map`,
+          () => showCentresOnMap(named),
+        )];
+      }
+    } else if (payload.mode === "needs_area_confirmation" && payload.place) {
+      const confirmation = { place: payload.place, message, publish };
+      addMessage("assistant", payload.answer, {
+        label: payload.label,
+        actions: [confirmAreaAction(confirmation)],
+        confirmation,
+      });
+      return;
+    }
+    if (payload.mode === "sig_evidence" && payload.evidence) {
+      rememberSigAnswer(payload, message);
+      addEvidenceMessage(payload, message);
+      renderEvidence(payload, message);
+    } else {
+      if (payload.mode === "gate_blocked") {
+        hidePublishConfirm();
+        const mapButton = $("[data-ev-map]");
+        mapButton.textContent = "Retry brief generation";
+        mapButton.onclick = () => send(message, { echo: false, confirmedPlace: payload.area?.requested });
+        $("[data-ev-foot]").textContent =
+          "Global Risk refused this draft. No public receipt or live map was created. Review the reason in chat, then retry.";
+      }
+      const failed = payload.mode === "area_rejected" || payload.mode === "gate_blocked";
+      addMessage("assistant", payload.answer, {
+        label: payload.label,
+        actions,
+        error: failed,
+        elapsedMs,
+        retry: failed ? () => send(message, { echo: false }) : null,
+      });
+    }
+    if (!publish && payload.mode !== "assessment_started") showFollowups(payload.mode);
+    if (!publish) {
+      state.history.push({ role: "user", text: message });
+      if (payload.answer?.trim()) {
+        state.history.push({ role: "assistant", text: payload.answer.slice(0, 1200) });
+      }
+      saveState();
+    }
+    return true;
+  };
+
+  // ---------- coming back to a conversation ----------
+  // Leaving Planning mid-lookup used to lose it: the page's own polling died with the page, and
+  // coming back restored this tab's copy, which had the question but not the answer.
+  const entryKey = (entry) => (entry.kind === "evidence"
+    ? `e|${(entry.payload && entry.payload.evidence && entry.payload.evidence.pack_id) || ""}|${entry.question || ""}`
+    : `m|${entry.role}|${entry.text}`);
+
+  // Answers the server saved after this tab last saw the conversation (another tab, or while the
+  // planner was on another page) are appended rather than lost.
+  const syncTailFromServer = async () => {
+    if (!state.chatAvailable || !state.hubCode || !transcript.length) return;
+    let stored = null;
+    try {
+      stored = await GRP.request(conversationPath());
+    } catch (_error) {
+      return;
+    }
+    const server = stored.messages || [];
+    const serverKeys = server.map(entryKey);
+    const localKeys = transcript.filter((entry) => !entry.error).map(entryKey);
+    const known = new Set(localKeys);
+    let tail = [];
+    for (let i = localKeys.length - 1; i >= 0; i -= 1) {
+      const index = serverKeys.lastIndexOf(localKeys[i]);
+      if (index >= 0) {
+        tail = server.slice(index + 1);
+        break;
+      }
+    }
+    tail.filter((entry) => !known.has(entryKey(entry))).forEach((entry) => {
+      if (entry.kind === "evidence" && entry.payload && entry.payload.evidence) {
+        addEvidenceMessage(entry.payload, entry.question || "");
+      } else {
+        addMessage(entry.role, entry.text, { label: entry.label });
+      }
+    });
+    if (tail.length && stored.history) {
+      state.history = stored.history;
+      saveState();
+    }
+  };
+
+  // Lookups still running on the server get their progress card back and their answer when it
+  // lands, in this tab or any other one the planner opens.
+  const resumeLookups = async () => {
+    if (!state.chatAvailable || !state.hubCode) return;
+    const mine = readPending().filter((item) => item.owner === ownerEmail && item.hub === state.hubCode);
+    if (!mine.length) return;
+    state.busy = true;
+    updateSend();
+    await Promise.all(mine.map(async (item) => {
+      let asked = -1;
+      transcript.forEach((entry, index) => {
+        if (entry.kind === "message" && entry.role === "user" && entry.text === item.message) asked = index;
+      });
+      const answered = asked >= 0 && transcript.slice(asked + 1).some(
+        (entry) => entry.kind === "evidence" || entry.role === "assistant",
+      );
+      if (answered) {
+        forgetPending(item.jobId);
+        GRP.jobs.done(item.jobId);
+        return;
+      }
+      if (asked < 0) addMessage("user", item.message);
+      const typing = addProgress({ publish: item.publish, since: item.since });
+      try {
+        const payload = await waitForLookup(item.jobId, item.since);
+        GRP.jobs.done(item.jobId);
+        forgetPending(item.jobId);
+        const elapsedMs = typing.elapsed();
+        typing.remove();
+        await showAnswer(payload, { message: item.message, publish: item.publish, elapsedMs });
+      } catch (error) {
+        typing.remove();
+        if (error.status === 404) {
+          // Finished long enough ago that the server let the job go; its answer is in the
+          // saved conversation.
+          await syncTailFromServer();
+          return;
+        }
+        showLookupError(error, item.message);
+      }
+    }));
+    state.busy = false;
+    updateSend();
+  };
+
   // A SIG gather for a Thai district has been measured at over a minute, so the answer comes
   // back as a job rather than as a held-open request (ADR-0025). The top-bar pill shows it
   // running, so a planner can switch pages and be told when it lands.
   const LOOKUP_POLL_MS = 2000;
   const LOOKUP_GIVE_UP_MS = 10 * 60 * 1000;
 
-  const askPlanning = async (body) => {
+  // Lookups still running, kept in localStorage so that leaving the page, opening another tab or
+  // reloading does not lose them: the server keeps the job, and the page picks it up again.
+  const PENDING_KEY = "grp.planning.pending";
+  const readPending = () => {
+    try {
+      const list = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch (_error) {
+      return [];
+    }
+  };
+  const writePending = (list) => {
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-5)));
+    } catch (_error) {
+      // Storage blocked: the lookup still finishes; it just cannot be resumed elsewhere.
+    }
+  };
+  const forgetPending = (jobId) => writePending(readPending().filter((item) => item.jobId !== jobId));
+
+  const startLookup = async (body, { message, publish }) => {
     const started = await GRP.request("/api/v1/planning/lookups", { method: "POST", body });
-    const statusPath = `/api/v1/planning/lookups/${started.job_id}`;
     GRP.jobs.track({
       id: started.job_id,
       label: "Global Risk evidence lookup",
-      statusPath,
+      statusPath: `/api/v1/planning/lookups/${started.job_id}`,
       href: "/planning.html",
       ownerPath: "/planning.html",
     });
-    const deadline = Date.now() + LOOKUP_GIVE_UP_MS;
+    writePending([
+      ...readPending().filter((item) => item.jobId !== started.job_id),
+      { jobId: started.job_id, message, publish, since: Date.now(), owner: ownerEmail, hub: state.hubCode },
+    ]);
+    return started.job_id;
+  };
+
+  const waitForLookup = async (jobId, since = Date.now()) => {
+    const statusPath = `/api/v1/planning/lookups/${jobId}`;
+    const deadline = since + LOOKUP_GIVE_UP_MS;
     try {
       for (;;) {
         const status = await GRP.request(statusPath);
@@ -3504,7 +3638,10 @@
     } catch (error) {
       // Stop watching only what has actually ended. A lookup this page gave up polling is
       // still running on the server, and the top bar is then the only thing tracking it.
-      if (!error.keepWatching) GRP.jobs.done(started.job_id);
+      if (!error.keepWatching) {
+        GRP.jobs.done(jobId);
+        forgetPending(jobId);
+      }
       throw error;
     }
   };
@@ -4084,6 +4221,8 @@
       const summaryButton = $("[data-summary-download]");
       summaryButton.addEventListener("click", () => downloadSummary(summaryButton));
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
+      await syncTailFromServer();
+      resumeLookups();
       // "Try it in Planning" from Share data: the question is put in the box, never sent unasked.
       const suggested = new URL(window.location.href).searchParams.get("ask");
       if (suggested && state.chatAvailable) {

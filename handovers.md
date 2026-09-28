@@ -115,7 +115,30 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24-25 September 2026, `main` at `7a3ae55`)
 
-### 0.00000000 District summary download (ADR-0033, 28 September, latest)
+### 0.000000000 One shelter version, and lookups survive leaving the page (28 September, latest)
+
+**Shelter clean-up (sandbox, owner's request).** The owner kept switching shelter versions because
+some districts showed no points. The versions were identical (10,303 points each), and every
+switch gave the same count (Chanuman 0/0, Ban Dung 36/36): the zeros are the data gap (256 of 929
+districts have no records). Kept **`a18b19dd`** (current, `grp-shelters/7`). Deleted the six old
+copies (`37108d23`, `da769049`, `1a0adc50`, `61a17773`, `6ff9adda`, `8f47dff2`), with the
+40 assessments that used them, their import jobs, file rows and storage folders. Backup first:
+`/tmp/before-centre-cleanup.dump` in the db container (pg_dump -Fc). The synthetic test set
+`01a0ce85` stays. The empty-district wording now says it is a data gap the same in every version
+(Planning centre list; Assessments shows "No centres in the data").
+
+**Lookups survive leaving the page.** The owner started a Global Risk lookup, switched page or tab,
+and came back to find the conversation gone while the top bar showed jobs running. A running
+lookup is now saved in `localStorage` (`grp.planning.pending`: job, question, start time, owner,
+Hub). On load, Planning:
+- appends any answers the server saved that this tab lacks (`syncTailFromServer`);
+- then gives each still-running lookup its progress card back, with the real elapsed time, and
+  shows its answer through the same `showAnswer` path as a live request (`resumeLookups`).
+
+A job the server has already dropped (older than 30 min) falls back to the saved conversation.
+`planning.js?v=20260928g`. **Not yet checked in a signed-in browser.**
+
+### 0.00000000 District summary download (ADR-0033, 28 September)
 
 The owner asked for everything about a district "in one docx" with a picture and the statistics
 tables. **Download summary** (chat header, and the evidence panel's Download menu) gives a Word
