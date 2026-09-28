@@ -65,6 +65,37 @@ def boundaries(
     }
 
 
+# Thailand's five statistical regions (National Statistical Office), read from the first two
+# digits of the official province code: Central includes the East (20-27) and West (70-77).
+REGIONS = (
+    ("bangkok", "Bangkok", "กรุงเทพมหานคร"),
+    ("central", "Central", "ภาคกลาง"),
+    ("north", "North", "ภาคเหนือ"),
+    ("northeast", "Northeast", "ภาคตะวันออกเฉียงเหนือ"),
+    ("south", "South", "ภาคใต้"),
+)
+
+
+def province_region(code: str) -> int:
+    """Index into REGIONS for a two-digit Thai province code; unknown codes sort last."""
+
+    try:
+        number = int(code)
+    except (TypeError, ValueError):
+        return len(REGIONS)
+    if number == 10:
+        return 0
+    if 11 <= number <= 27 or 70 <= number <= 77:
+        return 1
+    if 50 <= number <= 67:
+        return 2
+    if 30 <= number <= 49:
+        return 3
+    if 80 <= number <= 96:
+        return 4
+    return len(REGIONS)
+
+
 @router.get(
     "/provinces",
     summary="Provinces that contain a supported area",
@@ -102,16 +133,23 @@ def provinces(
         .group_by(Boundary.province_name)
         .order_by(Boundary.province_name)
     ).all()
+    # Grouped by region, Bangkok first, then A-Z within each region: an alphabetical list of 77
+    # names scattered neighbouring provinces across the whole list.
+    ordered = sorted(rows, key=lambda row: (province_region(row[0]), row[1]))
     return {
+        "regions": [{"key": key, "name": name, "name_th": name_th}
+                    for key, name, name_th in REGIONS],
         "provinces": [
             {
                 "code": code,
                 "name": name,
                 "name_th": name_th,
                 "district_count": int(districts),
+                "region": REGIONS[province_region(code)][0]
+                if province_region(code) < len(REGIONS) else "other",
             }
-            for code, name, name_th, districts in rows
-        ]
+            for code, name, name_th, districts in ordered
+        ],
     }
 
 

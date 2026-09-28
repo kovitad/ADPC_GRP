@@ -196,11 +196,26 @@
 
     const provinceSelect = $("[data-province]");
     const provinceCodes = new Set(provincePayload.provinces.map((item) => item.code));
-    provincePayload.provinces.forEach((item) => option(
-      provinceSelect,
-      item.code,
-      `${item.name}${item.name_th ? ` · ${item.name_th}` : ""} (${item.district_count})`,
-    ));
+    // One heading per region, in the order the API gives (Bangkok, Central, North, Northeast,
+    // South), with the provinces A-Z inside each.
+    const regionNames = new Map((provincePayload.regions || []).map((region) => [
+      region.key, `${region.name} · ${region.name_th}`,
+    ]));
+    const groups = new Map();
+    provincePayload.provinces.forEach((item) => {
+      const key = item.region || "other";
+      if (!groups.has(key)) {
+        const group = document.createElement("optgroup");
+        group.label = regionNames.get(key) || "Other";
+        groups.set(key, group);
+        provinceSelect.append(group);
+      }
+      option(
+        groups.get(key),
+        item.code,
+        `${item.name}${item.name_th ? ` · ${item.name_th}` : ""} (${item.district_count})`,
+      );
+    });
     // The synthetic test district carries no real province code, so it gets its own entry rather
     // than being hidden behind a province a planner would never think to open.
     const synthetic = searchIndex.filter((item) => item.synthetic);
@@ -208,7 +223,13 @@
       const code = item.admin_code.slice(0, 2);
       if (provinceCodes.has(code)) return;
       provinceCodes.add(code);
-      option(provinceSelect, code, `${item.name} (test data)`);
+      if (!groups.has("test")) {
+        const group = document.createElement("optgroup");
+        group.label = "Test data";
+        groups.set("test", group);
+        provinceSelect.append(group);
+      }
+      option(groups.get("test"), code, `${item.name} (test data)`);
     });
 
     const searchBox = $("[data-area-search]");
