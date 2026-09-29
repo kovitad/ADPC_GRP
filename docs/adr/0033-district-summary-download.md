@@ -66,6 +66,12 @@ chat shows.
    boxes. The file name has an ASCII form and a `filename*` form.
 8. `python-docx` becomes a runtime dependency.
 
+9. **Amended 29 September 2026:** the Global Risk section opens with "What Global Risk adds for
+   this district". It gives plain names, counts by depth class and whether each row is new to GRP. The
+   evacuation-centre row is marked as GRP's own test upload echoed back, not an independent check.
+   Each Global Risk answer in the chat now says whether it went into the selected district's
+   summary, and offers to select the right district when it did not.
+
 ## Consequences
 
 - One click gives a planner a document to share. It copies stored numbers and estimates nothing.

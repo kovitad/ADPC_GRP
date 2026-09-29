@@ -273,7 +273,17 @@ def render_summary(facts: dict[str, Any]) -> bytes:
         if evidence.get("source_note"):
             _warn(document, evidence["source_note"])
         if evidence.get("stats"):
-            _table(document, ["Item", "Exposed", "Total", "Unit"], evidence["stats"])
+            document.add_heading("What Global Risk adds for this district", level=2)
+            _para(document, "GRP's own data covers evacuation centres. Global Risk also counts "
+                            "schools, hospitals, buildings and roads inside its 100-year flood "
+                            "hazard layer. \"In flood hazard\" means flood hazard class 1 or "
+                            "higher (1 = up to 0.5 m, 5 = over 2 m); it is not a report of "
+                            "current flooding.", size=9.5)
+            _table(document, ["Item", "In flood hazard", "Total", "Unit", "By depth class",
+                              "What it means"], evidence["stats"])
+            if all(row[1] == 0 for row in evidence["stats"]):
+                _note(document, "Global Risk found none of these in its flood hazard layer for "
+                                "this district. That is a result, not missing data.")
         if evidence.get("brief"):
             document.add_heading("Brief", level=2)
             for line in str(evidence["brief"]).splitlines():

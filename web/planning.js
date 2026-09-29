@@ -1849,6 +1849,8 @@
         result.area_detail.province_name,
         "Thailand",
       ].filter(Boolean).join(", ");
+      // On a phone the answer lands in the chat, which is hidden while the map shows.
+      if (window.matchMedia("(max-width: 860px)").matches) document.body.dataset.view = "chat";
       return send(
         `Show supporting Global Risk flood, population, schools, hospitals and roads information for ${place}.`,
         { confirmedPlace: place },
@@ -3217,8 +3219,9 @@
   // Next questions under the latest answer. None uses the words that start an assessment run
   // (EXPLICIT_ASSESSMENT_PATTERN in api/planning.py), so a click only ever asks for information.
   const FOLLOWUPS = {
+    // Global Risk has no centre names or places to move to, so that question is not offered after
+    // its evidence; GRP's own assessment answers it.
     sig_evidence: [
-      "Which evacuation centres could people move to?",
       "Explain what the map shows",
       "What do these numbers leave out?",
     ],
@@ -3238,6 +3241,40 @@
     questions.forEach((question) => {
       box.append(chipButton(question, () => send(question)));
     });
+    thread.append(box);
+    scrollDown();
+  };
+
+  // ADR-0033: the district summary carries the latest evidence for the selected district only.
+  // Say whether this answer is in it, and how to get it in when the map is on another district.
+  const summaryHint = (payload, question) => {
+    const requested = String(payload.evidence?.area?.requested || "").toLowerCase();
+    if (!requested) return;
+    const matches = (boundary) => Boolean(boundary)
+      && canonicalSigPlace(boundary).toLowerCase() === requested;
+    const box = document.createElement("div");
+    box.className = "pw-followups pw-summary-hint";
+    const note = document.createElement("small");
+    if (matches(state.selected)) {
+      note.textContent = `Added to the ${state.selected.name} summary: Global Risk's counts of schools, hospitals, buildings and roads in its flood hazard layer, with this brief and its sources.`;
+      box.append(note, chipButton("Download summary (.docx)", (button) => downloadSummary(button)));
+    } else {
+      const place = payload.evidence.area.sig_place || payload.evidence.area.requested;
+      const other = state.boundaries.find(matches);
+      note.textContent = state.selected
+        ? `Not in the summary yet: the summary is for ${state.selected.name}, the district selected on the map.`
+        : "Not in a summary yet: the summary is for the district selected on the map.";
+      box.append(note);
+      if (other) {
+        box.append(chipButton(`Select ${other.name} to add it`, () => {
+          selectBoundary(other, { explicit: true });
+          renderEvidence(payload, question);
+          summaryHint(payload, question);
+        }));
+      } else {
+        note.textContent += ` Select ${place} on the map to add it.`;
+      }
+    }
     thread.append(box);
     scrollDown();
   };
@@ -3303,6 +3340,13 @@
     publish = false, publishToken = null, echo = true, confirmedPlace = null, refresh = false,
   } = {}) => {
     const message = (text ?? input.value).trim();
+    if (message && state.busy && text != null) {
+      // A button click used to vanish here while another lookup ran.
+      addMessage("assistant", "A Global Risk lookup is still running. Ask again when its answer arrives.", {
+        record: false,
+      });
+      return false;
+    }
     if (!message || state.busy || !state.hubCode) return;
     if (!state.chatAvailable) {
       addMessage("assistant", "The chat assistant runs only in the local Docker Desktop test right now.", { error: true });
@@ -3455,6 +3499,7 @@
       rememberSigAnswer(payload, message);
       addEvidenceMessage(payload, message);
       renderEvidence(payload, message);
+      if (!publish) summaryHint(payload, message);
     } else {
       if (payload.mode === "gate_blocked") {
         hidePublishConfirm();

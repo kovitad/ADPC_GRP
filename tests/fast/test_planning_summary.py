@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from api.planning_summary import _global_risk
+from api.planning_summary import _global_risk, global_risk_stats
 from core.access_models import AppUser, Base, Hub
 from core.assessment_models import Boundary
 from core.planning_memory_models import PlanningChatMessage
@@ -78,7 +78,26 @@ def test_only_this_districts_evidence_is_used_and_risk_fields_are_left_out() -> 
     assert found is not None
     assert found["place"] == "BANG KAPI District"
     assert found["question"] == "About BANG KAPI District, BANGKOK, Thailand"
-    assert found["stats"] == [["schools", 3, 9, "count"], ["roads", 1.5, 10.0, "km"]]
+    assert [row[:4] for row in found["stats"]] == [
+        ["Schools", 3, 9, "count"], ["Roads", 1.5, 10.0, "km"],
+    ]
+    assert "Global Risk adds it" in found["stats"][0][5]
     assert "receipt r1" in found["status"]
     assert found["map_link"].endswith("receipt_id=r1")
     assert found["source_note"] and "not a report of current flooding" in found["source_note"]
+
+
+def test_global_risk_rows_name_items_plainly_and_never_carry_risk_levels() -> None:
+    rows = global_risk_stats({"stats": {"counts": {
+        "evacuation_centres_th_test": {
+            "total": 16, "exposed": 2, "at_risk": 1, "by_risk": {"3": 1},
+            "by_severity": {"1": 0, "2": 2},
+        },
+        "roads": {"total_km": 522.8, "exposed_km": 3.0, "at_risk_km": 2.5},
+    }}})
+
+    assert rows[0][:5] == ["Evacuation centres", 2, 16, "count", "class 2: 2"]
+    # ADPC's test upload of GRP's own centres is not a second opinion.
+    assert "not an independent check" in rows[0][5]
+    assert rows[1][:4] == ["Roads", 3.0, 522.8, "km"]
+    assert 2.5 not in rows[1] and 1 not in rows[0][1:3]

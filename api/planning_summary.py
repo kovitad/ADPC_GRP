@@ -172,6 +172,53 @@ def _centres(
     }
 
 
+# Global Risk's layer names, as a planner would say them. An unknown layer keeps its own name.
+GLOBAL_RISK_ITEMS = {
+    "schools": "Schools",
+    "hospitals": "Hospitals",
+    "buildings": "Buildings",
+    "roads": "Roads",
+    "health_facilities": "Health facilities",
+}
+
+
+def _item_label(name: str) -> tuple[str, str]:
+    """The planner's name for a Global Risk layer, and what it means for them."""
+
+    if "evacuation_centre" in name or "evacuation_center" in name:
+        # ADPC uploaded GRP's own centre table to Global Risk as a test (ADR-0032). Its count is
+        # GRP's data echoed back, not a second opinion.
+        return ("Evacuation centres", "GRP's own centre data sent to Global Risk as a test "
+                "upload; not an independent check")
+    return GLOBAL_RISK_ITEMS.get(name, name.replace("_", " ").capitalize()), (
+        "Not in GRP's data; Global Risk adds it")
+
+
+def global_risk_stats(evidence: dict[str, Any]) -> list[list[Any]]:
+    """Rows of what Global Risk counted in its flood hazard layer for this district.
+
+    Hazard exposure only: Global Risk's risk levels (`at_risk`, `by_risk`) stay out (ADR-0014).
+    """
+
+    counts = (evidence.get("stats") or {}).get("counts") or {}
+    rows = []
+    for name, value in counts.items():
+        if not isinstance(value, dict):
+            continue
+        label, note = _item_label(str(name))
+        if isinstance(value.get("exposed"), int | float):
+            severity = value.get("by_severity") or {}
+            classes = ", ".join(
+                f"class {key}: {severity[key]}" for key in sorted(severity)
+                if isinstance(severity[key], int | float) and severity[key]
+            )
+            rows.append([label, value["exposed"], value.get("total"), "count",
+                         classes or "none", note])
+        elif isinstance(value.get("exposed_km"), int | float):
+            rows.append([label, value["exposed_km"], value.get("total_km"), "km", "-", note])
+    return rows
+
+
 def _global_risk(session, principal: CurrentPrincipal, hub_id: UUID,
                  boundary: Boundary) -> dict[str, Any] | None:
     """This person's latest Global Risk evidence for exactly this place, never another's."""
@@ -205,18 +252,7 @@ def _global_risk(session, principal: CurrentPrincipal, hub_id: UUID,
         area = evidence.get("area") or {}
         if str(area.get("requested") or "").casefold() not in wanted:
             continue
-        counts = (evidence.get("stats") or {}).get("counts") or {}
-        stats = []
-        for name, value in counts.items():
-            if not isinstance(value, dict):
-                continue
-            if isinstance(value.get("exposed"), int | float):
-                stats.append(
-                    [name.replace("_", " "), value["exposed"], value.get("total"), "count"]
-                )
-            elif isinstance(value.get("exposed_km"), int | float):
-                stats.append([name.replace("_", " "), value["exposed_km"], value.get("total_km"),
-                              "km"])
+        stats = global_risk_stats(evidence)
         receipt = evidence.get("receipt") or payload.get("receipt") or {}
         if receipt.get("receipt_id"):
             status = f"passed Global Risk's source check, receipt {receipt['receipt_id']}"
