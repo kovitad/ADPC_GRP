@@ -113,7 +113,59 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-2 October 2026, `main` at `e408f96` plus this note)
+## 0. Start here (sessions of 24 September-2 October 2026, `main` at `14e4993` plus this note)
+
+### 2 October (later): Mangrove Sprint Lab, a separate project
+
+GRP's code was not changed in this session. The work was a new, independent repository for the
+SERVIR mangrove sprint, built from the brief in `docs/adhoc/2026-10-02_Mangrove_Sprint_Lab_Claude_Code_Bootstrap.md`.
+That brief is the owner's file and is still untracked here.
+
+- **Where it is:**
+  - Local: `D:\adpcworkspace\mangrove-sprint-lab`.
+  - Remote: <https://github.com/SERVIRSEA/mangrove-sprint-lab>. The repo is **public**, so it
+    holds no internal document links or people's names.
+  - Commits: `b7e8b53` and `466d27e` on `main`, pushed.
+  - Handover: the lab's own `CLAUDE.md`, with `docs/ACCEPTANCE.md` and `docs/SPRINT_NOTES.md`.
+- **The owner's saved git login can push to SERVIRSEA.** Git Credential Manager pushed with
+  no org access block. That repo has its own local git name and email, because none is set
+  globally.
+- **What it is:** a Python 3.12 / uv command-line client called `msl`.
+  - It connects over the hosted contribution REST API (`POST /api/contribute`,
+    `GET /api/contribute/<id>`) or over MCP streamable HTTP at `/mcp`. The transport is chosen
+    explicitly and never falls back to the other.
+  - The token comes from SIG's `grp-login.py` helper. The helper is not vendored because it
+    states no licence; its SHA-256 on 2 October is recorded in the lab's `docs/CONNECTIONS.md`.
+  - It previews manifests locally, sends behind explicit gates, follows status with bounded
+    polling, and writes a JSONL trace per operation.
+  - An offline demo runs on synthetic data near 0,0.
+  - The official MCP SDK is pinned to 1.30, below 2.0, because the 2.x client was reworked.
+- **Ported from GRP (from `14e4993`; GRP has no licence file):**
+  - `core/contribution_rules.py`: required fields, the 3-40 character layer rule, Drive links,
+    contact fields;
+  - from `api/mcp_client.py`: the endpoint, the bearer token, and "401 means sign in";
+  - from `api/sig_connection.py`: renewing a token shortly before it expires;
+  - from `api/langfuse.py`: traces that hold only safe fields.
+- **Verified:**
+  - 58 tests pass with the network blocked, and ruff is clean.
+  - A fresh clone from GitHub installs, passes its tests and runs the demo.
+  - Live, with no real token:
+    - both endpoints answer 401;
+    - a real MCP SDK session with a fake token gives `sign_in_required`.
+  - Adapters are tested against fake responses only. Sign-in, `discover`, the `trace-emit`
+    resource and any live contribution have **not** been run.
+- **Found while testing:**
+  - The hosted REST 401 has **no `WWW-Authenticate` header**; the body is
+    `{"detail":"login required"}`. The runbook says it does. MCP's 401 does have the header.
+    GRP only uses MCP, so GRP is not affected.
+  - Mangrove data has no published contract:
+    - there is no mangrove pack;
+    - `vector` accepts points only;
+    - `raster` accepts hazard, risk or vulnerability classes, or population counts.
+
+    The lab reports these as gaps and does not force the data to fit.
+- **Cleanup:** only the two scratch folders this task created were deleted (the downloaded
+  runbook and helper, and the fresh-clone check).
 
 ### 2 October: committed, pushed and rebuilt
 
