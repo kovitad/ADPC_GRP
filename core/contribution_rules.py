@@ -51,6 +51,9 @@ TEMPORAL = {"forecast", "retrospective"}
 PACKS = {"risk", "food-security"}
 RASTER_PREFIXES = ("hazard_", "risk_", "vulnerability_", "population_")
 SNAKE = re.compile(r"^[a-z][a-z0-9_]{1,79}$")
+# Global Risk's gate (30 Sep 2026): "layer must be snake_case: lowercase letters, digits,
+# underscores, 3-40 chars". A longer name is declined after the whole submit round trip.
+LAYER_NAME = re.compile(r"^[a-z][a-z0-9_]{2,39}$")
 YEAR_MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])(-\d{2})?$")
 DRIVE_FILE = re.compile(r"^/file/d/([A-Za-z0-9_-]{10,})")
 CONTACT_FIELD = re.compile(
@@ -142,9 +145,14 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
 
     name_key = NAME_FIELD[kind]
     if kind in {"vector", "raster", "table"} and name_key in cleaned:
-        if not SNAKE.fullmatch(str(cleaned[name_key])):
+        name = str(cleaned[name_key])
+        if not SNAKE.fullmatch(name):
             problems[name_key] = (
                 "Lower-case letters, digits and underscores, starting with a letter."
+            )
+        elif name_key == "layer" and not LAYER_NAME.fullmatch(name):
+            problems[name_key] = (
+                f"Global Risk accepts 3 to 40 characters; this name has {len(name)}."
             )
         elif kind == "raster" and not str(cleaned[name_key]).startswith(RASTER_PREFIXES):
             problems[name_key] = "Start with hazard_, risk_, vulnerability_ or population_."

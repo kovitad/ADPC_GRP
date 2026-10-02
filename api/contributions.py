@@ -25,9 +25,11 @@ from sqlalchemy import select
 
 from api.dependencies import DatabaseSession
 from api.errors import GrpError, not_found
+from api.global_risk_layers import taken_name
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
+from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
 from api.settings import get_settings, planning_chat_available
 from api.sig_connection import sig_access_token
@@ -137,6 +139,42 @@ def view(row: SigContribution, principal: CurrentPrincipal) -> dict[str, Any]:
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }
+
+
+def _name_taken_message(taken: dict[str, Any]) -> str:
+    """Why a name cannot be sent again, and the only way to replace what is under it."""
+
+    name = taken["name"]
+    if taken["source"] == "this_hub":
+        when = (taken.get("submitted_at") or "")[:10]
+        held = (f"This Hub already sent `{name}` to Global Risk"
+                + (f" on {when}" if when else "")
+                + f" (state: {taken['state']}"
+                + (f", contribution {taken['contribution_id']}" if taken.get("contribution_id")
+                   else "")
+                + ").")
+    elif taken["source"] == "another_hub":
+        held = f"`{name}` was already sent to Global Risk from GRP by another Hub."
+    else:
+        held = (f"Global Risk already holds a layer named `{name}`: it was counted in Global "
+                f"Risk evidence on {(taken.get('seen_at') or '')[:10]}.")
+        return (
+            f"{held} Global Risk cannot update a contribution: contributions never overwrite, so "
+            "sending the same name again cannot replace what is there. To replace it, ask the "
+            "Global Risk team to remove the existing layer, giving its name and, if you have it, "
+            "its contribution ID. Once they confirm it is removed, gather Global Risk evidence "
+            "again in Planning for a district where it was counted, so GRP sees it is gone. Then "
+            "send the corrected file once, under the same name. Do not send it under a new name: "
+            "Global Risk would keep both and count both."
+        )
+    return (
+        f"{held} Global Risk cannot update a contribution: contributions never overwrite, so "
+        "sending the same name again cannot replace what is there. To replace it, ask a Global "
+        "Risk reviewer to withdraw the existing one with contribute_review, giving the name and "
+        "its contribution ID, so its record reads withdrawn. Then click \"Check on Global Risk\" "
+        "on it here; once it reads withdrawn or rejected, send the corrected file once, under the "
+        "same name. Do not send it under a new name: Global Risk would keep both and count both."
+    )
 
 
 def _audit(session, row: SigContribution, action: str, result: AuditResult) -> None:
@@ -415,13 +453,23 @@ async def create_contribution(
     hub = planner_membership(principal, payload.hub_code)
     kind = payload.kind.strip().lower()
     checked = check_manifest(kind, payload.manifest)
-    if payload.preview or checked.problems:
+    problems = dict(checked.problems)
+    duplicate = None
+    name_key = NAME_FIELD.get(kind)
+    if name_key and name_key not in problems:
+        # Checked on preview and again on send: a name Global Risk holds is never sent twice.
+        taken = taken_name(session, kind, str(checked.manifest.get(name_key) or ""), hub.hub_id)
+        if taken is not None:
+            duplicate = {**taken, "field": name_key, "message": _name_taken_message(taken)}
+            problems[name_key] = "Already sent to Global Risk. Contributions cannot be updated."
+    if payload.preview or problems:
         return {
             "sent": False,
             "kind": kind,
             "manifest": checked.manifest,
-            "problems": checked.problems,
+            "problems": problems,
             "notes": checked.notes,
+            "duplicate": duplicate,
         }
     access_token = await sig_access_token(get_settings(), principal.session_id)
     if not access_token:
@@ -445,6 +493,115 @@ async def create_contribution(
     session.refresh(row)
     _start(row.id, access_token)
     return {"sent": True, "contribution": view(row, principal)}
+
+
+LAYER_IN_TITLE = re.compile(r"\s*\(([a-z0-9_]{3,40})\)\s*$")
+TEST_LAYER = re.compile(r"(^|_)test(_|$)")
+
+
+def _on_global_risk_view(record: dict[str, Any], sent_here: dict[str, SigContribution]) -> dict:
+    """One of the person's Global Risk records, without its server paths or account label."""
+
+    preview = record.get("preview") if isinstance(record.get("preview"), dict) else {}
+    entry = preview.get("entry") if isinstance(preview.get("entry"), dict) else {}
+    observed = preview.get("observed") if isinstance(preview.get("observed"), dict) else {}
+    landing = record.get("landing") if isinstance(record.get("landing"), dict) else {}
+    title = str(record.get("title") or "")
+    in_title = LAYER_IN_TITLE.search(title)
+    name = str(
+        preview.get("layer")
+        or landing.get("layer")
+        or record.get("dataset")
+        or (in_title.group(1) if in_title else "")
+    )
+    contribution_id = str(record.get("contribution_id") or "")
+    row = sent_here.get(contribution_id)
+    reviewer = str(record.get("reviewer_label") or "")
+    return {
+        "contribution_id": contribution_id,
+        "kind": record.get("kind"),
+        "name": name,
+        "title": str(entry.get("title") or (LAYER_IN_TITLE.sub("", title) if in_title else title)),
+        "status": str(record.get("status") or "").lower(),
+        # Global Risk lands an approved contribution as a file it serves; without it, an approval
+        # changes no answer.
+        "live": bool(landing),
+        "features": landing.get("features") or observed.get("features") or entry.get("features"),
+        "license": entry.get("license"),
+        "vintage": entry.get("vintage"),
+        "usage_notes": entry.get("usage_notes"),
+        "is_test": bool(TEST_LAYER.search(name)) or "TEST" in title,
+        "auto_approved": "auto-approve" in reviewer.lower()
+        or "auto-approved" in str(record.get("decision_note") or "").lower(),
+        "decision_note": record.get("decision_note"),
+        # Global Risk does not record which app sent a contribution, only whose sign-in did. GRP
+        # knows the ones it sent itself; everything else came from another client.
+        "sent_from": "grp" if row is not None else "outside_grp",
+        "grp_row_id": str(row.id) if row is not None else None,
+        "created_at": record.get("created_at"),
+        "updated_at": record.get("updated_at"),
+    }
+
+
+@router.get(
+    "/on-global-risk",
+    summary="Everything your SERVIR sign-in has contributed to Global Risk, from any app",
+    openapi_extra={"x-grp-access": "protected"},
+)
+async def on_global_risk(
+    principal: SignedInMember, session: DatabaseSession, hub_code: str | None = None
+) -> dict[str, Any]:
+    _available()
+    planner_membership(principal, hub_code)
+    settings = get_settings()
+    limiter.check(
+        "sig_evidence_reads_per_minute",
+        str(principal.user_id),
+        settings.rate_limits["sig_evidence_reads_per_minute"],
+        60,
+    )
+    access_token = await sig_access_token(settings, principal.session_id)
+    if not access_token:
+        raise GrpError(
+            401, "SIG_REAUTH_REQUIRED", "Sign in with SERVIR again to check Global Risk."
+        )
+    try:
+        async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
+            result = await mcp.call_tool("contribute_status", {})
+    except (SigMcpError, httpx.HTTPError) as error:
+        if "renewed" in str(error):
+            raise GrpError(
+                401, "SIG_REAUTH_REQUIRED", "Sign in with SERVIR again to check Global Risk."
+            ) from error
+        raise GrpError(
+            503, "SIG_UNAVAILABLE", "Global Risk is not available right now."
+        ) from error
+    payload = tool_payload(result)
+    if result.is_error or str(payload.get("status") or "ok").lower() != "ok":
+        raise GrpError(
+            503,
+            "SIG_UNAVAILABLE",
+            str(payload.get("note") or "Global Risk could not list your contributions."),
+        )
+    records = [
+        record
+        for record in payload.get("contributions") or []
+        if isinstance(record, dict) and record.get("contribution_id")
+    ]
+    ids = {str(record["contribution_id"]) for record in records}
+    sent_here = {
+        str(row.contribution_id): row
+        for row in session.scalars(
+            select(SigContribution).where(
+                SigContribution.user_id == principal.user_id,
+                SigContribution.contribution_id.in_(ids),
+            )
+        )
+    } if ids else {}
+    return {
+        "checked_at": datetime.now(UTC).isoformat(),
+        "contributions": [_on_global_risk_view(record, sent_here) for record in records],
+    }
 
 
 def _own_hub_row(
@@ -490,7 +647,9 @@ async def refresh_contribution(
             "Only the person who sent this contribution can check it on Global Risk.",
         )
     unconfirmed = row.state == FAILED and row.error_code == "SUBMIT_UNCONFIRMED"
-    if row.state not in OPEN_STATES and not unconfirmed:
+    # An approved row is checked too: a Global Risk reviewer may have withdrawn it since, which
+    # is what frees its name to be sent again.
+    if row.state not in OPEN_STATES and row.state != APPROVED and not unconfirmed:
         return view(row, principal)
     access_token = await sig_access_token(get_settings(), principal.session_id)
     if not access_token:

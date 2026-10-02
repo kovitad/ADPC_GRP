@@ -7,9 +7,9 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Share data | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="/styles.css?v=20260928a" />
-    <link rel="stylesheet" href="/contribute.css?v=20260928a" />
+    <link rel="stylesheet" href="/contribute.css?v=20261001a" />
     <script src="/grp-common.js?v=20260928b" defer></script>
-    <script src="/contribute.js?v=20260928b" defer></script>
+    <script src="/contribute.js?v=20261001a" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -56,7 +56,7 @@
           </details>
           <label class="cb-agree">
             <input type="checkbox" data-agree />
-            <span data-agree-text>I understand this becomes available to every Global Risk user.</span>
+            <span data-agree-text>I understand Global Risk may make this available to every Global Risk user, and that I may not be able to take it back.</span>
           </label>
           <div class="cb-actions">
             <button class="button button--primary" type="button" data-send disabled>Send to Global Risk</button>
@@ -76,6 +76,53 @@
         <p class="cb-empty" data-empty hidden>Nothing has been shared from this Hub yet.</p>
         <ol class="cb-list" data-list></ol>
       </section>
+
+      <section class="admin-card cb-card" aria-labelledby="cb-gr-heading">
+        <div class="admin-card__heading">
+          <div>
+            <p class="eyebrow">Your SERVIR sign-in</p>
+            <h2 id="cb-gr-heading">On Global Risk now</h2>
+          </div>
+          <button class="button button--secondary button--compact" type="button" data-gr-reload>Check Global Risk</button>
+        </div>
+        <p class="cb-kind-help">
+          Everything your SERVIR account has contributed, from this page or from another app or
+          agent such as Claude Desktop. Global Risk records whose sign-in sent each one, not which
+          app, so GRP marks the ones sent from this page and labels the rest "Another app or agent".
+          A colleague's contributions are not listed here.
+        </p>
+        <p class="cb-item__meta" data-gr-checked></p>
+        <p class="cb-empty" data-gr-empty hidden></p>
+        <div class="table-scroll" data-gr-wrap hidden>
+          <table class="cb-table">
+            <thead>
+              <tr>
+                <th scope="col">Layer</th>
+                <th scope="col">Status</th>
+                <th scope="col">Used in answers</th>
+                <th scope="col">Points</th>
+                <th scope="col">Sent from</th>
+                <th scope="col">Review</th>
+                <th scope="col">Added</th>
+                <th scope="col">Contribution ID</th>
+              </tr>
+            </thead>
+            <tbody data-gr-rows></tbody>
+          </table>
+        </div>
+      </section>
     </main>
+    <dialog class="cb-dialog" data-duplicate aria-labelledby="cb-duplicate-heading">
+      <form method="dialog">
+        <h2 id="cb-duplicate-heading">This name is already on Global Risk</h2>
+        <p class="cb-dialog__name"><code data-duplicate-name></code></p>
+        <p data-duplicate-text></p>
+        <dl class="cb-facts" data-duplicate-facts hidden></dl>
+        <p class="cb-dialog__hint">The name is the key to a dataset on Global Risk. Nothing was sent.</p>
+        <div class="cb-actions">
+          <button class="button button--primary" type="submit">I understand</button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

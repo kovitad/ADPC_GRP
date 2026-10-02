@@ -27,7 +27,7 @@
       label: "Point layer",
       help: "A GeoJSON file of points (longitude, latitude), such as evacuation centres. Global Risk counts them against the flood layer beside hospitals and schools. GRP reads the file first and refuses it if it has contact fields (phone, fax, email).",
       fields: [
-        ["layer", { label: "Layer name", help: "Short snake_case name the risk pack counts under, e.g. evacuation_centres.", placeholder: "evacuation_centres" }],
+        ["layer", { label: "Layer name", help: "Short snake_case name the risk pack counts under, 3 to 40 characters, e.g. evacuation_centres.", placeholder: "evacuation_centres" }],
         ["url"], ["title"], ["description"], ["source"], ["license"], ["vintage"], ["countries"],
         ["name_field", { label: "Name field", optional: true, help: "The property holding each point's name, if any.", placeholder: "name" }],
         ["usage_notes"],
@@ -37,7 +37,7 @@
       label: "Raster",
       help: "A GeoTIFF in EPSG:4326. Hazard and vulnerability layers must already be classes 0-5 (0 = none). A population count grid stays as people per pixel and needs no legend.",
       fields: [
-        ["layer", { label: "Layer name", help: "Starts with hazard_, risk_, vulnerability_ or population_ (a count grid), e.g. hazard_flood_thailand_rp100.", placeholder: "vulnerability_vulnerable_people" }],
+        ["layer", { label: "Layer name", help: "Starts with hazard_, risk_, vulnerability_ or population_ (a count grid), 3 to 40 characters, e.g. hazard_flood_thailand_rp100.", placeholder: "vulnerability_vulnerable_people" }],
         ["url"], ["title"], ["description"], ["source"], ["license"], ["vintage"],
         ["legend", { label: "Legend", type: "map", help: "Class number to label. Not needed for population_ layers.", placeholder: "{\"1\": \"Very low\", \"2\": \"Low\", \"3\": \"Moderate\", \"4\": \"High\", \"5\": \"Very high\"}" }],
         ["declared", { label: "Declared contract", type: "map", help: "What the file is: dtype, valid_min, valid_max, and nodata if any. Global Risk checks the file against it.", placeholder: "{\"dtype\": \"uint8\", \"valid_min\": 0, \"valid_max\": 5, \"nodata\": 0}" }],
@@ -94,7 +94,7 @@
     failed: ["Not sent", "is-bad"],
   };
 
-  const state = { hubCode: null, kind: "vector", values: {}, checked: null, rows: [], timer: null };
+  const state = { hubCode: null, kind: "vector", values: {}, checked: null, rows: [], timer: null, servir: false };
 
   const kindButtons = () => {
     const box = $("[data-kinds]");
@@ -208,6 +208,23 @@
     banner.hidden = !text;
   };
 
+  // A layer or dataset name Global Risk already holds cannot be sent again (ADR-0032 amendment):
+  // contributions never overwrite. Say so in a dialog, never a browser alert.
+  const showDuplicate = (duplicate) => {
+    if (!duplicate) return;
+    const dialog = $("[data-duplicate]");
+    $("[data-duplicate-name]").textContent = duplicate.name;
+    $("[data-duplicate-text]").textContent = duplicate.message;
+    const facts = $("[data-duplicate-facts]");
+    facts.replaceChildren();
+    if (duplicate.state) facts.append(detail("State in GRP", duplicate.state));
+    if (duplicate.contribution_id) facts.append(detail("Global Risk ID", duplicate.contribution_id));
+    if (duplicate.submitted_at) facts.append(detail("Sent", GRP.formatTime(duplicate.submitted_at)));
+    facts.hidden = !facts.childNodes.length;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  };
+
   const check = async () => {
     const manifest = manifestFromForm();
     $("[data-confirm]").hidden = true;
@@ -216,6 +233,11 @@
       body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true },
     });
     renderFields(result.problems || {});
+    if (result.duplicate) {
+      showBanner(result.duplicate.message, "bad");
+      showDuplicate(result.duplicate);
+      return;
+    }
     if (Object.keys(result.problems || {}).length) {
       showBanner("Fix the marked fields, then check again.", "bad");
       return;
@@ -229,12 +251,13 @@
       return item;
     }));
     $("[data-manifest]").textContent = JSON.stringify(result.manifest, null, 2);
+    // Worded to stay true whether Global Risk auto-approves (as on 30 Sep 2026) or reviews first.
     $("[data-warning]").textContent = state.kind === "weights"
-      ? "This changes the flood risk levels every Global Risk user sees, everywhere. On the current Global Risk deployment it lands at once with no human review, and you cannot withdraw it after it is approved."
-      : "On the current Global Risk deployment a contribution lands at once for every Global Risk user, cited as \"auto-approved, no human reviewed this layer\". You cannot withdraw it after it is approved.";
+      ? "This changes the flood risk levels every Global Risk user sees, everywhere. Global Risk may apply it as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer."
+      : "Global Risk may publish this to every Global Risk user as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer.";
     $("[data-agree-text]").textContent = state.kind === "weights"
-      ? "I understand this changes risk levels for every Global Risk user."
-      : "I understand this becomes available to every Global Risk user.";
+      ? "I understand Global Risk may change risk levels for every Global Risk user, and that I may not be able to take it back."
+      : "I understand Global Risk may make this available to every Global Risk user, and that I may not be able to take it back.";
     $("[data-agree]").checked = false;
     $("[data-send]").disabled = true;
     $("[data-confirm]").hidden = false;
@@ -253,6 +276,10 @@
       if (!result.sent) {
         renderFields(result.problems || {});
         $("[data-confirm]").hidden = true;
+        if (result.duplicate) {
+          showBanner(result.duplicate.message, "bad");
+          showDuplicate(result.duplicate);
+        }
         return;
       }
       const row = result.contribution;
@@ -363,7 +390,7 @@
       const actions = document.createElement("div");
       actions.className = "cb-item__actions";
       const canRefresh = row.mine && (
-        ["submitting", "checking", "staged"].includes(row.status)
+        ["submitting", "checking", "staged", "approved"].includes(row.status)
         || row.error_code === "SUBMIT_UNCONFIRMED"
       );
       if (canRefresh) {
@@ -423,10 +450,76 @@
     }
   };
 
+  // Everything this SERVIR sign-in sent to Global Risk, from this page or any other app.
+  const cell = (text, className) => {
+    const td = document.createElement("td");
+    if (className) td.className = className;
+    td.textContent = text;
+    return td;
+  };
+
+  const loadGlobalRisk = async () => {
+    const button = $("[data-gr-reload]");
+    const empty = $("[data-gr-empty]");
+    button.disabled = true;
+    $("[data-gr-checked]").textContent = "Asking Global Risk…";
+    try {
+      const result = await GRP.request(`/api/v1/contributions/on-global-risk?hub_code=${encodeURIComponent(state.hubCode)}`);
+      const rows = result.contributions || [];
+      const body = $("[data-gr-rows]");
+      body.replaceChildren();
+      rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        const layer = document.createElement("td");
+        const name = document.createElement("code");
+        name.textContent = row.name || "(unnamed)";
+        layer.append(name);
+        if (row.is_test) {
+          const tag = document.createElement("span");
+          tag.className = "cb-tag is-test";
+          tag.textContent = "TEST";
+          tag.title = "A test copy: not for decisions";
+          layer.append(" ", tag);
+        }
+        if (row.title) {
+          const title = document.createElement("small");
+          title.textContent = row.title;
+          layer.append(title);
+        }
+        const [statusText, statusClass] = STATUS[row.status] || [row.status || "unknown", ""];
+        const status = document.createElement("td");
+        const pill = document.createElement("span");
+        pill.className = `cb-status ${statusClass}`;
+        pill.textContent = statusText;
+        status.append(pill);
+        tr.append(
+          layer,
+          status,
+          cell(row.live ? "Yes" : "No", row.live ? "is-live" : ""),
+          cell(row.features != null ? Number(row.features).toLocaleString() : "—"),
+          cell(row.sent_from === "grp" ? "This page (GRP)" : "Another app or agent"),
+          cell(row.auto_approved ? "Auto-approved, no human review" : (row.decision_note || "—")),
+          cell(row.created_at ? GRP.formatTime(row.created_at) : "—"),
+          cell(row.contribution_id || "—", "cb-mono"),
+        );
+        body.append(tr);
+      });
+      $("[data-gr-wrap]").hidden = rows.length === 0;
+      empty.hidden = rows.length > 0;
+      empty.textContent = "Your SERVIR account has not contributed anything to Global Risk yet.";
+      $("[data-gr-checked]").textContent = `Checked ${GRP.formatTime(result.checked_at)}. ${rows.length} contribution${rows.length === 1 ? "" : "s"}, ${rows.filter((row) => row.live).length} used in answers.`;
+    } catch (error) {
+      $("[data-gr-checked]").textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  };
+
   const checkServir = async () => {
     const pill = $("[data-servir]");
     try {
       const status = await GRP.request("/api/v1/planning/status");
+      state.servir = Boolean(status.sig_connected);
       if (status.sig_connected) {
         pill.textContent = "SERVIR signed in";
         pill.className = "status-pill";
@@ -460,6 +553,7 @@
     $("[data-confirm]").hidden = true;
   });
   $("[data-reload]").addEventListener("click", () => loadList().catch((error) => showBanner(error.message, "bad")));
+  $("[data-gr-reload]").addEventListener("click", () => loadGlobalRisk());
 
   GRP.bindSignOut();
   kindButtons();
@@ -476,6 +570,11 @@
       state.hubCode = membership.hub_code;
       $("[data-hub-name]").textContent = membership.hub_name;
       await Promise.all([checkServir(), loadList()]);
+      if (state.servir) {
+        await loadGlobalRisk();
+      } else {
+        $("[data-gr-checked]").textContent = "Sign in with SERVIR to see what your account has on Global Risk.";
+      }
     })
     .catch((error) => {
       if (error.status === 401 || error.status === 403) {

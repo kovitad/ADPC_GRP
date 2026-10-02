@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260928a" />
-    <link rel="stylesheet" href="/planning.css?v=20260928c" />
+    <link rel="stylesheet" href="/planning.css?v=20260929c" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20260928b" defer></script>
-    <script src="/planning.js?v=20260928h" defer></script>
+    <script src="/planning.js?v=20260929b" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -63,6 +63,21 @@
           <button class="pw-jump" type="button" data-jump hidden aria-label="Jump to the latest message">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
           </button>
+          <details class="pw-pick" data-layers hidden>
+            <summary><span data-layers-summary>Global Risk layers: all</span></summary>
+            <div class="pw-pick__panel">
+              <p class="pw-pick__help">
+                Choose what Global Risk should count for the selected area. Each name is exact:
+                it is the key to that dataset on Global Risk.
+              </p>
+              <div class="pw-pick__list" data-layers-list></div>
+              <p class="pw-pick__area" data-layers-area></p>
+              <div class="pw-pick__actions">
+                <button class="button button--primary button--compact" type="button" data-layers-write>Write the question</button>
+                <button class="button button--secondary button--compact" type="button" data-layers-clear>Clear</button>
+              </div>
+            </div>
+          </details>
           <div class="pw-composer__box">
             <textarea
               data-input
@@ -123,7 +138,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
           Layers
         </button>
-        <div class="pw-layers" data-layers hidden>
+        <div class="pw-pick" data-layers hidden>
           <label class="pw-scenario-label" for="area-level">Planning boundary level</label>
           <select id="area-level" data-area-level aria-label="Planning boundary level">
             <option value="district">District</option>

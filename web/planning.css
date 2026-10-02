@@ -1376,3 +1376,23 @@ a.pw-chip-button { display: inline-block; }
   /* Room for "Download summary" beside "New conversation" and the allowance on a phone. */
   .pw-chat__tools { flex-wrap: wrap; justify-content: flex-end; gap: 0.35rem; }
 }
+
+/* ADR-0034: the Global Risk layer picker above the message box. */
+.pw-pick { position: relative; display: block; width: 100%; box-sizing: border-box; margin: 0 0 0.45rem; border: 1px solid var(--pw-line); border-radius: 10px; background: var(--pw-surface); font-size: 0.8rem; }
+.pw-pick > summary { cursor: pointer; padding: 0.4rem 0.7rem; color: var(--pw-forest); font-weight: 600; list-style: none; }
+.pw-pick > summary::-webkit-details-marker { display: none; }
+.pw-pick > summary::after { content: " ▾"; color: var(--pw-muted); }
+.pw-pick[open] > summary::after { content: " ▴"; }
+.pw-pick.is-chosen > summary { background: #eaf4fa; border-radius: 10px; }
+/* Opens upward over the conversation, so the page layout never changes. */
+.pw-pick__panel { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 30; padding: 0.5rem 0.8rem 0.75rem; max-height: min(60vh, 520px); overflow-y: auto; background: var(--pw-surface); border: 1px solid var(--pw-line); border-radius: 12px; box-shadow: 0 12px 32px rgb(18 48 64 / 18%); }
+.pw-pick__help, .pw-pick__area { margin: 0.3rem 0; color: var(--pw-muted); line-height: 1.45; }
+.pw-pick__area { color: var(--pw-ink); font-weight: 600; }
+.pw-pick__group { margin: 0.6rem 0 0.2rem; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--pw-muted); }
+.pw-pick__item { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.3rem 0; cursor: pointer; }
+.pw-pick__item input { margin-top: 0.15rem; }
+.pw-pick__item code { font-size: 0.72rem; color: #1f4e79; overflow-wrap: anywhere; }
+.pw-pick__item small { display: block; color: var(--pw-muted); }
+.pw-pick__actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.pw-number-note { grid-column: 1 / -1; margin: 0 0 0.3rem; font-size: 0.78rem; color: var(--pw-muted); }
+.pw-number.is-missing strong { color: var(--pw-muted); }

@@ -55,6 +55,11 @@
     // SIG answers already obtained this session, keyed by place. A SIG lookup costs minutes, so
     // re-selecting a district offers the answer we already have instead of asking to run it again.
     sigAnswers: new Map(),
+    // ADR-0034: the Global Risk layers the planner chose, sent with every Global Risk question.
+    globalRiskLayers: [],
+    chosenLayers: new Set(),
+    maxChosenLayers: 12,
+    generatedQuestion: null,
     areaLevel: "district",
     centersVersion: null,
     methods: [],
@@ -511,6 +516,7 @@
   };
 
   const renderContext = () => {
+    if (state.globalRiskLayers.length) renderLayerSummary();
     const box = $("[data-context]");
     box.replaceChildren();
     if (state.selected) {
@@ -2732,6 +2738,14 @@
 
   // The figures the panel shows (exposed of total, never the unapproved risk fields) and the
   // citations behind them, for a spreadsheet.
+  // The counts to show for an evidence pack: only the chosen layers when some were chosen.
+  const chosenCounts = (evidence) => {
+    const counts = (evidence.stats && evidence.stats.counts) || {};
+    const chosen = evidence.selected_layers || [];
+    const entries = Object.entries(counts).filter(([name]) => !chosen.length || chosen.includes(name));
+    return { entries, missing: chosen.filter((name) => !(name in counts)) };
+  };
+
   const evidenceTable = (evidence) => {
     const rows = [
       ["Area", (evidence.area && evidence.area.sig_place) || evidence.place],
@@ -2742,7 +2756,7 @@
       [],
       ["Item", "Exposed", "Total", "Unit"],
     ];
-    Object.entries((evidence.stats && evidence.stats.counts) || {}).forEach(([name, value]) => {
+    chosenCounts(evidence).entries.forEach(([name, value]) => {
       if (!value || typeof value !== "object") return;
       if (typeof value.exposed === "number") rows.push([name, value.exposed, value.total ?? "", "count"]);
       else if (typeof value.exposed_km === "number") rows.push([name, value.exposed_km, value.total_km ?? "", "km"]);
@@ -2935,7 +2949,24 @@
 
     const numbers = $("[data-ev-numbers]");
     numbers.replaceChildren();
-    Object.entries((evidence.stats && evidence.stats.counts) || {}).forEach(([name, value]) => {
+    const chosen = evidence.selected_layers || [];
+    if (chosen.length) {
+      const note = document.createElement("p");
+      note.className = "pw-number-note";
+      note.textContent = `Layers chosen for this question: ${chosen.join(", ")}. Only these are shown; Global Risk may hold others for this area.`;
+      numbers.append(note);
+    }
+    chosenCounts(evidence).missing.forEach((name) => {
+      const tile = document.createElement("div");
+      tile.className = "pw-number is-missing";
+      const strong = document.createElement("strong");
+      const span = document.createElement("span");
+      strong.textContent = "No count";
+      span.textContent = `${name.replaceAll("_", " ")}: Global Risk returned no count in this area`;
+      tile.append(strong, span);
+      numbers.append(tile);
+    });
+    chosenCounts(evidence).entries.forEach(([name, value]) => {
       const tile = document.createElement("div");
       tile.className = "pw-number";
       const strong = document.createElement("strong");
@@ -3416,6 +3447,7 @@
         refresh,
         echo,
         history: state.history.slice(-8),
+        layers: [...state.chosenLayers].sort(),
       }, { message, publish });
       const payload = await waitForLookup(jobId);
       GRP.jobs.done(jobId);
@@ -3708,7 +3740,133 @@
   });
   $("[data-composer]").addEventListener("submit", (event) => {
     event.preventDefault();
+    const generated = state.generatedQuestion;
+    // A question written by the layer picker already names its area; send it as confirmed.
+    if (generated && input.value.trim() === generated.text) {
+      send(generated.text, { confirmedPlace: generated.place });
+      state.generatedQuestion = null;
+      return;
+    }
     send();
+  });
+
+  // ---------- Global Risk layer picker (ADR-0034) ----------
+  const layerLabel = (name) =>
+    (state.globalRiskLayers.find((item) => item.name === name) || {}).label || name;
+
+  const parentDistrict = (boundary) => state.boundaries.find((item) =>
+    item.admin_level === "district" && item.admin_code === String(boundary.admin_code || "").slice(0, 4));
+
+  // The area Global Risk will really count: it resolves districts, so a sub-district is asked as
+  // the district that contains it (api/planning.py _sig_context_boundary).
+  const layerArea = () => {
+    const selected = state.selected;
+    if (!selected) return null;
+    const province = selected.province_name ? `, ${selected.province_name}` : "";
+    if (selected.admin_level === "subdistrict") {
+      const parent = parentDistrict(selected);
+      const district = parent ? `${parent.name} District${province}` : `the district containing ${selected.name}`;
+      return {
+        text: `${district} (Global Risk counts the whole district that contains ${selected.name} Sub-district)`,
+        note: `Global Risk counts whole districts, so this asks about ${parent ? `${parent.name} District` : "the district"}, which contains ${selected.name} Sub-district.`,
+      };
+    }
+    return { text: `${selected.name} District${province}`, note: `For ${selected.name} District${province}.` };
+  };
+
+  const renderLayerSummary = () => {
+    const count = state.chosenLayers.size;
+    $("[data-layers-summary]").textContent = count
+      ? `Global Risk layers: ${count} chosen`
+      : "Global Risk layers: all (choose…)";
+    $("[data-layers]").classList.toggle("is-chosen", count > 0);
+    const area = layerArea();
+    $("[data-layers-area]").textContent = area ? area.note : "Select a district or sub-district on the map first.";
+    $("[data-layers-write]").disabled = !count || !area;
+    document.querySelectorAll("[data-layers-list] input").forEach((box) => {
+      box.disabled = !box.checked && count >= state.maxChosenLayers;
+    });
+  };
+
+  const renderLayerPicker = () => {
+    const list = $("[data-layers-list]");
+    list.replaceChildren();
+    const groups = [
+      ["global_risk", "Global Risk, from OpenStreetMap"],
+      ["contributed", "Contributed layers"],
+    ];
+    groups.forEach(([group, title]) => {
+      const items = state.globalRiskLayers.filter((item) => item.group === group);
+      if (!items.length) return;
+      const heading = document.createElement("p");
+      heading.className = "pw-pick__group";
+      heading.textContent = title;
+      list.append(heading);
+      items.forEach((item) => {
+        const row = document.createElement("label");
+        row.className = "pw-pick__item";
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = item.name;
+        box.checked = state.chosenLayers.has(item.name);
+        box.addEventListener("change", () => {
+          if (box.checked) state.chosenLayers.add(item.name);
+          else state.chosenLayers.delete(item.name);
+          renderLayerSummary();
+        });
+        const text = document.createElement("span");
+        const name = document.createElement("strong");
+        name.textContent = item.label;
+        const code = document.createElement("code");
+        code.textContent = item.name;
+        const note = document.createElement("small");
+        note.textContent = item.grp_origin ? `${item.note} · GRP's own data` : item.note;
+        text.append(name, " ", code, note);
+        row.append(box, text);
+        list.append(row);
+      });
+    });
+    renderLayerSummary();
+  };
+
+  const loadLayerPicker = async () => {
+    if (!state.chatAvailable || !state.hubCode) return;
+    try {
+      const result = await GRP.request(
+        `/api/v1/planning/global-risk-layers?hub_code=${encodeURIComponent(state.hubCode)}`,
+      );
+      state.globalRiskLayers = result.layers || [];
+      state.maxChosenLayers = result.max_chosen || 12;
+      // A layer no longer offered cannot stay chosen: the server would refuse the question.
+      const offered = new Set(state.globalRiskLayers.map((item) => item.name));
+      state.chosenLayers = new Set([...state.chosenLayers].filter((name) => offered.has(name)));
+      $("[data-layers]").hidden = !state.globalRiskLayers.length;
+      renderLayerPicker();
+    } catch {
+      $("[data-layers]").hidden = true;
+    }
+  };
+
+  $("[data-layers-write]").addEventListener("click", () => {
+    const area = layerArea();
+    if (!area || !state.chosenLayers.size) return;
+    const names = [...state.chosenLayers].sort();
+    const layers = names.map((name) => `${layerLabel(name)} (${name})`).join("; ");
+    const text =
+      `Get Global Risk evidence for ${area.text}: how many of each of these layers are in the ` +
+      `100-year flood hazard, by severity? Layers: ${layers}. Use exactly these layers, name each ` +
+      "one as written, and say plainly if Global Risk returned no count for one.";
+    state.generatedQuestion = { text, place: state.selected ? state.selected.name : null };
+    input.value = text;
+    autosize();
+    updateSend();
+    $("[data-layers]").open = false;
+    input.focus();
+  });
+
+  $("[data-layers-clear]").addEventListener("click", () => {
+    state.chosenLayers.clear();
+    renderLayerPicker();
   });
 
   // ---------- search ----------
@@ -4217,6 +4375,7 @@
         banner.hidden = false;
       } else {
         showSigConnectionNotice(planning);
+        loadLayerPicker();
       }
       state.boundaries = areas.boundaries;
       state.floodLayers = layers.flood;

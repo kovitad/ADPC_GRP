@@ -103,12 +103,16 @@ MATRIX = {
     # rules where it is.
     "list_contributions": (401, 404, 404, 404, 404),
     "check_contribution": (401, 404, 404, 404, 404),
+    "on_global_risk": (401, 404, 404, 404, 404),
     # ADR-0033: the district summary downloads need a planning role; an unknown district is not
     # found, and a Platform Admin with no planning membership is refused first.
     "summary_docx": (401, 404, 404, 404, 403),
     "summary_centres_csv": (401, 404, 404, 404, 403),
     "read_contribution": (401, 404, 404, 404, 404),
     "refresh_contribution": (401, 404, 404, 404, 404),
+    # ADR-0034: the Planning layer picker follows the planning conversation: every planning role
+    # reads its own Hub's list, a Platform Admin with no planning membership has none.
+    "global_risk_layers": (401, 200, 200, 200, 403),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -170,10 +174,12 @@ MATRIX_OPERATION_IDS = {
     "summary_centres_csv": "summary_centres_csv_api_v1_planning_summary_centres_csv_get",
     "list_contributions": "list_contributions_api_v1_contributions_get",
     "check_contribution": "create_contribution_api_v1_contributions_post",
+    "on_global_risk": "on_global_risk_api_v1_contributions_on_global_risk_get",
     "read_contribution": "read_contribution_api_v1_contributions__contribution_id__get",
     "refresh_contribution": (
         "refresh_contribution_api_v1_contributions__contribution_id__refresh_post"
     ),
+    "global_risk_layers": "global_risk_layers_api_v1_planning_global_risk_layers_get",
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
@@ -470,7 +476,9 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             {"hub_code": "adpc", "kind": "vector", "manifest": {}, "preview": True},
         ),
         "read_contribution": ("GET", f"/api/v1/contributions/{user_id}", None),
+        "on_global_risk": ("GET", "/api/v1/contributions/on-global-risk", None),
         "refresh_contribution": ("POST", f"/api/v1/contributions/{user_id}/refresh", None),
+        "global_risk_layers": ("GET", "/api/v1/planning/global-risk-layers", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)

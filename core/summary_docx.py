@@ -272,13 +272,25 @@ def render_summary(facts: dict[str, Any]) -> bytes:
             _note(document, f"Question: {evidence['question']}")
         if evidence.get("source_note"):
             _warn(document, evidence["source_note"])
+        if evidence.get("hazard") or evidence.get("area_km2") is not None:
+            counted = [f"flood layer {evidence['hazard']}"] if evidence.get("hazard") else []
+            if evidence.get("area_km2") is not None:
+                counted.append(f"district polygon {evidence['area_km2']:,} km²")
+            _note(document, f"Global Risk counted with its own {' and '.join(counted)}. GRP "
+                            "uses the DOPA boundary and its own flood tiles, so the two sets of "
+                            "counts can differ for that reason alone.")
+        if evidence.get("selected_layers"):
+            _note(document, "Layers chosen for this question: "
+                            f"{', '.join(evidence['selected_layers'])}. Only these are listed "
+                            "below; Global Risk may hold others for this district.")
         if evidence.get("stats"):
             document.add_heading("What Global Risk adds for this district", level=2)
-            _para(document, "GRP's own data covers evacuation centres. Global Risk also counts "
-                            "schools, hospitals, buildings and roads inside its 100-year flood "
-                            "hazard layer. \"In flood hazard\" means flood hazard class 1 or "
-                            "higher (1 = up to 0.5 m, 5 = over 2 m); it is not a report of "
-                            "current flooding.", size=9.5)
+            _para(document, "Global Risk counts schools, hospitals, buildings and roads inside "
+                            "its 100-year flood hazard layer. Rows marked as GRP's own data are "
+                            "GRP's datasets counted again by Global Risk, not an independent "
+                            "check. \"In flood hazard\" means flood hazard class 1 or higher "
+                            "(1 = up to 0.5 m, 5 = over 2 m); it is not a report of current "
+                            "flooding.", size=9.5)
             _table(document, ["Item", "In flood hazard", "Total", "Unit", "By depth class",
                               "What it means"], evidence["stats"])
             if all(row[1] == 0 for row in evidence["stats"]):

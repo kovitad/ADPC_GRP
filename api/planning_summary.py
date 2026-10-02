@@ -26,12 +26,15 @@ from api.assessments import LIMITS, assessment_result
 from api.catalog import area_profile
 from api.dependencies import DatabaseSession
 from api.errors import GrpError, not_found
+from api.global_risk_layers import GRP_ORIGIN_LAYERS, OTHER_LABELS, STANDARD_LAYERS
+from api.global_risk_layers import label as layer_label
 from api.maps import CentreIndicatorRequest, centre_indicator_values, dataset_features, map_layers
 from api.permissions import SignedInMember
 from api.planning import _canonical_sig_place
 from api.planning_access import planner_membership
 from api.sessions import CurrentPrincipal
 from core.assessment_models import AssessmentFeature, Boundary, Feature
+from core.contribution_models import APPROVED, SigContribution
 from core.planning_memory_models import PlanningChatMessage
 from core.summary_docx import STATUS_LABELS, render_summary
 
@@ -172,40 +175,38 @@ def _centres(
     }
 
 
-# Global Risk's layer names, as a planner would say them. An unknown layer keeps its own name.
-GLOBAL_RISK_ITEMS = {
-    "schools": "Schools",
-    "hospitals": "Hospitals",
-    "buildings": "Buildings",
-    "roads": "Roads",
-    "health_facilities": "Health facilities",
-}
-
-
-def _item_label(name: str) -> tuple[str, str]:
+def _item_label(name: str, grp_layers: frozenset[str] = frozenset()) -> tuple[str, str]:
     """The planner's name for a Global Risk layer, and what it means for them."""
 
-    if "evacuation_centre" in name or "evacuation_center" in name:
-        # ADPC uploaded GRP's own centre table to Global Risk as a test (ADR-0032). Its count is
-        # GRP's data echoed back, not a second opinion.
-        return ("Evacuation centres", "GRP's own centre data sent to Global Risk as a test "
-                "upload; not an independent check")
-    return GLOBAL_RISK_ITEMS.get(name, name.replace("_", " ").capitalize()), (
-        "Not in GRP's data; Global Risk adds it")
+    if name in GRP_ORIGIN_LAYERS or name in grp_layers:
+        # GRP's data echoed back by another engine: a second count, not a second opinion. The
+        # layer name is kept so two uploads of the same data show as two rows, not one.
+        return f"{layer_label(name)} ({name})", ("GRP's own data, counted again by Global Risk; "
+                                                 "not an independent check")
+    if name in STANDARD_LAYERS or name in OTHER_LABELS:
+        return layer_label(name), "Not in GRP's data; Global Risk adds it"
+    return f"{layer_label(name)} ({name})", (
+        "Not in GRP's data; a layer contributed to Global Risk, see its source in the citations")
 
 
-def global_risk_stats(evidence: dict[str, Any]) -> list[list[Any]]:
+def global_risk_stats(
+    evidence: dict[str, Any], grp_layers: frozenset[str] = frozenset()
+) -> list[list[Any]]:
     """Rows of what Global Risk counted in its flood hazard layer for this district.
 
     Hazard exposure only: Global Risk's risk levels (`at_risk`, `by_risk`) stay out (ADR-0014).
+    A count in a shape GRP does not know yet keeps a row pointing to the brief, never vanishes.
+    When the planner chose layers for the question (ADR-0034), only those are shown, and a chosen
+    layer Global Risk returned no count for says so.
     """
 
     counts = (evidence.get("stats") or {}).get("counts") or {}
+    chosen = [str(name) for name in evidence.get("selected_layers") or []]
     rows = []
     for name, value in counts.items():
-        if not isinstance(value, dict):
+        if not isinstance(value, dict) or (chosen and name not in chosen):
             continue
-        label, note = _item_label(str(name))
+        label, note = _item_label(str(name), grp_layers)
         if isinstance(value.get("exposed"), int | float):
             severity = value.get("by_severity") or {}
             classes = ", ".join(
@@ -216,6 +217,14 @@ def global_risk_stats(evidence: dict[str, Any]) -> list[list[Any]]:
                          classes or "none", note])
         elif isinstance(value.get("exposed_km"), int | float):
             rows.append([label, value["exposed_km"], value.get("total_km"), "km", "-", note])
+        else:
+            rows.append([label, "-", "-", "-", "-", f"{note}. GRP cannot tabulate this count "
+                         "yet; read it in the brief below"])
+    for name in chosen:
+        if name not in counts:
+            label, _ = _item_label(name, grp_layers)
+            rows.append([label, "-", "-", "-", "-", "Chosen for this question, but Global Risk "
+                         "returned no count for this layer in this district"])
     return rows
 
 
@@ -246,13 +255,22 @@ def _global_risk(session, principal: CurrentPrincipal, hub_id: UUID,
         .order_by(PlanningChatMessage.created_at.desc())
         .limit(60)
     ).all()
+    grp_layers = frozenset(session.scalars(
+        select(SigContribution.name).where(
+            SigContribution.hub_id == hub_id,
+            SigContribution.state == APPROVED,
+            SigContribution.name != "",
+        )
+    ).all())
     for message in messages:
         payload = message.payload or {}
         evidence = payload.get("evidence") or {}
         area = evidence.get("area") or {}
         if str(area.get("requested") or "").casefold() not in wanted:
             continue
-        stats = global_risk_stats(evidence)
+        stats = global_risk_stats(evidence, grp_layers)
+        pack_stats = evidence.get("stats") or {}
+        area_km2 = (pack_stats.get("aoi") or {}).get("area_km2")
         receipt = evidence.get("receipt") or payload.get("receipt") or {}
         if receipt.get("receipt_id"):
             status = f"passed Global Risk's source check, receipt {receipt['receipt_id']}"
@@ -269,6 +287,11 @@ def _global_risk(session, principal: CurrentPrincipal, hub_id: UUID,
             "question": message.question or evidence.get("question"),
             "brief": payload.get("answer") or message.text,
             "stats": stats,
+            # Global Risk's own flood layer and district polygon, so a planner can see why its
+            # counts may differ from GRP's (DOPA polygon, GRP's flood tiles).
+            "hazard": str(pack_stats.get("hazard") or ""),
+            "selected_layers": [str(n) for n in evidence.get("selected_layers") or []],
+            "area_km2": area_km2 if isinstance(area_km2, int | float) else None,
             "source_note": (
                 "No source was pulled live in this run; computed exposure is not a report of "
                 "current flooding." if summary.get("pulled_live") == 0 else None

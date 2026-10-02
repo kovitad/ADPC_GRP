@@ -98,6 +98,25 @@ def test_every_required_field_is_named_before_anything_is_sent() -> None:
     assert "https" in checked.problems["url"]
 
 
+@pytest.mark.parametrize(
+    ("layer", "refused"),
+    [
+        ("abc", False),
+        ("a" * 40, False),
+        ("early_warning_towers_ddpm_test_kj", False),
+        ("ab", True),
+        # The real decline of 30 Sep 2026: 43 characters.
+        ("early_warning_towers_ddpm_test_yourinitials", True),
+    ],
+)
+def test_a_layer_name_longer_than_global_risk_accepts_is_refused_before_sending(
+    layer: str, refused: bool
+) -> None:
+    checked = check_manifest("vector", {"layer": layer})
+
+    assert ("3 to 40 characters" in checked.problems.get("layer", "")) is refused
+
+
 def test_a_population_grid_needs_no_legend() -> None:
     checked = check_manifest(
         "raster",
@@ -406,3 +425,246 @@ def test_a_hub_you_do_not_plan_for_cannot_be_sent_for(world) -> None:
     )
 
     assert response.status_code == 404
+
+
+# --- a name is the key: never sent twice ------------------------------------------------
+
+
+def _hub_id(world: dict, code: str):
+    from core.access_models import Hub
+
+    with Session(world["engine"]) as session:
+        return session.scalar(select(Hub.id).where(Hub.code == code))
+
+
+def _existing(world: dict, *, hub: str = "adpc", state: str = "approved", kind: str = "vector",
+              name: str = "evacuation_centres", error_code: str | None = None) -> None:
+    with Session(world["engine"]) as session:
+        session.add(SigContribution(
+            hub_id=_hub_id(world, hub), user_id=world["users"]["planner@example.test"],
+            kind=kind, name=name, title="Earlier", manifest={"layer": name}, state=state,
+            contribution_id="c0ffee00000000aa", error_code=error_code,
+        ))
+        session.commit()
+
+
+def test_a_name_this_hub_already_sent_is_refused_with_the_way_to_replace_it(world) -> None:
+    _existing(world)
+    client = _client(world, "planner@example.test")
+
+    preview = _send(client, VECTOR, preview=True).json()
+    confirmed = _send(client, VECTOR).json()
+
+    for body in (preview, confirmed):
+        assert body["sent"] is False
+        assert "Already sent" in body["problems"]["layer"]
+        duplicate = body["duplicate"]
+        assert duplicate["source"] == "this_hub" and duplicate["state"] == "approved"
+        assert duplicate["contribution_id"] == "c0ffee00000000aa"
+        assert "cannot update" in duplicate["message"]
+        assert "never overwrite" in duplicate["message"]
+        assert "under a new name" in duplicate["message"]
+    # Nothing went to Global Risk and no second row was written.
+    assert FakeMcp.calls == [] and len(_rows(world)) == 1
+
+
+def test_another_hubs_name_is_refused_without_its_details(world) -> None:
+    _existing(world, hub="other")
+
+    duplicate = _send(_client(world, "planner@example.test"), VECTOR, preview=True).json()[
+        "duplicate"]
+
+    assert duplicate["source"] == "another_hub"
+    assert duplicate["contribution_id"] is None and duplicate["state"] is None
+    assert "another Hub" in duplicate["message"]
+
+
+@pytest.mark.parametrize("state", ["declined", "rejected", "withdrawn"])
+def test_a_name_that_never_landed_or_was_removed_is_free(world, state: str) -> None:
+    _existing(world, state=state)
+
+    body = _send(_client(world, "planner@example.test"), VECTOR, preview=True).json()
+
+    assert body["duplicate"] is None and body["problems"] == {}
+
+
+def test_an_unconfirmed_submit_holds_its_name_until_checked(world) -> None:
+    _existing(world, state="failed", error_code="SUBMIT_UNCONFIRMED")
+
+    body = _send(_client(world, "planner@example.test"), VECTOR, preview=True).json()
+
+    assert body["duplicate"]["state"] == "failed"
+
+
+def test_a_raster_cannot_reuse_a_point_layers_name_but_weights_can_be_resent(world) -> None:
+    _existing(world, name="population_th_grid")
+    _existing(world, kind="weights", name="flood")
+    raster = {
+        "layer": "population_th_grid", "url": DIRECT, "title": "Population",
+        "description": "Counts.", "source": "ADPC", "license": "unstated", "vintage": "2026-09",
+        "declared": {"dtype": "float32", "valid_min": 0, "valid_max": 1000},
+    }
+    weights = {"hazard": "flood", "weights": {"vulnerability_a": 0.5, "vulnerability_b": 0.5},
+               "rationale": "Adjusting the flood weights again."}
+    client = _client(world, "planner@example.test")
+
+    assert _send(client, raster, kind="raster", preview=True).json()["duplicate"] is not None
+    assert _send(client, weights, kind="weights", preview=True).json()["duplicate"] is None
+
+
+def test_a_layer_counted_in_global_risk_evidence_is_taken(world) -> None:
+    # A layer sent from Claude Desktop reaches GRP only as a count in someone's evidence.
+    from core.planning_memory_models import PlanningChatMessage
+
+    with Session(world["engine"]) as session:
+        session.add(PlanningChatMessage(
+            user_id=world["users"]["outsider@example.test"], hub_id=_hub_id(world, "other"),
+            role="assistant", kind="evidence", text="",
+            payload={"evidence": {"stats": {"counts": {
+                "evacuation_centres": {"exposed": 1, "total": 2}}}}},
+        ))
+        session.commit()
+
+    duplicate = _send(_client(world, "planner@example.test"), VECTOR, preview=True).json()[
+        "duplicate"]
+
+    assert duplicate["source"] == "global_risk_evidence" and duplicate["seen_at"]
+    assert "counted in Global Risk evidence" in duplicate["message"]
+
+
+def test_checking_an_approved_row_frees_its_name_once_global_risk_withdrew_it(world) -> None:
+    client = _client(world, "planner@example.test")
+    row_id = _send(client, VECTOR).json()["contribution"]["id"]
+    assert _send(client, VECTOR, preview=True).json()["duplicate"] is not None
+
+    FakeMcp.status = {"status": "ok", "contribution_id": "c0ffee0000000001",
+                      "kind": "vector", "status_detail": "withdrawn by a reviewer"}
+    FakeMcp.status["status"] = "withdrawn"
+    refreshed = client.post(f"/api/v1/contributions/{row_id}/refresh").json()
+
+    assert refreshed["status"] == "withdrawn"
+    assert _send(client, VECTOR, preview=True).json()["duplicate"] is None
+
+
+def test_a_removed_layer_stops_counting_once_evidence_for_its_place_is_gathered_again(
+    world,
+) -> None:
+    from datetime import timedelta
+
+    from core.planning_memory_models import PlanningChatMessage
+
+    now = datetime.now(UTC)
+    with Session(world["engine"]) as session:
+        for counts, when in (
+            ({"evacuation_centres": {"exposed": 1, "total": 2}}, now - timedelta(hours=2)),
+            ({"schools": {"exposed": 1, "total": 2}}, now - timedelta(hours=1)),
+        ):
+            session.add(PlanningChatMessage(
+                user_id=world["users"]["planner@example.test"], hub_id=_hub_id(world, "adpc"),
+                role="assistant", kind="evidence", text="", created_at=when,
+                payload={"evidence": {"area": {"requested": "Samko District, Ang Thong"},
+                                      "stats": {"counts": counts}}},
+            ))
+        session.commit()
+
+    body = _send(_client(world, "planner@example.test"), VECTOR, preview=True).json()
+
+    assert body["duplicate"] is None
+
+
+# --- everything the person's SERVIR sign-in sent, from any app -----------------------------
+
+
+def _status_record(contribution_id: str, layer: str, title: str, features: int) -> dict:
+    """The shape contribute_status returned on 1 Oct 2026, server paths included."""
+
+    return {
+        "contribution_id": contribution_id,
+        "kind": "vector",
+        "status": "approved",
+        "title": f"{title} ({layer})",
+        "contributor_label": "user_01SERVIRACCOUNT",
+        "created_at": "2026-09-30T08:14:54.375968+00:00",
+        "updated_at": "2026-09-30T08:14:54.408800+00:00",
+        "preview": {
+            "layer": layer,
+            "observed": {"features": features, "bbox": [97.6, 5.8, 105.6, 20.4]},
+            "staged_file": f"/opt/grp/cache/vectors/staged-{contribution_id}.geojson",
+            "entry": {
+                "local_path": f"vectors/staged-{contribution_id}.geojson",
+                "title": title,
+                "license": "unstated",
+                "vintage": "2026-09",
+                "usage_notes": "TEST copy. Do not use it for decisions.",
+                "staged_by": "user_01SERVIRACCOUNT",
+            },
+        },
+        "landing": {
+            "layer": layer,
+            "file": f"/opt/grp/cache/vectors/{layer}.geojson",
+            "features": features,
+        },
+        "decision_note": "auto-approved: this deployment lands contributions without review",
+        "reviewer_label": "auto-approve (GRP_AUTO_APPROVE on — no human reviewed this)",
+    }
+
+
+def test_every_contribution_of_my_sign_in_is_listed_and_marked_by_where_it_was_sent(world) -> None:
+    client = _client(world, "planner@example.test")
+    _send(client, VECTOR)  # GRP sends it; Global Risk answers c0ffee0000000001
+    FakeMcp.calls = []
+    FakeMcp.status = {
+        "status": "ok",
+        "contributions": [
+            _status_record("212436d83e490738", "early_warning_towers_test_kovitad",
+                           "Early-warning towers (TEST)", 1533),
+            _status_record("c0ffee0000000001", "evacuation_centres",
+                           "Evacuation centres, Thailand (DDPM)", 1),
+        ],
+    }
+
+    body = client.get("/api/v1/contributions/on-global-risk?hub_code=adpc").json()
+
+    assert FakeMcp.calls == [("contribute_status", {})]
+    desktop, here = body["contributions"]
+    assert desktop["name"] == "early_warning_towers_test_kovitad"
+    assert desktop["title"] == "Early-warning towers (TEST)"
+    assert desktop["sent_from"] == "outside_grp" and desktop["grp_row_id"] is None
+    assert desktop["is_test"] is True and desktop["live"] is True
+    assert desktop["features"] == 1533 and desktop["auto_approved"] is True
+    assert here["sent_from"] == "grp" and here["grp_row_id"]
+    assert here["is_test"] is False
+    # Global Risk's server paths and the SERVIR account label never reach the browser.
+    text = json.dumps(body)
+    assert "/opt/grp" not in text and "staged-" not in text and "user_01" not in text
+
+
+def test_a_row_another_person_sent_from_grp_is_not_marked_as_mine(world) -> None:
+    _send(_client(world, "colleague@example.test"), VECTOR)
+    FakeMcp.status = {
+        "status": "ok",
+        "contributions": [_status_record("c0ffee0000000001", "evacuation_centres", "E", 1)],
+    }
+
+    body = _client(world, "planner@example.test").get(
+        "/api/v1/contributions/on-global-risk"
+    ).json()
+
+    assert body["contributions"][0]["sent_from"] == "outside_grp"
+
+
+def test_listing_global_risk_needs_a_servir_sign_in_and_says_when_it_is_down(world, monkeypatch):
+    signed_out = _client(world, "planner@example.test", sig_token=False).get(
+        "/api/v1/contributions/on-global-risk"
+    )
+
+    class DownMcp(FakeMcp):
+        async def __aenter__(self):
+            raise SigMcpError("SIG MCP is unavailable")
+
+    monkeypatch.setattr(api.contributions, "SigMcpClient", DownMcp)
+    down = _client(world, "planner@example.test").get("/api/v1/contributions/on-global-risk")
+
+    assert signed_out.status_code == 401
+    assert signed_out.json()["error"]["code"] == "SIG_REAUTH_REQUIRED"
+    assert down.status_code == 503 and down.json()["error"]["code"] == "SIG_UNAVAILABLE"

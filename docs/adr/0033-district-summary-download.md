@@ -71,6 +71,13 @@ chat shows.
    evacuation-centre row is marked as GRP's own test upload echoed back, not an independent check.
    Each Global Risk answer in the chat now says whether it went into the selected district's
    summary, and offers to select the right district when it did not.
+10. **Amended 29 September 2026 (later):** a row is marked "GRP's own data, counted again by Global
+    Risk" when its layer name is in `GRP_ORIGIN_LAYERS` or in the Hub's approved
+    `sig_contribution` names. The match is exact, not a substring of "evacuation". The explicit
+    list is needed because a contribution made from Claude Desktop never reaches GRP's own
+    records. Such rows keep the layer name, so two uploads of the same data show as two rows. A
+    count in a shape GRP does not know keeps a row that points to the brief. The section names
+    Global Risk's flood layer and polygon area, because both differ from GRP's.
 
 ## Consequences
 
@@ -86,7 +93,8 @@ chat shows.
   Thai font slot, one picture, and no risk or contact fields. A non-PNG picture is refused. The CSV
   has a BOM and neutralises formulas.
 - `tests/fast/test_planning_summary.py`: a newer Bang Phli evidence record is not used for Bang
-  Kapi, and risk fields are left out.
+  Kapi, and risk fields are left out. GRP's layers counted back are never called Global Risk
+  additions, an unknown count shape keeps its row, and the .docx names the flood layer and polygon.
 - The permission matrix lists both routes.
 - On the desktop stack, generated from the real database: Mueang Amnat Charoen (Thai centre names,
   sensitivity, population, the planner's Global Risk evidence) and Bang Kapi (no centres, no

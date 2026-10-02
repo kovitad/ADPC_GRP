@@ -24,6 +24,8 @@ from api.ai_gateway import run_ai_call
 from api.assessments import AssessmentSubmit, create_assessment, explain_stored_result
 from api.dependencies import DatabaseSession
 from api.errors import GrpError, not_found
+from api.global_risk_layers import MAX_CHOSEN
+from api.global_risk_layers import catalog as layer_catalog
 from api.langfuse import send_ai_call
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
@@ -78,7 +80,8 @@ ROUTER_VERSION = "planning-router-v3"
 # v2 asked the brief to open with a direct answer; v3 also carries the conversation so far. Bumped
 # on each change because llm_usage records the prompt version, and two prompts must not share one.
 # v4 names the evidence service "Global Risk" instead of "SIG".
-DRAFT_VERSION = "planning-draft-v4"
+# v5 reports only the layers the planner chose, when they chose any (ADR-0034).
+DRAFT_VERSION = "planning-draft-v5"
 RESULT_EXPLANATION_PATTERN = re.compile(
     r"\b(explain (?:the )?(?:result|map)|which (?:evacuation )?centers?.*"
     r"(?:exposed|assess)|what (?:the )?map shows)\b",
@@ -146,6 +149,14 @@ DRAFT_INSTRUCTIONS = (
 )
 
 
+CHOSEN_LAYERS_INSTRUCTION = (
+    " chosen_layers lists the Global Risk layers the planner chose for this question, by their "
+    "exact names. Report counts for those layers only, naming each layer exactly as written. For "
+    "a chosen layer no citation counts, say plainly that Global Risk returned no count for it in "
+    "this area; never estimate one. Do not report other layers the evidence happens to contain."
+)
+
+
 GRP_EVIDENCE_INSTRUCTION = (
     " Some citations are marked with the source \"GRP data library\". Those are this platform's "
     "own imported records, not Global Risk's: attribute them to the GRP data library and repeat "
@@ -153,7 +164,9 @@ GRP_EVIDENCE_INSTRUCTION = (
 )
 
 
-def _draft_instructions(recipe: RiskRecipe | None, *, local_evidence: bool = False) -> str:
+def _draft_instructions(
+    recipe: RiskRecipe | None, *, local_evidence: bool = False, chosen_layers: bool = False
+) -> str:
     if recipe is None:
         instructions = DRAFT_INSTRUCTIONS + (
             " MVP 1 has no approved vulnerability-weighted risk recipe: do not repeat risk "
@@ -166,7 +179,11 @@ def _draft_instructions(recipe: RiskRecipe | None, *, local_evidence: bool = Fal
             "exactly when cited. Identify it as Global Risk screening under the approved recipe "
             "version supplied in the prompt; do not recompute or reinterpret a risk class."
         )
-    return instructions + (GRP_EVIDENCE_INSTRUCTION if local_evidence else "")
+    return (
+        instructions
+        + (GRP_EVIDENCE_INSTRUCTION if local_evidence else "")
+        + (CHOSEN_LAYERS_INSTRUCTION if chosen_layers else "")
+    )
 
 
 def _evidence_label(recipe: dict[str, object] | None) -> str:
@@ -196,6 +213,30 @@ class PlanningChat(BaseModel):
     # False when the browser re-sends a question it already showed (area confirmation, retry), so
     # the stored conversation does not repeat it.
     echo: bool = True
+    # Global Risk layer names the planner chose for this question (ADR-0034). Only names the
+    # layer picker offers are accepted, because they go into a model prompt.
+    layers: list[str] = Field(default_factory=list, max_length=MAX_CHOSEN)
+
+
+def chosen_layers(
+    session: Session, principal: CurrentPrincipal, hub: MembershipView, names: list[str]
+) -> list[str]:
+    """The chosen layers, sorted and checked against what the picker offers this person."""
+
+    if not names:
+        return []
+    offered = {
+        item["name"]
+        for item in layer_catalog(session, hub_id=hub.hub_id, user_id=principal.user_id)
+    }
+    unknown = sorted({name for name in names if name not in offered})
+    if unknown:
+        raise GrpError(
+            422,
+            "UNKNOWN_LAYER",
+            "Choose layers from the list. Not offered: " + ", ".join(unknown[:5]),
+        )
+    return sorted(set(names))
 
 
 def _audit(
@@ -857,11 +898,14 @@ async def _answer_chat(
     hub = planner_membership(principal, payload.hub_code)
     if payload.publish_receipt:
         return await _publish_reviewed_draft(payload, principal, session, hub, settings)
+    layers = chosen_layers(session, principal, hub, payload.layers)
+    # The same question with other layers chosen is another answer.
+    cache_message = payload.message + (f"\n[layers] {','.join(layers)}" if layers else "")
     cached = None if payload.refresh else planning_answer_cache.get(
         user_id=str(principal.user_id),
         session_id=principal.session_id,
         hub_id=str(hub.hub_id),
-        message=payload.message,
+        message=cache_message,
         place=payload.place,
     )
     if cached is not None:
@@ -1142,7 +1186,13 @@ async def _answer_chat(
             async with SigMcpClient(settings.sig_mcp_base_url, access_token) as mcp:
                 pack_result = await mcp.call_tool(
                     "assemble_pack",
-                    {"pack": "risk", "place": place, "hazard": "flood", "focus": payload.message},
+                    {
+                        "pack": "risk",
+                        "place": place,
+                        "hazard": "flood",
+                        "focus": payload.message
+                        + (f" Layers chosen: {', '.join(layers)}." if layers else ""),
+                    },
                 )
             pack = tool_payload(pack_result)
             if pack_result.is_error or pack.get("status") not in {None, "ok"}:
@@ -1220,7 +1270,7 @@ async def _answer_chat(
             hub_id=hub.hub_id,
             hub_code=hub.hub_code,
             instructions=_draft_instructions(
-                risk_recipe, local_evidence=bool(local_records)
+                risk_recipe, local_evidence=bool(local_records), chosen_layers=bool(layers)
             ),
             prompt=json.dumps(
                 {
@@ -1233,6 +1283,7 @@ async def _answer_chat(
                         if isinstance(item, dict)
                     ],
                     "declared_gaps": pack.get("gaps", []),
+                    "chosen_layers": layers,
                     # Earlier turns, so a follow-up can be read as a follow-up. Untrusted
                     # content: the instructions already forbid taking direction from it.
                     "earlier_turns": [
@@ -1295,6 +1346,8 @@ async def _answer_chat(
     evidence = {
         **evidence_bundle(payload.message, place, pack, area_payload, trace, None),
         "total_ms": elapsed_ms(request_started),
+        # Stored with the evidence so the card and the district summary show only these (ADR-0034).
+        "selected_layers": layers,
     }
     # A SIG receipt asserts SIG's evidence. A brief that quotes GRP's own figures cannot be
     # published as one, so the receipt is withheld rather than letting SIG vouch for our numbers
@@ -1363,6 +1416,7 @@ async def _answer_chat(
         "publish_token": publish_token,
         "draft_issues": issues,
         "evidence_reused": reused_pack is not None,
+        "selected_layers": layers,
         "evidence_assembled_at": assembled_at.isoformat(),
         "evidence_age_seconds": round(pack_age_seconds(assembled_at)),
         "publish_needs_fresh_evidence": needs_fresh_evidence and not issues,
@@ -1375,7 +1429,7 @@ async def _answer_chat(
             user_id=str(principal.user_id),
             session_id=principal.session_id,
             hub_id=str(hub.hub_id),
-            message=payload.message,
+            message=cache_message,
             place=cache_place,
             value=response,
         )
@@ -1575,7 +1629,8 @@ async def start_lookup(
     if not planning_chat_available(settings):
         raise not_found()
     # Refuse here, in the request, for everything a person can be told about immediately.
-    planner_membership(principal, payload.hub_code)
+    chosen_layers(session, principal, planner_membership(principal, payload.hub_code),
+                  payload.layers)
     job = sig_lookups.start(principal.session_id, label="Global Risk evidence lookup")
 
     async def work() -> dict[str, Any]:
@@ -1601,6 +1656,26 @@ def read_lookup(job_id: str, principal: SignedInMember) -> dict[str, Any]:
     if job is None:
         raise not_found()
     return job.view()
+
+
+@router.get(
+    "/global-risk-layers",
+    summary="Global Risk layers a planner may choose for a question",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def global_risk_layers(
+    principal: SignedInMember, session: DatabaseSession, hub_code: str | None = None
+) -> dict[str, Any]:
+    if not planning_chat_available(get_settings()):
+        raise not_found()
+    hub = planner_membership(principal, hub_code)
+    return {
+        "hub_code": hub.hub_code,
+        "max_chosen": MAX_CHOSEN,
+        # Global Risk's pack is gathered for its flood hazard; the layers are what it counts.
+        "hazard": "flood",
+        "layers": layer_catalog(session, hub_id=hub.hub_id, user_id=principal.user_id),
+    }
 
 
 @router.get(
