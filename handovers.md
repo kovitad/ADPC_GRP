@@ -113,7 +113,232 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24-28 September 2026, `main` at `c907c34`)
+## 0. Start here (sessions of 24 September-2 October 2026, `main` at `e408f96` plus this note)
+
+### 2 October: committed, pushed and rebuilt
+
+- The 29 September-1 October work is committed in three commits:
+  - `894eca1`: Share data's "On Global Risk now", the taken-name guard, the 40-character limit
+    and the Planning layer picker. These share `api/global_risk_layers.py`, so they are one
+    commit.
+  - `ec18741`: the guides and the contribution test kit.
+  - `e408f96`: the Langfuse plan and proposed ADR-0035.
+- The desktop image was rebuilt. `/api/v1/contributions/on-global-risk` and
+  `/api/v1/planning/global-risk-layers` are served, and return 401 without a session.
+  697 tests pass, 2 skip, and ruff is clean. The staging VM is not deployed.
+- Left untracked on purpose: `deliverables/`, the `docs/*_ex1.json` and `docs/receipt_*.json`
+  scratch files, the Bang Bua Thong test prompt and report, and the Runbook HTML.
+
+### Session of 1 October: Langfuse plan, and "On Global Risk now"
+
+- **Langfuse plan (not built).** Written as `docs/langfuse-observability-plan.md`, with proposed
+  ADR-0035.
+  - The owner revised the task: development only; no new retries; question and answer text only
+    for approved evaluation cases run by named test accounts; the free Hobby plan with two
+    individual seats.
+  - Ole is *proposed* as the acceptance reviewer, with Daniel supporting. This is not confirmed.
+  - Key gaps found in the current code:
+    - one trace per LLM call, not per question;
+    - no MCP spans;
+    - failed questions are probably never exported, because background tasks are skipped when
+      the request raises;
+    - missing usage is stored as 0.
+  - Start at step L0 of the plan.
+- **"On Global Risk now" on the Share data page** (ADR-0032, amendment 10).
+  - It lists everything the person's SERVIR account contributed, including contributions sent
+    from Claude Desktop. It uses `contribute_status {}` through
+    `GET /api/v1/contributions/on-global-risk`.
+  - The "Sent from" column reads "This page (GRP)" only for this person's own GRP rows. Global
+    Risk does not record which app sent a contribution.
+  - Checked live on 1 October: the account holds 3 approved, landed layers:
+    - `civil_defence_volunteer_centres_ddpm` `9919c5b9ad4f9aef`
+    - `early_warning_towers_test_kovitad` `212436d83e490738`
+    - `evacuation_centres_th_test` `c66ade79bc2605ac`
+
+    All three are auto-approved.
+  - 697 fast, contract and golden tests pass; 2 are skipped; ruff is clean.
+  - The API image must be rebuilt to serve the new route.
+
+### Session of 30 September: Share data page guide
+
+- **New guide:** `docs/guides/share-data-with-global-risk-guide.md`. It walks through GRP's
+  Share data page step by step, with the Claude Desktop tool call beside each step. Appendix A
+  has the value to type in every form field for each kit dataset. The kit's `drive` step now
+  copies it into `.local/data-out/google-drive-upload/`, and `00_START_HERE.md` asks testers to
+  pick one route per dataset.
+- **Word version to share:** `docs/guides/share-data-with-global-risk-guide.docx`, 12 A4
+  pages, also copied into the kit. `scripts/guides/build-guide-docx.js` is now generic: title
+  from the `#` line, optional footer label, `###` headings, nested lists and code, links, and
+  column widths fitted to the content. Rebuild with
+  `NODE_PATH=<dir with docx@9> node scripts/guides/build-guide-docx.js <md> <docx> "Share data with Global Risk"`.
+- **Guide v1.1, "Try it yourself":** the owner chose personal test copies for testers. Each
+  copy uses `<layer>_test_<initials>`, is labelled TEST, and is withdrawn afterwards. The GRP team
+  sends the first test copy and reads the reply before anyone else. If Global Risk
+  auto-approves, testers use Check only. Ready-to-paste GRP fields and Claude blocks cover three
+  owner-supplied Drive files: towers, volunteer centres, and the population grid. They are also
+  in `LINKS.csv`. **On 30 September all three links returned Google's sign-in page, not the
+  file**; the owner must set "Anyone with the link". Re-check with
+  `curl -sL "https://drive.google.com/uc?export=download&id=<ID>"`.
+- **Auto-approve confirmed (30 September).** The owner sent `early_warning_towers_test_kovitad`
+  from Claude Desktop.
+  - Global Risk replied `approved`, contribution `212436d83e490738`, 1,533 features, "auto-approved:
+    this deployment lands contributions without review". Its `how_to_test` text still claims
+    staging.
+  - Live test layers from ADPC now: that one and `evacuation_centres_th_test`
+    (`c66ade79bc2605ac`). Withdraw each before sending its real layer, or answers double count.
+  - Whether `contribute_status(action="withdraw")` works on an approved row is **unverified**.
+    Global Risk's docs say pending only; otherwise a reviewer must use `contribute_review`.
+  - Guide v1.3: a new "Sending means publishing" section. "Try it yourself" is now no-send: Check
+    on the page, a Claude **dry run**, and questions about the live test layer. Only the GRP team
+    sends. The kit's `00_START_HERE.md` matches.
+- **Global Risk limits layer names to 3-40 characters.** This was found on 30 September, when
+  the 43-character `early_warning_towers_ddpm_test_yourinitials` was declined with
+  "layer must be snake_case: lowercase letters, digits, underscores, 3-40 chars".
+  - A declined submit creates no record and no `contribution_id`, and Global Risk had not yet
+    fetched the file.
+  - GRP now checks the same limit for `layer` on Check (`LAYER_NAME` in
+    `core/contribution_rules.py`, with a test). The limit for a table's `dataset` name is still
+    unknown.
+  - Every real kit name fits; the longest is 36 characters.
+  - Guide v1.2 uses short test names: `early_warning_towers_test_`, `volunteer_centres_test_` and
+    `population_register_test_`, each followed by 2-6 lower-case initials.
+  - The placeholder is now upper-case `YOURINITIALS`, so a copy where it was not replaced is
+    refused by both GRP and Global Risk.
+  - 689 fast, contract and golden tests pass; 2 are skipped.
+- **Kit fixes** in `scripts/prepare_global_risk_contributions.py`, kit rebuilt, and `check`
+  passes:
+  - the villages `usage_notes` was cut off at 500 characters ("until they ar") and is
+    rewritten to fit;
+  - the sub-district table dropped `as_of_field: Pop_year`, which is not an output field, and
+    maps `pop_year` in `columns` instead.
+- **Still inconsistent (not changed):** the page's confirm warning and the old start sheet say
+  that every contribution is auto-approved. Global Risk's `contribute_submit` says a clean one is
+  staged for review. The guide says the first reply decides.
+- **Gap:** the page has no withdraw button. A staged row is withdrawn from Claude Desktop with
+  the same SERVIR account, then refreshed with **Check on Global Risk**.
+
+### Session of 29 September (evening): a name is sent once, and planners choose layers
+
+All uncommitted on `main`. 684 fast, contract and golden tests pass, and ruff is clean. The desktop
+image was rebuilt.
+
+- **Share data refuses a name Global Risk already holds** (ADR-0032, amendment 9).
+  - Global Risk's runbook says "Contributions never overwrite existing entries", so a `layer` or
+    `dataset` name that is taken is refused on Check and again on Send. A dialog says Global Risk
+    cannot update a contribution and how to replace one. Nothing is sent.
+  - A name is taken by any Hub's GRP row in `submitting`, `checking`, `staged` or `approved`, or
+    `failed` with `SUBMIT_UNCONFIRMED`. It is also taken by a layer counted in the newest stored
+    evidence for any place in the last 30 days, which catches layers sent from Claude Desktop.
+  - Weights are exempt: re-sending weights is Global Risk's documented way to adjust them.
+  - "Check on Global Risk" now works on approved rows, so a reviewer's withdrawal frees the name.
+- **Planning layer picker** (ADR-0034).
+  - "Global Risk layers" above the message box: a checkbox list of Global Risk's four
+    OpenStreetMap layers, this Hub's contributed layers, and layers seen in your evidence.
+  - "Write the question" writes a precise question for the selected district. A sub-district is
+    asked as its district, and the question says so.
+  - Chosen names go with every Global Risk question as `layers`. The server accepts only offered
+    names (`UNKNOWN_LAYER` otherwise).
+  - The choice steers the pack's `focus` and the draft (`planning-draft-v5`). It is stored as
+    `selected_layers`, and the evidence card and section 5 of the Word summary show only those
+    layers, with a "no count returned" row where Global Risk had none.
+  - Citations are never filtered. The hazard stays `flood`.
+- **Known limitation:** a layer removed by Global Risk's server command rather than a reviewer's
+  `contribute_review` withdrawal may still read `approved`, which keeps its name refused. The
+  dialog asks for a reviewer's withdrawal for that reason (ADR-0032, amendment 9).
+- **The guard covers GRP's Share data page only.** `contribute_submit` called from Claude Desktop
+  goes straight to Global Risk. GRP learns of such a layer only once a Planning lookup has counted
+  it.
+- **One module for layer names:** `api/global_risk_layers.py` is used by the summary labels, the
+  picker and the guard.
+- **Pitfall found:** `.pw-layers` was already the map's layer panel class. The picker uses
+  `.pw-pick`.
+- **Verified live on the desktop stack.** A local session for the one planning account was
+  minted in the API container, and Chromium was driven headless with Playwright:
+  - `evacuation_centres_th_test` (seen in stored evidence) is refused on preview and on send, with
+    no row and nothing sent;
+  - a fresh name passes;
+  - the dialog renders;
+  - the picker lists five layers, writes the Samko question, and has no page errors;
+  - an unknown layer gives 422.
+- **Not yet verified live:** a real Global Risk lookup with layers chosen, and its Word summary.
+  Both need the owner's SERVIR sign-in, because the restart cleared SIG tokens. No receipt was
+  published and no contribution was sent.
+- **Web files are bind-mounted read-only** into the API container (`/app/web`). Edits to `web/`
+  are live without a rebuild; Python changes need `.\scripts\docker-desktop.ps1`.
+
+### Session of 29 September: local print artifacts only
+
+Created two user-requested A4 claim-mailing PDFs under `deliverables/claim-mailing-final/`:
+an envelope label and a separate contact sheet. They were later updated from the user's local
+claim-notice image and visually rechecked as one A4 page each. No claim image was copied into the
+repository. No GRP application code, architecture, data, configuration or deployment state changed
+in this session. The contact sheet was finalized with the original receipt and contact sheet checked,
+the optional damage-notice item left unchecked, and the claim-type note removed.
+
+### Session of 29 September: Global Risk contribution test kit
+
+- **The test files (git-ignored).** `scripts/prepare_global_risk_contributions.py` turns every
+  `.local/data-in` dataset into a ready-to-submit contribution under `.local/data-out`. It uses
+  the same folders, and each one holds a manifest, the converted file and a `TEST.md`. Nothing
+  was submitted.
+- **Documents:**
+  - Gaps: `docs/global-risk-contribution-e2e.md`.
+  - Business-user guide: `docs/guides/global-risk-contribute-guide.md` and `.docx`, built by
+    `scripts/guides/build-guide-docx.js`.
+- **Before any real submit:** a Global Risk reviewer must withdraw test layer `c66ade79bc2605ac`,
+  or the centres are counted twice. Our account is not a reviewer.
+- **Checked against GRP's engine:**
+  - GRP's stored Samko assessment is 8 potentially exposed and 4 unable to assess; Global Risk
+    said 12 of 12.
+  - Tha Pla's DOPA polygon is 1,154 km²; Global Risk's is 1,784 km².
+- **Source defects:**
+  - 650 villages have male + female ≠ total. Summed naively, the villages give 128 million
+    people; with GRP's rule the total is 56.6 million.
+  - 80 villages have projected coordinates.
+- **Open:**
+  - Owner decisions: whether to contribute the sensitivity rasters, and the example
+    `flood_thailand` weights.
+
+### Session of 29 September (after the crash): Drive kit and summary labels
+
+- **The kit to hand over (git-ignored):** `.local/data-out/google-drive-upload/`. It holds:
+  - numbered folders 01-03 to submit, with 04-06 optional;
+  - `HOLD_evacuation_centres_until_test_layer_withdrawn/`;
+  - `LINKS.csv`, `00_START_HERE.md` and the guide `.docx`.
+
+  It is built by the new `drive` step of `scripts/prepare_global_risk_contributions.py`, and every
+  copied file passed `check`. Nothing was uploaded or submitted.
+- **Guide:** `docs/guides/global-risk-contribute-guide.md` and `.docx` gained:
+  - the folder order and the HOLD rule;
+  - a results sheet;
+  - questions that publish nothing;
+  - Step 6: gather again in GRP, download the summary, and check section 5.
+
+  Rebuild it with `NODE_PATH=<dir with docx@9> node scripts/guides/build-guide-docx.js ...`.
+- **Gap 8 fixed (uncommitted):** `api/planning_summary.py` labels GRP-origin layers by exact name.
+  The names come from `GRP_ORIGIN_LAYERS` plus the Hub's approved `sig_contribution` names. The
+  change also:
+  - keeps an unknown count shape as a row;
+  - adds Global Risk's hazard and polygon area to section 5 (`core/summary_docx.py`).
+
+  Tests are in `tests/fast/test_planning_summary.py`, and ADR-0033 is amended (item 10). Fast,
+  contract and golden tests pass (651). **Rebuild the desktop image before testing** (`build
+  migrate`, then `up -d --force-recreate api worker`).
+- **New gaps, 21-23 in `docs/global-risk-contribution-e2e.md`:**
+  - the summary uses only the downloader's own evidence;
+  - GRP always asks for hazard `flood`;
+  - the shape of a population count is unknown.
+- **Gap 19 is a test-day step:** the one-hour pack reuse. Click "Gather again from Global Risk".
+- **Later that day: the name is the key, and the staged case.**
+  - The guide and every `TEST.md` open with the layer name and use it in every step.
+  - Global Risk's main runbook (section 14) says "Contributions never overwrite existing
+    entries". So a corrected file means asking Global Risk to remove the old layer, by name and
+    `contribution_id`, before one new submit under the same name (gap 24).
+  - The guide now covers all three replies: `approved` (public, only a reviewer can remove it),
+    staged or preview (only the submitter and reviewers see it, and the submitter can withdraw
+    it) and `declined`.
+  - A staged layer reaches GRP's summary only if GRP's SERVIR sign-in is the submitting account.
+  - Whether auto-approve is still on is unknown; the first reply will show it.
 
 ### Session of 28 September: where things stand
 
