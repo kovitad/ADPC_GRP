@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # ADR-0038: the worker pulls the flood pilots' public sources (Floodboard). Off by default so
     # tests and servers stay offline until the pilot is switched on deliberately.
     flood_pilot_pulls_enabled: bool = False
+    # ADR-0049: Longdo Weather rain context for live flood pilots. The key lives in a secret file.
+    longdo_weather_enabled: bool = False
+    longdo_api_key_file: Path = Path(".local/secrets/longdo_api_key")
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None

@@ -145,3 +145,5 @@
 .fl-live__status { margin: 0; color: var(--ink-500); font-size: 0.78rem; }
 .fl-live__status.is-bad { color: #a61e1e; }
 .fl-live__credit { margin: 0; color: var(--ink-500); font-size: 0.72rem; }
+.fl-card--rain { background: #f1f7fd; }
+.fl-card__n--word { font-size: 1.15rem; }

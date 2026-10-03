@@ -230,3 +230,24 @@ class FloodReplay(Base):
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FloodWeather(Base):
+    """Rain now and the next 30 minutes for one scope at one radar observation (ADR-0049)."""
+
+    __tablename__ = "flood_weather"
+    __table_args__ = (
+        Index("ix_flood_weather_pilot_base", "pilot_id", "observed_base_time"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    observed_base_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    scope_kind: Mapped[str] = mapped_column(String(16), nullable=False)  # district | incident
+    scope_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    radius_km: Mapped[float] = mapped_column(Float, nullable=False)
+    rain_now: Mapped[dict[str, object] | None] = mapped_column(JSON_VALUE)
+    forecast: Mapped[list[dict[str, object]] | None] = mapped_column(JSON_VALUE)
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)

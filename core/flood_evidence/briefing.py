@@ -35,6 +35,7 @@ from core.flood_evidence.models import (
     FloodSourceFetch,
 )
 from core.flood_evidence.situation import ROADS_ADAPTER, sources_status
+from core.flood_evidence.weather import latest_weather
 from core.river_watch import bangkok_outlines
 
 MAX_INCIDENTS = 15
@@ -356,6 +357,27 @@ def build_facts(
                 "newly_near_flooding", []),
         })
         labels[label] = {"kind": "facility", "ref": asset["asset_id"]}
+
+    weather = latest_weather(session, config)
+    if weather["available"]:
+        districts = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
+        codes = area_codes(config, area)
+        facts.append({
+            "id": "W", "kind": "rain",
+            "note": "Weather context from radar; rain is not flooding, a forecast is not an "
+                    "observation",
+            "radar_time_bangkok": _clock(weather["observed_at"]),
+            "districts": [
+                {"district": districts.get(w["id"], w["id"]),
+                 "rain_now": (w["rain_now"] or {}).get("dominant_level", "unknown"),
+                 "heaviest_now": (w["rain_now"] or {}).get("max_level", "unknown"),
+                 "in_30_min": next((f.get("max_level", "unknown") for f in (w["forecast"] or [])
+                                    if f.get("available")), "unknown")}
+                for w in weather["scopes"]
+                if w["kind"] == "district" and (codes is None or w["id"] in codes)
+            ],
+        })
+        labels["W"] = {"kind": "rain"}
 
     facts.append({
         "id": "L", "kind": "limits",

@@ -26,7 +26,7 @@
     config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
     assets: null, facility: null, incidents: null, incident: null, allIncidents: false,
-    canWrite: false, changes: null, window: 60,
+    canWrite: false, changes: null, window: 60, weather: null,
   };
   const say = PilotText.t;
   let map = null;
@@ -251,7 +251,31 @@
   };
 
   // --- Cards and coverage --------------------------------------------------------------------
+  // Rain (ADR-0049): context only. Unknown is never shown as "no rain".
+  const RAIN_ORDER = ["no_rain", "very_light", "light", "moderate", "heavy", "very_heavy"];
+  const rainWord = (level) => say(`rain.level.${RAIN_ORDER.includes(level) ? level : "unknown"}`);
+  const heaviest = (levels) => levels.filter((l) => RAIN_ORDER.includes(l))
+    .sort((a, b) => RAIN_ORDER.indexOf(b) - RAIN_ORDER.indexOf(a))[0];
+
+  const drawRainCard = () => {
+    const w = state.weather;
+    const nowNode = $("[data-rain-now]");
+    const in30 = $("[data-rain-30]");
+    if (!w || !w.available) {
+      nowNode.textContent = w && w.reason === "replay" ? say("rain.replay") : say("rain.unknown");
+      in30.textContent = "";
+      return;
+    }
+    const codes = state.area === "corridor" ? corridorCodes() : state.area === "all" ? null : [state.area];
+    const districts = w.scopes.filter((x) => x.kind === "district" && (!codes || codes.includes(x.id)));
+    const now = heaviest(districts.map((x) => x.rain_now && x.rain_now.max_level));
+    const later = heaviest(districts.map((x) => (x.forecast || []).filter((f) => f.available).map((f) => f.max_level).pop()));
+    nowNode.textContent = now ? rainWord(now) : say("rain.unknown");
+    in30.textContent = say("rain.card.in30", { level: later ? rainWord(later) : say("rain.unknown") });
+  };
+
   const drawCards = () => {
+    drawRainCard();
     const roads = visibleRoads();
     const flooded = roads.filter((f) => !f.properties.cleared);
     const now = flooded.filter((f) => NOW_BANDS.has(f.properties.freshness));
@@ -319,6 +343,12 @@
       }), "ok");
     } else {
       row(say("cov.assets"), say("cov.not"), say("cov.assets.detail"), "none");
+    }
+    const w = state.weather;
+    if (w && w.available) {
+      row(say("cov.weather"), say("cov.ok"), say("cov.weather.detail", { time: clock(w.observed_at) }), "ok");
+    } else if (!REPLAY) {
+      row(say("cov.weather"), say("cov.not"), say("cov.weather.none"), "none");
     }
     row(say("cov.geoglows"), say("cov.elsewhere"), say("cov.geoglows.detail"), "none");
     $("[data-coverage-note]").textContent = `${say("cov.note")} ${say("cov.note.bbt")}`;
@@ -728,6 +758,24 @@
         ul.append(li);
       });
       box.append(ul);
+    }
+
+    box.append(el("h3", "fl-evidence__sub", say("rain.section")));
+    const rain = detail.weather && detail.weather.scope;
+    if (!detail.weather || !detail.weather.available) {
+      box.append(el("p", "fl-muted", detail.weather && detail.weather.reason === "replay" ? say("rain.replay") : say("rain.unknown")));
+    } else if (!rain) {
+      box.append(el("p", "fl-muted", say("rain.unknown")));
+    } else {
+      const ul = el("ul", "fl-timeline");
+      ul.append(el("li", "", rain.rain_now
+        ? say("rain.now", { level: rainWord(rain.rain_now.max_level), pct: number(rain.rain_now.coverage_pct) })
+        : say("rain.now", { level: say("rain.unknown"), pct: "–" })));
+      (rain.forecast || []).forEach((f, index) => {
+        ul.append(el("li", "", say("rain.at", { min: (index + 1) * 15, level: f.available ? rainWord(f.max_level) : say("rain.unknown") })));
+      });
+      box.append(ul);
+      box.append(el("p", "fl-muted", say("rain.source", { time: clock(detail.weather.observed_at) })));
     }
 
     box.append(el("h3", "fl-evidence__sub", say("ev.row.cctv")));
@@ -1140,6 +1188,11 @@
         GRP.request(`${API}/incidents`),
       ]);
       Object.assign(state, { situation, roads, reports, assets, incidents });
+      try {
+        state.weather = await GRP.request(`${API}/weather`);
+      } catch (error) {
+        state.weather = null;  // rain is context: the page works without it
+      }
       loadChanges();
       showBanner("");
       drawAll();

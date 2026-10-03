@@ -115,7 +115,19 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): Longdo APIs. Part 1, flood events (ADR-0048)
+### 3 October (latest): Longdo APIs. Part 2, rain context (ADR-0049)
+
+- **Built:** `core/flood_evidence/weather.py` and table `flood_weather` (migration
+  `20261003_0027`).
+  - A worker step that runs only when the radar time changes, for the 4 districts and the top 10
+    incidents: rain now (`/area`) and +15/+30 minutes (`/forecast/area`).
+  - `/polygon` answers 403 on this key, so districts use circles.
+  - The key goes `.env` → launcher → `longdo_api_key` secret file → `LONGDO_API_KEY_FILE`, and
+    is never logged (`httpx` logger at WARNING) or stored.
+- **On the page:** a "Rain now" card, rain on each incident, a coverage row and fact `W`.
+- **Next:** switch cameras to bmatraffic.com (the owner's request), then part 3, routing.
+
+### 3 October: Longdo APIs. Part 1, flood events (ADR-0048)
 
 - **Chosen:** the owner chose all three Longdo integrations: events, rain and forecast, and
   routing. The key is in `.env` as `LONGDO_API_KEY`; never print or log it.

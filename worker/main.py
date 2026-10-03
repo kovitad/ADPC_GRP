@@ -18,12 +18,13 @@ from core.boundary_import import (
 )
 from core.data_import_jobs import ImportClaim, claim_next_import, fail_import, version_id_for_import
 from core.data_library_models import DataImportJob
-from core.db import get_engine, session_scope
+from core.db import get_engine, read_secret, session_scope
 from core.flood_evidence.config import PILOT_IDS, pilot_config
 from core.flood_evidence.ingest import pull_due
 from core.flood_evidence.replay import run_one_step as replay_step
 from core.flood_evidence.retention import delete_raw
 from core.flood_evidence.retention import prune as prune_flood
+from core.flood_evidence.weather import LongdoWeather, run_weather
 from core.hazard_import import (
     PLATFORM_HAZARD_DATASET_ID,
     HazardImportError,
@@ -49,6 +50,7 @@ stop_event = Event()
 POLL_SECONDS = 3
 HOUSEKEEPING_SECONDS = 60
 RETENTION_SECONDS = 3600
+WEATHER_SECONDS = 300
 
 
 def _request_stop(_signum: int, _frame: object) -> None:
@@ -67,6 +69,7 @@ def run() -> None:
     last_housekeeping = 0.0
     last_flood_check = 0.0
     last_retention = 0.0
+    last_weather = 0.0
     while not stop_event.is_set():
         if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
             release_reservations_once()
@@ -94,6 +97,14 @@ def run() -> None:
         ):
             run_flood_pulls(storage)
             last_flood_check = time.monotonic()
+        # Rain context (ADR-0049): live pilots only, checked every 5 minutes when idle.
+        if (
+            not worked
+            and settings.longdo_weather_enabled
+            and time.monotonic() - last_weather >= WEATHER_SECONDS
+        ):
+            run_flood_weather(settings.longdo_api_key_file)
+            last_weather = time.monotonic()
         # Replays (ADR-0044): one stored fetch per idle pass, after everything live.
         if not worked:
             worked = run_one_replay_step(storage)
@@ -130,6 +141,28 @@ def run_flood_retention(storage: LocalStorage) -> None:
                 logger.info("Flood retention %s: %s", pilot_id, result)
         except Exception:
             logger.exception("Flood retention %s failed; will retry", pilot_id)
+
+
+def run_flood_weather(key_file: Path) -> None:
+    try:
+        key = read_secret(key_file)
+    except (OSError, RuntimeError):
+        logger.warning("Longdo Weather is on but its key file is missing or empty")
+        return
+    client = LongdoWeather(key=key)
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                stored = run_weather(session, config, client, datetime.now(UTC))
+                session.commit()
+            if stored:
+                logger.info("Longdo Weather %s: %d scopes recorded", pilot_id, stored)
+        except Exception as error:
+            logger.error("Longdo Weather %s failed: %s", pilot_id,
+                         client.redact(f"{type(error).__name__}: {error}"))
 
 
 def run_one_replay_step(storage: LocalStorage) -> bool:

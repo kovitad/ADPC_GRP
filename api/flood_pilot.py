@@ -67,6 +67,7 @@ from core.flood_evidence.reviews import (
     reviewer_names,
 )
 from core.flood_evidence.situation import current_roads, recent_reports, road_by_id, situation
+from core.flood_evidence.weather import latest_weather
 from core.river_watch import bangkok_outlines
 
 router = APIRouter(prefix="/pilot/flood", tags=["pilot"])
@@ -340,8 +341,12 @@ def read_incident(
         nearby_cameras(camera_registry(config.base_id), footprint, now, DEFAULT_CAMERA_RADIUS_M)
         if footprint["coordinates"] else []
     )
+    weather = latest_weather(session, config)
+    rain = next((w for w in weather["scopes"]
+                 if w["kind"] == "incident" and w["id"] == str(incident_id)), None)
     return {**detail, "roads": roads, "reports": reports, "facilities": facilities,
-            "cameras": cameras}
+            "cameras": cameras, "weather": {**{k: v for k, v in weather.items() if k != "scopes"},
+                                            "scope": rain}}
 
 
 @router.post(
@@ -723,3 +728,12 @@ def post_inject_outage(
         raise validation_failed(str(error)) from error
     session.commit()
     return public_replay(replay)
+
+
+@router.get(
+    "/{pilot_id}/weather",
+    summary="Rain now and the next 30 minutes per district and top incident (context only)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_weather(config: FloodPilot, session: DatabaseSession) -> dict[str, Any]:
+    return latest_weather(session, config)

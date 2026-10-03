@@ -97,6 +97,9 @@ if (Test-Path -LiteralPath $LocalAiKey) {
 } elseif (-not (Write-SecretFromEnv "ai_key_adpc" @("OPENAI_API_KEY"))) {
     Write-Warning "No AI provider key found; the AI test call will report AI unavailable."
 }
+if (-not (Write-SecretFromEnv "longdo_api_key" @("LONGDO_API_KEY"))) {
+    Write-Warning "No LONGDO_API_KEY in .env; Longdo rain context stays off."
+}
 if (-not (Write-SecretFromEnv "langfuse_secret_key" @("LANGFUSE_SECRET_KEY"))) {
     Write-Warning "No LANGFUSE_SECRET_KEY in .env; Langfuse export stays off."
 }
