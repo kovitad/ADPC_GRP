@@ -202,3 +202,31 @@ class FloodReview(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FloodReplay(Base):
+    """A replay of a stored period in its own namespace (ADR-0044). Never live data."""
+
+    __tablename__ = "flood_replay"
+    __table_args__ = (Index("ix_flood_replay_base_status", "base_pilot_id", "status"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    # The namespace every replay row is written under, e.g. "r0123456789a".
+    replay_pilot_id: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    base_pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    hub_id: Mapped[UUID] = mapped_column(ForeignKey("hub.id", ondelete="RESTRICT"), nullable=False)
+    created_by: Mapped[UUID] = mapped_column(
+        ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=False
+    )
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # The simulated time asked for, and the time actually processed up to (the replay clock).
+    target_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    steps_total: Mapped[int] = mapped_column(Integer, nullable=False)
+    steps_done: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)  # building | ready | failed
+    injections: Mapped[list[dict[str, object]]] = mapped_column(JSON_VALUE, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

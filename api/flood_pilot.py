@@ -43,6 +43,19 @@ from core.flood_evidence.incident_store import (
     incident_detail,
     list_incidents,
 )
+from core.flood_evidence.models import FloodReplay
+from core.flood_evidence.replay import (
+    ReplayRejected,
+    advance,
+    available_range,
+    create_replay,
+    find_replay,
+    is_replay_id,
+    replay_config,
+    restart,
+    wipe,
+)
+from core.flood_evidence.replay import public as public_replay
 from core.flood_evidence.reviews import (
     NOTE_MAX,
     ReviewRejected,
@@ -65,13 +78,33 @@ def may_open(principal: CurrentPrincipal, config: PilotConfig) -> bool:
     return any(member.hub_code.lower() in config.hubs for member in principal.memberships)
 
 
-def flood_pilot(pilot_id: str, principal: SignedInMember) -> PilotConfig:
-    config = pilot_config(pilot_id)
+def flood_pilot(
+    pilot_id: str, principal: SignedInMember, session: DatabaseSession
+) -> PilotConfig:
+    """A live pilot, or a replay namespace (ADR-0044) opened with its live pilot's access."""
+
+    if is_replay_id(pilot_id):
+        replay = find_replay(session, pilot_id)
+        config = replay_config(replay) if replay is not None else None
+    else:
+        config = pilot_config(pilot_id)
     if config is None:
         raise not_found()
     if not may_open(principal, config):
         raise access_not_authorized()
     return config
+
+
+def now_for(config: PilotConfig) -> datetime:
+    """Wall time for live data; the processed replay clock for a replay."""
+
+    return config.clock or datetime.now(UTC)
+
+
+def refuse_replay_writes(config: PilotConfig) -> None:
+    if config.is_replay:
+        raise GrpError(409, "REPLAY_READ_ONLY",
+                       "This is a replay. Nothing is recorded in a replay.")
 
 
 FloodPilot = Annotated[PilotConfig, Depends(flood_pilot)]
@@ -109,10 +142,10 @@ def _audit(session, principal: CurrentPrincipal, hub_id: UUID, action: str, targ
                            new_value=detail, result=AuditResult.SUCCESS))
 
 
-def _as_of(value: str | None) -> datetime:
-    """Now, or an earlier moment to look back at. The future is refused."""
+def _as_of(value: str | None, config: PilotConfig | None = None) -> datetime:
+    """Now (or the replay clock), or an earlier moment. Anything later is refused."""
 
-    now = datetime.now(UTC)
+    now = now_for(config) if config is not None else datetime.now(UTC)
     if value is None:
         return now
     try:
@@ -167,7 +200,7 @@ def read_flood_pilot(config: FloodPilot) -> dict[str, Any]:
     openapi_extra={"x-grp-access": "protected"},
 )
 def read_situation(config: FloodPilot, session: DatabaseSession, as_of: AsOf = None) -> dict:
-    return situation(session, config, _as_of(as_of))
+    return situation(session, config, _as_of(as_of, config))
 
 
 @router.get(
@@ -181,7 +214,7 @@ def read_roads(
     as_of: AsOf = None,
     include_all: Annotated[bool, Query(alias="all")] = False,
 ) -> dict[str, Any]:
-    return current_roads(session, config, _as_of(as_of), include_all=include_all)
+    return current_roads(session, config, _as_of(as_of, config), include_all=include_all)
 
 
 @router.get(
@@ -198,7 +231,7 @@ def read_reports(
     window = hours or config.report_window_hours["default"]
     if window > config.report_window_hours["max"]:
         raise validation_failed("hours is longer than this pilot keeps reports for")
-    return recent_reports(session, config, _as_of(as_of), window)
+    return recent_reports(session, config, _as_of(as_of, config), window)
 
 
 @router.get(
@@ -207,7 +240,7 @@ def read_reports(
     openapi_extra={"x-grp-access": "protected"},
 )
 def read_areas(config: FloodPilot) -> dict[str, Any]:
-    areas = bangkok_outlines() if config.pilot_id == "bangkok" else []
+    areas = bangkok_outlines() if config.base_id == "bangkok" else []
     return {"areas": sorted(areas, key=lambda a: a["name"])}
 
 
@@ -217,7 +250,7 @@ def read_areas(config: FloodPilot) -> dict[str, Any]:
     openapi_extra={"x-grp-access": "protected"},
 )
 def read_cameras(config: FloodPilot) -> dict[str, Any]:
-    cameras = camera_registry(config.pilot_id)
+    cameras = camera_registry(config.base_id)
     return {
         "cameras": [camera.public() for camera in cameras],
         "placeholders_only": bool(cameras) and all(c.placeholder for c in cameras),
@@ -239,7 +272,7 @@ def read_road_cameras(
 ) -> dict[str, Any]:
     if not ROAD_ID.fullmatch(road_id):
         raise not_found()
-    moment = _as_of(as_of)
+    moment = _as_of(as_of, config)
     road = road_by_id(session, config, moment, road_id)
     if road is None:
         raise not_found()
@@ -247,7 +280,7 @@ def read_road_cameras(
         "road_id": road_id,
         "radius_m": radius_m,
         "cameras": nearby_cameras(
-            camera_registry(config.pilot_id), road["geometry"], moment, radius_m
+            camera_registry(config.base_id), road["geometry"], moment, radius_m
         ),
     }
 
@@ -258,7 +291,7 @@ def read_road_cameras(
     openapi_extra={"x-grp-access": "protected"},
 )
 def read_assets(config: FloodPilot, session: DatabaseSession, as_of: AsOf = None) -> dict:
-    return latest_exposure(session, config, _as_of(as_of))
+    return latest_exposure(session, config, _as_of(as_of, config))
 
 
 @router.get(
@@ -267,7 +300,7 @@ def read_assets(config: FloodPilot, session: DatabaseSession, as_of: AsOf = None
     openapi_extra={"x-grp-access": "protected"},
 )
 def read_incidents(config: FloodPilot, session: DatabaseSession) -> dict[str, Any]:
-    return list_incidents(session, config)
+    return list_incidents(session, config, now_for(config))
 
 
 @router.get(
@@ -281,7 +314,7 @@ def read_incident(
     detail = incident_detail(session, config, incident_id)
     if detail is None:
         raise not_found()
-    now = datetime.now(UTC)
+    now = now_for(config)
     keys = set(detail.get("road_keys") or [])
     roads = [f for f in current_roads(session, config, now, include_all=True)["features"]
              if f["properties"]["id"] in keys]
@@ -302,7 +335,7 @@ def read_incident(
         ],
     }
     cameras = (
-        nearby_cameras(camera_registry(config.pilot_id), footprint, now, DEFAULT_CAMERA_RADIUS_M)
+        nearby_cameras(camera_registry(config.base_id), footprint, now, DEFAULT_CAMERA_RADIUS_M)
         if footprint["coordinates"] else []
     )
     return {**detail, "roads": roads, "reports": reports, "facilities": facilities,
@@ -321,8 +354,9 @@ def post_incident_review(
     incident_id: UUID,
     body: IncidentReviewRequest,
 ) -> dict[str, Any]:
+    refuse_replay_writes(config)
     hub_id = pilot_hub(principal, config)
-    now = datetime.now(UTC)
+    now = now_for(config)
     try:
         review = review_incident(
             session, config, incident_id=incident_id, user_id=principal.user_id, hub_id=hub_id,
@@ -350,8 +384,9 @@ def post_facility_access(
     session: DatabaseSession,
     body: FacilityAccessRequest,
 ) -> dict[str, Any]:
+    refuse_replay_writes(config)
     hub_id = pilot_hub(principal, config)
-    now = datetime.now(UTC)
+    now = now_for(config)
     try:
         review = review_facility(
             session, config, asset_id=body.asset_id, user_id=principal.user_id, hub_id=hub_id,
@@ -394,7 +429,7 @@ def read_changes(
     config: FloodPilot, session: DatabaseSession, area: Area = "corridor",
     since_minutes: SinceMinutes = 60,
 ) -> dict[str, Any]:
-    now = datetime.now(UTC)
+    now = now_for(config)
     try:
         return get_situation_changes(session, config, area, now - timedelta(minutes=since_minutes),
                                      now)
@@ -411,7 +446,7 @@ def read_facts(
     config: FloodPilot, session: DatabaseSession, area: Area = "corridor",
     since_minutes: SinceMinutes = 60,
 ) -> dict[str, Any]:
-    now = datetime.now(UTC)
+    now = now_for(config)
     try:
         return build_facts(session, config, area, now - timedelta(minutes=since_minutes), now,
                            road_names(session, config, now))
@@ -445,7 +480,7 @@ async def ask(
     """The computed answer always comes back. AI wording is added only for a pilot-Hub member,
     within the AI allowance, and only when every claim is cited and every number is a fact."""
 
-    now = datetime.now(UTC)
+    now = now_for(config)
     try:
         since = now - timedelta(minutes=body.since_minutes)
         bundle = build_facts(session, config, body.area, since, now,
@@ -462,6 +497,10 @@ async def ask(
         "ai": None,
         "withheld": None,
     }
+    if config.is_replay:
+        # No AI on simulated data: it would spend the allowance and send replayed evidence.
+        result["withheld"] = {"reason": "replay", "problems": []}
+        return result
     try:
         hub_id = pilot_hub(principal, config)
     except GrpError:
@@ -488,3 +527,140 @@ async def ask(
     result["ai"] = {"text": answer.text, "model": answer.model,
                     "label": "AI wording of the computed facts. Check the cited evidence."}
     return result
+
+
+# --- Replays (ADR-0044) ---------------------------------------------------------------------
+
+
+class ReplayRequest(BaseModel):
+    start_at: datetime
+    end_at: datetime
+
+
+class AdvanceRequest(BaseModel):
+    to: datetime | None = None
+    by_minutes: int | None = Field(default=None, ge=1, le=720)
+
+
+def _live_only(config: PilotConfig) -> None:
+    if config.is_replay:
+        raise not_found()
+
+
+def _replay_of(session, config: PilotConfig, replay_id: str):
+    replay = find_replay(session, replay_id)
+    if replay is None or replay.base_pilot_id != config.pilot_id:
+        raise not_found()
+    return replay
+
+
+def _when(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise validation_failed("Times need a time zone")
+    return value.astimezone(UTC)
+
+
+@router.get(
+    "/{pilot_id}/replays",
+    summary="Replays of this pilot and the period that can be replayed",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def list_replays(config: FloodPilot, session: DatabaseSession) -> dict[str, Any]:
+    _live_only(config)
+    from sqlalchemy import select as _select
+
+
+    rows = session.scalars(_select(FloodReplay).where(FloodReplay.base_pilot_id == config.pilot_id)
+                           .order_by(FloodReplay.created_at.desc()))
+    return {"replays": [public_replay(r) for r in rows],
+            "available": available_range(session, config)}
+
+
+@router.post(
+    "/{pilot_id}/replays",
+    summary="Start building a replay of a stored period (pilot-Hub members)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_replay(
+    config: FloodPilot, principal: SignedInMember, session: DatabaseSession, body: ReplayRequest
+) -> dict[str, Any]:
+    _live_only(config)
+    hub_id = pilot_hub(principal, config)
+    try:
+        replay = create_replay(session, config, start_at=_when(body.start_at),
+                               end_at=_when(body.end_at), user_id=principal.user_id,
+                               hub_id=hub_id, now=datetime.now(UTC))
+    except ReplayRejected as error:
+        raise validation_failed(str(error)) from error
+    session.commit()
+    return public_replay(replay)
+
+
+@router.get(
+    "/{pilot_id}/replays/{replay_id}",
+    summary="One replay's progress and simulated clock",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_replay(config: FloodPilot, session: DatabaseSession, replay_id: str) -> dict[str, Any]:
+    _live_only(config)
+    return public_replay(_replay_of(session, config, replay_id))
+
+
+@router.post(
+    "/{pilot_id}/replays/{replay_id}/advance",
+    summary="Move a replay's simulated time forward",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_advance(
+    config: FloodPilot, principal: SignedInMember, session: DatabaseSession, replay_id: str,
+    body: AdvanceRequest,
+) -> dict[str, Any]:
+    _live_only(config)
+    pilot_hub(principal, config)
+    replay = _replay_of(session, config, replay_id)
+    current = replay.processed_at or replay.start_at
+    if body.to is not None:
+        to = _when(body.to)
+    elif body.by_minutes is not None:
+        to = current.astimezone(UTC) + timedelta(minutes=body.by_minutes)
+    else:
+        raise validation_failed("Give a time or a number of minutes")
+    try:
+        advance(replay, to)
+    except ReplayRejected as error:
+        raise validation_failed(str(error)) from error
+    session.commit()
+    return public_replay(replay)
+
+
+@router.post(
+    "/{pilot_id}/replays/{replay_id}/restart",
+    summary="Wipe a replay and build it again from its start",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_restart(
+    config: FloodPilot, principal: SignedInMember, session: DatabaseSession, replay_id: str
+) -> dict[str, Any]:
+    _live_only(config)
+    pilot_hub(principal, config)
+    replay = _replay_of(session, config, replay_id)
+    restart(session, replay)
+    session.commit()
+    return public_replay(replay)
+
+
+@router.delete(
+    "/{pilot_id}/replays/{replay_id}",
+    summary="Delete a replay and everything in its namespace",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def delete_replay(
+    config: FloodPilot, principal: SignedInMember, session: DatabaseSession, replay_id: str
+) -> dict[str, Any]:
+    _live_only(config)
+    pilot_hub(principal, config)
+    replay = _replay_of(session, config, replay_id)
+    wipe(session, replay.replay_pilot_id)
+    session.delete(replay)
+    session.commit()
+    return {"deleted": replay_id}

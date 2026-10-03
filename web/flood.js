@@ -3,7 +3,17 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const PILOT = "bangkok";
-  const API = `/api/v1/pilot/flood/${PILOT}`;
+  const LIVE_API = `/api/v1/pilot/flood/${PILOT}`;
+  // ADR-0044: ?replay=<id> opens a replay namespace. Its ID shape is checked before any request.
+  const REPLAY = (() => {
+    const value = new URL(window.location.href).searchParams.get("replay");
+    return value && /^r[0-9a-f]{11}$/.test(value) ? value : null;
+  })();
+  const API = REPLAY ? `/api/v1/pilot/flood/${REPLAY}` : LIVE_API;
+  let replayClockMs = null;
+  // Every age and window on the page is measured from this: wall time live, the replay clock
+  // in a replay, so simulated data never reads as hours old.
+  const nowMs = () => (REPLAY && replayClockMs != null ? replayClockMs : Date.now());
   const TZ = "Asia/Bangkok";
   const REFRESH_MS = 2 * 60 * 1000;
   const NEAR_M = 200;
@@ -32,7 +42,7 @@
     timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
   }).format(new Date(iso));
   const ago = (iso) => {
-    const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    const minutes = Math.max(0, Math.round((nowMs() - new Date(iso).getTime()) / 60000));
     if (minutes < 90) return say("ago.min", { n: minutes });
     if (minutes < 48 * 60) return say("ago.hour", { n: Math.round(minutes / 60) });
     return say("ago.day", { n: Math.round(minutes / 1440) });
@@ -245,7 +255,7 @@
     set("blocked", now.filter((f) => f.properties.provider_verdict[state.vehicle] === "blocked").length);
     set("closed", now.filter((f) => f.properties.closed_all).length);
     set("old", flooded.length - now.length);
-    const hourAgo = Date.now() - 3600 * 1000;
+    const hourAgo = nowMs() - 3600 * 1000;
     set("reports", visibleReports().filter((f) => new Date(f.properties.observed_at).getTime() >= hourAgo).length);
     const notOk = state.situation.sources.filter((s) => s.state !== "ok").length;
     set("sources", notOk);
@@ -259,7 +269,7 @@
     });
     const snapshot = state.roads.snapshot_retrieved_at;
     $("[data-asof]").textContent = snapshot
-      ? say("fl.asof", { time: clock(new Date().toISOString()), age: ago(snapshot) })
+      ? say("fl.asof", { time: clock(new Date(nowMs()).toISOString()), age: ago(snapshot) })
       : say("fl.asof.none");
   };
 
@@ -743,7 +753,7 @@
 
   // --- Evidence card -----------------------------------------------------------------------
   const nearbyReports = (feature) => {
-    const since = Date.now() - NEAR_HOURS * 3600 * 1000;
+    const since = nowMs() - NEAR_HOURS * 3600 * 1000;
     const points = vertices(feature.geometry);
     return (state.reports ? state.reports.features : []).filter((r) => {
       if (new Date(r.properties.observed_at).getTime() < since) return false;
@@ -1071,13 +1081,145 @@
   });
   drawSuggestions();
 
+  // --- Replay (slice 6a) ----------------------------------------------------------------------
+  const REPLAYS = `${LIVE_API}/replays`;
+  const player = { playing: false, speed: 20, info: null, lastClock: null, pending: 0 };
+
+  const drawReplayBar = () => {
+    const bar = $("[data-replay-bar]");
+    const info = player.info;
+    if (!REPLAY || !info) return;
+    bar.hidden = false;
+    $("[data-player]").hidden = false;
+    bar.textContent = info.clock
+      ? say("rp.banner", { time: clock(info.clock) })
+      : say("rp.banner.building", { done: info.steps_done, total: info.steps_total });
+    document.title = `REPLAY · ${say("fl.page.title")}`;
+    $("[data-player-clock]").textContent = say("rp.clock", {
+      time: info.clock ? clock(info.clock) : "–", start: clock(info.start_at), end: clock(info.end_at),
+    });
+    $("[data-player-progress]").textContent = say("rp.progress", { done: info.steps_done, total: info.steps_total });
+    $("[data-player-play]").textContent = say(player.playing ? "rp.pause" : "rp.play");
+    if (!state.canControl) {
+      $("[data-player]").querySelectorAll("button, select").forEach((n) => { n.disabled = true; });
+      $("[data-player-status]").textContent = say("rp.watchOnly");
+    }
+  };
+
+  const pollReplay = async () => {
+    try {
+      player.info = await GRP.request(`${REPLAYS}/${REPLAY}`);
+    } catch (error) {
+      showBanner(error.message || say("fl.error"));
+      return;
+    }
+    if (player.info.clock) replayClockMs = new Date(player.info.clock).getTime();
+    drawReplayBar();
+    if (player.info.clock && player.info.clock !== player.lastClock) {
+      player.lastClock = player.info.clock;
+      await load();
+    }
+    if (player.playing && player.info.clock && player.info.clock >= player.info.end_at) {
+      player.playing = false;
+      $("[data-player-status]").textContent = say("rp.end");
+      drawReplayBar();
+    }
+  };
+
+  const advanceBy = async (minutes) => {
+    try {
+      player.info = await post(`${REPLAYS}/${REPLAY}/advance`, { by_minutes: Math.max(1, Math.round(minutes)) });
+      drawReplayBar();
+    } catch (error) {
+      $("[data-player-status]").textContent = error.message || "";
+    }
+  };
+
+  const startReplay = async () => {
+    await pollReplay();
+    window.setInterval(pollReplay, 3000);
+    // "N×" plays N simulated minutes per real minute. Ticks are 3 s; whole minutes are sent.
+    window.setInterval(() => {
+      if (!player.playing || !player.info || player.info.status !== "ready") return;
+      player.pending += (player.speed * 3) / 60;
+      if (player.pending >= 1) {
+        const minutes = Math.floor(player.pending);
+        player.pending -= minutes;
+        advanceBy(minutes);
+      }
+    }, 3000);
+    $("[data-player-play]").addEventListener("click", () => { player.playing = !player.playing; drawReplayBar(); });
+    $("[data-player-speed]").addEventListener("change", (event) => { player.speed = Number(event.target.value); });
+    document.querySelectorAll("[data-player-step]").forEach((b) => b.addEventListener("click", () => advanceBy(Number(b.dataset.playerStep))));
+    $("[data-player-restart]").addEventListener("click", async () => {
+      player.playing = false;
+      player.info = await post(`${REPLAYS}/${REPLAY}/restart`, {});
+      player.lastClock = null;
+      drawReplayBar();
+    });
+    $("[data-player-delete]").addEventListener("click", async () => {
+      await GRP.request(`${REPLAYS}/${REPLAY}`, { method: "DELETE" });
+      window.location.href = "/flood.html";
+    });
+  };
+
+  const loadReplays = async () => {
+    let answer;
+    try {
+      answer = await GRP.request(REPLAYS);
+    } catch (error) {
+      return;
+    }
+    const section = $("[data-replays]");
+    section.hidden = false;
+    const { first, last } = answer.available;
+    $("[data-rp-available]").textContent = first ? say("rp.available", { first: clock(first), last: clock(last) }) : say("rp.none");
+    const select = $("[data-rp-start]");
+    select.replaceChildren();
+    if (first) {
+      const step = 30 * 60 * 1000;
+      for (let t = Math.ceil(new Date(first).getTime() / step) * step; t < new Date(last).getTime(); t += step) {
+        const option = el("option", "", clock(new Date(t).toISOString()));
+        option.value = new Date(t).toISOString();
+        select.append(option);
+      }
+    }
+    $("[data-rp-length]").querySelectorAll("option").forEach((o) => { o.textContent = say("rp.h", { n: o.value }); });
+    $("[data-rp-create]").disabled = !first || !state.canControl;
+    const list = $("[data-rp-list]");
+    list.replaceChildren();
+    answer.replays.forEach((r) => {
+      const li = el("li", "", say("rp.item", { start: clock(r.start_at), end: clock(r.end_at), status: say(`rp.status.${r.status}`) }) + " ");
+      const link = el("a", "", say("rp.open"));
+      link.href = `/flood.html?replay=${encodeURIComponent(r.replay_id)}`;
+      li.append(link);
+      list.append(li);
+    });
+  };
+
+  $("[data-rp-create]").addEventListener("click", async () => {
+    const status = $("[data-rp-status]");
+    const start = new Date($("[data-rp-start]").value);
+    const hours = Number($("[data-rp-length]").value);
+    const latest = Date.now() - 60 * 1000;
+    const end = new Date(Math.min(start.getTime() + hours * 3600 * 1000, latest));
+    status.textContent = say("rp.creating");
+    try {
+      const replay = await post(REPLAYS, { start_at: start.toISOString(), end_at: end.toISOString() });
+      window.location.href = `/flood.html?replay=${encodeURIComponent(replay.replay_id)}`;
+    } catch (error) {
+      status.textContent = say("rp.failed", { msg: error.message || "" });
+    }
+  });
+
   GRP.bindSignOut();
   GRP.me()
     .then(async (identity) => {
       const isAdmin = identity.is_platform_admin || identity.memberships.some((m) => m.role === "admin");
       $("[data-river-link]").hidden = !isAdmin;
       // ADR-0042: only members of the pilot's Hubs record checks; the server enforces it too.
-      state.canWrite = identity.memberships.length > 0;
+      state.canWrite = identity.memberships.length > 0 && !REPLAY;
+      state.canControl = identity.memberships.length > 0;
       const [config, areas, cameras] = await Promise.all([
         GRP.request(API), GRP.request(`${API}/areas`), GRP.request(`${API}/cameras`),
       ]);
@@ -1088,8 +1230,13 @@
       if (asked === "all" || state.areas.some((a) => a.admin_code === asked)) state.area = asked;
       if (state.area === "corridor" && !corridorCodes().length) state.area = "all";
       fillAreas();
-      await load();
-      window.setInterval(load, REFRESH_MS);
+      if (REPLAY) {
+        await startReplay();
+      } else {
+        await load();
+        window.setInterval(load, REFRESH_MS);
+        loadReplays();
+      }
     })
     .catch((error) => {
       if (error.status === 401) {

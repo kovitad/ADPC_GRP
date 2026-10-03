@@ -21,7 +21,7 @@ from core.flood_evidence.situation import current_roads, latest_roads_snapshot
 def store_exposure(session: Session, config: PilotConfig, fetch: FloodSourceFetch) -> int:
     """Assess every facility against the snapshot ``fetch`` and store one row each."""
 
-    assets, _ = asset_registry(config.pilot_id)
+    assets, _ = asset_registry(config.base_id)
     if not assets:
         return 0
     roads = current_roads(session, config, fetch.retrieved_at)["features"]
@@ -47,7 +47,7 @@ def store_exposure(session: Session, config: PilotConfig, fetch: FloodSourceFetc
 def latest_exposure(session: Session, config: PilotConfig, as_of: datetime) -> dict[str, Any]:
     """Facilities with their state from the latest good roads snapshot at ``as_of``."""
 
-    assets, source = asset_registry(config.pilot_id)
+    assets, source = asset_registry(config.base_id)
     snapshot = latest_roads_snapshot(session, config, as_of)
     rows = {}
     if snapshot is not None:

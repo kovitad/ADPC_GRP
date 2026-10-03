@@ -115,7 +115,21 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): grounded questions, slice 7b (ADR-0043)
+### 3 October (latest): replay, slice 6a (ADR-0044)
+
+- **Built:**
+  - `core/flood_evidence/replay.py` and table `flood_replay` (migration `20261003_0026`).
+  - `PilotConfig.base_id` and `clock`, with `now_for(config)` in every flood route.
+  - A worker step: one stored fetch per idle pass.
+  - Replay routes (list, create, read, advance, restart, delete).
+  - On the page, `?replay=`: a purple REPLAY bar, the player, ages from the replay clock, officer
+    writes off, and AI off.
+- **Real check:** 10:00–11:40 replayed in 76 s and matched live runs exactly after 11:08. The
+  test replay was deleted.
+- **Tests:** 8 replay tests. 1,023 pass and 2 skip.
+- **Next, slice 6b:** inject a synthetic report or a source outage into a replay.
+
+### 3 October: grounded questions, slice 7b (ADR-0043)
 
 - **Built:**
   - `core/flood_evidence/answer.py`: the prompt, the gate and the bilingual computed answer.

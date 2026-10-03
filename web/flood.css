@@ -128,3 +128,11 @@
 .fl-answer__text p { margin: 0 0 0.35rem; font-size: 0.88rem; line-height: 1.55; overflow-wrap: anywhere; }
 .fl-cite { margin: 0 0.15rem; padding: 0 0.35rem; border: 1px solid #9cc0da; border-radius: 4px; background: #fff; color: var(--servir-blue-dark); font: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
 @media (max-width: 600px) { .fl-ask__row { flex-direction: column; } .fl-ask__row .button { width: 100%; } }
+.fl-replaybar { position: sticky; top: 0; z-index: 1000; margin: 0.8rem 0 0; padding: 0.6rem 0.9rem; border-radius: 8px; background: #5f3dc4; color: #fff; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 2px 6px rgb(0 0 0 / 20%); }
+.fl-player { margin-top: 0.6rem; padding: 0.8rem 1rem; border: 2px solid #5f3dc4; border-radius: var(--radius-lg); background: #f6f3ff; }
+.fl-player__clock { margin: 0; font-weight: 700; color: #3b2384; }
+.fl-player__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.fl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.fl-replays { margin-top: 1.5rem; padding: 1rem 1.1rem; border: 1px dashed #9b87d8; border-radius: var(--radius-lg); background: var(--white); }
+.fl-replays h2 { margin: 0; font-size: 1.1rem; }
+.fl-rp__form { align-items: flex-end; flex-wrap: wrap; }

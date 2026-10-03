@@ -60,7 +60,7 @@ def params_for(config: PilotConfig) -> Params:
 
 def demo_outlines(config: PilotConfig) -> list[dict[str, Any]]:
     codes = set(config.demo_corridor.get("areas") or [])
-    if config.pilot_id != "bangkok" or not codes:
+    if config.base_id != "bangkok" or not codes:
         return []
     return [a["outline"] for a in bangkok_outlines() if a["admin_code"] in codes]
 

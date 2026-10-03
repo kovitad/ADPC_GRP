@@ -48,7 +48,7 @@ NAME_MAX = 60
 def area_outlines(config: PilotConfig, area: str) -> list[dict[str, Any]] | None:
     """Outlines for ``all`` (None = no filter), ``corridor`` (the demo area) or a district code."""
 
-    if area == "all" or config.pilot_id != "bangkok":
+    if area == "all" or config.base_id != "bangkok":
         return None
     codes = set(config.demo_corridor.get("areas") or []) if area == "corridor" else {area}
     outlines = [a["outline"] for a in bangkok_outlines() if a["admin_code"] in codes]
@@ -198,7 +198,7 @@ def get_situation_changes(
 
     before = _exposure_at(session, config, effective)
     after = _exposure_at(session, config, now)
-    assets = {a.asset_id: a for a in asset_registry(config.pilot_id)[0]
+    assets = {a.asset_id: a for a in asset_registry(config.base_id)[0]
               if codes is None or a.district_code in codes}
 
     def exposed(rows: dict[str, Any], asset_id: str) -> bool:
@@ -367,6 +367,9 @@ def build_facts(
         "road_verdicts_are": "Floodboard's estimate, not a BMA rule",
         "facilities_are": "OpenStreetMap, not an official list",
         "confidence_is": "a pilot rule with reasons, not a probability",
+        **({"replay": True, "simulated_time_bangkok": _clock(now.isoformat()),
+            "replay_uses": "today's facility list, cameras and rules, not those of the time"}
+           if config.is_replay else {}),
     })
     labels["L"] = {"kind": "limits"}
     return {"facts": facts, "labels": labels, "changes": changes,

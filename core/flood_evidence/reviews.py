@@ -54,7 +54,7 @@ def _clean_note(note: str | None) -> str | None:
 def _check_camera(config: PilotConfig, camera_id: str | None) -> None:
     if camera_id is None:
         return
-    camera = next((c for c in camera_registry(config.pilot_id) if c.camera_id == camera_id), None)
+    camera = next((c for c in camera_registry(config.base_id) if c.camera_id == camera_id), None)
     if camera is None or camera.placeholder or camera.access_mode not in VIEWER_MODES:
         raise ReviewRejected("camera_not_usable", "That camera cannot be looked through")
 
@@ -105,7 +105,7 @@ def review_facility(
 ) -> FloodReview:
     if action not in FACILITY_ACTIONS:
         raise ReviewRejected("unknown_action", "Unknown access action")
-    assets, _ = asset_registry(config.pilot_id)
+    assets, _ = asset_registry(config.base_id)
     if not any(a.asset_id == asset_id for a in assets):
         raise LookupError(asset_id)
     if action == "withdraw":

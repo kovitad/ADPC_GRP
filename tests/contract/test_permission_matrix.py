@@ -144,6 +144,15 @@ MATRIX = {
     "flood_facts": (401, 200, 200, 403, 200),
     # A non-member Platform Admin gets the computed answer without AI (200, withheld).
     "flood_ask": (401, 200, 200, 403, 200),
+    # ADR-0044: anyone who can open the pilot sees its replays; building, moving, restarting and
+    # deleting one needs a pilot-Hub membership. The fixture has no stored fetches (422 for a new
+    # replay) and no replay (404).
+    "flood_replays": (401, 200, 200, 403, 200),
+    "flood_replay_create": (401, 422, 422, 403, 403),
+    "flood_replay": (401, 404, 404, 403, 404),
+    "flood_replay_advance": (401, 404, 404, 403, 403),
+    "flood_replay_restart": (401, 404, 404, 403, 403),
+    "flood_replay_delete": (401, 404, 404, 403, 403),
     # No road is stored in the fixture, so allowed callers are told it is not found.
     "flood_road_cameras": (401, 404, 404, 403, 404),
     # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
@@ -247,6 +256,18 @@ MATRIX_OPERATION_IDS = {
     "flood_changes": "read_changes_api_v1_pilot_flood__pilot_id__changes_get",
     "flood_facts": "read_facts_api_v1_pilot_flood__pilot_id__facts_get",
     "flood_ask": "ask_api_v1_pilot_flood__pilot_id__ask_post",
+    "flood_replays": "list_replays_api_v1_pilot_flood__pilot_id__replays_get",
+    "flood_replay_create": "post_replay_api_v1_pilot_flood__pilot_id__replays_post",
+    "flood_replay": "read_replay_api_v1_pilot_flood__pilot_id__replays__replay_id__get",
+    "flood_replay_advance": (
+        "post_advance_api_v1_pilot_flood__pilot_id__replays__replay_id__advance_post"
+    ),
+    "flood_replay_restart": (
+        "post_restart_api_v1_pilot_flood__pilot_id__replays__replay_id__restart_post"
+    ),
+    "flood_replay_delete": (
+        "delete_replay_api_v1_pilot_flood__pilot_id__replays__replay_id__delete"
+    ),
     "flood_road_cameras": (
         "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
     ),
@@ -579,6 +600,22 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "flood_facts": ("GET", "/api/v1/pilot/flood/bangkok/facts", None),
         "flood_ask": (
             "POST", "/api/v1/pilot/flood/bangkok/ask", {"question": "What changed?"}
+        ),
+        "flood_replays": ("GET", "/api/v1/pilot/flood/bangkok/replays", None),
+        "flood_replay_create": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays",
+            {"start_at": "2026-10-01T00:00:00Z", "end_at": "2026-10-01T01:00:00Z"},
+        ),
+        "flood_replay": ("GET", "/api/v1/pilot/flood/bangkok/replays/r00000000000", None),
+        "flood_replay_advance": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/advance",
+            {"by_minutes": 10},
+        ),
+        "flood_replay_restart": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/restart", None
+        ),
+        "flood_replay_delete": (
+            "DELETE", "/api/v1/pilot/flood/bangkok/replays/r00000000000", None
         ),
         "flood_road_cameras": (
             "GET", "/api/v1/pilot/flood/bangkok/roads/0123456789abcdef/cameras", None

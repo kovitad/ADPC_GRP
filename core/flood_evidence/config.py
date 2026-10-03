@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,15 @@ class PilotConfig:
     # Facility exposure distances in metres (ADR-0040): near_m and frontage_m.
     exposure: dict[str, float]
     sources: tuple[SourceConfig, ...]
+    # Registries, outlines and Hubs come from ``base_id``. A replay (ADR-0044) runs in its own
+    # ``pilot_id`` namespace with ``base_id`` set to the live pilot and ``clock`` set to the
+    # simulated time it has processed up to; ``clock`` is None for live data.
+    base_id: str = ""
+    clock: datetime | None = field(default=None, compare=False)
+
+    @property
+    def is_replay(self) -> bool:
+        return self.base_id != self.pilot_id
 
     def source(self, source_id: str) -> SourceConfig | None:
         return next((s for s in self.sources if s.source_id == source_id), None)
@@ -73,6 +83,7 @@ def _parse(raw: dict[str, Any]) -> PilotConfig:
             "frontage_m": float(raw.get("exposure", {}).get("frontage_m", 60)),
         },
         sources=sources,
+        base_id=raw["pilot_id"],
     )
 
 

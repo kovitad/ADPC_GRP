@@ -1,6 +1,7 @@
 import logging
 import signal
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
 
@@ -20,6 +21,7 @@ from core.data_library_models import DataImportJob
 from core.db import get_engine, session_scope
 from core.flood_evidence.config import PILOT_IDS, pilot_config
 from core.flood_evidence.ingest import pull_due
+from core.flood_evidence.replay import run_one_step as replay_step
 from core.hazard_import import (
     PLATFORM_HAZARD_DATASET_ID,
     HazardImportError,
@@ -84,6 +86,9 @@ def run() -> None:
         ):
             run_flood_pulls(storage)
             last_flood_check = time.monotonic()
+        # Replays (ADR-0044): one stored fetch per idle pass, after everything live.
+        if not worked:
+            worked = run_one_replay_step(storage)
         if not worked:
             stop_event.wait(POLL_SECONDS)
 
@@ -100,6 +105,15 @@ def run_flood_pulls(storage: LocalStorage) -> None:
                 pull_due(session, storage, config)
         except Exception:
             logger.exception("Flood pilot %s pull failed; will retry", pilot_id)
+
+
+def run_one_replay_step(storage: LocalStorage) -> bool:
+    try:
+        with Session(get_engine()) as session:
+            return replay_step(session, storage, datetime.now(UTC))
+    except SQLAlchemyError:
+        logger.exception("Replay step database error; will retry")
+        return False
 
 
 def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:

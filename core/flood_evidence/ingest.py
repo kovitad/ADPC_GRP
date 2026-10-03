@@ -177,8 +177,12 @@ def ingest_body(
     source: SourceConfig,
     pulled: Pulled,
     retrieved_at: datetime,
+    stored_key: str | None = None,
 ) -> FloodSourceFetch:
-    """Record one attempt and, when its bytes parse, every observed state in it."""
+    """Record one attempt and, when its bytes parse, every observed state in it.
+
+    ``stored_key`` points a replay at the original raw bytes instead of storing a copy.
+    """
 
     fetch = FloodSourceFetch(
         pilot_id=config.pilot_id,
@@ -195,7 +199,7 @@ def ingest_body(
         return fetch
     fetch.byte_count = len(pulled.body)
     fetch.sha256 = sha256_text_bytes(pulled.body)
-    fetch.storage_key = _store_raw(
+    fetch.storage_key = stored_key or _store_raw(
         storage, config.pilot_id, source.source_id, retrieved_at, pulled.body
     )
     try:
