@@ -297,7 +297,8 @@
       const detail = s.last_success_at
         ? say("cov.fb.detail", { age: ago(s.last_success_at), n: number(s.last_success_records ?? 0), license: s.license })
         : say("cov.fb.never");
-      row(say(s.source_id === "floodboard_roads" ? "cov.fb.roads" : "cov.fb.reports"), say(`cov.${s.state}`), detail, tone);
+      const label = { floodboard_roads: "cov.fb.roads", floodboard_reports: "cov.fb.reports", longdo_events: "cov.longdo_events" }[s.source_id];
+      row(label ? say(label) : s.source_id, say(`cov.${s.state}`), detail, tone);
     });
     row(say("cov.bma"), say("cov.not"), say("cov.bma.detail"), "none");
     const cams = state.cameras ? state.cameras.cameras : [];

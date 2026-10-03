@@ -24,7 +24,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.flood_evidence.config import PilotConfig, SourceConfig
-from core.flood_evidence.floodboard import PARSERS
+from core.flood_evidence.floodboard import PARSERS as FLOODBOARD_PARSERS
+from core.flood_evidence.longdo_events import parse_events
 from core.flood_evidence.models import (
     FETCH_FORMAT_ERROR,
     FETCH_HTTP_ERROR,
@@ -44,6 +45,14 @@ from core.storage import LocalStorage
 
 logger = logging.getLogger("grp.flood_evidence")
 RULE_VERSION = "FloodboardAdapter v0.1"
+
+
+def parse_source(adapter: str, body: bytes, retrieved_at: datetime) -> list[ObservationDraft]:
+    """Every adapter's parser in one place. Event feeds need the retrieval time for expiry."""
+
+    if adapter == "longdo_events":
+        return parse_events(body, retrieved_at)
+    return FLOODBOARD_PARSERS[adapter](body)
 FETCH_TIMEOUT_SECONDS = 20.0
 USER_AGENT = "GRP-flood-pilot/0.1 (ADPC SERVIR pilot)"
 IN_CHUNK = 500
@@ -203,7 +212,7 @@ def ingest_body(
         storage, config.pilot_id, source.source_id, retrieved_at, pulled.body
     )
     try:
-        drafts = PARSERS[source.adapter](pulled.body)
+        drafts = parse_source(source.adapter, pulled.body, retrieved_at)
     except SourceFormatError as error:
         fetch.outcome = FETCH_FORMAT_ERROR
         fetch.error = str(error)[:500]

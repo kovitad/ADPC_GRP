@@ -28,6 +28,8 @@ HEALTH_OFFLINE = "offline"
 HEALTH_NEVER = "never_fetched"
 ROADS_ADAPTER = "floodboard_roads"
 REPORTS_ADAPTER = "floodboard_reports"
+# Every adapter whose observations are point reports (ADR-0048 adds the Longdo event feed).
+REPORT_ADAPTERS = frozenset({REPORTS_ADAPTER, "longdo_events"})
 
 
 def _iso(moment: datetime | None) -> str | None:
@@ -169,18 +171,23 @@ def road_by_id(
     return _road_feature(row, freshness(utc(row.reported_at), as_of, config.freshness_minutes))
 
 
+def _report_rank(row: FloodObservation) -> tuple:
+    direct = row.source_id != REPORTS_ADAPTER and row.external_id.startswith("longdo:")
+    return (direct, utc(row.last_seen_at))
+
+
 def recent_reports(
     session: Session, config: PilotConfig, as_of: datetime, hours: int
 ) -> dict[str, Any]:
     """The newest state of each report observed in the window. No text and no links."""
 
-    source = next((s for s in config.sources if s.adapter == REPORTS_ADAPTER), None)
+    report_sources = [s.source_id for s in config.sources if s.adapter in REPORT_ADAPTERS]
     newest: dict[str, FloodObservation] = {}
-    if source is not None:
+    if report_sources:
         rows = session.scalars(
             select(FloodObservation).where(
                 FloodObservation.pilot_id == config.pilot_id,
-                FloodObservation.source_id == source.source_id,
+                FloodObservation.source_id.in_(report_sources),
                 FloodObservation.kind == REPORT,
                 FloodObservation.observed_at >= as_of - timedelta(hours=hours),
                 FloodObservation.observed_at <= as_of,
@@ -188,8 +195,10 @@ def recent_reports(
             )
         )
         for row in rows:
+            # The same report can arrive twice: Floodboard relays Longdo events under the same
+            # ID ("longdo:<eid>"). The direct copy wins, since it names the real source family.
             held = newest.get(row.record_key)
-            if held is None or utc(row.last_seen_at) > utc(held.last_seen_at):
+            if held is None or _report_rank(row) > _report_rank(held):
                 newest[row.record_key] = row
     features = []
     for row in sorted(newest.values(), key=lambda r: utc(r.observed_at), reverse=True):

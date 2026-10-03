@@ -89,6 +89,24 @@
       "pii": "Report text and links can identify people. GRP keeps only a hash of the text and never displays it.",
       "redistribution": "Export allowed with attribution; quoted text not cleared",
       "quality_notes": "Each row names its underlying source (traffy, crowd, bma_sensor, bma_dds, news). A sensor keeps one ID across readings."
+    },
+    {
+      "source_id": "longdo_events",
+      "adapter": "longdo_events",
+      "url": "https://event.longdo.com/feed/json",
+      "interval_minutes": 15,
+      "max_bytes": 10000000,
+      "owner": "Longdo Traffic (Metamedia Technology)",
+      "dataset": "Traffic events feed: flood events only",
+      "purpose": "Independent flood reports, mostly official Department of Highways (DOH) road status",
+      "access": "Public HTTPS feed, no key",
+      "license": "Not stated; credit Longdo Traffic, DOH and iTIC",
+      "attribution": "Longdo Traffic event feed (DOH, iTIC and Longdo users)",
+      "update_frequency": "Continuous",
+      "coverage": "Thailand; GRP keeps the Bangkok region",
+      "pii": "Contributor names can be usernames: only a source family is kept. Description text is kept as a hash.",
+      "redistribution": "Not stated; local demo only",
+      "quality_notes": "Flood events only (icon 'flood'). 'Passable' means flooded but passable, never dry. Times are Bangkok time; expired events are dropped."
     }
   ]
 }

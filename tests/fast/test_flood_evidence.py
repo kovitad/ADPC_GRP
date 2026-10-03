@@ -225,7 +225,9 @@ def test_pull_due_respects_the_interval_and_records_failures(session, storage) -
     pull_due(session, storage, CONFIG, now, fetcher)
     pull_due(session, storage, CONFIG, now + timedelta(minutes=5), fetcher)
     pull_due(session, storage, CONFIG, now + timedelta(minutes=10), fetcher)
-    assert calls == ["floodboard_roads", "floodboard_reports", "floodboard_roads"]
+    # Roads every 10 minutes; reports and the Longdo event feed every 15.
+    assert calls == ["floodboard_roads", "floodboard_reports", "longdo_events",
+                     "floodboard_roads"]
     outcomes = session.scalars(select(FloodSourceFetch.outcome)).all()
     assert set(outcomes) == {FETCH_HTTP_ERROR}
 
@@ -331,3 +333,27 @@ def test_a_road_is_found_by_its_short_id_in_the_latest_snapshot(session, storage
     found = road_by_id(session, CONFIG, at, road["properties"]["id"])
     assert found["geometry"] == road["geometry"]
     assert road_by_id(session, CONFIG, at, "0" * 16) is None
+
+
+def test_a_longdo_event_relayed_by_floodboard_counts_once_as_the_direct_copy(
+    session, storage
+) -> None:
+    from core.flood_evidence.longdo_events import BANGKOK_TIME
+
+    at = _newest_report_time() + timedelta(minutes=1)
+    start = at.astimezone(BANGKOK_TIME).strftime("%Y-%m-%d %H:%M:%S")
+    stop = (at + timedelta(hours=3)).astimezone(BANGKOK_TIME).strftime("%Y-%m-%d %H:%M:%S")
+    header = REPORTS.decode("utf-8-sig").splitlines()[0]
+    relayed = (header + '\n"longdo:42","' + (at - timedelta(minutes=1)).strftime(
+        "%Y-%m-%dT%H:%M:%S.000Z") + '","13.80","100.55","longdo","crowd","","false","false",'
+        '"false","0.5","",""\n').encode()
+    _ingest(session, storage, REPORTS_SOURCE, relayed, at)
+    event = json.dumps([{"eid": "42", "title": "น้ำท่วม (ผ่านได้)", "title_en": "Flood",
+                         "start": start, "stop": stop, "latitude": "13.80", "longitude": "100.55",
+                         "contributor": "DOH Admin", "icon": "flood", "type": "6",
+                         "description": "x", "severity": ""}]).encode()
+    _ingest(session, storage, CONFIG.source("longdo_events"), event, at)
+    reports = [f for f in recent_reports(session, CONFIG, at + timedelta(minutes=1), 6)["features"]
+               if f["properties"]["observed_at"].startswith(at.strftime("%Y-%m-%dT%H"))]
+    sources = [f["properties"]["underlying_source"] for f in reports]
+    assert sources.count("doh") == 1 and "longdo" not in sources

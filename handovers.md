@@ -115,7 +115,19 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): live camera views, BMA plus iTIC/Longdo (ADR-0047)
+### 3 October (latest): Longdo APIs. Part 1, flood events (ADR-0048)
+
+- **Chosen:** the owner chose all three Longdo integrations: events, rain and forecast, and
+  routing. The key is in `.env` as `LONGDO_API_KEY`; never print or log it.
+- **Built:** source `longdo_events` (public feed, no key). It keeps flood events only, in Bangkok
+  time, drops expired ones, skips points outside the region, and maps contributors to families
+  (`doh`, `itic`, `longdo_user`). DOH is official, like BMA. The direct copy beats Floodboard's
+  relay of the same `longdo:<eid>`.
+- **Freshness** comes from `start`, so the morning DOH statuses age out of the 6-hour window.
+- **Next:** part 2, rain now and the 30-minute forecast (Weather API, key server-side, live
+  only, never evidence); part 3, routing access (read-only, a separate `route_check` field).
+
+### 3 October: live camera views, BMA plus iTIC/Longdo (ADR-0047)
 
 - **BMA stream hosts are not public** (no DNS). BMA's page plays them through its relay
   `/api/proxy?rtcUrl=…`, which returned HTTP 500 for every camera tried from here.

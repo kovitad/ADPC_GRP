@@ -31,7 +31,11 @@ from core.flood_evidence.geo import (
 )
 
 RULE_VERSION = "IncidentGrouping v0.1"
-FAMILY = {"bma_sensor": "bma", "bma_dds": "bma", "traffy": "traffy", "crowd": "crowd"}
+FAMILY = {"bma_sensor": "bma", "bma_dds": "bma", "traffy": "traffy", "crowd": "crowd",
+          # Longdo event feed (ADR-0048): Department of Highways, iTIC staff, Longdo users.
+          "doh": "doh", "itic": "itic", "longdo_user": "longdo_user"}
+# Families from an official body; with another family they make an incident high confidence.
+OFFICIAL = frozenset({"bma", "doh"})
 FRESH_CONTRARY = frozenset({"current", "recent"})
 CONFIDENCE_ORDER = {"conflicting": 0, "low": 1, "medium": 2, "high": 3}
 
@@ -188,6 +192,8 @@ def assess_cluster(cluster: Cluster, as_of: datetime, params: Params) -> dict[st
         reasons.append("several_reports_one_type")
     if "bma" in families:
         reasons.append("bma_reading")
+    if "doh" in families:
+        reasons.append("doh_report")
     if any(r["properties"].get("evidence_class") == "synthetic_demo"
            for r in cluster.reports + cluster.contrary):
         reasons.append("synthetic_evidence")
@@ -196,9 +202,9 @@ def assess_cluster(cluster: Cluster, as_of: datetime, params: Params) -> dict[st
 
     if conflict:
         confidence = "conflicting"
-    elif "bma" in families and len(families) >= 2:
+    elif families & OFFICIAL and len(families) >= 2:
         confidence = "high"
-    elif len(families) >= 2 or families == {"bma"}:
+    elif len(families) >= 2 or (families and families <= OFFICIAL):
         confidence = "medium"
     else:
         confidence = "low"
