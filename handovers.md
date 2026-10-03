@@ -128,8 +128,11 @@ RP20/RP50 rasters and methods exist.
   - The page refreshes an image inside the card and pauses after 10 minutes.
 - **Live check:** camera 1362 gave a real 21.6 KB picture through the running app.
   Not yet checked in a browser (the Chrome extension was not connected).
+- **Fix, same day:** every camera showed the same picture, because bmatraffic sends the session's
+  last-opened camera. Now there is one session per watched camera (idle sessions are dropped
+  after 30 seconds, at most 16). 1362 and 1108 checked live.
 - **BMA request:** now says what the demo does and asks permission before wider use (Gate B).
-- **Tests:** 1,087 passed, 2 skipped; Ruff clean.
+- **Tests:** 1,089 passed, 2 skipped; Ruff clean.
 
 ### 3 October: camera fixes and source switches on the map
 

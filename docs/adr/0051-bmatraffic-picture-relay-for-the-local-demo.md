@@ -83,3 +83,19 @@ bounded by the limits above. Every other upstream call stays in the worker.
   - the camera list shows `frames`.
 - Live check in the Docker Desktop stack: camera 1362 (Sam Sen junction) returned a real
   21.6 KB picture in 1.9 seconds, including opening the session.
+
+## Amendment, 3 October 2026: one session per camera
+
+The owner saw every bmatraffic camera show the same picture. bmatraffic.com sends the picture of
+the camera whose `PlayVideo.aspx` the session opened last, and ignores the `image` number.
+Checked with curl: the same session gave 1362's picture for `image=1108` until it opened 1108's
+player.
+
+- **One session per watched camera.** Each session opens the home page and that camera's player
+  once.
+- **Sessions are dropped** after 30 seconds without a viewer, which also drops the picture.
+  At most 16 sessions exist at once; beyond that the least recently used idle one goes, or the
+  request gets 429.
+- **Each camera has its own lock,** so a slow camera no longer delays the others. This replaces
+  the single-lock consequence above.
+- **Live check:** cameras 1362 and 1108 gave different, correct pictures.

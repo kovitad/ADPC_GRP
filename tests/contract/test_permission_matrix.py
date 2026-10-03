@@ -759,7 +759,7 @@ def test_the_camera_relay_serves_only_bmatraffic_pictures_when_switched_on(
     monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
     asked: list[str] = []
 
-    def site(path: str) -> tuple[int, str, bytes]:
+    def site(_session: str, path: str) -> tuple[int, str, bytes]:
         asked.append(path)
         return (200, "image/jpeg", picture) if path.startswith("/show.aspx") else (
             200, "text/html", b"<html>")
