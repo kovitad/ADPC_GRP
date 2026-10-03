@@ -115,7 +115,21 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): real BMA cameras (ADR-0046)
+### 3 October (latest): live camera views, BMA plus iTIC/Longdo (ADR-0047)
+
+- **BMA stream hosts are not public** (no DNS). BMA's page plays them through its relay
+  `/api/proxy?rtcUrl=…`, which returned HTTP 500 for every camera tried from here.
+- **Added iTIC/Longdo:** the documented feed `camera.longdo.com/feed/?command=json`. 21 Bangkok
+  cameras with HLS, live and playable by other sites. `grpcli/longdo_cameras_capture.py` writes
+  `core/data/flood_pilot_bangkok_cameras_longdo.json`. The registry loads all camera files
+  together (893 cameras).
+- **On the page:** "▶ Play live here" (hls.js from jsDelivr, or MP4 through BMA's relay), one
+  player at a time, a 15 s failure message, camera markers that open a camera card, and a credit
+  line on each player.
+- **Not verified:** frames in a real browser. The owner should click an iTIC camera, for example
+  near Wong Sawang in Bang Sue.
+
+### 3 October: real BMA cameras (ADR-0046)
 
 - **Source:** BMA's flood site serves its camera list without a login. The owner approved it for
   the demo.

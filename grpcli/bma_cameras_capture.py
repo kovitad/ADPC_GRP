@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,9 @@ SOURCE_URL = (
     "?limit=-1"
 )
 USER_AGENT = "GRP-flood-pilot/0.1 (ADPC SERVIR pilot)"
+# BMA's own page plays each camera through this public relay; the raw stream hosts are not
+# reachable from the public internet (checked 3 October 2026).
+RELAY = "https://floodbangkok.bangkok.go.th/api/proxy?rtcUrl="
 
 
 def download(path: Path) -> None:
@@ -63,7 +67,9 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "lat": round(float(lat), 6),
             "lon": round(float(lon), 6),
             # The provider's own live view, opened in a new tab by the officer's browser.
-            "viewer_url": url,
+            "viewer_url": RELAY + urllib.parse.quote(url, safe=""),
+            "live": {"kind": "mp4", "url": RELAY + urllib.parse.quote(url, safe="")},
+            "provider_stream": url,
             "related_sensor_ids": [item["SensorName"]] if item.get("SensorName") else [],
             "district_code": district["admin_code"],
         })
@@ -79,7 +85,8 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "terms": "Not confirmed. Approved by the Product Owner for the Gate A local demo on "
                      "3 October 2026; a request to BMA is pending "
                      "(docs/pilot/2026-10-03_BMA_CCTV_Metadata_Request.md).",
-            "use": "Location, linked BMA sensor and a link to the provider's live view only. "
+            "use": "Location, linked BMA sensor and BMA's own public live relay, played by the "
+                   "officer's browser. "
                    "GRP never embeds, relays, records or analyses video.",
         },
         # Shared by every camera; ``parse_registry`` merges these into each record.
@@ -97,6 +104,7 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "ingestion_allowed": False,
             "cv_allowed": False,
             "placeholder": False,
+            "source_label": "BMA flood site (floodbangkok.bangkok.go.th)",
         },
         "cameras": cameras,
     }

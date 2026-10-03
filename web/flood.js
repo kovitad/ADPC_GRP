@@ -220,6 +220,7 @@
             fillColor: colour, fillOpacity: c.placeholder ? 0 : 0.6,
           });
           marker.bindTooltip(textOf(cameraName(c)), { sticky: true });
+          marker.on("click", () => showCamera(c));
           return marker;
         }),
     ).addTo(map);
@@ -305,7 +306,10 @@
     } else if (!cams.length) {
       row(say("cov.cctv"), say("cov.not"), say("cov.cctv.detail"), "none");
     } else {
-      row(say("cov.cctv"), say("cov.bma"), say("cov.cctv.detail.bma", { n: number(cams.length) }), "warn");
+      const count = (provider) => cams.filter((c) => c.provider === provider).length;
+      row(say("cov.cctv"), say("cov.cams"), say("cov.cctv.detail.combined", {
+        n: number(cams.length), bma: number(count("BMA_DDS")), itic: number(count("ITIC_LONGDO")),
+      }), "warn");
     }
     if (state.assets && state.assets.assets.length) {
       const stamp = state.assets.source.osm_timestamp;
@@ -632,6 +636,7 @@
   };
 
   const showIncident = async (incidentId) => {
+    stopLive();
     state.incident = incidentId;
     state.selected = null;
     state.facility = null;
@@ -794,13 +799,120 @@
     renderCameras(row, answer);
   };
 
+  // --- Live camera views (ADR-0047): played by the officer's browser, one at a time ---------
+  const HLS_JS = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
+  let livePlayer = null;
+  let hlsLoading = null;
+
+  const stopLive = () => {
+    if (!livePlayer) return;
+    if (livePlayer.hls) livePlayer.hls.destroy();
+    livePlayer.video.pause();
+    livePlayer.video.removeAttribute("src");
+    livePlayer.video.load();
+    window.clearTimeout(livePlayer.timer);
+    livePlayer.box.replaceChildren();
+    livePlayer = null;
+  };
+
+  const loadHlsJs = () => {
+    if (window.Hls) return Promise.resolve(window.Hls);
+    hlsLoading = hlsLoading || new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = HLS_JS;
+      script.onload = () => resolve(window.Hls);
+      script.onerror = reject;
+      document.head.append(script);
+    });
+    return hlsLoading;
+  };
+
+  const playLive = async (camera, box) => {
+    stopLive();
+    const video = document.createElement("video");
+    video.className = "fl-live__video";
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.controls = true;
+    const status = el("p", "fl-live__status", say("cam.connecting"));
+    const credit = el("p", "fl-live__credit", say("cam.live", { source: camera.source_label }));
+    box.replaceChildren(video, status, credit);
+    const player = { video, box, hls: null, timer: null };
+    livePlayer = player;
+    const fail = () => {
+      if (livePlayer !== player) return;
+      status.textContent = say("cam.failed");
+      status.classList.add("is-bad");
+    };
+    video.addEventListener("playing", () => {
+      window.clearTimeout(player.timer);
+      status.textContent = "";
+    });
+    video.addEventListener("error", fail);
+    player.timer = window.setTimeout(() => { if (video.readyState < 2) fail(); }, 15000);
+    const { kind, url } = camera.live;
+    if (kind === "hls" && !video.canPlayType("application/vnd.apple.mpegurl")) {
+      try {
+        const Hls = await loadHlsJs();
+        if (livePlayer !== player) return;
+        if (!Hls || !Hls.isSupported()) { fail(); return; }
+        player.hls = new Hls({ liveDurationInfinity: true });
+        player.hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) fail(); });
+        player.hls.loadSource(url);
+        player.hls.attachMedia(video);
+      } catch (error) {
+        fail();
+      }
+    } else {
+      video.src = url;
+    }
+  };
+
+  const liveControls = (camera) => {
+    const wrap = el("div", "fl-live");
+    if (!camera.live) return wrap;
+    const box = el("div", "fl-live__box");
+    const button = el("button", "button button--secondary button--compact", say("cam.play"));
+    button.type = "button";
+    button.addEventListener("click", () => {
+      if (livePlayer && livePlayer.box === box) {
+        stopLive();
+        button.textContent = say("cam.play");
+      } else {
+        document.querySelectorAll(".fl-live button").forEach((b) => { b.textContent = say("cam.play"); });
+        playLive(camera, box);
+        button.textContent = say("cam.stop");
+      }
+    });
+    wrap.append(button, box);
+    return wrap;
+  };
+
+  const showCamera = (camera) => {
+    stopLive();
+    state.selected = null;
+    state.facility = null;
+    state.incident = null;
+    const box = $("[data-evidence]");
+    box.replaceChildren();
+    box.append(el("p", "fl-evidence__kicker", say("cam.kicker")));
+    box.append(el("h2", "fl-evidence__title", cameraName(camera)));
+    box.append(el("p", "fl-muted", say("cam.source", { source: camera.source_label })));
+    if (camera.related_sensor_ids && camera.related_sensor_ids.length) {
+      box.append(el("p", "fl-muted", say("cam.sensor", { id: camera.related_sensor_ids.join(", ") })));
+    }
+    box.append(liveControls(camera));
+    box.append(el("p", "fl-muted", say("cam.card.note")));
+  };
+
   const renderCameras = (row, answer) => {
     if (!answer.cameras.length) {
       row.append(el("span", "", say("cam.none", { r: answer.radius_m })));
       return;
     }
     const items = el("ul", "fl-cams");
-    answer.cameras.slice(0, 3).forEach((c) => {
+    answer.cameras.slice(0, 5).forEach((c) => {
       const li = el("li", "fl-cam");
       li.append(el("span", "fl-cam__name", cameraName(c)));
       li.append(el("span", "fl-cam__meta", [
@@ -813,13 +925,8 @@
       }
       const why = c.reasons.map((r) => say(`cam.reason.${r}`)).join(", ");
       li.append(el("span", "fl-cam__role", c.role === "officer_can_look" ? say("cam.look") : say("cam.cannot", { reasons: why })));
-      if (c.viewer_url && !c.placeholder) {
-        const link = el("a", "fl-cam__open", say("cam.open"));
-        link.href = c.viewer_url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        li.append(link);
-      }
+      li.append(el("span", "fl-cam__meta", say("cam.source", { source: c.source_label })));
+      if (c.live) li.append(liveControls(c));
       items.append(li);
     });
     row.append(items);
@@ -835,6 +942,7 @@
   };
 
   const showFacility = (asset) => {
+    stopLive();
     state.selected = null;
     state.incident = null;
     state.facility = asset;
@@ -875,6 +983,7 @@
   };
 
   const showEvidence = (feature) => {
+    stopLive();
     state.facility = null;
     state.incident = null;
     state.selected = feature;

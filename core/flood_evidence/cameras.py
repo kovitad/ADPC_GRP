@@ -20,7 +20,6 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
 from core.flood_evidence.config import DATA
@@ -31,6 +30,7 @@ ACCESS_MODES = frozenset(
 )
 FRAME_MODES = frozenset({"snapshot", "hls", "mjpeg", "webrtc"})
 VIEWER_MODES = frozenset({"external_viewer", "embed"})
+LIVE_KINDS = frozenset({"hls", "mp4"})
 STATUSES = frozenset({"online", "offline", "unknown"})
 PLACEHOLDER = "PLACEHOLDER"
 HEALTH_FRESH = timedelta(minutes=30)
@@ -66,9 +66,15 @@ class Camera:
     ingestion_allowed: bool
     cv_allowed: bool
     placeholder: bool
+    # A live view the provider publishes for viewers' browsers (ADR-0047): HLS or MP4. The
+    # officer's browser plays it; GRP never fetches, relays, records or analyses it.
+    live_kind: str | None = None
+    live_url: str | None = None
+    source_label: str = ""
 
     def public(self) -> dict[str, Any]:
-        """What operators see. Stream and snapshot endpoints are never sent to the browser."""
+        """What operators see. Ingestion endpoints never go to the browser; a published live
+        view does, because only the officer's browser plays it."""
 
         return {
             "camera_id": self.camera_id,
@@ -87,6 +93,8 @@ class Camera:
             "related_sensor_ids": list(self.related_sensor_ids),
             "rights": self.rights,
             "placeholder": self.placeholder,
+            "live": {"kind": self.live_kind, "url": self.live_url} if self.live_url else None,
+            "source_label": self.source_label,
         }
 
 
@@ -146,6 +154,16 @@ def parse_camera(item: dict[str, Any]) -> Camera:
         raise CameraRegistryError("Only placeholders use the PLACEHOLDER provider")
     elif access_mode == "external_viewer" and not viewer:
         raise CameraRegistryError("An external-viewer camera needs its viewer URL")
+    live = item.get("live")
+    live_kind = live_url = None
+    if live:
+        if not isinstance(live, dict) or live.get("kind") not in LIVE_KINDS:
+            raise CameraRegistryError(f"A live view must be one of {sorted(LIVE_KINDS)}")
+        if placeholder:
+            raise CameraRegistryError("A placeholder has no live view")
+        live_kind, live_url = live["kind"], _https(live.get("url"), "live.url")
+        if not live_url:
+            raise CameraRegistryError("A live view needs its URL")
     checked = item.get("status_checked_at")
     try:
         checked_at = datetime.fromisoformat(checked).astimezone(UTC) if checked else None
@@ -172,6 +190,9 @@ def parse_camera(item: dict[str, Any]) -> Camera:
         ingestion_allowed=ingestion_allowed,
         cv_allowed=cv_allowed,
         placeholder=placeholder,
+        live_kind=live_kind,
+        live_url=live_url,
+        source_label=str(item.get("source_label") or item.get("provider") or ""),
     )
 
 
@@ -188,10 +209,15 @@ def parse_registry(raw: dict[str, Any]) -> tuple[Camera, ...]:
 
 @lru_cache
 def camera_registry(pilot_id: str) -> tuple[Camera, ...]:
-    path = DATA / f"flood_pilot_{pilot_id}_cameras.json"
-    if not Path(path).exists():
-        return ()
-    return parse_registry(json.loads(path.read_text(encoding="utf-8")))
+    """Every source's file (``flood_pilot_<id>_cameras*.json``), combined. IDs never repeat."""
+
+    cameras: list[Camera] = []
+    for path in sorted(DATA.glob(f"flood_pilot_{pilot_id}_cameras*.json")):
+        cameras.extend(parse_registry(json.loads(path.read_text(encoding="utf-8"))))
+    ids = [c.camera_id for c in cameras]
+    if len(ids) != len(set(ids)):
+        raise CameraRegistryError("Camera IDs repeat across sources")
+    return tuple(cameras)
 
 
 def frame_capable(camera: Camera) -> bool:

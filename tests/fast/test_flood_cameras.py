@@ -48,19 +48,44 @@ def _real(**changes):
     return item
 
 
-def test_shipped_registry_is_bma_cameras_that_are_links_never_evidence() -> None:
+def test_shipped_cameras_combine_both_sources_and_are_never_evidence() -> None:
     cameras = camera_registry("bangkok")
-    assert len(cameras) > 500 and not any(c.placeholder for c in cameras)
-    assert {c.provider for c in cameras} == {"BMA_DDS"}
+    by_provider = {p: [c for c in cameras if c.provider == p] for p in ("BMA_DDS", "ITIC_LONGDO")}
+    assert len(by_provider["BMA_DDS"]) > 500 and len(by_provider["ITIC_LONGDO"]) > 5
+    assert len(cameras) == sum(len(v) for v in by_provider.values())
     for camera in cameras:
-        assert not frame_capable(camera) and not camera.ingestion_allowed and not camera.cv_allowed
-        assert camera.access_mode == "external_viewer" and camera.viewer_url.startswith("https://")
+        assert not camera.placeholder and not frame_capable(camera)
+        assert not camera.ingestion_allowed and not camera.cv_allowed
         assert camera.stream_url is None and camera.snapshot_url is None
+        assert camera.live_url and camera.live_url.startswith("https://")
         role, reasons = corroboration_role(camera, ROAD, NOW)
         assert role == CANNOT_CONFIRM and "status_unknown" in reasons
-    assert sum(1 for c in cameras if c.related_sensor_ids) > 0.9 * len(cameras)
-    raw = json.loads((DATA / "flood_pilot_bangkok_cameras.json").read_text(encoding="utf-8"))
-    assert "not confirmed" in raw["_source"]["terms"].lower() and raw["_source"]["sha256"]
+        assert camera.public()["live"]["url"] == camera.live_url and camera.source_label
+    # BMA views go through BMA's own public relay; iTIC/Longdo cameras publish HLS.
+    assert all(c.live_kind == "mp4" and c.live_url.startswith(
+        "https://floodbangkok.bangkok.go.th/api/proxy?rtcUrl=") for c in by_provider["BMA_DDS"])
+    assert all(c.live_kind == "hls" for c in by_provider["ITIC_LONGDO"])
+    assert sum(1 for c in by_provider["BMA_DDS"] if c.related_sensor_ids) > 0.9 * len(
+        by_provider["BMA_DDS"])
+    for name in ("flood_pilot_bangkok_cameras.json", "flood_pilot_bangkok_cameras_longdo.json"):
+        raw = json.loads((DATA / name).read_text(encoding="utf-8"))
+        assert raw["_source"]["sha256"] and raw["_source"]["terms"]
+
+
+@pytest.mark.parametrize(
+    "live",
+    [{"kind": "rtsp", "url": "https://x/y"}, {"kind": "hls", "url": "http://x/y.m3u8"},
+     {"kind": "hls"}],
+)
+def test_live_views_must_be_hls_or_mp4_over_https(live) -> None:
+    with pytest.raises(CameraRegistryError):
+        parse_camera(_real(live=live))
+
+
+def test_a_placeholder_never_has_a_live_view() -> None:
+    with pytest.raises(CameraRegistryError):
+        parse_camera(_real(provider="PLACEHOLDER", placeholder=True, viewer_url=None,
+                           live={"kind": "hls", "url": "https://x/y.m3u8"}))
 
 
 def test_shared_defaults_are_merged_and_each_camera_still_checked() -> None:

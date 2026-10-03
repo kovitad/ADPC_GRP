@@ -139,3 +139,9 @@
 .fl-inject { margin-top: 0.6rem; padding: 0.5rem 0.7rem; border: 1px dashed #d6336c; border-radius: 8px; background: #fff5f8; }
 .fl-inject summary { cursor: pointer; font-weight: 600; color: #a61e4d; }
 .fl-inject input[type="number"] { width: 6rem; padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.fl-live { display: grid; gap: 0.3rem; margin-top: 0.35rem; }
+.fl-live .button { justify-self: start; }
+.fl-live__video { width: 100%; max-height: 260px; border-radius: 6px; background: #000; }
+.fl-live__status { margin: 0; color: var(--ink-500); font-size: 0.78rem; }
+.fl-live__status.is-bad { color: #a61e1e; }
+.fl-live__credit { margin: 0; color: var(--ink-500); font-size: 0.72rem; }
