@@ -132,6 +132,7 @@ MATRIX = {
     "flood_reports": (401, 200, 200, 403, 200),
     "flood_areas": (401, 200, 200, 403, 200),
     "flood_cameras": (401, 200, 200, 403, 200),
+    "flood_assets": (401, 200, 200, 403, 200),
     # No road is stored in the fixture, so allowed callers are told it is not found.
     "flood_road_cameras": (401, 404, 404, 403, 404),
     # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
@@ -221,6 +222,7 @@ MATRIX_OPERATION_IDS = {
     "flood_reports": "read_reports_api_v1_pilot_flood__pilot_id__reports_get",
     "flood_areas": "read_areas_api_v1_pilot_flood__pilot_id__areas_get",
     "flood_cameras": "read_cameras_api_v1_pilot_flood__pilot_id__cameras_get",
+    "flood_assets": "read_assets_api_v1_pilot_flood__pilot_id__assets_get",
     "flood_road_cameras": (
         "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
     ),
@@ -538,6 +540,7 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "flood_reports": ("GET", "/api/v1/pilot/flood/bangkok/reports", None),
         "flood_areas": ("GET", "/api/v1/pilot/flood/bangkok/areas", None),
         "flood_cameras": ("GET", "/api/v1/pilot/flood/bangkok/cameras", None),
+        "flood_assets": ("GET", "/api/v1/pilot/flood/bangkok/assets", None),
         "flood_road_cameras": (
             "GET", "/api/v1/pilot/flood/bangkok/roads/0123456789abcdef/cameras", None
         ),

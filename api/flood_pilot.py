@@ -22,6 +22,7 @@ from api.permissions import SignedInMember
 from api.sessions import CurrentPrincipal
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
+from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.situation import current_roads, recent_reports, road_by_id, situation
 from core.river_watch import bangkok_outlines
 
@@ -189,3 +190,12 @@ def read_road_cameras(
             camera_registry(config.pilot_id), road["geometry"], moment, radius_m
         ),
     }
+
+
+@router.get(
+    "/{pilot_id}/assets",
+    summary="Schools, hospitals and clinics with exposure and access states from the latest roads",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_assets(config: FloodPilot, session: DatabaseSession, as_of: AsOf = None) -> dict:
+    return latest_exposure(session, config, _as_of(as_of))

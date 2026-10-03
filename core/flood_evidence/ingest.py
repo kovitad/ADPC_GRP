@@ -209,6 +209,11 @@ def ingest_body(
     fetch.record_count = len(drafts)
     fetch.new_states = _apply(session, fetch, drafts)
     session.flush()
+    if source.adapter == "floodboard_roads":
+        # Imported here: exposure reads the snapshot through the situation module.
+        from core.flood_evidence.exposure import store_exposure
+
+        store_exposure(session, config, fetch)
     return fetch
 
 

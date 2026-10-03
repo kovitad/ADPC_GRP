@@ -1,0 +1,537 @@
+{
+ "_source": {
+  "provider": "OpenStreetMap contributors",
+  "license": "ODbL 1.0",
+  "attribution": "© OpenStreetMap contributors, ODbL",
+  "query": "[out:json][timeout:90];nwr[\"amenity\"~\"^(school|hospital|clinic)$\"](13.7946,100.50633,13.85893,100.59112);out center tags;",
+  "osm_timestamp": "2026-10-03T03:27:51Z",
+  "captured_at": "2026-10-03T03:28:49+00:00",
+  "areas": [
+   "1029",
+   "1030"
+  ],
+  "note": "Crowd-mapped. Labelled as OSM wherever shown; replace with an authoritative BMA list when one is available."
+ },
+ "assets": [
+  {
+   "asset_id": "osm:node/12435141401",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "Mor Ying Lardprao Animal Clinic",
+   "lat": 13.8102023,
+   "lon": 100.5674435,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/13875639182",
+   "asset_type": "clinic",
+   "name": "NP Prime Clinic - สาขาลาดพร้าว",
+   "name_en": "",
+   "lat": 13.8082395,
+   "lon": 100.5708801,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/13963957230",
+   "asset_type": "clinic",
+   "name": "Shine Clinic",
+   "name_en": "",
+   "lat": 13.8052897,
+   "lon": 100.5742103,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620815499",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "The Art",
+   "lat": 13.8286696,
+   "lon": 100.5683434,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620840297",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "V Square",
+   "lat": 13.8286701,
+   "lon": 100.5684177,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620840596",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "Nitipon",
+   "lat": 13.828607,
+   "lon": 100.5682031,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620842290",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "Revolution",
+   "lat": 13.8279292,
+   "lon": 100.5674191,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620842292",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "Nutta",
+   "lat": 13.8282827,
+   "lon": 100.5679565,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620843389",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "Celine",
+   "lat": 13.8306858,
+   "lon": 100.5613401,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4620843397",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "Pio",
+   "lat": 13.8285131,
+   "lon": 100.5683034,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/2440347102",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลเมโย",
+   "name_en": "Mayo Hospital",
+   "lat": 13.8354411,
+   "lon": 100.5738973,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4969552121",
+   "asset_type": "hospital",
+   "name": "สถานพยาบาลแพทย์แผนจีน มหาวิทยาลัยราชภัฏจันทรเกษม",
+   "name_en": "",
+   "lat": 13.8189754,
+   "lon": 100.5756447,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/123189159",
+   "asset_type": "hospital",
+   "name": "สถานพยาบาล",
+   "name_en": "Infirmary of Kasetsart University",
+   "lat": 13.8467299,
+   "lon": 100.5683329,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1249184586",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลมิราเคิล อ๊อฟไลท์",
+   "name_en": "Miracal of lifes",
+   "lat": 13.8156884,
+   "lon": 100.5527665,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1350679705",
+   "asset_type": "hospital",
+   "name": "ศูนย์บริการสาธารณะสุข 3 บางซื่อ",
+   "name_en": "",
+   "lat": 13.8023582,
+   "lon": 100.5339465,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1384673134",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลบางโพ",
+   "name_en": "",
+   "lat": 13.8068562,
+   "lon": 100.5229925,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1434648444",
+   "asset_type": "hospital",
+   "name": "ทัณฑสถานโรงพยาบาลราชทัณฑ์",
+   "name_en": "Department of Corrections Hospital",
+   "lat": 13.8496979,
+   "lon": 100.5534927,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/156691292",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลเกษมราษฎร์ ประชาชื่น",
+   "name_en": "",
+   "lat": 13.8318854,
+   "lon": 100.5386866,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/31134625",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลวิภาวดี",
+   "name_en": "Vibhavadi Hospital",
+   "lat": 13.8461353,
+   "lon": 100.5619709,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/544281344",
+   "asset_type": "hospital",
+   "name": "ศูนย์บริการสาธารณสุข 24 บางเขน",
+   "name_en": "Public Health Center 24 Bang Khen",
+   "lat": 13.8497864,
+   "lon": 100.581165,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/12325451426",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดบางโพอมาวาส",
+   "name_en": "Watbangpho Omawas School",
+   "lat": 13.8088854,
+   "lon": 100.5199436,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/1374590623",
+   "asset_type": "school",
+   "name": "Veterinary Technology",
+   "name_en": "",
+   "lat": 13.8456681,
+   "lon": 100.5764959,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/1374592027",
+   "asset_type": "school",
+   "name": "คณะสัตวแพทย์ศาสตร์",
+   "name_en": "Faculty of Veternary Medicine",
+   "lat": 13.8451226,
+   "lon": 100.5770893,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/13918623301",
+   "asset_type": "school",
+   "name": "",
+   "name_en": "Brighton College Bangkok Vibhavadi",
+   "lat": 13.8351425,
+   "lon": 100.5583105,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/1597519241",
+   "asset_type": "school",
+   "name": "ภาควิชาพืชไร่นา",
+   "name_en": "",
+   "lat": 13.850176,
+   "lon": 100.5720578,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/2099152266",
+   "asset_type": "school",
+   "name": "kid fun",
+   "name_en": "",
+   "lat": 13.838373,
+   "lon": 100.5510337,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/2099152267",
+   "asset_type": "school",
+   "name": "abcdschool",
+   "name_en": "",
+   "lat": 13.8383508,
+   "lon": 100.5511156,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/2099152268",
+   "asset_type": "school",
+   "name": "",
+   "name_en": "",
+   "lat": 13.8376082,
+   "lon": 100.5506193,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/4205599590",
+   "asset_type": "school",
+   "name": "",
+   "name_en": "",
+   "lat": 13.8139275,
+   "lon": 100.5401594,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/897205017",
+   "asset_type": "school",
+   "name": "อนุบาลสุดารักษ์",
+   "name_en": "",
+   "lat": 13.8448757,
+   "lon": 100.5815151,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1195339620",
+   "asset_type": "school",
+   "name": "โรงเรียนอนุบาลคหกรรมศาสตร์",
+   "name_en": "",
+   "lat": 13.844216,
+   "lon": 100.5710825,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1411867293",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดประชาศรัทธาธรรม",
+   "name_en": "Wat Pracha Sattha Tham School",
+   "lat": 13.818544,
+   "lon": 100.5191984,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1412748394",
+   "asset_type": "school",
+   "name": "โรงเรียนบางบัว (เพ่งตั้งตรงจิตรวิทยาคาร)",
+   "name_en": "Bangbua School",
+   "lat": 13.8568946,
+   "lon": 100.5850017,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1421091040",
+   "asset_type": "school",
+   "name": "โรงเรียนมัธยมประชานิเวศน์",
+   "name_en": "Mathayom Prachaniwet school",
+   "lat": 13.8419072,
+   "lon": 100.5476615,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1421092393",
+   "asset_type": "school",
+   "name": "วิทยาลัยเทคโนโลยีวราธิปบริหารธุรกิจ",
+   "name_en": "",
+   "lat": 13.8428887,
+   "lon": 100.5457172,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1422842270",
+   "asset_type": "school",
+   "name": "โรงเรียนบีคอนเฮาส์ แย้มสอาดลาดพร้าว",
+   "name_en": "",
+   "lat": 13.8027578,
+   "lon": 100.5669653,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1433074923",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดเทวสุนทร",
+   "name_en": "",
+   "lat": 13.8538698,
+   "lon": 100.5619506,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1433798307",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดมัชฌันติการาม",
+   "name_en": "",
+   "lat": 13.8220564,
+   "lon": 100.5175644,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1433798346",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดเลียบราษฏร์บำรุง",
+   "name_en": "Wat Liap Rat Bamrung School",
+   "lat": 13.8287964,
+   "lon": 100.5211181,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1434322100",
+   "asset_type": "school",
+   "name": "โรงเรียนโยธินบูรณะ 2 (สุวรรณสุทธาราม)",
+   "name_en": "Yothinburana 2 (Suwansuttharam) School",
+   "lat": 13.8336293,
+   "lon": 100.5291615,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1434322101",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดทองสุทธาราม",
+   "name_en": "Wat Thong Sutharam School",
+   "lat": 13.8328359,
+   "lon": 100.529894,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1434548578",
+   "asset_type": "school",
+   "name": "โรงเรียนธัชรินทร์วิทยา",
+   "name_en": "",
+   "lat": 13.8235246,
+   "lon": 100.5563057,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1444930261",
+   "asset_type": "school",
+   "name": "โรงเรียนอรรถมิตร",
+   "name_en": "Attamit School",
+   "lat": 13.8340011,
+   "lon": 100.5684787,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1546667786",
+   "asset_type": "school",
+   "name": "โรงเรียนเพชรรัชต์",
+   "name_en": "",
+   "lat": 13.849376,
+   "lon": 100.5446532,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/208501778",
+   "asset_type": "school",
+   "name": "โรงเรียนหอวัง",
+   "name_en": "Horwang School",
+   "lat": 13.8187811,
+   "lon": 100.560922,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/222374446",
+   "asset_type": "school",
+   "name": "โรงเรียนสารวิทยา",
+   "name_en": "Sarawittaya School",
+   "lat": 13.8511698,
+   "lon": 100.583581,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/231663776",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดเสมียนนารี",
+   "name_en": "Watsamiennaree School",
+   "lat": 13.8406297,
+   "lon": 100.5564182,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/32089660",
+   "asset_type": "school",
+   "name": "โรงเรียนสาธิตแห่งมหาวิทยาลัยเกษตรศาสตร์",
+   "name_en": "Kasetsart University Laboratory School",
+   "lat": 13.8516078,
+   "lon": 100.5679605,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/589549221",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดสร้อยทอง",
+   "name_en": "Wat Soi Thong School",
+   "lat": 13.8133319,
+   "lon": 100.5176118,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/606092510",
+   "asset_type": "school",
+   "name": "โรงเรียนสตรีวรนารถ บางเขน",
+   "name_en": "",
+   "lat": 13.8222198,
+   "lon": 100.5663203,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/665908917",
+   "asset_type": "school",
+   "name": "โรงเรียนโยธินบูรณะ",
+   "name_en": "Yothinburana School",
+   "lat": 13.8135216,
+   "lon": 100.5199624,
+   "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/788316491",
+   "asset_type": "school",
+   "name": "โรงเรียนประชานิเวศน์",
+   "name_en": "Prachaniwet School",
+   "lat": 13.8438517,
+   "lon": 100.5466414,
+   "district_code": "1030",
+   "source": "OpenStreetMap"
+  }
+ ]
+}

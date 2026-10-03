@@ -95,3 +95,27 @@ class FloodObservation(Base):
     provider_judgement: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
     text_sha256: Mapped[str | None] = mapped_column(String(64))
     rule_version: Mapped[str] = mapped_column(String(48), nullable=False)
+
+
+class FloodAssetExposure(Base):
+    """A facility's exposure and access state against one good roads snapshot (ADR-0040)."""
+
+    __tablename__ = "flood_asset_exposure"
+    __table_args__ = (
+        UniqueConstraint("fetch_id", "asset_id", name="uq_flood_asset_exposure_fetch_asset"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    fetch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("flood_source_fetch.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    asset_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    exposure_state: Mapped[str] = mapped_column(String(32), nullable=False)
+    access_state: Mapped[str] = mapped_column(String(32), nullable=False)
+    nearest_road_key: Mapped[str | None] = mapped_column(String(16))
+    nearest_distance_m: Mapped[int | None] = mapped_column(Integer)
+    road_keys: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
+    reasons: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(48), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

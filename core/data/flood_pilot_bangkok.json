@@ -41,6 +41,11 @@
     "default": 6,
     "max": 24
   },
+  "exposure": {
+    "near_m": 150,
+    "frontage_m": 60,
+    "note": "Display thresholds for the demo, not validated rules. near_m: a flooded road this close makes a facility potentially exposed. frontage_m: a closed or truck-risky road this close puts access under review."
+  },
   "sources": [
     {
       "source_id": "floodboard_roads",

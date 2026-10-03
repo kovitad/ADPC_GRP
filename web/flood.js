@@ -15,6 +15,7 @@
   const state = {
     config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
+    assets: null, facility: null,
   };
   const say = PilotText.t;
   let map = null;
@@ -23,6 +24,7 @@
   let outlineLayer = null;
   let selectedLayer = null;
   let cameraLayer = null;
+  let facilityLayer = null;
   let evidenceToken = 0;
 
   const clock = (iso) => new Intl.DateTimeFormat(PilotText.locale(), {
@@ -40,6 +42,9 @@
     span.textContent = text;
     return span;
   };
+  const FACILITY_LETTER = { hospital: "H", clinic: "C", school: "S" };
+  const facilityName = (a) => (PilotText.lang() === "en" && a.name_en) || a.name || a.name_en
+    || say("fac.unnamed", { type: say(`fac.type.${a.asset_type}`) });
   const cameraName = (c) => c.name[PilotText.lang()] || c.name.en;
   const sourceName = (id) => (say(`src.${id}`) === `src.${id}` ? id : say(`src.${id}`));
 
@@ -80,6 +85,8 @@
     url.searchParams.delete("road");
     if (state.area !== "corridor") url.searchParams.set("area", state.area);
     if (state.selected) url.searchParams.set("road", state.selected.properties.id);
+    url.searchParams.delete("facility");
+    if (state.facility) url.searchParams.set("facility", state.facility.asset_id);
     window.history.replaceState(null, "", url);
   };
 
@@ -96,6 +103,9 @@
     const points = geometry.type === "Point" ? [geometry.coordinates] : vertices(geometry);
     return points.some((p) => areas.some((area) => insideArea(p, area.outline)));
   };
+  const visibleFacilities = () => (state.assets ? state.assets.assets.filter(
+    (a) => inArea({ type: "Point", coordinates: [a.lon, a.lat] }),
+  ) : []);
   const visibleRoads = () => (state.roads ? state.roads.features.filter((f) => inArea(f.geometry)) : []);
   const visibleReports = () => (state.reports ? state.reports.features.filter((f) => inArea(f.geometry)) : []);
 
@@ -124,7 +134,7 @@
 
   const drawMap = () => {
     ensureMap();
-    [roadLayer, reportLayer, outlineLayer, selectedLayer, cameraLayer].forEach((layer) => layer && map.removeLayer(layer));
+    [roadLayer, reportLayer, outlineLayer, selectedLayer, cameraLayer, facilityLayer].forEach((layer) => layer && map.removeLayer(layer));
     selectedLayer = null;
     const area = currentArea();
     outlineLayer = area
@@ -154,6 +164,23 @@
         layer.on("click", () => showEvidence(feature));
       },
     }).addTo(map);
+    facilityLayer = window.L.layerGroup(
+      visibleFacilities().map((a) => {
+        const tone = a.access_state === "access_under_review" ? "review"
+          : a.exposure_state === "potentially_exposed" ? "exposed" : "none";
+        const marker = window.L.marker([a.lat, a.lon], {
+          // The icon holds only this file's own letter; names go in the tooltip as text.
+          icon: window.L.divIcon({
+            className: `fl-fac fl-fac--${tone}`,
+            html: FACILITY_LETTER[a.asset_type] || "?",
+            iconSize: [20, 20],
+          }),
+        });
+        marker.bindTooltip(textOf(facilityName(a)), { sticky: true });
+        marker.on("click", () => showFacility(a));
+        return marker;
+      }),
+    ).addTo(map);
     cameraLayer = window.L.layerGroup(
       (state.cameras ? state.cameras.cameras : [])
         .filter((c) => inArea({ type: "Point", coordinates: [c.lon, c.lat] }))
@@ -188,6 +215,9 @@
     item({ background: "repeating-linear-gradient(90deg,#e8590c 0 3px,transparent 3px 8px)" }, say("leg.derived"));
     item({ background: "#7950f2", borderRadius: "50%", width: "0.6rem", height: "0.6rem" }, say("leg.report"));
     item({ border: "2px dashed #4a555b", borderRadius: "50%", width: "0.7rem", height: "0.7rem" }, say("leg.camera"));
+    item({ background: "#e8590c", borderRadius: "4px", width: "0.8rem", height: "0.8rem" }, say("leg.fac.exposed"));
+    item({ background: "#c92a2a", borderRadius: "4px", width: "0.8rem", height: "0.8rem" }, say("leg.fac.review"));
+    item({ background: "#ffffff", border: "1px solid #6c7a80", borderRadius: "4px", width: "0.8rem", height: "0.8rem" }, say("leg.fac.none"));
   };
 
   // --- Cards and coverage --------------------------------------------------------------------
@@ -204,6 +234,9 @@
     set("reports", visibleReports().filter((f) => new Date(f.properties.observed_at).getTime() >= hourAgo).length);
     const notOk = state.situation.sources.filter((s) => s.state !== "ok").length;
     set("sources", notOk);
+    const facilities = visibleFacilities();
+    set("exposed", facilities.filter((a) => a.exposure_state === "potentially_exposed").length);
+    set("access", facilities.filter((a) => a.access_state === "access_under_review").length);
     $("[data-card-sources]").classList.toggle("is-warn", notOk > 0);
     const vehicle = say(`veh.${state.vehicle}`);
     $('[data-card-label="blocked"]').textContent = say("card.blocked", {
@@ -243,7 +276,14 @@
     } else if (!cams.length) {
       row(say("cov.cctv"), say("cov.not"), say("cov.cctv.detail"), "none");
     }
-    row(say("cov.assets"), say("cov.not"), say("cov.assets.detail"), "none");
+    if (state.assets && state.assets.assets.length) {
+      const stamp = state.assets.source.osm_timestamp;
+      row(say("cov.assets"), say("cov.osm"), say("cov.assets.detail.osm", {
+        n: number(state.assets.assets.length), date: stamp ? clock(stamp) : "–",
+      }), "ok");
+    } else {
+      row(say("cov.assets"), say("cov.not"), say("cov.assets.detail"), "none");
+    }
     row(say("cov.geoglows"), say("cov.elsewhere"), say("cov.geoglows.detail"), "none");
     $("[data-coverage-note]").textContent = `${say("cov.note")} ${say("cov.note.bbt")}`;
   };
@@ -317,7 +357,39 @@
     selectedLayer.bringToBack();
   };
 
+  const showFacility = (asset) => {
+    state.selected = null;
+    state.facility = asset;
+    setUrl();
+    if (selectedLayer) { map.removeLayer(selectedLayer); selectedLayer = null; }
+    const box = $("[data-evidence]");
+    box.replaceChildren();
+    box.append(el("h2", "fl-evidence__title", facilityName(asset)));
+    const badges = el("p", "fl-badges");
+    badges.append(el("span", "fl-badge", say(`fac.type.${asset.asset_type}`)));
+    badges.append(el("span", "fl-badge", "OpenStreetMap"));
+    box.append(badges);
+    box.append(el("h3", "fl-evidence__sub", say("fac.exposure")));
+    box.append(el("p", "", say(`fac.exposure.${asset.exposure_state}`, {
+      d: number(asset.nearest_distance_m ?? 0), m: number(state.assets.near_m),
+    })));
+    const road = asset.nearest_road_key && state.roads
+      ? state.roads.features.find((f) => f.properties.id === asset.nearest_road_key) : null;
+    if (road) {
+      const label = road.properties.name || road.properties.name_en || say("ev.unnamed");
+      const button = el("button", "fl-linkbtn", `${say("fac.nearest")}: ${label}`);
+      button.type = "button";
+      button.addEventListener("click", () => showEvidence(road));
+      box.append(button);
+    }
+    box.append(el("h3", "fl-evidence__sub", say("fac.access")));
+    box.append(el("p", "", say(`fac.access.${asset.access_state}`, { f: number(state.assets.frontage_m) })));
+    box.append(el("p", "fl-muted", say("fac.osm")));
+    if (asset.rule_version) box.append(el("p", "fl-muted", say("fac.rule", { v: asset.rule_version })));
+  };
+
   const showEvidence = (feature) => {
+    state.facility = null;
     state.selected = feature;
     setUrl();
     if (map) highlight(feature);
@@ -387,7 +459,25 @@
     fillCameras(cctv, p.id);
 
     box.append(el("h3", "fl-evidence__sub", say("ev.affected")));
-    box.append(el("p", "fl-muted", say("ev.affected.v")));
+    const nearFacilities = state.assets ? state.assets.assets.filter((a) => a.road_keys.includes(p.id)) : [];
+    const nearM = state.assets ? state.assets.near_m : 150;
+    if (!state.assets) {
+      box.append(el("p", "fl-muted", say("ev.affected.v")));
+    } else if (!nearFacilities.length) {
+      box.append(el("p", "fl-muted", say("ev.affected.none", { m: number(nearM) })));
+    } else {
+      box.append(el("p", "fl-muted", say("ev.affected.list", { n: nearFacilities.length, m: number(nearM) })));
+      const ul = el("ul", "fl-facs");
+      nearFacilities.forEach((a) => {
+        const li = el("li", "");
+        const button = el("button", "fl-linkbtn", `${say(`fac.type.${a.asset_type}`)} · ${facilityName(a)}`);
+        button.type = "button";
+        button.addEventListener("click", () => showFacility(a));
+        li.append(button);
+        ul.append(li);
+      });
+      box.append(ul);
+    }
   };
 
   // --- Loading -----------------------------------------------------------------------------
@@ -398,7 +488,18 @@
     drawLegend();
     drawMap();
     if (!state.roads.snapshot_retrieved_at) showBanner(say("fl.empty"));
-    if (state.selected) {
+    if (!state.facility && !state.selected && params.get("facility") && state.assets) {
+      const linked = state.assets.assets.find((x) => x.asset_id === params.get("facility"));
+      params.delete("facility");
+      if (linked) {
+        showFacility(linked);
+        return;
+      }
+    }
+    if (state.facility && state.assets) {
+      const again = state.assets.assets.find((a) => a.asset_id === state.facility.asset_id);
+      if (again) showFacility(again);
+    } else if (state.selected) {
       const again = state.roads.features.find((f) => f.properties.id === state.selected.properties.id);
       if (again) showEvidence(again);
     } else if (params.get("road")) {
@@ -414,12 +515,13 @@
   const load = async () => {
     try {
       const roadsUrl = `${API}/roads${state.all ? "?all=true" : ""}`;
-      const [situation, roads, reports] = await Promise.all([
+      const [situation, roads, reports, assets] = await Promise.all([
         GRP.request(`${API}/situation`),
         GRP.request(roadsUrl),
         GRP.request(`${API}/reports?hours=${NEAR_HOURS}`),
+        GRP.request(`${API}/assets`),
       ]);
-      Object.assign(state, { situation, roads, reports });
+      Object.assign(state, { situation, roads, reports, assets });
       showBanner("");
       drawAll();
     } catch (error) {

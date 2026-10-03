@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-3, ADR-0038/0039, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-4, ADR-0038/0039/0040, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -114,6 +114,34 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
+
+### 3 October (latest): facilities near flooding, slice 4 (ADR-0040), and the sign-in fix
+
+- **Sign-in was "unavailable".** Restarting with raw `docker compose up` drops the shell-only
+  `SERVIR_AUTH_CLIENT_ID`. **Always restart with `scripts/docker-desktop.ps1`.** After using the
+  launcher, `/api/v1/auth/login` redirects to SERVIR again.
+  - The only local account is `kovitad.janlakhon@adpc.net` (Platform Admin, adpc Hub Admin).
+  - The owner wrote `janlakkon`. If that is a different SERVIR email, add it with
+    `scripts/docker-desktop.ps1 -AdminEmail <email>`, but only once the owner confirms.
+- **Facilities:**
+  - `grpcli/osm_assets_capture.py` wrote `core/data/flood_pilot_bangkok_assets.json`: 52 OSM
+    schools, hospitals and clinics in Bang Sue and Chatuchak, ODbL.
+  - `core/flood_evidence/assets.py` sets two states per facility:
+    - exposure: `potentially_exposed` within 150 m of flooding now, else `no_report_nearby`;
+    - access: `access_under_review` when a closed or truck-risky road is within 60 m, else
+      `access_unknown`. It is never "accessible".
+  - The worker stores `flood_asset_exposure` rows after each roads snapshot (migration
+    `20261003_0023`). `GET /pilot/flood/{id}/assets` reads them.
+  - On the page: H, C and S markers, two cards, a facility card, facilities listed in the road
+    card, and `?facility=` links.
+- **Live result at 10:35:** Kasemrad Prachachuen Hospital is potentially exposed (78 m) and so is
+  Atthamit School (69 m). Access for both is unknown.
+- **Tests:** 11 facility tests, including tweak scenario 8. 901 pass and 2 skip, and Ruff is clean.
+- **Next:**
+  - Slice 5: incidents and the officer check, which is also where `access_disrupted_confirmed`
+    is recorded.
+  - Bring in a road network if access should move beyond "unknown".
+  - Replace the placeholder cameras with BMA's list once it arrives.
 
 ### 3 October (later): CCTV P0 for the Bang Sue and Chatuchak corridor (ADR-0039)
 

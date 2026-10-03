@@ -47,6 +47,15 @@ def _latest(
     return session.scalars(query.order_by(FloodSourceFetch.retrieved_at.desc()).limit(1)).first()
 
 
+def latest_roads_snapshot(
+    session: Session, config: PilotConfig, as_of: datetime
+) -> FloodSourceFetch | None:
+    """The latest good roads fetch at ``as_of``: the snapshot every road read is based on."""
+
+    source = next((s for s in config.sources if s.adapter == ROADS_ADAPTER), None)
+    return _latest(session, config, source.source_id, as_of, True) if source else None
+
+
 def source_health(
     session: Session, config: PilotConfig, source: SourceConfig, as_of: datetime
 ) -> dict[str, Any]:

@@ -33,6 +33,8 @@ class PilotConfig:
     map: dict[str, Any]
     freshness_minutes: dict[str, int]
     report_window_hours: dict[str, int]
+    # Facility exposure distances in metres (ADR-0040): near_m and frontage_m.
+    exposure: dict[str, float]
     sources: tuple[SourceConfig, ...]
 
     def source(self, source_id: str) -> SourceConfig | None:
@@ -66,6 +68,10 @@ def _parse(raw: dict[str, Any]) -> PilotConfig:
         map=dict(raw["map"]),
         freshness_minutes=bands,
         report_window_hours={k: int(v) for k, v in raw["report_window_hours"].items()},
+        exposure={
+            "near_m": float(raw.get("exposure", {}).get("near_m", 150)),
+            "frontage_m": float(raw.get("exposure", {}).get("frontage_m", 60)),
+        },
         sources=sources,
     )
 

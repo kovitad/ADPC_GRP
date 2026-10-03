@@ -66,3 +66,9 @@
 .fl-cam__role { color: var(--ink-700); }
 .fl-cam__open { justify-self: start; color: var(--servir-blue-dark); }
 .fl-cam__note { margin-top: 0.3rem; color: #8a5a00; }
+.fl-fac { display: grid; place-items: center; border-radius: 5px; font-size: 11px; font-weight: 700; line-height: 1; box-shadow: 0 1px 2px rgb(0 0 0 / 30%); }
+.fl-fac--none { background: #fff; color: #4a555b; border: 1px solid #6c7a80; }
+.fl-fac--exposed { background: #e8590c; color: #fff; border: 1px solid #a83f06; }
+.fl-fac--review { background: #c92a2a; color: #fff; border: 1px solid #8c1d1d; }
+.fl-facs { display: grid; gap: 0.25rem; margin: 0.3rem 0 0; padding: 0; list-style: none; font-size: 0.8rem; }
+.fl-linkbtn { padding: 0; border: 0; background: none; color: var(--servir-blue-dark); font: inherit; font-size: 0.82rem; text-align: left; text-decoration: underline; cursor: pointer; }
