@@ -54,6 +54,7 @@ and asked to "combine them for maximum benefit". This amends ADR-0039 and ADR-00
   than showing nothing.
 - At deployment, no open incident had an iTIC/Longdo camera within 400 m; 8 of 50 had a BMA
   camera.
-- **Not verified:** frames played in a real browser. Headless capture could not wait for video;
-  the playlist, segment, codec support and the page's player code were checked.
+- **Verified:** on 3 October the Product Owner confirmed that a Bang Sue iTIC/Longdo camera plays
+  live in the page in their own browser. Headless capture could not wait for video; the
+  playlist, segment, codec support and the player code had been checked beforehand.
 - Gate B needs written terms from BMA and from iTIC/Longdo.
