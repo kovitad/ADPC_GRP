@@ -127,7 +127,10 @@ RP20/RP50 rasters and methods exist.
   player at a time, a 15 s failure message, camera markers that open a camera card, and a credit
   line on each player.
 - **Verified by the owner:** a Bang Sue iTIC/Longdo camera plays live in the page (3 October).
-  BMA's relay is still unconfirmed; the owner can check whether BMA's own page plays video.
+  The owner also reports that BMA's own page plays video ("all working fine"), so BMA's relay is
+  up. The HTTP 500s seen here came from command-line requests, not a browser. Still to confirm:
+  whether a BMA camera (for example `EB-LB-62-C1` near the top Lat Krabang incident) plays inside
+  GRP. If it does not, ask BMA to allow GRP's page to use the relay.
 
 ### 3 October: real BMA cameras (ADR-0046)
 
