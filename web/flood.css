@@ -147,3 +147,4 @@
 .fl-live__credit { margin: 0; color: var(--ink-500); font-size: 0.72rem; }
 .fl-card--rain { background: #f1f7fd; }
 .fl-card__n--word { font-size: 1.15rem; }
+.fl-live__frame { width: 100%; aspect-ratio: 400 / 266; border: 0; border-radius: 6px; background: #000; }

@@ -30,7 +30,9 @@ ACCESS_MODES = frozenset(
 )
 FRAME_MODES = frozenset({"snapshot", "hls", "mjpeg", "webrtc"})
 VIEWER_MODES = frozenset({"external_viewer", "embed"})
-LIVE_KINDS = frozenset({"hls", "mp4"})
+LIVE_KINDS = frozenset({"hls", "mp4", "iframe"})
+# Nearby cameras with a quicker live view come first (the owner found bmatraffic.com fastest).
+LIVE_PREFERENCE = {"iframe": 0, "hls": 1, "mp4": 2}
 STATUSES = frozenset({"online", "offline", "unknown"})
 PLACEHOLDER = "PLACEHOLDER"
 HEALTH_FRESH = timedelta(minutes=30)
@@ -98,12 +100,17 @@ class Camera:
         }
 
 
-def _https(url: Any, field: str) -> str | None:
+def _https(url: Any, field: str, allow_http: bool = False) -> str | None:
+    """Links must be https://, unless the registry file states that its source only serves
+    http:// (bmatraffic.com); such links work on the local demo page, not on an https site."""
+
     if url is None:
         return None
-    if not isinstance(url, str) or not url.startswith("https://"):
+    if not isinstance(url, str):
         raise CameraRegistryError(f"{field} must be an https:// URL")
-    return url
+    if url.startswith("https://") or (allow_http and url.startswith("http://")):
+        return url
+    raise CameraRegistryError(f"{field} must be an https:// URL")
 
 
 def _angle(value: Any, field: str, upper: float) -> float | None:
@@ -134,7 +141,8 @@ def parse_camera(item: dict[str, Any]) -> Camera:
         raise CameraRegistryError(f"Unknown camera status {status!r}")
     if not isinstance(name, dict) or not name.get("en"):
         raise CameraRegistryError("A camera needs an English name")
-    viewer = _https(item.get("viewer_url"), "viewer_url")
+    allow_http = item.get("allow_http_links") is True
+    viewer = _https(item.get("viewer_url"), "viewer_url", allow_http)
     stream = _https(item.get("stream_url"), "stream_url")
     snapshot = _https(item.get("snapshot_url"), "snapshot_url")
     if stream and access_mode not in {"hls", "mjpeg", "webrtc"}:
@@ -161,7 +169,7 @@ def parse_camera(item: dict[str, Any]) -> Camera:
             raise CameraRegistryError(f"A live view must be one of {sorted(LIVE_KINDS)}")
         if placeholder:
             raise CameraRegistryError("A placeholder has no live view")
-        live_kind, live_url = live["kind"], _https(live.get("url"), "live.url")
+        live_kind, live_url = live["kind"], _https(live.get("url"), "live.url", allow_http)
         if not live_url:
             raise CameraRegistryError("A live view needs its URL")
     checked = item.get("status_checked_at")
@@ -303,5 +311,6 @@ def nearby_cameras(
             }
         )
     found.sort(key=lambda c: (c["role"] != OFFICER_CAN_LOOK, c["status"] != "online",
+                              LIVE_PREFERENCE.get((c["live"] or {}).get("kind"), 9),
                               c["distance_m"]))
     return found

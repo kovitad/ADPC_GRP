@@ -333,7 +333,8 @@
     } else {
       const count = (provider) => cams.filter((c) => c.provider === provider).length;
       row(say("cov.cctv"), say("cov.cams"), say("cov.cctv.detail.combined", {
-        n: number(cams.length), bma: number(count("BMA_DDS")), itic: number(count("ITIC_LONGDO")),
+        n: number(cams.length), traffic: number(count("BMA_TRAFFIC")), bma: number(count("BMA_DDS")),
+        itic: number(count("ITIC_LONGDO")),
       }), "warn");
     }
     if (state.assets && state.assets.assets.length) {
@@ -878,6 +879,21 @@
 
   const playLive = async (camera, box) => {
     stopLive();
+    if (camera.live.kind === "iframe") {
+      // The provider's own player page (bmatraffic.com), embedded as the owner asked. Sandboxed:
+      // it may run its own scripts but never navigate this page or open windows.
+      const frame = document.createElement("iframe");
+      frame.className = "fl-live__frame";
+      frame.src = camera.live.url;
+      frame.title = cameraName(camera);
+      frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
+      frame.setAttribute("referrerpolicy", "no-referrer");
+      frame.setAttribute("scrolling", "no");
+      frame.loading = "lazy";
+      box.replaceChildren(frame, el("p", "fl-live__credit", say("cam.live", { source: camera.source_label })));
+      livePlayer = { video: document.createElement("video"), box, hls: null, timer: null };
+      return;
+    }
     const video = document.createElement("video");
     video.className = "fl-live__video";
     video.muted = true;

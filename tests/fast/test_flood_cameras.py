@@ -48,28 +48,50 @@ def _real(**changes):
     return item
 
 
-def test_shipped_cameras_combine_both_sources_and_are_never_evidence() -> None:
+def test_shipped_cameras_combine_three_sources_and_are_never_evidence() -> None:
     cameras = camera_registry("bangkok")
-    by_provider = {p: [c for c in cameras if c.provider == p] for p in ("BMA_DDS", "ITIC_LONGDO")}
-    assert len(by_provider["BMA_DDS"]) > 500 and len(by_provider["ITIC_LONGDO"]) > 5
+    providers = ("BMA_TRAFFIC", "BMA_DDS", "ITIC_LONGDO")
+    by_provider = {p: [c for c in cameras if c.provider == p] for p in providers}
+    assert len(by_provider["BMA_TRAFFIC"]) > 400 and len(by_provider["BMA_DDS"]) > 500
+    assert len(by_provider["ITIC_LONGDO"]) > 5
     assert len(cameras) == sum(len(v) for v in by_provider.values())
     for camera in cameras:
         assert not camera.placeholder and not frame_capable(camera)
         assert not camera.ingestion_allowed and not camera.cv_allowed
         assert camera.stream_url is None and camera.snapshot_url is None
-        assert camera.live_url and camera.live_url.startswith("https://")
+        assert camera.live_url and camera.source_label
         role, reasons = corroboration_role(camera, ROAD, NOW)
         assert role == CANNOT_CONFIRM and "status_unknown" in reasons
-        assert camera.public()["live"]["url"] == camera.live_url and camera.source_label
-    # BMA views go through BMA's own public relay; iTIC/Longdo cameras publish HLS.
-    assert all(c.live_kind == "mp4" and c.live_url.startswith(
-        "https://floodbangkok.bangkok.go.th/api/proxy?rtcUrl=") for c in by_provider["BMA_DDS"])
+    # Only bmatraffic.com, which declares it serves plain http, may use an http:// link.
+    assert all(c.live_url.startswith("https://") for p in ("BMA_DDS", "ITIC_LONGDO")
+               for c in by_provider[p])
+    assert all(c.live_kind == "iframe" and c.live_url.startswith(
+        "http://www.bmatraffic.com/PlayVideo.aspx?ID=") for c in by_provider["BMA_TRAFFIC"])
+    assert all(c.live_kind == "mp4" for c in by_provider["BMA_DDS"])
     assert all(c.live_kind == "hls" for c in by_provider["ITIC_LONGDO"])
-    assert sum(1 for c in by_provider["BMA_DDS"] if c.related_sensor_ids) > 0.9 * len(
-        by_provider["BMA_DDS"])
-    for name in ("flood_pilot_bangkok_cameras.json", "flood_pilot_bangkok_cameras_longdo.json"):
-        raw = json.loads((DATA / name).read_text(encoding="utf-8"))
+    for name in ("flood_pilot_bangkok_cameras.json", "flood_pilot_bangkok_cameras_longdo.json",
+                 "flood_pilot_bangkok_cameras_bmatraffic.json"):
+        text = (DATA / name).read_text(encoding="utf-8")
+        assert "10.102." not in text  # internal addresses are never kept
+        raw = json.loads(text)
         assert raw["_source"]["sha256"] and raw["_source"]["terms"]
+
+
+def test_http_links_need_the_registry_to_declare_them() -> None:
+    http = {"kind": "iframe", "url": "http://example.test/player?ID=1"}
+    with pytest.raises(CameraRegistryError):
+        parse_camera(_real(live=http))
+    assert parse_camera(_real(live=http, allow_http_links=True)).live_kind == "iframe"
+
+
+def test_cameras_with_a_quicker_live_view_come_first() -> None:
+    cameras = parse_registry({"cameras": [
+        _real(camera_id="mp4", live={"kind": "mp4", "url": "https://x/a.mp4"}),
+        _real(camera_id="iframe", lat=13.8395, allow_http_links=True,
+              live={"kind": "iframe", "url": "http://x/p?ID=1"}),
+    ]})
+    found = nearby_cameras(cameras, ROAD, NOW, radius_m=400)
+    assert [c["camera_id"] for c in found] == ["iframe", "mp4"]
 
 
 @pytest.mark.parametrize(

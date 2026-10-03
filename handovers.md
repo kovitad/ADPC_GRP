@@ -115,7 +115,19 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): Longdo APIs. Part 2, rain context (ADR-0049)
+### 3 October (latest): bmatraffic.com cameras first (ADR-0050)
+
+- **Requested:** the owner asked to use `bmatraffic.com`, which is faster.
+- **Built:** `grpcli/bmatraffic_cameras_capture.py` keeps 520 Bangkok cameras, with internal IPs
+  dropped. The new live kind `iframe` embeds `PlayVideo.aspx?ID=` in a sandbox.
+  - The site is http only; `allow_http_links` is declared for this source only. This needs
+    HTTPS or a proxy before Gate B.
+  - Ranking is bmatraffic, then Longdo HLS, then the BMA relay. 1,413 cameras in all.
+- **Next:** the owner asked for a **plan** (not built) to publish a live feed from this data to
+  Global Risk and later serve it through MCP:
+  `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`. Routing (Longdo part 3) is on hold.
+
+### 3 October: Longdo APIs. Part 2, rain context (ADR-0049)
 
 - **Built:** `core/flood_evidence/weather.py` and table `flood_weather` (migration
   `20261003_0027`).
