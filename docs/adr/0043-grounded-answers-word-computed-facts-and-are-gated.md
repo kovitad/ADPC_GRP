@@ -128,3 +128,12 @@ here. Part 7b, the AI wording and the gate, is added below when built.
 - **Not verified:** a live AI answer. The owner should ask one question after signing in. It will
   use their allowance and send the fact bundle (about 11,000 characters, no report text or notes)
   to the configured provider.
+
+## Amendment: clock times are compared whole (3 October, later)
+
+A gate test failed only after 12:00 Bangkok time. The fact `"time_now_bangkok": "12:10"` made
+the bare number 12 allowed, so an answer claiming "12 active incidents" passed. The gate now
+compares clock times (`HH:MM` or `HH.MM`) as whole tokens, and strips them before comparing other
+numbers. An hour or minute from a fact's time no longer allows a stray number. The test answer
+uses an implausible number, and new cases cover a stray hour and an invented time. The general
+limit still applies: a wrong number that equals another number in the facts passes.

@@ -59,6 +59,9 @@ def test_a_cited_answer_using_only_fact_numbers_passes() -> None:
         ("ควรอพยพผู้ป่วยออกจากโรงพยาบาล [F1]", "evacuation"),
         ("The hospital road will flood tonight [F1].", "forecast_as_observed"),
         ("มีเหตุการณ์ ๕๗ เหตุการณ์ [S]", "number_not_in_facts"),
+        # The hour of a fact's clock time is not a number the answer may use on its own.
+        ("There are 12 active incidents [S].", "number_not_in_facts"),
+        ("The newest report was at 12:45 [C].", "number_not_in_facts"),
     ],
 )
 def test_ungrounded_wording_is_withheld(text, problem) -> None:
@@ -67,6 +70,10 @@ def test_ungrounded_wording_is_withheld(text, problem) -> None:
 
 def test_thai_digits_from_the_facts_and_citation_numbers_are_allowed() -> None:
     assert gate("มีเหตุการณ์ ๕๕ เหตุการณ์ [S] ตรวจ [I1] ก่อน", FACTS, QUESTION) == []
+
+
+def test_clock_times_from_the_facts_are_allowed_whole() -> None:
+    assert gate("Tracking began at 11:08 and it is now 12:10 [C][S].", FACTS, QUESTION) == []
 
 
 @pytest.mark.parametrize("lang", ["th", "en"])
@@ -159,7 +166,7 @@ def test_a_grounded_ai_answer_is_returned_with_the_computed_one(world) -> None:
 
 
 def test_an_invented_number_is_withheld_and_the_computed_answer_stands(world) -> None:
-    world["reply"]["text"] = "There are 12 active incidents [S]."
+    world["reply"]["text"] = "There are 987 active incidents [S]."
     body = _ask(world, "officer@example.test")
     assert body["ai"] is None
     assert body["withheld"] == {"reason": "not_grounded", "problems": ["number_not_in_facts"]}

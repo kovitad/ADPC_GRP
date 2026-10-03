@@ -21,6 +21,8 @@ from typing import Any
 PROMPT_VERSION = "flood-ask-v1"
 CITATION = re.compile(r"\[([A-Z]\d{0,2})\]")
 NUMBER = re.compile(r"\d+")
+# Clock times are compared whole, so "12:10" in the facts never allows a stray "12".
+TIME = re.compile(r"(?<!\d)\d{1,2}[:.]\d{2}(?!\d)")
 THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
 BANNED = (
     ("evacuation", re.compile(r"evacuat", re.IGNORECASE)),
@@ -60,8 +62,13 @@ def instructions_for(lang: str) -> str:
     return INSTRUCTIONS.format(language="Thai" if lang == "th" else "English")
 
 
+def _times(text: str) -> set[str]:
+    return {t.replace(".", ":").zfill(5) for t in TIME.findall(text.translate(THAI_DIGITS))}
+
+
 def _numbers(text: str) -> set[int]:
-    return {int(n) for n in NUMBER.findall(text.translate(THAI_DIGITS))}
+    bare = TIME.sub(" ", text.translate(THAI_DIGITS))
+    return {int(n) for n in NUMBER.findall(bare)}
 
 
 def gate(text: str, facts: list[dict[str, Any]], question: str) -> list[str]:
@@ -74,9 +81,9 @@ def gate(text: str, facts: list[dict[str, Any]], question: str) -> list[str]:
         problems.append("no_citations")
     if any(label not in labels for label in cited):
         problems.append("unknown_citation")
-    allowed = _numbers(render_facts(facts)) | _numbers(question)
+    source = render_facts(facts) + " " + question
     bare = CITATION.sub(" ", text)
-    if _numbers(bare) - allowed:
+    if _numbers(bare) - _numbers(source) or _times(bare) - _times(source):
         problems.append("number_not_in_facts")
     for code, pattern in BANNED:
         if pattern.search(text) and code not in problems:
