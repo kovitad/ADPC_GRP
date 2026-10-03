@@ -126,6 +126,9 @@ RP20/RP50 rasters and methods exist.
   provider, outline), remembered in `localStorage`.
 - **Checked by the owner (3 October):** the layer switches work, and bmatraffic cameras open and
   play in a new tab.
+- **Then:** bmatraffic cameras open in a small reused window beside the map. On the first click
+  it opens bmatraffic's home page so the session is set, then moves to the camera (ADR-0050
+  amendment 2). A new-tab link is kept as a fallback. Not yet checked in a browser.
 
 ### 3 October: Global Risk live-feed plan (plan only)
 

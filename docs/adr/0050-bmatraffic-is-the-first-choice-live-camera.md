@@ -74,3 +74,18 @@ request on the same day, and the owner found BMA's own site slow too. The page g
 The map also gained one on/off switch per source: road ratings, reports by original source,
 facilities, cameras by provider, and the district outline. The choice is remembered in the
 browser only.
+
+## Amendment 2, 3 October 2026: a small window instead of a tab
+
+The owner asked for the camera to stay closer to the map. bmatraffic cameras now open in a small
+window (460×340) beside the map, named `grp-camera` and reused by later clicks.
+
+- **First click:** the window opens www.bmatraffic.com's home page, so the site sets its own
+  session the normal way. After 2.5 seconds it moves to the camera's `PlayVideo.aspx`. Later
+  clicks go straight to the camera.
+  - This is what a person would do by hand. GRP never fetches, proxies or records the pictures.
+- **Security:** the window starts as `about:blank`, and its `opener` is cut before the provider
+  page loads, so that page cannot navigate GRP.
+- **Fallbacks:** if pop-ups are blocked, the card says so. A plain new-tab link is always there.
+- **Still pending:** playback inside the camera card needs BMA's permission or an embed-friendly
+  feed (options 1 and 2 in the session notes).

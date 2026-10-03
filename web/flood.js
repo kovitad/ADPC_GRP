@@ -1020,17 +1020,64 @@
     }
   };
 
+  // A provider whose player works only on its own site gets a small window beside the map. The
+  // first time, the window opens the provider's home page so the provider sets its own session the
+  // normal way (bmatraffic.com shows a blank picture without one), then moves to the camera.
+  const VIEWER_START = { BMA_TRAFFIC: "http://www.bmatraffic.com/index.aspx" };
+  const START_WAIT_MS = 2500;
+  let viewerWindow = null;
+  let viewerStarted = new Set();
+
+  const openViewerWindow = (camera) => {
+    const width = 460;
+    const height = 340;
+    const left = Math.max(0, window.screenX + window.outerWidth - width - 24);
+    const top = Math.max(0, window.screenY + 140);
+    const reuse = viewerWindow && !viewerWindow.closed;
+    const win = reuse ? viewerWindow
+      : window.open("", "grp-camera", `popup,width=${width},height=${height},left=${left},top=${top}`);
+    if (!win) return false;
+    if (!reuse) {
+      // Still about:blank and ours: cut the link back to this page before the provider loads.
+      try { win.opener = null; } catch (error) { /* already cut */ }
+      viewerStarted = new Set();
+    }
+    viewerWindow = win;
+    const start = VIEWER_START[camera.provider];
+    if (start && !viewerStarted.has(camera.provider)) {
+      viewerStarted.add(camera.provider);
+      win.location.href = start;
+      window.setTimeout(() => {
+        if (viewerWindow === win && !win.closed) win.location.href = camera.viewer_url;
+      }, START_WAIT_MS);
+    } else {
+      win.location.href = camera.viewer_url;
+    }
+    try { win.focus(); } catch (error) { /* some browsers refuse; the window is still open */ }
+    return true;
+  };
+
   const liveControls = (camera) => {
     const wrap = el("div", "fl-live");
     if (!camera.live) {
       // No in-page player (bmatraffic.com: its pictures need a bmatraffic session, which a browser
-      // never sends from inside another site). Open the provider's own page in a new tab instead.
+      // never sends from inside another site). Open the provider's own page in a small window.
       if (!camera.placeholder && /^https?:\/\//.test(camera.viewer_url || "")) {
-        const link = el("a", "button button--secondary button--compact", say("cam.tab"));
+        const button = el("button", "button button--secondary button--compact", say("cam.window"));
+        button.type = "button";
+        const note = el("p", "fl-muted", say("cam.window.hint", { source: camera.source_label }));
+        const link = el("a", "fl-live__tab", say("cam.tab"));
         link.href = camera.viewer_url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        wrap.append(link, el("p", "fl-muted", say("cam.tab.hint", { source: camera.source_label })));
+        button.addEventListener("click", () => {
+          const opened = openViewerWindow(camera);
+          note.textContent = opened
+            ? say("cam.window.hint", { source: camera.source_label })
+            : say("cam.window.blocked");
+          note.classList.toggle("is-bad", !opened);
+        });
+        wrap.append(button, note, link);
       }
       return wrap;
     }
