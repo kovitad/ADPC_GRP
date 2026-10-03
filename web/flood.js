@@ -15,7 +15,7 @@
   const state = {
     config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
-    assets: null, facility: null,
+    assets: null, facility: null, incidents: null, incident: null, allIncidents: false,
   };
   const say = PilotText.t;
   let map = null;
@@ -86,6 +86,8 @@
     if (state.area !== "corridor") url.searchParams.set("area", state.area);
     if (state.selected) url.searchParams.set("road", state.selected.properties.id);
     url.searchParams.delete("facility");
+    url.searchParams.delete("incident");
+    if (state.incident) url.searchParams.set("incident", state.incident);
     if (state.facility) url.searchParams.set("facility", state.facility.asset_id);
     window.history.replaceState(null, "", url);
   };
@@ -106,6 +108,18 @@
   const visibleFacilities = () => (state.assets ? state.assets.assets.filter(
     (a) => inArea({ type: "Point", coordinates: [a.lon, a.lat] }),
   ) : []);
+  const visibleIncidents = () => (state.incidents ? state.incidents.incidents.filter(
+    (i) => inArea({ type: "Point", coordinates: i.center }),
+  ) : []);
+  const incidentName = (incident) => {
+    const names = [];
+    (state.roads ? state.roads.features : []).forEach((f) => {
+      if (!incident.road_keys.includes(f.properties.id)) return;
+      const name = (PilotText.lang() === "en" && f.properties.name_en) || f.properties.name;
+      if (name && !names.includes(name)) names.push(name);
+    });
+    return names.length ? names.slice(0, 2).join(", ") + (names.length > 2 ? " …" : "") : say("inc.unnamed");
+  };
   const visibleRoads = () => (state.roads ? state.roads.features.filter((f) => inArea(f.geometry)) : []);
   const visibleReports = () => (state.reports ? state.reports.features.filter((f) => inArea(f.geometry)) : []);
 
@@ -288,6 +302,186 @@
     $("[data-coverage-note]").textContent = `${say("cov.note")} ${say("cov.note.bbt")}`;
   };
 
+  // --- Incidents (slice 5a) ---------------------------------------------------------------
+  const confidenceBadge = (confidence) => el("span", `fl-conf fl-conf--${confidence}`, say(`inc.conf.${confidence}`));
+
+  const drawIncidents = () => {
+    const list = $("[data-incidents]");
+    list.replaceChildren();
+    const items = visibleIncidents();
+    const active = items.filter((i) => i.status === "active").length;
+    $("[data-inc-count]").textContent = say("inc.count", { a: active, r: items.length - active });
+    const more = $("[data-inc-more]");
+    if (!items.length) {
+      list.append(el("li", "fl-inc-empty", say("inc.none")));
+      more.hidden = true;
+      return;
+    }
+    const shown = state.allIncidents ? items : items.slice(0, 8);
+    shown.forEach((incident, index) => {
+      const li = el("li", "fl-inc");
+      const button = el("button", "fl-inc__btn");
+      button.type = "button";
+      button.setAttribute("aria-pressed", String(state.incident === incident.incident_id));
+      button.append(el("span", "fl-inc__rank", String(index + 1)));
+      const body = el("span", "fl-inc__body");
+      body.append(el("span", "fl-inc__name", incidentName(incident)));
+      const tags = el("span", "fl-inc__tags");
+      tags.append(confidenceBadge(incident.confidence));
+      if (incident.status !== "active") tags.append(el("span", "fl-badge", say(`inc.status.${incident.status}`)));
+      if (incident.access_to_check) tags.append(el("span", "fl-badge fl-badge--warn", say("inc.access")));
+      if (incident.hospital_near) tags.append(el("span", "fl-badge fl-badge--warn", say("inc.hospital")));
+      body.append(tags);
+      body.append(el("span", "fl-inc__meta", [
+        say("inc.roads", { n: incident.road_keys.length }),
+        say("inc.reports", { n: incident.report_keys.length }),
+        say(`inc.fresh.${incident.freshness_basis}`, { age: ago(incident.newest_evidence_at) }),
+      ].join(" · ")));
+      button.append(body);
+      button.addEventListener("click", () => showIncident(incident.incident_id));
+      li.append(button);
+      list.append(li);
+    });
+    more.hidden = items.length <= 8;
+    more.textContent = state.allIncidents ? say("inc.less") : say("inc.more", { n: items.length });
+  };
+
+  const reasonText = (code, incident) => {
+    if (code.startsWith("source_types:")) {
+      return say("inc.reason.source_types", {
+        list: incident.source_families.map((f) => say(`inc.family.${f}`)).join(", "),
+      });
+    }
+    return say(`inc.reason.${code}`);
+  };
+
+  const reportLine = (report) => {
+    const p = report.properties;
+    const what = p.cleared ? say("inc.report.dry")
+      : p.depth_cm == null ? "" : say("inc.report.depth", { n: number(p.depth_cm) });
+    const line = say("inc.report", {
+      source: sourceName(p.underlying_source), when: ago(p.observed_at), dist: number(report.distance_m ?? 0),
+    });
+    return what ? `${line} · ${what}` : line;
+  };
+
+  const eventText = (event) => {
+    const d = event.detail || {};
+    const conf = (value) => (value ? say(`inc.conf.${value}`) : "–");
+    return say(`inc.event.${event.kind}`, {
+      before: event.kind === "confidence_changed" ? conf(d.before) : d.before,
+      after: event.kind === "confidence_changed" ? conf(d.after) : d.after,
+    });
+  };
+
+  const showIncident = async (incidentId) => {
+    state.incident = incidentId;
+    state.selected = null;
+    state.facility = null;
+    setUrl();
+    drawIncidents();
+    const token = ++evidenceToken;
+    let detail;
+    try {
+      detail = await GRP.request(`${API}/incidents/${incidentId}`);
+    } catch (error) {
+      detail = null;
+    }
+    if (token !== evidenceToken) return;
+    const box = $("[data-evidence]");
+    box.replaceChildren();
+    if (!detail) {
+      state.incident = null;
+      box.append(el("p", "fl-evidence__empty", say("ev.empty")));
+      return;
+    }
+    if (selectedLayer) map.removeLayer(selectedLayer);
+    if (detail.roads.length) {
+      selectedLayer = window.L.geoJSON({ type: "FeatureCollection", features: detail.roads }, {
+        style: { color: "#0d2534", weight: 12, opacity: 0.3 }, interactive: false,
+      }).addTo(map);
+      selectedLayer.bringToBack();
+      // Zoom only when an incident is opened, not on every refresh.
+      if (state.fitted !== incidentId) {
+        map.fitBounds(selectedLayer.getBounds(), { maxZoom: 16, padding: [30, 30] });
+        state.fitted = incidentId;
+      }
+    }
+    box.append(el("p", "fl-evidence__kicker", say("inc.heading")));
+    box.append(el("h2", "fl-evidence__title", incidentName(detail)));
+    const badges = el("p", "fl-badges");
+    badges.append(confidenceBadge(detail.confidence));
+    badges.append(el("span", "fl-badge", say(`inc.status.${detail.status}`)));
+    badges.append(el("span", `fl-badge fl-badge--fresh-${detail.freshness}`,
+      say(`inc.fresh.${detail.freshness_basis}`, { age: ago(detail.newest_evidence_at) })));
+    box.append(badges);
+
+    box.append(el("h3", "fl-evidence__sub", say("inc.why")));
+    const why = el("ul", "fl-why");
+    detail.reasons.forEach((code) => why.append(el("li", "", reasonText(code, detail))));
+    box.append(why);
+
+    box.append(el("h3", "fl-evidence__sub", say("inc.facts")));
+    const facts = el("dl", "rw-facts");
+    const fact = (label, value) => { facts.append(el("dt", "", label), el("dd", "", value)); };
+    fact(say("inc.roadCount"), String(detail.road_keys.length));
+    fact(say("inc.depth"), detail.max_depth_cm == null ? say("ev.depth.none") : `${number(detail.max_depth_cm)} cm`);
+    fact(say("inc.closed"), String(detail.closed_roads));
+    if (detail.worst_verdict && detail.worst_verdict.sedan) fact(say("inc.worst"), say(`leg.${detail.worst_verdict.sedan}`));
+    box.append(facts);
+
+    if (detail.conflict) {
+      box.append(el("h3", "fl-evidence__sub", say("inc.against")));
+      const against = el("ul", "fl-rows");
+      detail.reports.filter((r) => detail.contrary_keys.includes(r.properties.id)).forEach((r) => {
+        against.append(el("li", "fl-row fl-row--pending", reportLine(r)));
+      });
+      box.append(against);
+    }
+
+    box.append(el("h3", "fl-evidence__sub", say("inc.timeline")));
+    const timeline = detail.reports
+      .filter((r) => detail.report_keys.includes(r.properties.id))
+      .sort((a, b) => (a.properties.observed_at < b.properties.observed_at ? 1 : -1));
+    if (!timeline.length) {
+      box.append(el("p", "fl-muted", say("inc.timeline.none")));
+    } else {
+      const ul = el("ul", "fl-timeline");
+      timeline.slice(0, 20).forEach((r) => ul.append(el("li", "", reportLine(r))));
+      box.append(ul);
+    }
+
+    box.append(el("h3", "fl-evidence__sub", say("ev.affected")));
+    if (!detail.facilities.length) {
+      box.append(el("p", "fl-muted", say("ev.affected.none", { m: number(state.assets ? state.assets.near_m : 150) })));
+    } else {
+      const ul = el("ul", "fl-facs");
+      detail.facilities.forEach((a) => {
+        const button = el("button", "fl-linkbtn", `${say(`fac.type.${a.asset_type}`)} · ${facilityName(a)}`);
+        button.type = "button";
+        button.addEventListener("click", () => showFacility(a));
+        const li = el("li", "");
+        li.append(button);
+        ul.append(li);
+      });
+      box.append(ul);
+    }
+
+    box.append(el("h3", "fl-evidence__sub", say("ev.row.cctv")));
+    const camRow = el("div", "fl-row fl-row--missing");
+    renderCameras(camRow, { cameras: detail.cameras, radius_m: state.cameras ? state.cameras.default_radius_m : 400 });
+    box.append(camRow);
+
+    box.append(el("h3", "fl-evidence__sub", say("inc.events")));
+    const events = el("ul", "fl-timeline");
+    detail.events.slice(0, 12).forEach((e) => events.append(el("li", "", `${clock(e.at)} · ${eventText(e)}`)));
+    box.append(events);
+
+    box.append(el("h3", "fl-evidence__sub", say("inc.check")));
+    box.append(el("p", "fl-muted", say("inc.check.soon")));
+    box.append(el("p", "fl-muted", say("inc.engine", { v: detail.rule_version })));
+  };
+
   // --- Evidence card -----------------------------------------------------------------------
   const nearbyReports = (feature) => {
     const since = Date.now() - NEAR_HOURS * 3600 * 1000;
@@ -321,6 +515,10 @@
       row.append(el("span", "", say("ev.row.cctv.v")));
       return;
     }
+    renderCameras(row, answer);
+  };
+
+  const renderCameras = (row, answer) => {
     if (!answer.cameras.length) {
       row.append(el("span", "", say("cam.none", { r: answer.radius_m })));
       return;
@@ -359,6 +557,7 @@
 
   const showFacility = (asset) => {
     state.selected = null;
+    state.incident = null;
     state.facility = asset;
     setUrl();
     if (selectedLayer) { map.removeLayer(selectedLayer); selectedLayer = null; }
@@ -390,6 +589,7 @@
 
   const showEvidence = (feature) => {
     state.facility = null;
+    state.incident = null;
     state.selected = feature;
     setUrl();
     if (map) highlight(feature);
@@ -403,6 +603,14 @@
     badges.append(el("span", `fl-badge fl-badge--fresh-${p.freshness}`, say(`fresh.${p.freshness}`)));
     box.append(badges);
 
+    const parent = state.incidents
+      ? state.incidents.incidents.find((i) => i.road_keys.includes(p.id)) : null;
+    if (parent) {
+      const link = el("button", "fl-linkbtn", say("inc.open"));
+      link.type = "button";
+      link.addEventListener("click", () => showIncident(parent.incident_id));
+      box.append(link);
+    }
     box.append(el("h3", "fl-evidence__sub", say("ev.now")));
     const facts = el("dl", "rw-facts");
     const fact = (label, value) => { facts.append(el("dt", "", label), el("dd", "", value)); };
@@ -484,10 +692,21 @@
   const drawAll = () => {
     if (!state.situation || !state.roads) return;
     drawCards();
+    drawIncidents();
     drawCoverage();
     drawLegend();
     drawMap();
     if (!state.roads.snapshot_retrieved_at) showBanner(say("fl.empty"));
+    if (state.incident) {
+      showIncident(state.incident);
+      return;
+    }
+    if (params.get("incident")) {
+      const linked = params.get("incident");
+      params.delete("incident");
+      showIncident(linked);
+      return;
+    }
     if (!state.facility && !state.selected && params.get("facility") && state.assets) {
       const linked = state.assets.assets.find((x) => x.asset_id === params.get("facility"));
       params.delete("facility");
@@ -515,13 +734,14 @@
   const load = async () => {
     try {
       const roadsUrl = `${API}/roads${state.all ? "?all=true" : ""}`;
-      const [situation, roads, reports, assets] = await Promise.all([
+      const [situation, roads, reports, assets, incidents] = await Promise.all([
         GRP.request(`${API}/situation`),
         GRP.request(roadsUrl),
         GRP.request(`${API}/reports?hours=${NEAR_HOURS}`),
         GRP.request(`${API}/assets`),
+        GRP.request(`${API}/incidents`),
       ]);
-      Object.assign(state, { situation, roads, reports, assets });
+      Object.assign(state, { situation, roads, reports, assets, incidents });
       showBanner("");
       drawAll();
     } catch (error) {
@@ -566,6 +786,7 @@
   $("[data-vehicle]").addEventListener("change", (event) => { state.vehicle = event.target.value; drawAll(); });
   $("[data-all]").addEventListener("change", (event) => { state.all = event.target.checked; load(); });
   $("[data-refresh]").addEventListener("click", load);
+  $("[data-inc-more]").addEventListener("click", () => { state.allIncidents = !state.allIncidents; drawIncidents(); });
   PilotText.onChange(() => { fillAreas(); drawAll(); });
 
   GRP.bindSignOut();

@@ -16,7 +16,6 @@ Only roads with current evidence count: expired, stale or cleared segments are i
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -24,6 +23,7 @@ from typing import Any
 
 from core.flood_evidence.config import DATA
 from core.flood_evidence.freshness import counts_as_current
+from core.flood_evidence.geo import point_to_geometry_m
 
 ASSET_TYPES = ("hospital", "clinic", "school")
 POTENTIALLY_EXPOSED = "potentially_exposed"
@@ -98,31 +98,10 @@ def asset_registry(pilot_id: str) -> tuple[tuple[Asset, ...], dict[str, Any]]:
     return parse_assets(raw), dict(raw.get("_source") or {})
 
 
-def _segment_metres(px: float, py: float, ax: float, ay: float, bx: float, by: float) -> float:
-    dx, dy = bx - ax, by - ay
-    length = dx * dx + dy * dy
-    t = 0.0 if length == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length))
-    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
-
-
 def distance_to_line_m(lon: float, lat: float, geometry: dict[str, Any]) -> float:
-    """Metres from a point to the nearest part of a line, in a local flat projection."""
+    """Metres from a point to the nearest part of a line (see ``core.flood_evidence.geo``)."""
 
-    scale_x = 111_320 * math.cos(math.radians(lat))
-    scale_y = 110_540
-    kind, coords = geometry["type"], geometry["coordinates"]
-    if kind == "Point":
-        lines = [[coords, coords]]
-    else:
-        lines = coords if kind == "MultiLineString" else [coords]
-    best = math.inf
-    for line in lines:
-        points = [((p[0] - lon) * scale_x, (p[1] - lat) * scale_y) for p in line]
-        if len(points) == 1:
-            points = points * 2
-        for (ax, ay), (bx, by) in zip(points, points[1:], strict=False):
-            best = min(best, _segment_metres(0.0, 0.0, ax, ay, bx, by))
-    return best
+    return point_to_geometry_m(lon, lat, geometry)
 
 
 @dataclass(frozen=True)

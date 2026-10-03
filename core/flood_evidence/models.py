@@ -119,3 +119,56 @@ class FloodAssetExposure(Base):
     reasons: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
     rule_version: Mapped[str] = mapped_column(String(48), nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FloodIncident(Base):
+    """A group of nearby flooding evidence that keeps its identity across snapshots (ADR-0041)."""
+
+    __tablename__ = "flood_incident"
+    __table_args__ = (Index("ix_flood_incident_pilot_status", "pilot_id", "status"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    # active: flooding reported now; receding: no current evidence; closed: gone or merged.
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_active_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_snapshot_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    road_keys: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
+    bbox: Mapped[list[float]] = mapped_column(JSON_VALUE, nullable=False)
+    # The latest interpretation: confidence, reasons, evidence keys, facts, facilities, priority.
+    summary: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(48), nullable=False)
+
+
+class FloodIncidentEvent(Base):
+    """What changed for an incident between consecutive snapshots."""
+
+    __tablename__ = "flood_incident_event"
+    __table_args__ = (Index("ix_flood_incident_event_pilot_at", "pilot_id", "at"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    incident_id: Mapped[UUID] = mapped_column(
+        ForeignKey("flood_incident.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    detail: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
+
+
+class FloodIncidentRun(Base):
+    """One incident pass over one roads snapshot. Older snapshots are never processed again."""
+
+    __tablename__ = "flood_incident_run"
+    __table_args__ = (Index("ix_flood_incident_run_pilot_snapshot", "pilot_id", "snapshot_at"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    fetch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("flood_source_fetch.id", ondelete="CASCADE"), nullable=False
+    )
+    snapshot_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    active_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)

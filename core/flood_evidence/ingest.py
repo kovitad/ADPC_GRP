@@ -212,8 +212,10 @@ def ingest_body(
     if source.adapter == "floodboard_roads":
         # Imported here: exposure reads the snapshot through the situation module.
         from core.flood_evidence.exposure import store_exposure
+        from core.flood_evidence.incident_store import update_incidents
 
         store_exposure(session, config, fetch)
+        update_incidents(session, config, fetch)
     return fetch
 
 

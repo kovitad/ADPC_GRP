@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-4, ADR-0038/0039/0040, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-5a, ADR-0038 to 0041, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,34 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): facilities near flooding, slice 4 (ADR-0040), and the sign-in fix
+### 3 October (latest): incidents, slice 5a (ADR-0041)
+
+- **Built:**
+  - `core/flood_evidence/incidents.py`, the pure grouping and assessment.
+  - `core/flood_evidence/incident_store.py`, which keeps identity, merge and split, recession
+    and events, and skips older snapshots.
+  - `core/flood_evidence/geo.py`, shared distances and area tests.
+  - Migration `20261003_0024`.
+  - The worker runs it after exposure on each good roads snapshot.
+  - Routes `/incidents` and `/incidents/{id}`.
+  - On the page: a "Check first" queue and an incident card.
+- **Rules:**
+  - Families are BMA, Traffy and crowd. `cluster` and `news` never count.
+  - Confidence: `conflicting` for fresh dry or 0 cm evidence within 100 m; `high` for BMA plus
+    another family; `medium` for two families or BMA alone; otherwise `low`.
+  - Freshness comes from the newest report.
+- **Live at 11:15:** 58 open incidents in the four districts.
+  - The first to check: Chao Khun Thahan and Lat Krabang roads, 92 segments, 36 reports, BMA
+    readings, and three fresh "cleared" reports nearby.
+  - The first pass took 4.8 s.
+- **Tests:** 15 incident tests (spec A–D, merge, split, recede and close, out-of-order). 926 pass
+  and 2 skip.
+- **Next, slice 5b:** officer reviews and facility access confirmation.
+  - Reviews are time-bound and store the road keys reviewed.
+  - Every review is audited, with CSRF and the matrix covered.
+  - Notes are capped and rendered as text only.
+
+### 3 October: facilities near flooding, slice 4 (ADR-0040), and the sign-in fix
 
 - **Demo area widened (later the same day):** the owner added Bang Kapi (1006) and Lat Krabang
   (1011) to `demo_corridor`, which now covers four districts. The OSM capture was re-run with one

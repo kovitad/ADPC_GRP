@@ -72,3 +72,25 @@
 .fl-fac--review { background: #c92a2a; color: #fff; border: 1px solid #8c1d1d; }
 .fl-facs { display: grid; gap: 0.25rem; margin: 0.3rem 0 0; padding: 0; list-style: none; font-size: 0.8rem; }
 .fl-linkbtn { padding: 0; border: 0; background: none; color: var(--servir-blue-dark); font: inherit; font-size: 0.82rem; text-align: left; text-decoration: underline; cursor: pointer; }
+.fl-incidents { margin-top: 1.1rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--white); }
+.fl-inc-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 1rem; }
+.fl-inc-head h2 { margin: 0; font-size: 1.1rem; }
+.fl-inc-count { margin: 0; color: var(--ink-500); font-size: 0.82rem; }
+.fl-inc-intro { margin: 0.3rem 0 0; color: var(--ink-700); font-size: 0.82rem; line-height: 1.5; }
+.fl-inc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: 0.5rem; margin: 0.7rem 0 0.4rem; padding: 0; list-style: none; }
+.fl-inc-empty { color: var(--ink-500); font-size: 0.85rem; }
+.fl-inc__btn { display: flex; gap: 0.6rem; width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: #fbfcfc; font: inherit; text-align: left; cursor: pointer; }
+.fl-inc__btn[aria-pressed="true"] { border-color: var(--servir-blue-dark); box-shadow: 0 0 0 2px rgb(27 103 143 / 20%); }
+.fl-inc__rank { flex: none; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--servir-navy); color: #fff; font-size: 0.8rem; font-weight: 700; }
+.fl-inc__body { display: grid; gap: 0.25rem; min-width: 0; }
+.fl-inc__name { font-weight: var(--weight-semibold); font-size: 0.88rem; overflow-wrap: anywhere; }
+.fl-inc__tags { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.fl-inc__meta { color: var(--ink-500); font-size: 0.76rem; }
+.fl-conf { padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+.fl-conf--conflicting { background: #fde2e2; color: #8c1d1d; }
+.fl-conf--low { background: #eceff1; color: #3d474c; }
+.fl-conf--medium { background: #e3eef8; color: #1b4f72; }
+.fl-conf--high { background: #e6f4ea; color: #1e6b33; }
+.fl-badge--warn { background: #fff1e6; color: #8a3b00; }
+.fl-evidence__kicker { margin: 0; color: var(--ink-500); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.fl-why, .fl-timeline { display: grid; gap: 0.25rem; margin: 0; padding-left: 1.1rem; font-size: 0.8rem; line-height: 1.45; }

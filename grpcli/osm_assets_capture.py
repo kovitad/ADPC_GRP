@@ -22,33 +22,12 @@ from pathlib import Path
 from typing import Any
 
 from core.flood_evidence.config import DATA, pilot_config
+from core.flood_evidence.geo import inside_outline
 from core.river_watch import bangkok_outlines
 
 OVERPASS = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "GRP-flood-pilot-capture/0.1 (ADPC SERVIR pilot)"
 AMENITIES = ("school", "hospital", "clinic")
-
-
-def _inside_ring(x: float, y: float, ring: list[list[float]]) -> bool:
-    inside = False
-    j = len(ring) - 1
-    for i in range(len(ring)):
-        xi, yi = ring[i][0], ring[i][1]
-        xj, yj = ring[j][0], ring[j][1]
-        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
-            inside = not inside
-        j = i
-    return inside
-
-
-def inside_outline(lon: float, lat: float, outline: dict[str, Any]) -> bool:
-    polygons = outline["coordinates"] if outline["type"] == "MultiPolygon" else [
-        outline["coordinates"]
-    ]
-    return any(
-        _inside_ring(lon, lat, rings[0]) and not any(_inside_ring(lon, lat, r) for r in rings[1:])
-        for rings in polygons
-    )
 
 
 def _bounds(outlines: list[dict[str, Any]]) -> tuple[float, float, float, float]:

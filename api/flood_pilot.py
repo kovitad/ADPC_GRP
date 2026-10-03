@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
@@ -23,6 +24,11 @@ from api.sessions import CurrentPrincipal
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
+from core.flood_evidence.incident_store import (
+    REPORT_WINDOW_HOURS,
+    incident_detail,
+    list_incidents,
+)
 from core.flood_evidence.situation import current_roads, recent_reports, road_by_id, situation
 from core.river_watch import bangkok_outlines
 
@@ -199,3 +205,51 @@ def read_road_cameras(
 )
 def read_assets(config: FloodPilot, session: DatabaseSession, as_of: AsOf = None) -> dict:
     return latest_exposure(session, config, _as_of(as_of))
+
+
+@router.get(
+    "/{pilot_id}/incidents",
+    summary="Open incidents in the demo area, in check-first order",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_incidents(config: FloodPilot, session: DatabaseSession) -> dict[str, Any]:
+    return list_incidents(session, config)
+
+
+@router.get(
+    "/{pilot_id}/incidents/{incident_id}",
+    summary="One incident: interpretation, change events, roads, reports, facilities, cameras",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_incident(
+    config: FloodPilot, session: DatabaseSession, incident_id: UUID
+) -> dict[str, Any]:
+    detail = incident_detail(session, config, incident_id)
+    if detail is None:
+        raise not_found()
+    now = datetime.now(UTC)
+    keys = set(detail.get("road_keys") or [])
+    roads = [f for f in current_roads(session, config, now, include_all=True)["features"]
+             if f["properties"]["id"] in keys]
+    wanted = set(detail.get("report_keys") or []) | set(detail.get("contrary_keys") or [])
+    reports = [f for f in recent_reports(session, config, now, REPORT_WINDOW_HOURS)["features"]
+               if f["properties"]["id"] in wanted]
+    ids = set(detail.get("facility_ids") or [])
+    facilities = [
+        a for a in latest_exposure(session, config, now)["assets"] if a["asset_id"] in ids
+    ]
+    footprint = {
+        "type": "MultiLineString",
+        "coordinates": [
+            line for f in roads for line in (
+                f["geometry"]["coordinates"] if f["geometry"]["type"] == "MultiLineString"
+                else [f["geometry"]["coordinates"]]
+            )
+        ],
+    }
+    cameras = (
+        nearby_cameras(camera_registry(config.pilot_id), footprint, now, DEFAULT_CAMERA_RADIUS_M)
+        if footprint["coordinates"] else []
+    )
+    return {**detail, "roads": roads, "reports": reports, "facilities": facilities,
+            "cameras": cameras}
