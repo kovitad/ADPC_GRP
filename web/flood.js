@@ -132,7 +132,10 @@
       style: styleFor,
       onEachFeature: (feature, layer) => {
         const p = feature.properties;
-        layer.bindTooltip(p.name || p.name_en || say(p.road_class === "zone" ? "ev.zone" : "ev.unnamed"), { sticky: true });
+        // Leaflet renders a string tooltip as HTML; provider names go in as text only.
+        const tip = document.createElement("span");
+        tip.textContent = p.name || p.name_en || say(p.road_class === "zone" ? "ev.zone" : "ev.unnamed");
+        layer.bindTooltip(tip, { sticky: true });
         layer.on("click", () => showEvidence(feature));
       },
     }).addTo(map);
@@ -208,7 +211,7 @@
     row(say("cov.cctv"), say("cov.not"), say("cov.cctv.detail"), "none");
     row(say("cov.assets"), say("cov.not"), say("cov.assets.detail"), "none");
     row(say("cov.geoglows"), say("cov.elsewhere"), say("cov.geoglows.detail"), "none");
-    $("[data-coverage-note]").textContent = say("cov.note");
+    $("[data-coverage-note]").textContent = `${say("cov.note")} ${say("cov.note.bbt")}`;
   };
 
   // --- Evidence card -----------------------------------------------------------------------

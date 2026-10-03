@@ -7,6 +7,12 @@
   const BATHTUB_M3 = 0.15;
   const state = { reaches: [], reachId: null, view: null, mode: "bbt", districts: [], district: null };
   const say = PilotText.t;
+  // Leaflet renders a string tooltip as HTML; place names from data go in as text only.
+  const textNode = (text) => {
+    const span = document.createElement("span");
+    span.textContent = text;
+    return span;
+  };
 
   const number = (value, digits = 3) =>
     new Intl.NumberFormat(PilotText.locale(), { maximumSignificantDigits: digits }).format(value);
@@ -165,10 +171,10 @@
         const line = window.L.polyline(toLatLng(w.line), { color: "#2380b0", weight: 9, opacity: 0.45 });
         const name = waterwayName(w);
         if (name && !labelled.has(name)) {
-          line.bindTooltip(name, { permanent: true, direction: "top", className: "rw-map-label" });
+          line.bindTooltip(textNode(name), { permanent: true, direction: "top", className: "rw-map-label" });
           labelled.add(name);
         } else if (name) {
-          line.bindTooltip(name);
+          line.bindTooltip(textNode(name));
         }
         group.addLayer(line);
       });

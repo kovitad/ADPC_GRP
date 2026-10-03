@@ -29,6 +29,14 @@ The inputs are the owner's development spec v0.3, `GRP_Bangkok_Integration_Tweak
   - Report `text` quotes news and Traffy complaints.
   - `stats.json` and `feed.json` do not exist.
   - `robots.txt` disallows `/api/cam/`.
+- **Floodboard's `updated` is not always evidence time.** Between captures at 02:31 and 02:52 UTC
+  on 3 October, 112 segments moved only `updated`.
+  - 71 BMA-sensor segments shared one stamp: a sensor re-read, which is real evidence time.
+  - 41 Traffy, crowd and cluster segments shared two batch stamps: a Floodboard recalculation,
+    with no new report behind it in 86 of the 112 cases.
+  - Freshness measured from `updated` can therefore overstate "now" for derived segments. The
+    page labels the time "Floodboard last updated". Slice 5 (incidents) measures freshness from
+    the newest underlying report instead.
 - **Other sources are blocked.** The BMA water-level entry on data.go.th has only a data
   dictionary and no licence. The community CCTV catalogue has no licence.
 - **The spec suggests Next.js, TypeScript and MapLibre.** The repo uses FastAPI, static `web/`,
@@ -68,8 +76,15 @@ The inputs are the owner's development spec v0.3, `GRP_Bangkok_Integration_Tweak
    - Zone, estimated, inferred and cluster features are `provider_derived`.
    - The verdict is served as `provider_verdict` and labelled as Floodboard's estimate. GRP
      computes no passability of its own until BMA supplies rules.
-9. **Privacy.** Report text is reduced to a SHA-256 and links are not kept, so neither is ever
-   served. Fixtures are redacted.
+9. **Privacy.** Report text and links are **never served and never committed**.
+   - Observation rows keep only a SHA-256 of the text and drop the links.
+   - Fixtures are redacted.
+   - Two copies still hold them, both for audit and replay, and readable only by whoever has the
+     storage folder or database:
+     - the gzipped raw fetches (decision 3), which contain the full text and URLs;
+     - `external_id`, which keeps provider IDs, including full news URLs and Traffy ticket IDs
+       that resolve to public complaint pages.
+   - The retention rule required before Gate B must cover both copies.
 10. **Access ("add Hub operators").**
     - A pilot lists its Hubs in `core/data/flood_pilot_bangkok.json` (Bangkok: `adpc`). Every
       member of those Hubs, in any role, and every Platform Admin can open it. Another Hub's Admin
