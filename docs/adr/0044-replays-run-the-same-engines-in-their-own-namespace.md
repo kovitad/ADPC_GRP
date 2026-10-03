@@ -76,3 +76,38 @@ built.
   - reads cannot pass the clock;
   - writes are refused and there is no AI in a replay;
   - replays are not listed as pilots.
+
+## Decision (6b): injections, added the same day
+
+1. **A made-up report.**
+   - `POST …/replays/{id}/inject-report` takes the time, place, source (`crowd`, `traffy` or
+     `bma_sensor`), depth (0–300 cm) and whether it says cleared.
+   - It is fed through the same reports parser, as a one-row CSV at its time, with ID
+     `synthetic:<replay>-<n>`. The parser always marks such IDs `synthetic_demo`, whatever their
+     source.
+   - It counts as its stated source family, which is the point of a test. The incident adds the
+     reason `synthetic_evidence`, and the page labels it SYNTHETIC in timelines and on the map.
+2. **An outage.** `POST …/inject-outage` takes the source and a window. Stored downloads of that
+   source inside the window replay as failed pulls (spec scenario F).
+3. **Limits:**
+   - injections are only accepted after the replay clock and inside the replay;
+   - at most 20 per replay;
+   - pilot-Hub members only;
+   - a restart re-applies them.
+4. **Concurrency.** Worker steps take the replay's row lock with `SKIP LOCKED`. Advance, restart,
+   delete and inject take the same lock and wait.
+   - Found on the real stack: a script stepping a replay at the same time as the worker
+     deadlocked on the wipe, and two steppers could have ingested one download twice.
+   - After the fix, a delete issued while the worker was building waited for the lock and left
+     no rows. SQLite fast tests cannot exercise row locks; this was checked on PostgreSQL.
+
+## Consequences (6b)
+
+- **On real data (11:10–11:25 replay):** a synthetic BMA reading of 0 cm placed on a high
+  confidence incident's road turned it **conflicting**. The reasons included "a BMA sensor nearby
+  reads 0 cm" and "synthetic evidence". An injected roads outage made roads health `degraded`
+  with a `network_error` last attempt, while the last good data kept its real age. Both test
+  replays were deleted.
+- **Tests:** a synthetic zero reading makes a labelled conflict and leaves live data untouched;
+  an injected outage replays as failures and shows in health; injections must be ahead of the
+  clock and inside the replay.

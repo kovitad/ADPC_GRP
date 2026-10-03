@@ -27,6 +27,7 @@ from core.flood_evidence.observation import (
     PROVIDER_DERIVED,
     REPORT,
     ROAD_SEGMENT,
+    SYNTHETIC_DEMO,
     VEHICLES,
     VERDICTS,
     ObservationDraft,
@@ -228,7 +229,9 @@ def parse_reports(body: bytes) -> list[ObservationDraft]:
                 "cleared": _flag(row["cleared"], "cleared"),
             },
             underlying_sources=(source,),
-            evidence_class=PROVIDER_DERIVED if source in DERIVED_SOURCES else OBSERVED,
+            # A replay injection (ADR-0044) is always labelled as made up, whatever its source.
+            evidence_class=SYNTHETIC_DEMO if external_id.startswith("synthetic:")
+            else PROVIDER_DERIVED if source in DERIVED_SOURCES else OBSERVED,
             provider_judgement={"current_weight": _number(row["current_weight"], "current_weight")},
             depth_cm=_depth(row["depth_cm"], "depth_cm"),
             text_sha256=sha256_text(report_text) if report_text else None,

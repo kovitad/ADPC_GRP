@@ -188,6 +188,9 @@ def assess_cluster(cluster: Cluster, as_of: datetime, params: Params) -> dict[st
         reasons.append("several_reports_one_type")
     if "bma" in families:
         reasons.append("bma_reading")
+    if any(r["properties"].get("evidence_class") == "synthetic_demo"
+           for r in cluster.reports + cluster.contrary):
+        reasons.append("synthetic_evidence")
     if all(s["properties"]["evidence_class"] == "provider_derived" for s in cluster.segments):
         reasons.append("floodboard_inferred_only")
 

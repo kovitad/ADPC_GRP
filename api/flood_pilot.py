@@ -50,6 +50,8 @@ from core.flood_evidence.replay import (
     available_range,
     create_replay,
     find_replay,
+    inject_outage,
+    inject_report,
     is_replay_id,
     replay_config,
     restart,
@@ -547,8 +549,8 @@ def _live_only(config: PilotConfig) -> None:
         raise not_found()
 
 
-def _replay_of(session, config: PilotConfig, replay_id: str):
-    replay = find_replay(session, replay_id)
+def _replay_of(session, config: PilotConfig, replay_id: str, *, lock: bool = False):
+    replay = find_replay(session, replay_id, lock=lock)
     if replay is None or replay.base_pilot_id != config.pilot_id:
         raise not_found()
     return replay
@@ -617,7 +619,7 @@ def post_advance(
 ) -> dict[str, Any]:
     _live_only(config)
     pilot_hub(principal, config)
-    replay = _replay_of(session, config, replay_id)
+    replay = _replay_of(session, config, replay_id, lock=True)
     current = replay.processed_at or replay.start_at
     if body.to is not None:
         to = _when(body.to)
@@ -643,7 +645,7 @@ def post_restart(
 ) -> dict[str, Any]:
     _live_only(config)
     pilot_hub(principal, config)
-    replay = _replay_of(session, config, replay_id)
+    replay = _replay_of(session, config, replay_id, lock=True)
     restart(session, replay)
     session.commit()
     return public_replay(replay)
@@ -659,8 +661,65 @@ def delete_replay(
 ) -> dict[str, Any]:
     _live_only(config)
     pilot_hub(principal, config)
-    replay = _replay_of(session, config, replay_id)
+    replay = _replay_of(session, config, replay_id, lock=True)
     wipe(session, replay.replay_pilot_id)
     session.delete(replay)
     session.commit()
     return {"deleted": replay_id}
+
+
+class InjectReportRequest(BaseModel):
+    at: datetime
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    source: Literal["traffy", "crowd", "bma_sensor"] = "crowd"
+    depth_cm: float | None = Field(default=None, ge=0, le=300)
+    cleared: bool = False
+
+
+class InjectOutageRequest(BaseModel):
+    source_id: str = Field(min_length=1, max_length=64)
+    start: datetime
+    end: datetime
+
+
+@router.post(
+    "/{pilot_id}/replays/{replay_id}/inject-report",
+    summary="Add a made-up report to a replay, labelled synthetic (scenario testing)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_inject_report(
+    config: FloodPilot, principal: SignedInMember, session: DatabaseSession, replay_id: str,
+    body: InjectReportRequest,
+) -> dict[str, Any]:
+    _live_only(config)
+    pilot_hub(principal, config)
+    replay = _replay_of(session, config, replay_id, lock=True)
+    try:
+        inject_report(replay, at=_when(body.at), lat=body.lat, lon=body.lon, source=body.source,
+                      depth_cm=body.depth_cm, cleared=body.cleared)
+    except ReplayRejected as error:
+        raise validation_failed(str(error)) from error
+    session.commit()
+    return public_replay(replay)
+
+
+@router.post(
+    "/{pilot_id}/replays/{replay_id}/inject-outage",
+    summary="Make one source fail for a window of a replay (scenario F)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_inject_outage(
+    config: FloodPilot, principal: SignedInMember, session: DatabaseSession, replay_id: str,
+    body: InjectOutageRequest,
+) -> dict[str, Any]:
+    _live_only(config)
+    pilot_hub(principal, config)
+    replay = _replay_of(session, config, replay_id, lock=True)
+    try:
+        inject_outage(replay, config, source_id=body.source_id, start=_when(body.start),
+                      end=_when(body.end))
+    except ReplayRejected as error:
+        raise validation_failed(str(error)) from error
+    session.commit()
+    return public_replay(replay)

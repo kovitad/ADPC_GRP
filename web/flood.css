@@ -136,3 +136,6 @@
 .fl-replays { margin-top: 1.5rem; padding: 1rem 1.1rem; border: 1px dashed #9b87d8; border-radius: var(--radius-lg); background: var(--white); }
 .fl-replays h2 { margin: 0; font-size: 1.1rem; }
 .fl-rp__form { align-items: flex-end; flex-wrap: wrap; }
+.fl-inject { margin-top: 0.6rem; padding: 0.5rem 0.7rem; border: 1px dashed #d6336c; border-radius: 8px; background: #fff5f8; }
+.fl-inject summary { cursor: pointer; font-weight: 600; color: #a61e4d; }
+.fl-inject input[type="number"] { width: 6rem; padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; }

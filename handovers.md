@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-5 and 7, ADR-0038 to 0043, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-7, ADR-0038 to 0044, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,18 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): replay, slice 6a (ADR-0044)
+### 3 October (latest): replay injections, slice 6b (ADR-0044)
+
+- **Injections:** a synthetic report (source, depth or dry, time; placed at the map centre on the
+  page), and a source outage. Synthetic IDs always parse as `synthetic_demo`, and incidents gain
+  the reason `synthetic_evidence`.
+- **Row locks** on `flood_replay`: worker steps use `SKIP LOCKED`, and changes wait. This fixed a
+  real deadlock between the worker and a concurrent wipe.
+- **Real check:** a synthetic 0 cm BMA reading turned a high-confidence incident conflicting, and
+  a roads outage made health degraded. The test replays were deleted.
+- **Tests:** 11 replay tests. 1,036 pass and 2 skip.
+
+### 3 October: replay, slice 6a (ADR-0044)
 
 - **Built:**
   - `core/flood_evidence/replay.py` and table `flood_replay` (migration `20261003_0026`).

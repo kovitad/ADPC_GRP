@@ -260,3 +260,87 @@ def test_a_replay_refuses_officer_writes_and_gives_no_ai(world, tmp_path, monkey
             assert session.scalar(select(FloodReplay)) is not None
     finally:
         app.dependency_overrides.clear()
+
+
+# --- Injections (slice 6b) ------------------------------------------------------------------
+
+
+def _flooded_point() -> tuple[float, float]:
+    # The freshest uncleared feature (the fixture's other flooded roads are hours old).
+    features = [f for f in json.loads(ROADS)["features"] if not f["properties"]["cleared"]]
+    newest = max(features, key=lambda f: f["properties"]["updated"])
+    lon, lat = newest["geometry"]["coordinates"][0][0]
+    return lat, lon
+
+
+def _fresh_replay(session, world):
+    replay = create_replay(session, CONFIG, start_at=world["t0"] - timedelta(minutes=1),
+                           end_at=world["t0"] + timedelta(minutes=30),
+                           user_id=world["users"]["officer@example.test"], hub_id=world["hub"],
+                           now=world["now"])
+    advance(replay, replay.end_at)
+    return replay
+
+
+def test_a_synthetic_zero_reading_makes_a_conflict_labelled_synthetic(world) -> None:
+    from core.flood_evidence.replay import inject_report
+
+    lat, lon = _flooded_point()
+    with Session(world["engine"]) as session:
+        live_before = _counts(session, "bangkok")
+        replay = _fresh_replay(session, world)
+        inject_report(replay, at=world["t0"] + timedelta(minutes=15), lat=lat, lon=lon,
+                      source="bma_sensor", depth_cm=0, cleared=False)
+        while step(session, world["storage"], replay):
+            pass
+        session.commit()
+        synthetic = session.scalars(select(FloodObservation).where(
+            FloodObservation.pilot_id == replay.replay_pilot_id,
+            FloodObservation.external_id.like("synthetic:%"))).all()
+        assert [o.evidence_class for o in synthetic] == ["synthetic_demo"]
+        conflicting = [i for i in session.scalars(select(FloodIncident).where(
+            FloodIncident.pilot_id == replay.replay_pilot_id)) if i.summary["conflict"]]
+        assert conflicting and "synthetic_evidence" in conflicting[0].summary["reasons"]
+        assert all(not i.summary["conflict"] for i in session.scalars(select(FloodIncident).where(
+            FloodIncident.pilot_id == "bangkok")))
+        assert _counts(session, "bangkok") == live_before
+        assert replay.injections[0]["done"] is True
+
+
+def test_an_injected_outage_replays_as_failures_and_shows_in_health(world) -> None:
+    from core.flood_evidence.replay import inject_outage
+    from core.flood_evidence.situation import sources_status
+
+    with Session(world["engine"]) as session:
+        replay = _fresh_replay(session, world)
+        inject_outage(replay, CONFIG, source_id="floodboard_roads",
+                      start=world["t0"] + timedelta(minutes=15),
+                      end=world["t0"] + timedelta(minutes=25))
+        while step(session, world["storage"], replay):
+            pass
+        session.commit()
+        config = replay_config(replay)
+        roads = sources_status(session, config, config.clock)[0]
+        assert roads["last_attempt_outcome"] == "network_error"
+        assert roads["state"] != "ok"
+        assert roads["last_success_at"] == world["t0"].isoformat()
+
+
+def test_injections_must_be_ahead_of_the_clock_and_inside_the_replay(world) -> None:
+    from core.flood_evidence.replay import inject_outage, inject_report
+
+    lat, lon = _flooded_point()
+    with Session(world["engine"]) as session:
+        replay = _fresh_replay(session, world)
+        while step(session, world["storage"], replay):
+            pass
+        with pytest.raises(ReplayRejected):
+            inject_report(replay, at=world["t0"], lat=lat, lon=lon, source="crowd",
+                          depth_cm=10, cleared=False)
+        with pytest.raises(ReplayRejected):
+            inject_report(replay, at=world["t0"] + timedelta(hours=2), lat=lat, lon=lon,
+                          source="crowd", depth_cm=10, cleared=False)
+        with pytest.raises(ReplayRejected):
+            inject_outage(replay, CONFIG, source_id="nope",
+                          start=world["t0"] + timedelta(minutes=25),
+                          end=world["t0"] + timedelta(minutes=28))

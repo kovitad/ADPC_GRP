@@ -175,10 +175,14 @@
     reportLayer = window.L.layerGroup(
       visibleReports()
         .filter((f) => f.properties.freshness !== "expired")
-        .map((f) => window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
-          radius: 2.5, color: "#7950f2", weight: 0, fillColor: "#7950f2",
-          fillOpacity: NOW_BANDS.has(f.properties.freshness) ? 0.55 : 0.25, interactive: false,
-        })),
+        .map((f) => (f.properties.evidence_class === "synthetic_demo"
+          ? window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
+            radius: 9, color: "#d6336c", weight: 3, dashArray: "3 3", fillColor: "#d6336c", fillOpacity: 0.25,
+          }).bindTooltip(textOf(say("inc.synthetic")), { permanent: true, direction: "top" })
+          : window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
+            radius: 2.5, color: "#7950f2", weight: 0, fillColor: "#7950f2",
+            fillOpacity: NOW_BANDS.has(f.properties.freshness) ? 0.55 : 0.25, interactive: false,
+          }))),
     ).addTo(map);
     roadLayer = window.L.geoJSON({ type: "FeatureCollection", features: visibleRoads() }, {
       style: styleFor,
@@ -526,9 +530,10 @@
     const p = report.properties;
     const what = p.cleared ? say("inc.report.dry")
       : p.depth_cm == null ? "" : say("inc.report.depth", { n: number(p.depth_cm) });
-    const line = say("inc.report", {
+    let line = say("inc.report", {
       source: sourceName(p.underlying_source), when: ago(p.observed_at), dist: number(report.distance_m ?? 0),
     });
+    if (p.evidence_class === "synthetic_demo") line = `${say("inc.synthetic")} · ${line}`;
     return what ? `${line} · ${what}` : line;
   };
 
@@ -1106,6 +1111,53 @@
     }
   };
 
+  const drawInjections = () => {
+    const list = $("[data-inject-list]");
+    list.replaceChildren();
+    (player.info ? player.info.injections : []).forEach((i) => {
+      const text = i.kind === "report"
+        ? say("rp.inject.list.report", {
+          time: clock(i.at), source: sourceName(i.source),
+          what: i.cleared ? say("inc.report.dry") : i.depth_cm == null ? "" : say("inc.report.depth", { n: number(i.depth_cm) }),
+          state: say(i.done ? "rp.inject.done" : "rp.inject.pending"),
+        })
+        : say("rp.inject.list.outage", { feed: say(`rp.inject.feed.${i.source_id}`), start: clock(i.start), end: clock(i.end) });
+      list.append(el("li", "", text));
+    });
+  };
+
+  const syncInjectForm = () => {
+    const kind = $("[data-inject-kind]").value;
+    document.querySelectorAll("[data-inject-only]").forEach((n) => { n.hidden = n.dataset.injectOnly !== kind; });
+    $("[data-inject-depth]").disabled = $("[data-inject-dry]").checked;
+  };
+
+  const addInjection = async () => {
+    const status = $("[data-inject-status]");
+    if (!player.info || !player.info.clock) return;
+    const base = new Date(player.info.clock).getTime() + Number($("[data-inject-after]").value) * 60000;
+    const at = new Date(base).toISOString();
+    try {
+      if ($("[data-inject-kind]").value === "report") {
+        const center = map.getCenter();
+        const dry = $("[data-inject-dry]").checked;
+        player.info = await post(`${REPLAYS}/${REPLAY}/inject-report`, {
+          at, lat: center.lat, lon: center.lng, source: $("[data-inject-source]").value,
+          depth_cm: dry ? 0 : Number($("[data-inject-depth]").value), cleared: dry,
+        });
+      } else {
+        const end = new Date(base + Number($("[data-inject-for]").value) * 60000).toISOString();
+        player.info = await post(`${REPLAYS}/${REPLAY}/inject-outage`, {
+          source_id: $("[data-inject-feed]").value, start: at, end,
+        });
+      }
+      status.textContent = say("rp.inject.added");
+      drawInjections();
+    } catch (error) {
+      status.textContent = error.message || "";
+    }
+  };
+
   const pollReplay = async () => {
     try {
       player.info = await GRP.request(`${REPLAYS}/${REPLAY}`);
@@ -1115,6 +1167,7 @@
     }
     if (player.info.clock) replayClockMs = new Date(player.info.clock).getTime();
     drawReplayBar();
+    drawInjections();
     if (player.info.clock && player.info.clock !== player.lastClock) {
       player.lastClock = player.info.clock;
       await load();
@@ -1149,6 +1202,10 @@
       }
     }, 3000);
     $("[data-player-play]").addEventListener("click", () => { player.playing = !player.playing; drawReplayBar(); });
+    $("[data-inject-kind]").addEventListener("change", syncInjectForm);
+    $("[data-inject-dry]").addEventListener("change", syncInjectForm);
+    $("[data-inject-add]").addEventListener("click", addInjection);
+    syncInjectForm();
     $("[data-player-speed]").addEventListener("change", (event) => { player.speed = Number(event.target.value); });
     document.querySelectorAll("[data-player-step]").forEach((b) => b.addEventListener("click", () => advanceBy(Number(b.dataset.playerStep))));
     $("[data-player-restart]").addEventListener("click", async () => {

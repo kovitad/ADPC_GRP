@@ -153,6 +153,8 @@ MATRIX = {
     "flood_replay_advance": (401, 404, 404, 403, 403),
     "flood_replay_restart": (401, 404, 404, 403, 403),
     "flood_replay_delete": (401, 404, 404, 403, 403),
+    "flood_replay_inject_report": (401, 404, 404, 403, 403),
+    "flood_replay_inject_outage": (401, 404, 404, 403, 403),
     # No road is stored in the fixture, so allowed callers are told it is not found.
     "flood_road_cameras": (401, 404, 404, 403, 404),
     # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
@@ -267,6 +269,12 @@ MATRIX_OPERATION_IDS = {
     ),
     "flood_replay_delete": (
         "delete_replay_api_v1_pilot_flood__pilot_id__replays__replay_id__delete"
+    ),
+    "flood_replay_inject_report": (
+        "post_inject_report_api_v1_pilot_flood__pilot_id__replays__replay_id__inject_report_post"
+    ),
+    "flood_replay_inject_outage": (
+        "post_inject_outage_api_v1_pilot_flood__pilot_id__replays__replay_id__inject_outage_post"
     ),
     "flood_road_cameras": (
         "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
@@ -616,6 +624,15 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         ),
         "flood_replay_delete": (
             "DELETE", "/api/v1/pilot/flood/bangkok/replays/r00000000000", None
+        ),
+        "flood_replay_inject_report": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/inject-report",
+            {"at": "2026-10-03T04:00:00Z", "lat": 13.8, "lon": 100.5},
+        ),
+        "flood_replay_inject_outage": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/inject-outage",
+            {"source_id": "floodboard_roads", "start": "2026-10-03T04:00:00Z",
+             "end": "2026-10-03T04:30:00Z"},
         ),
         "flood_road_cameras": (
             "GET", "/api/v1/pilot/flood/bangkok/roads/0123456789abcdef/cameras", None
