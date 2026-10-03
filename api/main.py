@@ -15,6 +15,7 @@ from api import (
     contributions,
     data_inspector,
     data_library,
+    flood_pilot,
     hand_demo,
     health,
     maps,
@@ -58,6 +59,7 @@ for module in (
     data_library,
     river_watch,
     hand_demo,
+    flood_pilot,
 ):
     app.include_router(module.router, prefix="/api/v1")
 

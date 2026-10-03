@@ -18,6 +18,8 @@ from core.boundary_import import (
 from core.data_import_jobs import ImportClaim, claim_next_import, fail_import, version_id_for_import
 from core.data_library_models import DataImportJob
 from core.db import get_engine, session_scope
+from core.flood_evidence.config import PILOT_IDS, pilot_config
+from core.flood_evidence.ingest import pull_due
 from core.hazard_import import (
     PLATFORM_HAZARD_DATASET_ID,
     HazardImportError,
@@ -58,6 +60,7 @@ def run() -> None:
     storage = LocalStorage(settings.storage_root)
     logger.info("Worker started (lease %d min)", settings.job_lease_minutes)
     last_housekeeping = 0.0
+    last_flood_check = 0.0
     while not stop_event.is_set():
         if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
             release_reservations_once()
@@ -73,8 +76,30 @@ def run() -> None:
             )
         if not worked:
             worked = run_one_inspection(settings.data_in_root, settings.job_lease_minutes, storage)
+        # Flood pilot pulls run only when nothing else is waiting, and are checked once a minute.
+        if (
+            not worked
+            and settings.flood_pilot_pulls_enabled
+            and time.monotonic() - last_flood_check >= HOUSEKEEPING_SECONDS
+        ):
+            run_flood_pulls(storage)
+            last_flood_check = time.monotonic()
         if not worked:
             stop_event.wait(POLL_SECONDS)
+
+
+def run_flood_pulls(storage: LocalStorage) -> None:
+    """Pull every flood-pilot source that is due (ADR-0038). A failure never stops the worker."""
+
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                pull_due(session, storage, config)
+        except Exception:
+            logger.exception("Flood pilot %s pull failed; will retry", pilot_id)
 
 
 def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:

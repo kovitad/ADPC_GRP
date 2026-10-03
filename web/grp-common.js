@@ -162,6 +162,7 @@ window.GRP = (() => {
     "/data-preview.html": "data",
     "/data-library.html": "library",
     "/pilot.html": "pilot",
+    "/flood.html": "pilot",
   };
 
   let mePromise = null;
@@ -236,8 +237,21 @@ window.GRP = (() => {
         nav.querySelector('[data-nav="data"]').hidden = !(isHubAdmin || identity.is_platform_admin);
         nav.querySelector('[data-nav="library"]').hidden = !(isHubAdmin || identity.is_platform_admin);
         nav.querySelector('[data-nav="platform"]').hidden = !identity.is_platform_admin;
-        // ADR-0036: the River Watch pilot is for Admins while it is a pilot.
-        nav.querySelector('[data-nav="pilot"]').hidden = !(isHubAdmin || identity.is_platform_admin);
+        // ADR-0036: the River Watch pilot is for Admins. ADR-0038: the Bangkok flood view is also
+        // open to every member of the pilot's Hubs, who land on it instead.
+        const pilotLink = nav.querySelector('[data-nav="pilot"]');
+        if (isHubAdmin || identity.is_platform_admin) {
+          pilotLink.hidden = false;
+        } else if (identity.memberships.length) {
+          request("/api/v1/pilot/flood")
+            .then((answer) => {
+              if (answer.pilots && answer.pilots.length) {
+                pilotLink.href = "/flood.html";
+                pilotLink.hidden = false;
+              }
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => {});
   };

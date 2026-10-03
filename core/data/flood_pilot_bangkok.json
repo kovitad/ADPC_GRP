@@ -1,0 +1,46 @@
+{
+  "pilot_id": "bangkok",
+  "title": {"en": "Bangkok flood pilot", "th": "นำร่องน้ำท่วมกรุงเทพฯ"},
+  "hubs": ["adpc"],
+  "map": {"center": [13.75, 100.55], "zoom": 11, "bbox": [100.32, 13.49, 100.94, 13.96]},
+  "freshness_minutes": {"current": 30, "recent": 120, "aging": 360, "stale": 720},
+  "report_window_hours": {"default": 6, "max": 24},
+  "sources": [
+    {
+      "source_id": "floodboard_roads",
+      "adapter": "floodboard_roads",
+      "url": "https://www.floodboard.org/api/export/roads.geojson",
+      "interval_minutes": 10,
+      "max_bytes": 20000000,
+      "owner": "Floodboard",
+      "dataset": "Flooded roads (roads.geojson)",
+      "purpose": "Road flood state and Floodboard's per-vehicle verdict",
+      "access": "Public HTTPS export, no key",
+      "license": "CC BY 4.0",
+      "attribution": "Floodboard (floodboard.org), CC BY 4.0",
+      "update_frequency": "Continuous; cached 30 seconds",
+      "coverage": "Bangkok and nearby provinces",
+      "pii": "None in road properties",
+      "redistribution": "Allowed with attribution",
+      "quality_notes": "A fusion of Traffy, crowd reports and BMA sensors. No feature IDs; GRP identifies a segment by a hash of its geometry. Features marked zone, estimated, inferred or cluster are Floodboard's own derivations. The verdict is Floodboard's estimate, not a BMA rule."
+    },
+    {
+      "source_id": "floodboard_reports",
+      "adapter": "floodboard_reports",
+      "url": "https://www.floodboard.org/api/export/reports.csv",
+      "interval_minutes": 15,
+      "max_bytes": 20000000,
+      "owner": "Floodboard",
+      "dataset": "Recent reports (reports.csv)",
+      "purpose": "Point reports behind the road states, about the last 24 hours",
+      "access": "Public HTTPS export, no key",
+      "license": "CC BY 4.0 for the export; quoted text may carry other terms",
+      "attribution": "Floodboard (floodboard.org), CC BY 4.0",
+      "update_frequency": "Continuous; cached 4 hours",
+      "coverage": "Bangkok and nearby provinces",
+      "pii": "Report text and links can identify people. GRP keeps only a hash of the text and never displays it.",
+      "redistribution": "Export allowed with attribution; quoted text not cleared",
+      "quality_notes": "Each row names its underlying source (traffy, crowd, bma_sensor, bma_dds, news). A sensor keeps one ID across readings."
+    }
+  ]
+}

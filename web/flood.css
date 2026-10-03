@@ -1,0 +1,61 @@
+/* ADR-0038: Bangkok Live Risk Intelligence. Builds on pilot.css. */
+.fl-titletools { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+.fl-switch { color: var(--servir-blue-dark); font-size: 0.88rem; }
+
+.fl-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem 1.1rem; margin-top: 1.1rem; }
+.fl-field { display: grid; gap: 0.25rem; font-size: 0.82rem; color: var(--ink-700); }
+.fl-field select { min-width: 12rem; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; background: var(--white); font: inherit; font-size: 0.92rem; }
+.fl-check { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--ink-700); }
+.fl-asof { flex-basis: 100%; margin: 0; color: var(--ink-500); font-size: 0.8rem; }
+
+.fl-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: 0.7rem; margin-top: 1rem; }
+.fl-card { padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--white); }
+.fl-card--quiet { background: #f6f8f9; }
+.fl-card.is-warn { border-color: #f1c27d; background: #fff7e3; }
+.fl-card__n { margin: 0; font-family: var(--font-display); font-size: 1.6rem; font-weight: var(--weight-strong); line-height: 1.1; }
+.fl-card__l { margin: 0.25rem 0 0; color: var(--ink-700); font-size: 0.8rem; line-height: 1.35; }
+
+.fl-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); gap: 1rem; margin-top: 1rem; align-items: start; }
+.fl-map { height: min(68vh, 560px); border: 1px solid var(--line); border-radius: var(--radius-md); z-index: 0; }
+.fl-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; margin: 0.6rem 0 0; padding: 0; list-style: none; color: var(--ink-700); font-size: 0.78rem; }
+.fl-legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.fl-swatch { display: inline-block; width: 1.3rem; height: 0.35rem; border-radius: 3px; }
+.fl-mapnote { margin: 0.5rem 0 0; color: var(--ink-500); font-size: 0.8rem; line-height: 1.5; }
+
+.fl-evidence { padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--white); box-shadow: var(--shadow-sm); max-height: min(78vh, 640px); overflow: auto; }
+.fl-evidence__empty { margin: 0; color: var(--ink-500); font-size: 0.9rem; }
+.fl-evidence__title { margin: 0; font-size: 1.15rem; line-height: 1.3; }
+.fl-evidence__sub { margin: 1rem 0 0.3rem; font-size: 0.85rem; color: var(--ink-700); text-transform: none; }
+.fl-badges, .fl-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0 0; }
+.fl-badge, .fl-chip { padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; background: #eef2f4; color: var(--ink-700); }
+.fl-badge--provider_derived { background: #fff1e6; color: #8a3b00; }
+.fl-badge--fresh-current, .fl-badge--fresh-recent { background: #e6f4ea; color: #1e6b33; }
+.fl-badge--fresh-stale, .fl-badge--fresh-expired { background: #eceff1; color: #4a555b; }
+.fl-chip--ok { background: #e6f4ea; color: #1e6b33; }
+.fl-chip--caution { background: #fff5d6; color: #6b4f00; }
+.fl-chip--risky { background: #ffe8d9; color: #8a3b00; }
+.fl-chip--blocked { background: #fde2e2; color: #8c1d1d; }
+.fl-muted { margin: 0; color: var(--ink-500); font-size: 0.82rem; line-height: 1.5; }
+.fl-rows { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.fl-row { display: grid; gap: 0.1rem; padding: 0.45rem 0.6rem 0.45rem 0.8rem; border-left: 3px solid #cfd8dc; border-radius: 4px; background: #f8fafb; font-size: 0.8rem; line-height: 1.45; }
+.fl-row strong { font-size: 0.8rem; }
+.fl-row--have { border-left-color: #2f9e44; }
+.fl-row--missing { border-left-color: #adb5bd; color: var(--ink-700); }
+.fl-row--pending { border-left-color: #e0a800; }
+
+.fl-coverage { margin-top: 1.5rem; }
+.fl-coverage h2 { font-size: 1.1rem; }
+.fl-coverage__note { margin: 0.3rem 0 0; color: var(--ink-700); font-size: 0.85rem; }
+.fl-state { font-weight: var(--weight-semibold); white-space: nowrap; }
+.fl-state--ok { color: #1e6b33; }
+.fl-state--warn { color: #8a5a00; }
+.fl-state--bad { color: #a61e1e; }
+.fl-state--none { color: var(--ink-500); }
+.fl-attrib { margin: 1.25rem 0 0; color: var(--ink-500); font-size: 0.78rem; line-height: 1.5; }
+
+@media (max-width: 860px) {
+  .fl-main { grid-template-columns: 1fr; }
+  .fl-map { height: min(60vh, 460px); }
+  .fl-evidence { max-height: none; }
+}
+.fl-coverage .rw-table th, .fl-coverage .rw-table td { text-align: left; vertical-align: top; }

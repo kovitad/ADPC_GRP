@@ -198,6 +198,21 @@ def bangkok_districts() -> list[dict[str, Any]]:
     return out
 
 
+def bangkok_outlines() -> list[dict[str, Any]]:
+    """Every captured Bangkok district outline, for area pickers outside River Watch."""
+
+    return [
+        {
+            "admin_code": code,
+            "name": district["name"],
+            "name_th": district["name_th"],
+            "outline": district["outline"],
+            "main_reach": district["main_reach"],
+        }
+        for code, district in _bangkok()["districts"].items()
+    ]
+
+
 def bangkok_district(admin_code: str) -> dict[str, Any] | None:
     data = _bangkok()
     district = data["districts"].get(admin_code)

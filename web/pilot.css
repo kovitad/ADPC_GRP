@@ -179,3 +179,4 @@ html:lang(th) .rw-headline { line-height: 1.45; }
 .rw-wkey--district { height: 0; border-top: 2px dashed #0d2534; background: none; }
 .rw-where[data-mode="bkk"] [data-only="bbt"],
 .rw-where[data-mode="bbt"] [data-only="bkk"] { display: none; }
+.rw-tolive { margin-left: auto; margin-top: 0.35rem; color: var(--servir-blue-dark); font-size: 0.88rem; }

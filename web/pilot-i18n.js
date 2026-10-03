@@ -8,6 +8,7 @@ window.PilotText = (() => {
       "lang.label": "Language",
       "rw.eyebrow": "Pilot · try-out only",
       "rw.title": "River Watch",
+      "rw.toFlood": "Bangkok live flood view →",
       "rw.intro": "What a global river model expects the chosen river to do over the next 7 days. It shows <strong>how much water is flowing</strong>, not how high the water is or where it floods. Use it as a prompt to look at local information more closely.",
       "rw.picker": "Which river spot?",
       "rw.unconfirmed": "<span aria-hidden=\"true\">⚠</span> These spots were picked by the model's \"nearest river\" search. A hydrologist has <strong>not yet confirmed</strong> that either one is the right river for Bang Bua Thong.",
@@ -181,6 +182,7 @@ window.PilotText = (() => {
       "lang.label": "ภาษา",
       "rw.eyebrow": "นำร่อง · ทดลองใช้เท่านั้น",
       "rw.title": "เฝ้าดูแม่น้ำ (River Watch)",
+      "rw.toFlood": "ดูน้ำท่วมกรุงเทพฯ แบบสด →",
       "rw.intro": "แบบจำลองแม่น้ำระดับโลกคาดว่าแม่น้ำที่เลือกจะเป็นอย่างไรใน 7 วันข้างหน้า หน้านี้แสดง<strong>ปริมาณน้ำที่ไหล</strong> ไม่ใช่ความสูงของระดับน้ำหรือพื้นที่ที่จะท่วม ใช้เป็นสัญญาณให้ติดตามข้อมูลในพื้นที่อย่างใกล้ชิดขึ้น",
       "rw.picker": "เลือกจุดแม่น้ำ",
       "rw.unconfirmed": "<span aria-hidden=\"true\">⚠</span> จุดเหล่านี้ได้จากการค้นหา \"แม่น้ำที่ใกล้ที่สุด\" ของแบบจำลอง ผู้เชี่ยวชาญด้านอุทกวิทยา<strong>ยังไม่ได้ยืนยัน</strong>ว่าจุดใดเป็นแม่น้ำที่เหมาะกับบางบัวทอง",
@@ -374,7 +376,7 @@ window.PilotText = (() => {
 
   const applyStatic = () => {
     document.documentElement.lang = lang;
-    document.title = t("page.title");
+    document.title = t(document.documentElement.dataset.titleKey || "page.title");
     document.querySelectorAll("[data-t]").forEach((node) => { node.textContent = t(node.dataset.t); });
     document.querySelectorAll("[data-t-html]").forEach((node) => { node.innerHTML = t(node.dataset.tHtml); });
     document.querySelectorAll("[data-lang]").forEach((button) => {
@@ -395,10 +397,17 @@ window.PilotText = (() => {
   });
   applyStatic();
 
+  // Another pilot page adds its own keys; both languages share the remembered choice.
+  const extend = (more) => {
+    ["en", "th"].forEach((code) => { Object.assign(DICT[code], more[code] || {}); });
+    applyStatic();
+  };
+
   return {
     t,
     locale,
     set,
+    extend,
     lang: () => lang,
     onChange: (fn) => listeners.push(fn),
   };

@@ -124,7 +124,7 @@ where a decision is made.
 - **Done when:** a headless render shows current and stale states in both languages, and a test
   proves an expired report never sets a current state.
 
-### Slice 3: exposure and access (spec Epic H/FB-4; AC4, AC5; Story 7)
+### Slice 4: exposure and access (spec Epic H/FB-4; AC4, AC5; Story 7)
 - Assets come from **data already in the repo**: Bangkok shelters (evacuation centres), villages
   and district/sub-district boundaries from the Thailand bundle.
 - **Schools, hospitals, clinics and transit are a data gap.** OSM is the candidate. Its ODbL
@@ -137,7 +137,7 @@ where a decision is made.
 - **Done when:** golden-style fixture tests (fixtures we write, not scientific golden values) show
   the right assets and reasons for a hand-made flooded segment.
 
-### Slice 4: incidents, corroboration and verification (spec Epic F/J, §10; AC1, AC3; Stories 4 and 5)
+### Slice 5: incidents, corroboration and verification (spec Epic F/J, §10; AC1, AC3; Stories 4 and 5)
 - Clustering by space and time with configurable radius and window. A road segment and the
   reports near it form one incident.
 - **Corroboration counts independent underlying sources** (section 3.1).
@@ -153,7 +153,7 @@ where a decision is made.
 - Lifecycle events from Appendix A are stored in `pilot_incident_event`.
 - **Done when:** scenarios A, B, C and D from spec §29 pass as fast tests.
 
-### Slice 5: replay (spec §30; AC9)
+### Slice 6: replay (spec §30; AC9)
 - Replay reads captured raw fetches (section 6) or redacted fixtures in time order and runs the
   same engines with a simulated `as_of`.
 - Controls: choose an event, start, pause, 1×/5×/20× speed and jump to a time. Inject a synthetic
@@ -162,7 +162,7 @@ where a decision is made.
 - **Done when:** one captured window replays to the same incident timeline twice, and an injected
   outage shows the health warning.
 
-### Slice 6: CCTV P0 (v0.3 addendum §17 P0)
+### Slice 3: CCTV P0 (v0.3 addendum §17 P0)
 - Provider-neutral `pilot_camera` registry and `CameraProviderAdapter` interface.
 - The camera source is **blocked** (section 2). Until BMA provides metadata, the only allowed path
   is cameras entered by hand from the official BMA viewer, as `EXTERNAL_VIEWER` or `METADATA_ONLY`
@@ -209,6 +209,79 @@ headers and SHA-256.
 - The fetches are polite: one request per export per interval, well within the 30-second and
   4-hour cache headers.
 - Nothing is committed. Redacted fixtures, with no `text`, are made later from this capture.
+
+## 6a. Refinements from the integration tweak (v0.1, 3 October)
+
+[`GRP_Bangkok_Integration_Tweak_v0.1.md`](GRP_Bangkok_Integration_Tweak_v0.1.md) agrees with
+sections 3 and 4 on the main points:
+- Floodboard is a replaceable aggregator;
+- one underlying report is counted once;
+- provider confidence stays the provider's;
+- a missing value is never zero, and an unavailable camera never means dry;
+- AI only reads deterministic results.
+
+Its "increment 0, repository audit" is sections 2 and 4 of this plan. These points change the
+plan:
+
+1. **One app, two study areas.** Bang Bua Thong stays the hydrology modelling area (River Watch,
+   HAND). Bangkok is the operational-evidence area. The Bangkok flood view is part of the
+   existing Pilot tab, with the same sign-in, top bar, Thai/English text and Leaflet map. It is
+   not a second application. Provider coverage is configured per area, and no BMA sensor or
+   camera is assumed to cover Bang Bua Thong.
+2. **Every observation has an evidence class:** `observed`, `provider_derived`, `forecast`,
+   `static_scenario` or `synthetic_demo`. Floodboard zone, estimated, inferred and cluster
+   features are `provider_derived`. River Watch is `forecast` with its run time and valid time.
+   RP100 is `static_scenario`, and the HAND slider is `synthetic_demo`. The class is stored and
+   always shown.
+3. **CCTV P0 moves earlier, to slice 3**, ahead of exposure. It is limited to manual
+   `external_viewer` entries for the chosen corridor, because no licensed camera catalogue
+   exists. Nearest camera is a discovery hint only. A camera without a known view or a fresh
+   check never confirms anything. A viewer-only camera can never reach snapshot or CV code. The
+   check confirmed Floodboard's `robots.txt` disallows `/api/cam/`, so GRP never reads cameras
+   through Floodboard. Exposure and access become slice 4, and incidents become slice 5.
+4. **Exposure states** follow the tweak, which is sharper than spec §13:
+   - `potentially_exposed` (overlay only);
+   - `access_under_review`;
+   - `access_disrupted_confirmed` (operator-confirmed);
+   - `access_unknown`, which is what a missing road graph or missing rule produces, never
+     "accessible".
+5. **AI tools** use the tweak's read-only set (`get_current_incidents`, `get_incident_evidence`,
+   `get_nearby_cameras`, `get_exposed_assets`, `get_access_impact`, `get_river_outlook`,
+   `get_situation_changes`). Each is a thin wrapper over a deterministic endpoint that already
+   exists.
+6. **Tweak scenarios are added to the tests:**
+   - 1: timeout, 429 or bad schema keeps the last good data, marked stale;
+   - 2: a BMA event mirrored by Floodboard counts once;
+   - 3: canal metres are never treated as road centimetres;
+   - 5: a viewer-only camera never reaches CV;
+   - 6: an old forecast run stays labelled old;
+   - 8: no road graph gives `access_unknown`;
+   - 9: AI never presents HAND or RP100 as observed.
+   Scenario 7 (HAND NoData is unknown) is already covered by ADR-0037.
+7. **Release gates A, B and C** are adopted. All work in this plan is **Gate A, a local demo**:
+   - captured or permitted read-only data;
+   - no feed registration;
+   - no `contribute_submit`;
+   - no production configuration.
+
+Checked on 3 October: Floodboard `stats.json` and `feed.json` return 404, so only the two exports
+exist. `roads.geojson` sends `Access-Control-Allow-Origin: *`, but GRP still reads it in the
+worker and never in the browser.
+
+## 6b. The owner's expected outcome ([`expected_outcome.docx`](expected_outcome.docx))
+
+The owner pictures four screens and one goal: **prove one area end to end**, rather than
+finishing every feature. Each screen maps to slices:
+
+| Screen in the expected outcome | Where it lands | What is honest on day one |
+|---|---|---|
+| 1. "Bangkok Live Risk Intelligence": layers plus an area picker (Bang Sue, Bang Khen, Bang Bua Thong) showing only data that covers the chosen area | Slice 2 builds the page, its title, Floodboard roads and reports, and a district picker over the 50 Bangkok district outlines already in `core/data/river_watch_bangkok.json`. GEOGLOWS links from the existing River Watch. | BMA levels and rain, CCTV, and schools/hospitals/population appear in a **coverage panel** as "not connected yet". Bang Bua Thong is shown with a note that Floodboard has only about 6 segments there and BMA has none. Its outline comes from the Thailand hierarchy in a later step. |
+| 2. Click a road and see an evidence card: Floodboard, BMA sensor, CCTV, verification status | Slice 2 builds the card with one row per evidence type. | Floodboard is real. "BMA sensor" shows only when the segment's lineage names `bma_sensor` or `bma_dds` (via Floodboard, counted once). CCTV says "no authorised camera registered" until slice 3. Verification is "awaiting officer review" until slice 5 adds the action. Nothing is filled in to look complete. |
+| 3. Who is affected: schools near flooding, hospitals whose access may be affected, places to check | Slice 4, with OSM schools and hospitals and the tweak's states | Proximity is labelled `potentially_exposed`. Access stays `access_unknown` until a road graph and rules exist. |
+| 4. AI: "What has changed in Bangkok during the last hour, and which critical facilities may require attention?" | Slice 7 MCP tools over deterministic change and exposure endpoints | Every sentence cites evidence IDs and times. |
+
+Owner-facing demo order: screens 1 and 2 (slices 1–3), then 3, then 4. The demo corridor is
+the one decision still open in section 7.
 
 ## 7. Owner decisions
 

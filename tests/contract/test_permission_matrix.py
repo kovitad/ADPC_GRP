@@ -123,6 +123,16 @@ MATRIX = {
     "hand_practice": (401, 403, 200, 200, 200),
     "river_watch_districts": (401, 403, 200, 200, 200),
     "river_watch_district": (401, 403, 404, 404, 404),
+    # ADR-0038: a flood pilot is open to every role in its configured Hubs (Bangkok: adpc) and to
+    # Platform Admins; another Hub's Admin is refused. The list only names pilots you can open.
+    "flood_pilots": (401, 200, 200, 200, 200),
+    "flood_pilot": (401, 200, 200, 403, 200),
+    "flood_situation": (401, 200, 200, 403, 200),
+    "flood_roads": (401, 200, 200, 403, 200),
+    "flood_reports": (401, 200, 200, 403, 200),
+    "flood_areas": (401, 200, 200, 403, 200),
+    # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
+    "flood_unknown_pilot": (401, 404, 404, 404, 404),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -201,6 +211,13 @@ MATRIX_OPERATION_IDS = {
     "river_watch_district": (
         "read_district_api_v1_pilot_river_watch_districts__admin_code__get"
     ),
+    "flood_pilots": "list_flood_pilots_api_v1_pilot_flood_get",
+    "flood_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
+    "flood_situation": "read_situation_api_v1_pilot_flood__pilot_id__situation_get",
+    "flood_roads": "read_roads_api_v1_pilot_flood__pilot_id__roads_get",
+    "flood_reports": "read_reports_api_v1_pilot_flood__pilot_id__reports_get",
+    "flood_areas": "read_areas_api_v1_pilot_flood__pilot_id__areas_get",
+    "flood_unknown_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
@@ -507,6 +524,13 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "hand_practice": ("GET", "/api/v1/pilot/hand-demo?stage_m=3", None),
         "river_watch_districts": ("GET", "/api/v1/pilot/river-watch/districts", None),
         "river_watch_district": ("GET", "/api/v1/pilot/river-watch/districts/no-such", None),
+        "flood_pilots": ("GET", "/api/v1/pilot/flood", None),
+        "flood_pilot": ("GET", "/api/v1/pilot/flood/bangkok", None),
+        "flood_situation": ("GET", "/api/v1/pilot/flood/bangkok/situation", None),
+        "flood_roads": ("GET", "/api/v1/pilot/flood/bangkok/roads", None),
+        "flood_reports": ("GET", "/api/v1/pilot/flood/bangkok/reports", None),
+        "flood_areas": ("GET", "/api/v1/pilot/flood/bangkok/areas", None),
+        "flood_unknown_pilot": ("GET", "/api/v1/pilot/flood/no-such", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)

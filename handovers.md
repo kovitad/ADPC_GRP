@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 2 October 2026 (River Watch pilot tab, ADR-0036, uncommitted; see Section 0). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-2, ADR-0038, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -113,9 +113,72 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-2 October 2026, `main` at `14e4993` plus this note)
+## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 2 October (latest): River Watch pilot tab (ADR-0036), not committed
+### 3 October (latest): Bangkok Live Risk Intelligence, slices 1-2 (ADR-0038)
+
+- **Branch `pilot/river-watch-and-bangkok-flood`, not pushed.**
+  - `0d8c285` commits the 2 October Pilot work (River Watch, HAND practice, Thai).
+  - The next commits add the Bangkok plan and this build.
+- **Inputs, all in `docs/pilot/`:**
+  - the owner's spec `Bangkok_Flood_GRP_Pilot_Development_Spec_v0.3.md`;
+  - `GRP_Bangkok_Integration_Tweak_v0.1.md`;
+  - `expected_outcome.docx` (Thai, four screens).
+- **The plan** is `docs/pilot/2026-10-03_Bangkok_Flood_Pilot_Implementation_Plan.md`.
+  - Section 2: live source checks.
+  - Section 6a: the tweak refinements.
+  - Section 6b: the expected-outcome mapping.
+  - Section 7: the owner's decisions.
+  - Slice order: 1 registry and Floodboard, 2 observe map, 3 CCTV P0, 4 exposure, 5 incidents,
+    6 replay, 7 AI.
+- **Owner decisions (3 October):** capture now; OSM for schools and hospitals; Hub operators can
+  open the view; build slices 1 and 2 first.
+  - **Still open:** the demo corridor.
+- **Facts measured on 3 October:**
+  - Floodboard's `roads.geojson` and `reports.csv` are CC BY 4.0 and need no key.
+  - Roads have no IDs; GRP uses a geometry SHA-256.
+  - `conf` and `current_weight` decay without a state change.
+  - `stats.json` and `feed.json` return 404, and `robots.txt` disallows `/api/cam/`.
+  - The BMA water-level entry on data.go.th has only a data dictionary and no licence.
+  - The community CCTV list has no licence.
+- **Built:**
+  - `core/flood_evidence/`: config, Floodboard adapter, observation model, freshness, ingest,
+    situation.
+  - Migration `20261003_0022`.
+  - Worker pulls behind `FLOOD_PILOT_PULLS_ENABLED`, which is on only in `compose.desktop.yml`.
+  - `api/flood_pilot.py`: six protected read-only routes under `/api/v1/pilot/flood`.
+  - `web/flood.html`, `flood.js`, `flood-i18n.js` and `flood.css`, with a Pilot nav item for
+    non-admin `adpc` members.
+  - `PilotText.extend` added to `pilot-i18n.js`.
+  - The CLI `grpcli/flood_pilot.py`, with `ingest-capture` and `pull`.
+  - Redacted fixtures in `tests/fixtures/floodboard/`.
+- **Capture still running:** `grpcli/floodboard_capture.py` has been a detached local process
+  since 09:28 on 3 October (PID 26672 and its child). It saves both exports every 20 minutes into
+  the ignored `.local/capture/floodboard/`.
+  - It will not survive a reboot. Restart it with
+    `python -m grpcli.floodboard_capture --every-minutes 20`, or replace it with a Task Scheduler
+    job.
+  - Keep it until the worker pulls have run cleanly for a day.
+- **Verified:**
+  - 850 tests pass and 2 skip, and Ruff is clean. The permission matrix gives
+    `(401, 200, 200, 403, 200)` for the flood routes.
+  - The migration ran on the Desktop stack. The worker pulls live: 5,134 roads and 749 reports.
+  - The captures were backfilled. Loading them after the live pull exposed an out-of-order bug,
+    now fixed and tested.
+  - At 09:50: 742 roads had flooding reported now, 129 were not passable by car according to
+    Floodboard, 19 were closed, and there were 128 reports in the last hour.
+  - The page was rendered headless from the real API answers with a stubbed sign-in: Thai,
+    English, an evidence card (`?road=`), and Bang Khen at 504 px (`?area=1005`).
+  - **Not verified:** a signed-in browser pass on the real stack.
+- **Next:**
+  1. The owner picks the demo corridor.
+  2. Slice 3: manual CCTV `external_viewer` entries for that corridor.
+  3. Slice 4: OSM schools, hospitals and clinics, with states `potentially_exposed` and
+     `access_unknown`.
+  4. Add a retention rule for raw fetches before Gate B (about 43 MB a day gzipped).
+  5. Add a Bang Bua Thong outline to the area picker from the Thailand hierarchy.
+
+### 2 October: River Watch pilot tab (ADR-0036), committed on 3 October as `0d8c285`
 
 - **What it is.** A new **Pilot** tab (`/pilot.html`), shown to Hub Admins and Platform Admins
   only, that reads the live, public GEOGLOWS river forecast and explains it in plain language:

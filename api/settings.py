@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     shelter_browser_upload_enabled: bool = False
     shelter_upload_max_bytes: int = 64 * 1024 * 1024
     shelter_upload_max_uncompressed_bytes: int = 128 * 1024 * 1024
+    # ADR-0038: the worker pulls the flood pilots' public sources (Floodboard). Off by default so
+    # tests and servers stay offline until the pilot is switched on deliberately.
+    flood_pilot_pulls_enabled: bool = False
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None

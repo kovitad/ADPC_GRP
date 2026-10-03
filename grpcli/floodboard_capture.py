@@ -57,7 +57,7 @@ def capture_once(out_root: Path, now: datetime | None = None) -> Path:
     for name, url in EXPORTS.items():
         try:
             status, headers, body = _fetch(url)
-        except (OSError, urllib.error.URLError) as error:
+        except Exception as error:
             files[name] = {"url": url, "error": str(error)}
             logger.warning("Floodboard %s failed: %s", name, error)
             continue
@@ -91,8 +91,12 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     interval = max(args.every_minutes, MIN_INTERVAL_MINUTES) * 60
     while True:
-        folder = capture_once(args.out)
-        logger.info("Captured %s", folder)
+        try:
+            folder = capture_once(args.out)
+            logger.info("Captured %s", folder)
+        except Exception:
+            # A lost pull is recoverable at the next interval; a dead loop loses the event.
+            logger.exception("Capture failed; trying again at the next interval")
         if args.once:
             return
         time.sleep(interval)
