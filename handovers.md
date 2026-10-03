@@ -115,7 +115,20 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): bmatraffic.com cameras first (ADR-0050)
+### 3 October (latest): Global Risk live-feed plan (plan only)
+
+- **Written:** `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`. Nothing has been built,
+  submitted or registered.
+- **Key finding:** Global Risk already serves a contributed live feed (`usgs_quakes_m45_month`)
+  as `generic_json` with an external call-out. That is the pattern to copy: GRP serves
+  `feed.json` and Global Risk keeps only a manifest.
+  - Global Risk must be able to reach the URL, so a public HTTPS host is the real blocker.
+- **v1 scope:** incident records only, with confidence and reasons. No report text, usernames,
+  camera links, Longdo events or rain.
+- **Next:** the owner answers the 6 decisions at the end of the plan. Then Step 1 (the endpoint,
+  tests and ADR-0051) can be built locally under Gate A.
+
+### 3 October: bmatraffic.com cameras first (ADR-0050)
 
 - **Requested:** the owner asked to use `bmatraffic.com`, which is faster.
 - **Built:** `grpcli/bmatraffic_cameras_capture.py` keeps 520 Bangkok cameras, with internal IPs
