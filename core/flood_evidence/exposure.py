@@ -57,6 +57,10 @@ def latest_exposure(session: Session, config: PilotConfig, as_of: datetime) -> d
                 select(FloodAssetExposure).where(FloodAssetExposure.fetch_id == snapshot.id)
             )
         }
+    # Imported here: reviews read the asset registry through this package too.
+    from core.flood_evidence.reviews import facility_overrides
+
+    confirmed = facility_overrides(session, config, as_of)
     out = []
     for asset in assets:
         row = rows.get(asset.asset_id)
@@ -76,6 +80,11 @@ def latest_exposure(session: Session, config: PilotConfig, as_of: datetime) -> d
                 reasons=row.reasons,
                 rule_version=row.rule_version,
             )
+        if asset.asset_id in confirmed:
+            # An officer saw that the facility is cut off. Only a person can set this state.
+            item["access_state"] = "access_disrupted_confirmed"
+            item["officer"] = confirmed[asset.asset_id]
+            item["reasons"] = [*item["reasons"], "officer_confirmed_access_disrupted"]
         out.append(item)
     return {
         "assets": out,

@@ -16,6 +16,7 @@
     config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
     assets: null, facility: null, incidents: null, incident: null, allIncidents: false,
+    canWrite: false,
   };
   const say = PilotText.t;
   let map = null;
@@ -180,7 +181,7 @@
     }).addTo(map);
     facilityLayer = window.L.layerGroup(
       visibleFacilities().map((a) => {
-        const tone = a.access_state === "access_under_review" ? "review"
+        const tone = ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state) ? "review"
           : a.exposure_state === "potentially_exposed" ? "exposed" : "none";
         const marker = window.L.marker([a.lat, a.lon], {
           // The icon holds only this file's own letter; names go in the tooltip as text.
@@ -250,7 +251,7 @@
     set("sources", notOk);
     const facilities = visibleFacilities();
     set("exposed", facilities.filter((a) => a.exposure_state === "potentially_exposed").length);
-    set("access", facilities.filter((a) => a.access_state === "access_under_review").length);
+    set("access", facilities.filter((a) => ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state)).length);
     $("[data-card-sources]").classList.toggle("is-warn", notOk > 0);
     const vehicle = say(`veh.${state.vehicle}`);
     $('[data-card-label="blocked"]').textContent = say("card.blocked", {
@@ -329,6 +330,9 @@
       const tags = el("span", "fl-inc__tags");
       tags.append(confidenceBadge(incident.confidence));
       if (incident.status !== "active") tags.append(el("span", "fl-badge", say(`inc.status.${incident.status}`)));
+      if (incident.verification && incident.verification !== "unverified") {
+        tags.append(el("span", `fl-badge fl-badge--officer fl-badge--${incident.verification}`, say(`rev.badge.${incident.verification}`)));
+      }
       if (incident.access_to_check) tags.append(el("span", "fl-badge fl-badge--warn", say("inc.access")));
       if (incident.hospital_near) tags.append(el("span", "fl-badge fl-badge--warn", say("inc.hospital")));
       body.append(tags);
@@ -368,10 +372,93 @@
   const eventText = (event) => {
     const d = event.detail || {};
     const conf = (value) => (value ? say(`inc.conf.${value}`) : "–");
+    if (event.kind === "officer_review") return say("inc.event.officer_review", { action: say(`rev.action.${d.action}`) });
     return say(`inc.event.${event.kind}`, {
       before: event.kind === "confidence_changed" ? conf(d.before) : d.before,
       after: event.kind === "confidence_changed" ? conf(d.after) : d.after,
     });
+  };
+
+  // Officer checks (slice 5b): a person's own observation, saved with the CSRF header by GRP.request.
+  const post = (url, body) => GRP.request(url, { method: "POST", body });
+
+  const reviewForm = (detail) => {
+    const form = el("form", "fl-review");
+    form.append(el("p", "fl-review__prompt", say("rev.prompt")));
+    const note = el("textarea", "fl-review__note");
+    note.maxLength = 500;
+    note.rows = 2;
+    note.setAttribute("aria-label", say("rev.note"));
+    note.placeholder = say("rev.note");
+    const usable = (detail.cameras || []).filter((c) => !c.placeholder && c.viewer_url);
+    let camera = null;
+    if (usable.length) {
+      camera = el("select", "fl-review__camera");
+      camera.setAttribute("aria-label", say("rev.camera"));
+      const none = el("option", "", say("rev.camera.none"));
+      none.value = "";
+      camera.append(none);
+      usable.forEach((c) => {
+        const option = el("option", "", cameraName(c));
+        option.value = c.camera_id;
+        camera.append(option);
+      });
+    }
+    const status = el("p", "fl-review__status");
+    status.setAttribute("aria-live", "polite");
+    const buttons = el("div", "fl-review__buttons");
+    ["flooding_seen", "dry_seen", "cannot_tell"].forEach((action) => {
+      const button = el("button", `button button--secondary button--compact fl-review__btn fl-review__btn--${action}`, say(`rev.action.${action}`));
+      button.type = "button";
+      button.addEventListener("click", async () => {
+        buttons.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+        status.textContent = say("rev.saving");
+        try {
+          await post(`${API}/incidents/${detail.incident_id}/reviews`, {
+            action, note: note.value.trim() || null, camera_id: camera && camera.value ? camera.value : null,
+          });
+          status.textContent = say("rev.saved");
+          await load();
+        } catch (error) {
+          status.textContent = say("rev.failed", { msg: error.message || "" });
+          buttons.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+        }
+      });
+      buttons.append(button);
+    });
+    form.append(buttons, note);
+    if (camera) form.append(camera);
+    form.append(status);
+    return form;
+  };
+
+  const facilityForm = (asset) => {
+    const form = el("form", "fl-review");
+    const note = el("textarea", "fl-review__note");
+    note.maxLength = 500;
+    note.rows = 2;
+    note.placeholder = say("rev.note");
+    note.setAttribute("aria-label", say("rev.note"));
+    const status = el("p", "fl-review__status");
+    status.setAttribute("aria-live", "polite");
+    const confirmed = asset.access_state === "access_disrupted_confirmed";
+    const action = confirmed ? "withdraw" : "access_disrupted";
+    const button = el("button", "button button--secondary button--compact", say(confirmed ? "fac.withdraw" : "fac.confirm"));
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      status.textContent = say("rev.saving");
+      try {
+        await post(`${API}/facilities/access`, { asset_id: asset.asset_id, action, note: note.value.trim() || null });
+        status.textContent = say("rev.saved");
+        await load();
+      } catch (error) {
+        status.textContent = say("rev.failed", { msg: error.message || "" });
+        button.disabled = false;
+      }
+    });
+    form.append(button, note, status);
+    return form;
   };
 
   const showIncident = async (incidentId) => {
@@ -478,7 +565,26 @@
     box.append(events);
 
     box.append(el("h3", "fl-evidence__sub", say("inc.check")));
-    box.append(el("p", "fl-muted", say("inc.check.soon")));
+    box.append(el("p", `fl-officer fl-officer--${detail.verification}`, say(`rev.state.${detail.verification}`, {
+      time: detail.verified_at ? clock(detail.verified_at) : "", until: detail.verified_until ? clock(detail.verified_until) : "",
+    })));
+    if (state.canWrite && detail.status !== "closed") {
+      box.append(reviewForm(detail));
+    } else if (!state.canWrite) {
+      box.append(el("p", "fl-muted", say("rev.readonly")));
+    }
+    if (detail.reviews && detail.reviews.length) {
+      box.append(el("h3", "fl-evidence__sub", say("rev.history")));
+      const ul = el("ul", "fl-timeline");
+      detail.reviews.forEach((r) => {
+        const li = el("li", "", say("rev.item", { by: r.by, when: clock(r.at), action: say(`rev.action.${r.action}`) })
+          + (r.current ? "" : ` ${say("rev.expired")}`));
+        if (r.note) li.append(el("span", "fl-note", r.note));
+        ul.append(li);
+      });
+      box.append(ul);
+    }
+    box.append(el("p", "fl-muted", say("rev.rule")));
     box.append(el("p", "fl-muted", say("inc.engine", { v: detail.rule_version })));
   };
 
@@ -583,6 +689,14 @@
     }
     box.append(el("h3", "fl-evidence__sub", say("fac.access")));
     box.append(el("p", "", say(`fac.access.${asset.access_state}`, { f: number(state.assets.frontage_m) })));
+    if (asset.officer) {
+      box.append(el("p", "fl-officer fl-officer--officer_saw_flooding", say("fac.confirmed", {
+        time: clock(asset.officer.confirmed_at), until: clock(asset.officer.confirmed_until),
+      })));
+    }
+    box.append(el("h3", "fl-evidence__sub", say("fac.check")));
+    if (state.canWrite) box.append(facilityForm(asset));
+    else box.append(el("p", "fl-muted", say("rev.readonly")));
     box.append(el("p", "fl-muted", say("fac.osm")));
     if (asset.rule_version) box.append(el("p", "fl-muted", say("fac.rule", { v: asset.rule_version })));
   };
@@ -794,6 +908,8 @@
     .then(async (identity) => {
       const isAdmin = identity.is_platform_admin || identity.memberships.some((m) => m.role === "admin");
       $("[data-river-link]").hidden = !isAdmin;
+      // ADR-0042: only members of the pilot's Hubs record checks; the server enforces it too.
+      state.canWrite = identity.memberships.length > 0;
       const [config, areas, cameras] = await Promise.all([
         GRP.request(API), GRP.request(`${API}/areas`), GRP.request(`${API}/cameras`),
       ]);

@@ -94,3 +94,17 @@
 .fl-badge--warn { background: #fff1e6; color: #8a3b00; }
 .fl-evidence__kicker { margin: 0; color: var(--ink-500); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .fl-why, .fl-timeline { display: grid; gap: 0.25rem; margin: 0; padding-left: 1.1rem; font-size: 0.8rem; line-height: 1.45; }
+.fl-officer { margin: 0; padding: 0.45rem 0.6rem; border-radius: 6px; background: #f1f4f5; font-size: 0.82rem; }
+.fl-officer--officer_saw_flooding { background: #e3eef8; color: #1b4f72; }
+.fl-officer--officer_saw_dry { background: #fde2e2; color: #8c1d1d; }
+.fl-officer--officer_could_not_tell { background: #fff5d6; color: #6b4f00; }
+.fl-badge--officer { font-weight: 600; }
+.fl-badge--officer_saw_flooding { background: #e3eef8; color: #1b4f72; }
+.fl-badge--officer_saw_dry { background: #fde2e2; color: #8c1d1d; }
+.fl-badge--officer_could_not_tell { background: #fff5d6; color: #6b4f00; }
+.fl-review { display: grid; gap: 0.45rem; margin-top: 0.5rem; }
+.fl-review__prompt { margin: 0; font-size: 0.82rem; font-weight: 600; }
+.fl-review__buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.fl-review__note, .fl-review__camera { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 0.82rem; }
+.fl-review__status { margin: 0; color: var(--ink-500); font-size: 0.78rem; min-height: 1em; }
+.fl-note { display: block; margin-top: 0.15rem; color: var(--ink-700); white-space: pre-wrap; overflow-wrap: anywhere; }

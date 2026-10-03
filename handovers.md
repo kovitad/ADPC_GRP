@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-5a, ADR-0038 to 0041, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-5, ADR-0038 to 0042, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,28 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): incidents, slice 5a (ADR-0041)
+### 3 October (latest): officer checks, slice 5b (ADR-0042)
+
+- **Built:**
+  - `core/flood_evidence/reviews.py` and table `flood_review` (migration `20261003_0025`).
+  - `POST /pilot/flood/{id}/incidents/{incident_id}/reviews` with actions `flooding_seen`,
+    `dry_seen` and `cannot_tell`.
+  - `POST /pilot/flood/{id}/facilities/access` with actions `access_disrupted` and `withdraw`.
+  - Audit events, typed bodies and notes of at most 500 characters.
+- **Rules:**
+  - Reviews count for 3 hours, and only while the incident still holds a reviewed road.
+  - They never change the engine's confidence; they add `verification`.
+  - "Officer saw dry" ranks first.
+  - Facility `access_disrupted_confirmed` can only come from an officer and can be withdrawn.
+  - A Platform Admin with no pilot-Hub membership is read-only. Placeholder cameras cannot be
+    named in a review.
+- **On the page:** the officer state, three buttons and a note on the incident card; the history;
+  "Access is cut (I saw it)" and withdraw on the facility card; officer badges in the queue.
+- **Tests:** 12 review tests. 948 pass and 2 skip. The stack is on `20261003_0025`.
+- **Not verified:** a real signed-in POST. The owner should try one review after signing in.
+- **Next:** slice 6, replay over the saved captures, or slice 7, grounded questions.
+
+### 3 October: incidents, slice 5a (ADR-0041)
 
 - **Built:**
   - `core/flood_evidence/incidents.py`, the pure grouping and assessment.

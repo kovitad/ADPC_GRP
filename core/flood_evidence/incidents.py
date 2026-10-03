@@ -276,17 +276,22 @@ def facility_flags(incident: dict[str, Any], exposures: list[dict[str, Any]]) ->
     return {
         "facility_ids": sorted(a["asset_id"] for a in hit),
         "hospital_near": any(a["asset_type"] == "hospital" for a in hit),
-        "access_to_check": any(a["access_state"] == "access_under_review" for a in hit),
+        "access_to_check": any(
+            a["access_state"] in {"access_under_review", "access_disrupted_confirmed"} for a in hit
+        ),
     }
 
 
 def priority(incident: dict[str, Any]) -> tuple:
-    """Check-first order: conflict, access to check, hospital near, least certain, biggest."""
+    """Check-first order: conflict (or an officer saw it dry), access to check, hospital near,
+    not yet seen by an officer, least certain, biggest."""
 
+    verification = incident.get("verification") or "unverified"
     return (
-        0 if incident["conflict"] else 1,
+        0 if incident["conflict"] or verification == "officer_saw_dry" else 1,
         0 if incident.get("access_to_check") else 1,
         0 if incident.get("hospital_near") else 1,
+        0 if verification == "unverified" else 1,
         CONFIDENCE_ORDER[incident["confidence"]],
         -len(incident["road_keys"]),
         incident["road_keys"][0],

@@ -12,15 +12,17 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 
 from api.dependencies import DatabaseSession
 from api.errors import access_not_authorized, not_found, validation_failed
 from api.permissions import SignedInMember
 from api.sessions import CurrentPrincipal
+from core.access_models import AuditEvent, AuditResult
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
@@ -28,6 +30,14 @@ from core.flood_evidence.incident_store import (
     REPORT_WINDOW_HOURS,
     incident_detail,
     list_incidents,
+)
+from core.flood_evidence.reviews import (
+    NOTE_MAX,
+    ReviewRejected,
+    history,
+    review_facility,
+    review_incident,
+    reviewer_names,
 )
 from core.flood_evidence.situation import current_roads, recent_reports, road_by_id, situation
 from core.river_watch import bangkok_outlines
@@ -53,6 +63,38 @@ def flood_pilot(pilot_id: str, principal: SignedInMember) -> PilotConfig:
 
 
 FloodPilot = Annotated[PilotConfig, Depends(flood_pilot)]
+
+
+def pilot_hub(principal: CurrentPrincipal, config: PilotConfig) -> UUID:
+    """The pilot Hub an officer acts for. Writing needs a membership; a Platform Admin with no
+    pilot-Hub membership can read but not record observations (ADR-0042)."""
+
+    hubs = sorted(
+        (m for m in principal.memberships if m.hub_code.lower() in config.hubs),
+        key=lambda m: m.hub_code,
+    )
+    if not hubs:
+        raise access_not_authorized()
+    return hubs[0].hub_id
+
+
+class IncidentReviewRequest(BaseModel):
+    action: Literal["flooding_seen", "dry_seen", "cannot_tell"]
+    camera_id: str | None = Field(default=None, max_length=120)
+    note: str | None = Field(default=None, max_length=NOTE_MAX)
+
+
+class FacilityAccessRequest(BaseModel):
+    asset_id: str = Field(min_length=1, max_length=120)
+    action: Literal["access_disrupted", "withdraw"]
+    note: str | None = Field(default=None, max_length=NOTE_MAX)
+
+
+def _audit(session, principal: CurrentPrincipal, hub_id: UUID, action: str, target_type: str,
+           target_id: str, detail: dict[str, Any]) -> None:
+    session.add(AuditEvent(actor_user_id=principal.user_id, actor_kind="person", hub_id=hub_id,
+                           action=action, target_type=target_type, target_id=target_id,
+                           new_value=detail, result=AuditResult.SUCCESS))
 
 
 def _as_of(value: str | None) -> datetime:
@@ -253,3 +295,67 @@ def read_incident(
     )
     return {**detail, "roads": roads, "reports": reports, "facilities": facilities,
             "cameras": cameras}
+
+
+@router.post(
+    "/{pilot_id}/incidents/{incident_id}/reviews",
+    summary="Record what an officer saw at an incident (time-bound human evidence)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_incident_review(
+    config: FloodPilot,
+    principal: SignedInMember,
+    session: DatabaseSession,
+    incident_id: UUID,
+    body: IncidentReviewRequest,
+) -> dict[str, Any]:
+    hub_id = pilot_hub(principal, config)
+    now = datetime.now(UTC)
+    try:
+        review = review_incident(
+            session, config, incident_id=incident_id, user_id=principal.user_id, hub_id=hub_id,
+            action=body.action, camera_id=body.camera_id, note=body.note, now=now,
+        )
+    except LookupError as error:
+        raise not_found() from error
+    except ReviewRejected as error:
+        raise validation_failed(str(error)) from error
+    _audit(session, principal, hub_id, "flood_pilot.incident_review", "flood_incident",
+           str(incident_id), {"action": body.action, "camera_id": body.camera_id,
+                              "note_chars": len(review.note or ""), "pilot_id": config.pilot_id})
+    session.commit()
+    return read_incident(config, session, incident_id)
+
+
+@router.post(
+    "/{pilot_id}/facilities/access",
+    summary="Confirm, or withdraw, that an officer saw a facility cut off",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def post_facility_access(
+    config: FloodPilot,
+    principal: SignedInMember,
+    session: DatabaseSession,
+    body: FacilityAccessRequest,
+) -> dict[str, Any]:
+    hub_id = pilot_hub(principal, config)
+    now = datetime.now(UTC)
+    try:
+        review = review_facility(
+            session, config, asset_id=body.asset_id, user_id=principal.user_id, hub_id=hub_id,
+            action=body.action, note=body.note, now=now,
+        )
+    except LookupError as error:
+        raise not_found() from error
+    except ReviewRejected as error:
+        raise validation_failed(str(error)) from error
+    _audit(session, principal, hub_id, "flood_pilot.facility_access", "flood_facility",
+           body.asset_id, {"action": body.action, "note_chars": len(review.note or ""),
+                           "pilot_id": config.pilot_id})
+    session.commit()
+    facility = next(a for a in latest_exposure(session, config, now)["assets"]
+                    if a["asset_id"] == body.asset_id)
+    return {**facility, "reviews": history(
+        session, config, "facility", body.asset_id, now,
+        reviewer_names(session, config, "facility", body.asset_id),
+    )}

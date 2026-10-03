@@ -18,7 +18,7 @@ never rewrite lifecycle history.
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -42,6 +42,7 @@ from core.flood_evidence.models import (
     FloodIncidentRun,
     FloodSourceFetch,
 )
+from core.flood_evidence.reviews import history, incident_verification, reviewer_names
 from core.flood_evidence.situation import current_roads, recent_reports
 from core.river_watch import bangkok_outlines
 
@@ -194,7 +195,10 @@ def _public(incident: FloodIncident) -> dict[str, Any]:
     }
 
 
-def list_incidents(session: Session, config: PilotConfig) -> dict[str, Any]:
+def list_incidents(
+    session: Session, config: PilotConfig, now: datetime | None = None
+) -> dict[str, Any]:
+    now = now or datetime.now(UTC)
     rows = list(
         session.scalars(
             select(FloodIncident).where(
@@ -202,31 +206,42 @@ def list_incidents(session: Session, config: PilotConfig) -> dict[str, Any]:
             )
         )
     )
-    active = sorted((r for r in rows if r.status == ACTIVE), key=lambda r: priority(r.summary))
-    receding = sorted((r for r in rows if r.status == RECEDING),
-                      key=lambda r: utc(r.last_active_at), reverse=True)
+    officer = incident_verification(session, config, rows, now)
+    public = {str(r.id): _with_officer(_public(r), officer) for r in rows}
+    active = sorted((public[str(r.id)] for r in rows if r.status == ACTIVE), key=priority)
+    receding = sorted((public[str(r.id)] for r in rows if r.status == RECEDING),
+                      key=lambda i: i["last_active_at"], reverse=True)
     return {
-        "incidents": [_public(r) for r in active + receding],
+        "incidents": active + receding,
         "last_processed_at": (lp.isoformat() if (lp := last_processed(session, config.pilot_id))
                               else None),
         "rule_version": RULE_VERSION,
     }
 
 
+def _with_officer(item: dict[str, Any], officer: dict[str, dict]) -> dict[str, Any]:
+    return {**item, "verification": "unverified", **officer.get(item["incident_id"], {})}
+
+
 def incident_detail(
-    session: Session, config: PilotConfig, incident_id: UUID
+    session: Session, config: PilotConfig, incident_id: UUID, now: datetime | None = None
 ) -> dict[str, Any] | None:
+    now = now or datetime.now(UTC)
     incident = session.get(FloodIncident, incident_id)
     if incident is None or incident.pilot_id != config.pilot_id:
         return None
+    officer = incident_verification(session, config, [incident], now)
     events = session.scalars(
         select(FloodIncidentEvent)
         .where(FloodIncidentEvent.incident_id == incident.id)
         .order_by(FloodIncidentEvent.at.desc(), FloodIncidentEvent.id.desc())
         .limit(50)
     )
+    reviews = history(session, config, "incident", str(incident.id), now,
+                      reviewer_names(session, config, "incident", str(incident.id)))
     return {
-        **_public(incident),
+        **_with_officer(_public(incident), officer),
+        "reviews": reviews,
         "events": [
             {"at": utc(e.at).isoformat(), "kind": e.kind, "detail": e.detail} for e in events
         ],

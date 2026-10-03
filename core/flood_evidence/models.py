@@ -172,3 +172,33 @@ class FloodIncidentRun(Base):
     snapshot_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     active_count: Mapped[int] = mapped_column(Integer, nullable=False)
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class FloodReview(Base):
+    """An officer's own observation of an incident or a facility's access (ADR-0042).
+
+    Human evidence with a time: it applies only until ``expires_at``, only while the reviewed
+    roads are still part of the incident, and never changes what the evidence engine computed.
+    """
+
+    __tablename__ = "flood_review"
+    __table_args__ = (
+        Index("ix_flood_review_target", "pilot_id", "target_kind", "target_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    hub_id: Mapped[UUID] = mapped_column(ForeignKey("hub.id", ondelete="RESTRICT"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=False
+    )
+    target_kind: Mapped[str] = mapped_column(String(16), nullable=False)  # incident | facility
+    target_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    camera_id: Mapped[str | None] = mapped_column(String(120))
+    note: Mapped[str | None] = mapped_column(Text)
+    # The roads the officer was looking at, so a re-cut incident cannot inherit the review.
+    road_keys: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
