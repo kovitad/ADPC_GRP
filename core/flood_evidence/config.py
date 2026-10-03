@@ -36,6 +36,8 @@ class PilotConfig:
     report_window_hours: dict[str, int]
     # Facility exposure distances in metres (ADR-0040): near_m and frontage_m.
     exposure: dict[str, float]
+    # Retention in days (ADR-0045): raw_days and exposure_days.
+    retention: dict[str, int]
     sources: tuple[SourceConfig, ...]
     # Registries, outlines and Hubs come from ``base_id``. A replay (ADR-0044) runs in its own
     # ``pilot_id`` namespace with ``base_id`` set to the live pilot and ``clock`` set to the
@@ -81,6 +83,10 @@ def _parse(raw: dict[str, Any]) -> PilotConfig:
         exposure={
             "near_m": float(raw.get("exposure", {}).get("near_m", 150)),
             "frontage_m": float(raw.get("exposure", {}).get("frontage_m", 60)),
+        },
+        retention={
+            "raw_days": int(raw.get("retention", {}).get("raw_days", 14)),
+            "exposure_days": int(raw.get("retention", {}).get("exposure_days", 7)),
         },
         sources=sources,
         base_id=raw["pilot_id"],

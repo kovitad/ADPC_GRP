@@ -48,6 +48,11 @@
     "frontage_m": 60,
     "note": "Display thresholds for the demo, not validated rules. near_m: a flooded road this close makes a facility potentially exposed. frontage_m: a closed or truck-risky road this close puts access under review."
   },
+  "retention": {
+    "raw_days": 14,
+    "exposure_days": 7,
+    "note": "ADR-0045. Raw downloads and report IDs older than raw_days are removed (fetch rows and SHA-256 stay); per-snapshot facility states older than exposure_days are deleted. Observations, incidents and events are kept."
+  },
   "sources": [
     {
       "source_id": "floodboard_roads",

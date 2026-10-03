@@ -22,6 +22,8 @@ from core.db import get_engine, session_scope
 from core.flood_evidence.config import PILOT_IDS, pilot_config
 from core.flood_evidence.ingest import pull_due
 from core.flood_evidence.replay import run_one_step as replay_step
+from core.flood_evidence.retention import delete_raw
+from core.flood_evidence.retention import prune as prune_flood
 from core.hazard_import import (
     PLATFORM_HAZARD_DATASET_ID,
     HazardImportError,
@@ -46,6 +48,7 @@ logger = logging.getLogger("grp.worker")
 stop_event = Event()
 POLL_SECONDS = 3
 HOUSEKEEPING_SECONDS = 60
+RETENTION_SECONDS = 3600
 
 
 def _request_stop(_signum: int, _frame: object) -> None:
@@ -63,9 +66,14 @@ def run() -> None:
     logger.info("Worker started (lease %d min)", settings.job_lease_minutes)
     last_housekeeping = 0.0
     last_flood_check = 0.0
+    last_retention = 0.0
     while not stop_event.is_set():
         if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
             release_reservations_once()
+            # ADR-0045: flood-pilot retention, at most once an hour.
+            if time.monotonic() - last_retention >= RETENTION_SECONDS:
+                run_flood_retention(storage)
+                last_retention = time.monotonic()
             last_housekeeping = time.monotonic()
             logger.info("Worker heartbeat")
         worked = run_one_job(storage, settings.job_lease_minutes)
@@ -105,6 +113,23 @@ def run_flood_pulls(storage: LocalStorage) -> None:
                 pull_due(session, storage, config)
         except Exception:
             logger.exception("Flood pilot %s pull failed; will retry", pilot_id)
+
+
+def run_flood_retention(storage: LocalStorage) -> None:
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                result = prune_flood(session, config, datetime.now(UTC))
+                session.commit()
+            delete_raw(storage, result)
+            if any(result[k] for k in ("raw_fetches_cleared", "report_ids_pruned",
+                                        "exposure_rows_removed")):
+                logger.info("Flood retention %s: %s", pilot_id, result)
+        except Exception:
+            logger.exception("Flood retention %s failed; will retry", pilot_id)
 
 
 def run_one_replay_step(storage: LocalStorage) -> bool:

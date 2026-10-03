@@ -108,7 +108,8 @@ def available_range(session: Session, base: PilotConfig) -> dict[str, Any]:
         select(func.min(FloodSourceFetch.retrieved_at), func.max(FloodSourceFetch.retrieved_at))
         .where(FloodSourceFetch.pilot_id == base.pilot_id,
                FloodSourceFetch.source_id == roads.source_id,
-               FloodSourceFetch.outcome == FETCH_OK)
+               FloodSourceFetch.outcome == FETCH_OK,
+               FloodSourceFetch.storage_key.is_not(None))
     ).one()
     return {"first": utc(first).isoformat() if first else None,
             "last": utc(last).isoformat() if last else None}
@@ -131,6 +132,8 @@ def create_replay(
     if open_count >= MAX_OPEN:
         raise ReplayRejected("too_many", "Delete an older replay first")
     fetches = _base_fetches(session, base, start_at - timedelta(microseconds=1), end_at)
+    if any(f.outcome == FETCH_OK and not f.storage_key for f in fetches):
+        raise ReplayRejected("raw_pruned", "Raw downloads for that period have been removed")
     if not any(f.outcome == FETCH_OK and f.source_id.endswith("roads") for f in fetches):
         raise ReplayRejected("no_data", "No stored road data in that period")
     replay = FloodReplay(

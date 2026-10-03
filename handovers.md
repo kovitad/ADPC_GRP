@@ -115,7 +115,24 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): replay injections, slice 6b (ADR-0044)
+### 3 October (latest): retention (ADR-0045), and the backup capture hung
+
+- **Retention:**
+  - raw downloads 14 days (whole UTC day folders, deleted only after the commit; fetch rows and
+    SHA-256 kept);
+  - report IDs 14 days, then `pruned:`;
+  - facility states 7 days;
+  - runs hourly in the worker, live pilots only.
+
+  Replays refuse periods whose raw data has been removed. Raw storage is about 30 MB a day, so
+  roughly 0.4 GB at 14 days.
+- **Backup capture:** `grpcli/floodboard_capture.py` hung silently after 12:12 (its urllib call
+  has no overall deadline). It was restarted at 14:40. The worker's own pulls kept saving, so
+  nothing was lost. The capture is now only a backup; drop it once the worker has run cleanly
+  for a day.
+- **Tests:** 6 retention tests. 1,045 pass and 2 skip.
+
+### 3 October: replay injections, slice 6b (ADR-0044)
 
 - **Injections:** a synthetic report (source, depth or dry, time; placed at the map centre on the
   page), and a source outage. Synthetic IDs always parse as `synthetic_demo`, and incidents gain
