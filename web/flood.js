@@ -34,8 +34,28 @@
   let reportLayer = null;
   let outlineLayer = null;
   let selectedLayer = null;
-  let cameraLayer = null;
   let facilityLayer = null;
+  // Map layers the officer can switch on and off, one per source. Remembered in this browser only.
+  let toggleLayers = {};
+  let layerCounts = {};
+  const LAYER_ORDER = ["roads", "rep_traffy", "rep_crowd", "rep_bma", "rep_doh", "rep_longdo", "rep_other",
+    "facilities", "cam_traffic", "cam_bma", "cam_longdo", "cam_other", "outline"];
+  const REPORT_GROUPS = {
+    traffy: ["traffy"], crowd: ["crowd"], bma: ["bma_sensor", "bma_dds"], doh: ["doh"],
+    longdo: ["itic", "longdo", "longdo_user"],
+  };
+  const reportGroup = (f) => `rep_${Object.keys(REPORT_GROUPS)
+    .find((g) => REPORT_GROUPS[g].includes(f.properties.underlying_source)) || "other"}`;
+  const CAMERA_GROUPS = { BMA_TRAFFIC: "cam_traffic", BMA_DDS: "cam_bma", ITIC_LONGDO: "cam_longdo" };
+  const LAYER_KEY = "grp.flood.hiddenLayers";
+  const hiddenLayers = (() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(LAYER_KEY) || "[]");
+      return new Set(Array.isArray(saved) ? saved.filter((k) => LAYER_ORDER.includes(k)) : []);
+    } catch (error) {
+      return new Set();
+    }
+  })();
   let evidenceToken = 0;
 
   const clock = (iso) => new Intl.DateTimeFormat(PilotText.locale(), {
@@ -159,7 +179,9 @@
 
   const drawMap = () => {
     ensureMap();
-    [roadLayer, reportLayer, outlineLayer, selectedLayer, cameraLayer, facilityLayer].forEach((layer) => layer && map.removeLayer(layer));
+    [...Object.values(toggleLayers), reportLayer, selectedLayer].forEach((layer) => layer && map.removeLayer(layer));
+    toggleLayers = {};
+    layerCounts = {};
     selectedLayer = null;
     const area = currentArea();
     outlineLayer = area
@@ -169,21 +191,30 @@
         }, {
           style: { color: "#0d2534", weight: 2, dashArray: "6 5", fill: true, fillOpacity: 0.03 },
           interactive: false,
-        }).addTo(map)
+        })
       : null;
     // Reports sit under the roads: the roads are the main signal, the dots are context.
+    const reports = visibleReports().filter((f) => f.properties.freshness !== "expired");
+    // Injected replay reports always show: they are what the replay is testing.
+    const synthetic = (f) => f.properties.evidence_class === "synthetic_demo";
     reportLayer = window.L.layerGroup(
-      visibleReports()
-        .filter((f) => f.properties.freshness !== "expired")
-        .map((f) => (f.properties.evidence_class === "synthetic_demo"
-          ? window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
+      reports.filter(synthetic).map((f) => window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
             radius: 9, color: "#d6336c", weight: 3, dashArray: "3 3", fillColor: "#d6336c", fillOpacity: 0.25,
-          }).bindTooltip(textOf(say("inc.synthetic")), { permanent: true, direction: "top" })
-          : window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
-            radius: 2.5, color: "#7950f2", weight: 0, fillColor: "#7950f2",
-            fillOpacity: NOW_BANDS.has(f.properties.freshness) ? 0.55 : 0.25, interactive: false,
-          }))),
+          }).bindTooltip(textOf(say("inc.synthetic")), { permanent: true, direction: "top" })),
     ).addTo(map);
+    const reportGroups = {};
+    reports.filter((f) => !synthetic(f)).forEach((f) => {
+      const key = reportGroup(f);
+      (reportGroups[key] = reportGroups[key] || []).push(
+        window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
+          radius: 2.5, color: "#7950f2", weight: 0, fillColor: "#7950f2",
+          fillOpacity: NOW_BANDS.has(f.properties.freshness) ? 0.55 : 0.25, interactive: false,
+        }));
+    });
+    Object.entries(reportGroups).forEach(([key, markers]) => {
+      toggleLayers[key] = window.L.featureGroup(markers);
+      layerCounts[key] = markers.length;
+    });
     roadLayer = window.L.geoJSON({ type: "FeatureCollection", features: visibleRoads() }, {
       style: styleFor,
       onEachFeature: (feature, layer) => {
@@ -192,7 +223,7 @@
         layer.bindTooltip(textOf(p.name || p.name_en || say(p.road_class === "zone" ? "ev.zone" : "ev.unnamed")), { sticky: true });
         layer.on("click", () => showEvidence(feature));
       },
-    }).addTo(map);
+    });
     facilityLayer = window.L.layerGroup(
       visibleFacilities().map((a) => {
         const tone = ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state) ? "review"
@@ -209,11 +240,13 @@
         marker.on("click", () => showFacility(a));
         return marker;
       }),
-    ).addTo(map);
-    cameraLayer = window.L.layerGroup(
-      (state.cameras ? state.cameras.cameras : [])
-        .filter((c) => inArea({ type: "Point", coordinates: [c.lon, c.lat] }))
-        .map((c) => {
+    );
+    const cameraGroups = {};
+    (state.cameras ? state.cameras.cameras : [])
+      .filter((c) => inArea({ type: "Point", coordinates: [c.lon, c.lat] }))
+      .forEach((c) => {
+        const key = CAMERA_GROUPS[c.provider] || "cam_other";
+        (cameraGroups[key] = cameraGroups[key] || []).push((() => {
           const colour = c.status === "online" ? "#1e6b33" : c.status === "offline" ? "#a61e1e" : "#4a555b";
           const marker = window.L.circleMarker([c.lat, c.lon], {
             radius: 7, color: colour, weight: 2.5, dashArray: c.placeholder ? "3 3" : null,
@@ -222,9 +255,62 @@
           marker.bindTooltip(textOf(cameraName(c)), { sticky: true });
           marker.on("click", () => showCamera(c));
           return marker;
-        }),
-    ).addTo(map);
+        })());
+      });
+    Object.entries(cameraGroups).forEach(([key, markers]) => {
+      toggleLayers[key] = window.L.layerGroup(markers);
+      layerCounts[key] = markers.length;
+    });
+    toggleLayers.roads = roadLayer;
+    layerCounts.roads = visibleRoads().length;
+    toggleLayers.facilities = facilityLayer;
+    layerCounts.facilities = visibleFacilities().length;
+    if (outlineLayer) {
+      toggleLayers.outline = outlineLayer;
+      layerCounts.outline = currentAreas().length;
+    }
+    applyLayers();
+    drawLayerControls();
     if (area && outlineLayer) map.fitBounds(outlineLayer.getBounds(), { padding: [20, 20] });
+  };
+
+  // Show or hide each source's layer. Reports stay under the roads: the roads are the main signal.
+  const applyLayers = () => {
+    LAYER_ORDER.forEach((key) => {
+      const layer = toggleLayers[key];
+      if (!layer) return;
+      const show = !hiddenLayers.has(key);
+      if (show && !map.hasLayer(layer)) {
+        layer.addTo(map);
+        if (key.startsWith("rep_")) layer.bringToBack();
+      } else if (!show && map.hasLayer(layer)) {
+        map.removeLayer(layer);
+      }
+    });
+    if (selectedLayer) selectedLayer.bringToFront();
+  };
+
+  const drawLayerControls = () => {
+    const box = $("[data-layers]");
+    if (!box) return;
+    box.replaceChildren(el("legend", "fl-layers__title", say("lay.title")));
+    LAYER_ORDER.filter((key) => toggleLayers[key]).forEach((key) => {
+      const label = el("label", "fl-layers__item");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = !hiddenLayers.has(key);
+      input.addEventListener("change", () => {
+        if (input.checked) hiddenLayers.delete(key); else hiddenLayers.add(key);
+        try {
+          window.localStorage.setItem(LAYER_KEY, JSON.stringify([...hiddenLayers]));
+        } catch (error) {
+          // Not remembered in this browser; the switch still works for this visit.
+        }
+        applyLayers();
+      });
+      label.append(input, el("span", "", `${say(`lay.${key}`)} · ${number(layerCounts[key] || 0)}`));
+      box.append(label);
+    });
   };
 
   const drawLegend = () => {
@@ -915,7 +1001,7 @@
       status.textContent = "";
     });
     video.addEventListener("error", fail);
-    player.timer = window.setTimeout(() => { if (video.readyState < 2) fail(); }, 15000);
+    player.timer = window.setTimeout(() => { if (video.readyState < 2) fail(); }, 12000);
     const { kind, url } = camera.live;
     if (kind === "hls" && !video.canPlayType("application/vnd.apple.mpegurl")) {
       try {
@@ -936,7 +1022,18 @@
 
   const liveControls = (camera) => {
     const wrap = el("div", "fl-live");
-    if (!camera.live) return wrap;
+    if (!camera.live) {
+      // No in-page player (bmatraffic.com: its pictures need a bmatraffic session, which a browser
+      // never sends from inside another site). Open the provider's own page in a new tab instead.
+      if (!camera.placeholder && /^https?:\/\//.test(camera.viewer_url || "")) {
+        const link = el("a", "button button--secondary button--compact", say("cam.tab"));
+        link.href = camera.viewer_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        wrap.append(link, el("p", "fl-muted", say("cam.tab.hint", { source: camera.source_label })));
+      }
+      return wrap;
+    }
     const box = el("div", "fl-live__box");
     const button = el("button", "button button--secondary button--compact", say("cam.play"));
     button.type = "button";
@@ -991,7 +1088,7 @@
       const why = c.reasons.map((r) => say(`cam.reason.${r}`)).join(", ");
       li.append(el("span", "fl-cam__role", c.role === "officer_can_look" ? say("cam.look") : say("cam.cannot", { reasons: why })));
       li.append(el("span", "fl-cam__meta", say("cam.source", { source: c.source_label })));
-      if (c.live) li.append(liveControls(c));
+      li.append(liveControls(c));
       items.append(li);
     });
     row.append(items);

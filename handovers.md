@@ -115,7 +115,19 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): Global Risk live-feed plan (plan only)
+### 3 October (latest): camera fixes and source switches on the map
+
+- **bmatraffic was blank in GRP:** its pictures need a bmatraffic session cookie (`SameSite=Lax`),
+  which a browser never sends from inside our page. The cameras now open in a new tab. They are
+  not proxied (see the ADR-0050 amendment). In-page players (Longdo HLS, BMA MP4) rank first.
+- **BMA flood relay:** answers HTTP 500 upstream. The player gives up after 12 seconds with a
+  clear message.
+- **Map:** one switch per source (roads, reports by original source, facilities, cameras by
+  provider, outline), remembered in `localStorage`.
+- **Not yet checked in a browser:** the Chrome extension was not connected. The owner should check
+  the switches and the new-tab link.
+
+### 3 October: Global Risk live-feed plan (plan only)
 
 - **Written:** `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`. Nothing has been built,
   submitted or registered.

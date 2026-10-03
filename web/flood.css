@@ -148,3 +148,6 @@
 .fl-card--rain { background: #f1f7fd; }
 .fl-card__n--word { font-size: 1.15rem; }
 .fl-live__frame { width: 100%; aspect-ratio: 400 / 266; border: 0; border-radius: 6px; background: #000; }
+.fl-layers { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0.6rem 0 0; padding: 0.5rem 0.7rem; border: 1px solid #d5dde0; border-radius: 6px; font-size: 0.8rem; color: var(--ink-700); }
+.fl-layers__title { padding: 0 0.3rem; font-weight: 600; }
+.fl-layers__item { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }

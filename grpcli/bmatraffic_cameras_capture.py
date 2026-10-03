@@ -7,11 +7,14 @@ or, to download the page once first:
     python -m grpcli.bmatraffic_cameras_capture --download .local/bmatraffic_index.html
 
 BMA's traffic CCTV site lists its cameras in its public home page and plays each one at
-``http://www.bmatraffic.com/PlayVideo.aspx?ID=<id>``, a page it lets other sites embed. The
-Product Owner found it the fastest live view and asked to use it (3 October 2026). GRP keeps each
-camera's ID, Thai and English names, viewing direction and location; the internal IP address in
-the list is never stored. The site answers only over plain http, so its embed works on the local
-demo page but would be blocked on an https deployment.
+``http://www.bmatraffic.com/PlayVideo.aspx?ID=<id>``. The Product Owner found it the fastest
+live view and asked to use it (3 October 2026). GRP keeps each camera's ID, Thai and English
+names, viewing direction and location; the internal IP address in the list is never stored.
+
+The player page cannot play inside GRP: its pictures come from ``show.aspx``, which sends a real
+frame only to a browser holding a bmatraffic.com session cookie (``SameSite=Lax``), and a browser
+never sends that cookie from inside another site's frame. GRP therefore links to the player in a
+new tab and never works around the session check. The site answers only over plain http.
 """
 
 from __future__ import annotations
@@ -74,7 +77,6 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "lat": round(lat_f, 6),
             "lon": round(lon_f, 6),
             "viewer_url": PLAYER.format(id=cam_id),
-            "live": {"kind": "iframe", "url": PLAYER.format(id=cam_id)},
             "district_code": district["admin_code"],
         })
     cameras.sort(key=lambda c: int(c["provider_camera_id"]))
@@ -89,8 +91,11 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "terms": "Public site, no terms stated, no robots.txt. Embedding approved by the "
                      "Product Owner for the Gate A local demo on 3 October 2026; confirm with BMA "
                      "before wider use. Plain http only.",
-            "use": "Location, names and the site's own player page embedded in GRP. GRP never "
-                   "fetches, records or analyses the video; internal IP addresses are dropped.",
+            "use": "Location, names and a link that opens the site's own player page in a new "
+                   "tab. The player shows a picture only to a browser with a bmatraffic.com "
+                   "session, which a browser never sends from inside another site, so it cannot "
+                   "play inside GRP (checked 3 October 2026). GRP never fetches, records or "
+                   "analyses the video; internal IP addresses are dropped.",
         },
         "defaults": {
             "provider": "BMA_TRAFFIC",
@@ -102,7 +107,8 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "status": "unknown",
             "status_checked_at": None,
             "related_sensor_ids": [],
-            "rights": "bmatraffic.com public player; embedding approved for the local demo only",
+            "rights": ("bmatraffic.com public player, opened on its own site; linking approved "
+                       "for the local demo only"),
             "retention_policy": "No video is stored",
             "ingestion_allowed": False,
             "cv_allowed": False,

@@ -48,3 +48,29 @@ ADR-0047.
   test of the same embed worked.
 - **Tests:** three sources combined and never evidence; no internal IPs; `http` only when
   declared; quicker live views ranked first.
+
+## Amendment, 3 October 2026: open bmatraffic in a new tab
+
+The embedded player showed a blank picture inside GRP. Checked with curl:
+
+- `show.aspx` sends the real frame (about 24 KB) only with a bmatraffic session cookie that was
+  first set by `index.aspx`. Without it, it sends a blank white JPEG of about 1.4 KB.
+- The cookie is `SameSite=Lax`, so a browser never sends it from a frame inside another site.
+  That is why it works in its own tab and not in GRP.
+
+Decision:
+
+- bmatraffic cameras keep their location and `viewer_url` but have no `live` player. The card
+  shows "Open live view in a new tab", with a hint to open www.bmatraffic.com once if the picture
+  stays blank.
+- GRP does not proxy the images or fake a session. That would work around the site's own check,
+  and it needs BMA's permission (Gate B).
+- Cameras that play inside GRP now come first: Longdo HLS, then the BMA relay MP4.
+
+The BMA flood relay (`floodbangkok.bangkok.go.th/api/proxy`) answered HTTP 500 to a direct
+request on the same day, and the owner found BMA's own site slow too. The page gives up after
+12 seconds and suggests a camera from another source.
+
+The map also gained one on/off switch per source: road ratings, reports by original source,
+facilities, cameras by provider, and the district outline. The choice is remembered in the
+browser only.

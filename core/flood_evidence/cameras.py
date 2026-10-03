@@ -31,8 +31,10 @@ ACCESS_MODES = frozenset(
 FRAME_MODES = frozenset({"snapshot", "hls", "mjpeg", "webrtc"})
 VIEWER_MODES = frozenset({"external_viewer", "embed"})
 LIVE_KINDS = frozenset({"hls", "mp4", "iframe"})
-# Nearby cameras with a quicker live view come first (the owner found bmatraffic.com fastest).
-LIVE_PREFERENCE = {"iframe": 0, "hls": 1, "mp4": 2}
+# Nearby cameras that play inside GRP come first, quicker players before slower ones. bmatraffic
+# cameras have no in-page player (its pictures need a session a framed page never has), so they
+# come after these and open on bmatraffic.com in a new tab.
+LIVE_PREFERENCE = {"hls": 0, "mp4": 1, "iframe": 2}
 STATUSES = frozenset({"online", "offline", "unknown"})
 PLACEHOLDER = "PLACEHOLDER"
 HEALTH_FRESH = timedelta(minutes=30)

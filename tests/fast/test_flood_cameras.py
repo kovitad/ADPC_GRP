@@ -59,13 +59,17 @@ def test_shipped_cameras_combine_three_sources_and_are_never_evidence() -> None:
         assert not camera.placeholder and not frame_capable(camera)
         assert not camera.ingestion_allowed and not camera.cv_allowed
         assert camera.stream_url is None and camera.snapshot_url is None
-        assert camera.live_url and camera.source_label
+        assert camera.source_label
+        # bmatraffic cameras have no in-page player; the others play inside GRP.
+        assert bool(camera.live_url) == (camera.provider != "BMA_TRAFFIC")
         role, reasons = corroboration_role(camera, ROAD, NOW)
         assert role == CANNOT_CONFIRM and "status_unknown" in reasons
     # Only bmatraffic.com, which declares it serves plain http, may use an http:// link.
     assert all(c.live_url.startswith("https://") for p in ("BMA_DDS", "ITIC_LONGDO")
                for c in by_provider[p])
-    assert all(c.live_kind == "iframe" and c.live_url.startswith(
+    # bmatraffic pictures need a bmatraffic session, which a framed page never has: the camera
+    # opens on its own site in a new tab instead of playing inside GRP.
+    assert all(c.live_kind is None and c.viewer_url.startswith(
         "http://www.bmatraffic.com/PlayVideo.aspx?ID=") for c in by_provider["BMA_TRAFFIC"])
     assert all(c.live_kind == "mp4" for c in by_provider["BMA_DDS"])
     assert all(c.live_kind == "hls" for c in by_provider["ITIC_LONGDO"])
@@ -84,14 +88,14 @@ def test_http_links_need_the_registry_to_declare_them() -> None:
     assert parse_camera(_real(live=http, allow_http_links=True)).live_kind == "iframe"
 
 
-def test_cameras_with_a_quicker_live_view_come_first() -> None:
+def test_cameras_that_play_inside_grp_come_first() -> None:
     cameras = parse_registry({"cameras": [
         _real(camera_id="mp4", live={"kind": "mp4", "url": "https://x/a.mp4"}),
         _real(camera_id="iframe", lat=13.8395, allow_http_links=True,
               live={"kind": "iframe", "url": "http://x/p?ID=1"}),
     ]})
     found = nearby_cameras(cameras, ROAD, NOW, radius_m=400)
-    assert [c["camera_id"] for c in found] == ["iframe", "mp4"]
+    assert [c["camera_id"] for c in found] == ["mp4", "iframe"]
 
 
 @pytest.mark.parametrize(
