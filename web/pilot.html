@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>River Watch pilot | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/styles.css?v=20260928a" />
+    <link rel="stylesheet" href="/pilot.css?v=20261002e" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="/grp-common.js?v=20261002a" defer></script>
+    <script src="/pilot-i18n.js?v=20261002c" defer></script>
+    <script src="/pilot.js?v=20261002e" defer></script>
+    <script src="/pilot-practice.js?v=20261002b" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header data-grp-topbar></header>
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <div class="rw-titlebar">
+        <div>
+          <p class="eyebrow" data-t="rw.eyebrow">Pilot · try-out only</p>
+          <h1 data-t="rw.title">River Watch</h1>
+        </div>
+        <div class="rw-lang" role="group" aria-label="Language / ภาษา">
+          <button type="button" data-lang="th" aria-pressed="false" lang="th">ไทย</button>
+          <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
+        </div>
+      </div>
+      <p class="workspace-intro" data-t-html="rw.intro"></p>
+
+      <p class="rw-banner is-bad" data-banner hidden></p>
+
+      <section class="rw-picker" aria-labelledby="rw-picker-heading" data-picker-section hidden>
+        <div class="rw-modes" role="tablist" aria-label="Area">
+          <button type="button" role="tab" data-mode="bbt" aria-selected="true" data-t="mode.bbt">Bang Bua Thong (2 spots)</button>
+          <button type="button" role="tab" data-mode="bkk" aria-selected="false" data-t="mode.bkk">Bangkok, by district</button>
+        </div>
+
+        <div data-mode-bbt>
+          <h2 id="rw-picker-heading" class="rw-picker__title" data-t="rw.picker">Which river spot?</h2>
+          <div class="rw-reaches" data-reaches role="radiogroup" aria-labelledby="rw-picker-heading"></div>
+          <p class="rw-unconfirmed" data-t-html="rw.unconfirmed"></p>
+        </div>
+
+        <div data-mode-bkk hidden>
+          <label class="rw-district">
+            <span class="rw-picker__title" data-t="bkk.pick">Choose a Bangkok district</span>
+            <select data-district></select>
+          </label>
+          <p class="rw-district__note" data-district-note hidden></p>
+          <p class="rw-unconfirmed" data-t="bkk.rule"></p>
+          <p class="rw-inland" data-inland hidden data-t="where.inland"></p>
+        </div>
+
+        <div class="rw-where" data-where hidden>
+          <h3 class="rw-where__title" data-t="where.title">Where is this river spot?</h3>
+          <div class="rw-where__grid">
+            <div class="rw-map" data-map role="img"></div>
+            <div class="rw-where__text">
+              <p class="rw-where__size" data-where-size></p>
+              <p class="rw-where__likely" data-where-likely hidden></p>
+              <p data-where-along></p>
+              <ul class="rw-where__legend">
+                <li><span class="rw-wkey rw-wkey--model" aria-hidden="true"></span><span data-t="where.key.model"></span></li>
+                <li data-only="bbt"><span class="rw-wkey rw-wkey--real" aria-hidden="true"></span><span data-t="where.key.real"></span></li>
+                <li data-only="bbt"><span class="rw-wkey rw-wkey--search" aria-hidden="true"></span><span data-t="where.key.search"></span></li>
+                <li data-only="bkk"><span class="rw-wkey rw-wkey--other" aria-hidden="true"></span><span data-t="where.key.other"></span></li>
+                <li data-only="bkk"><span class="rw-wkey rw-wkey--district" aria-hidden="true"></span><span data-t="where.key.district"></span></li>
+              </ul>
+              <p class="rw-where__note" data-t="where.note"></p>
+            </div>
+          </div>
+          <p class="rw-where__credit" data-t="where.credit"></p>
+        </div>
+      </section>
+
+      <section class="rw-answer" data-answer aria-live="polite" hidden>
+        <div class="rw-answer__top">
+          <span class="rw-pill" data-fresh-pill></span>
+          <button class="button button--secondary button--compact" type="button" data-refresh data-t="rw.refresh">Check again</button>
+        </div>
+        <p class="rw-answer__river" data-answer-river></p>
+        <p class="rw-headline" data-headline></p>
+        <p class="rw-peak" data-peak></p>
+        <p class="rw-scale" data-scale></p>
+        <p class="rw-range" data-range></p>
+        <p class="rw-made" data-made></p>
+        <p class="rw-source" data-source></p>
+      </section>
+
+      <section class="rw-unavailable" data-unavailable hidden>
+        <h2 data-t="rw.unavailable">The forecast is not available right now</h2>
+        <p data-unavailable-reason></p>
+        <p>
+          <span data-t="rw.unavailable.try1">Nothing is shown rather than a guess. Try</span>
+          <button class="rw-link" type="button" data-retry data-t="rw.unavailable.retry">checking again</button>
+          <span data-t="rw.unavailable.try2">in a few minutes.</span>
+        </p>
+      </section>
+
+      <p class="rw-loading" data-loading data-t="rw.loading">Loading the latest forecast…</p>
+
+      <section class="rw-chart-card" data-chart-card hidden aria-labelledby="rw-chart-heading">
+        <h2 id="rw-chart-heading" data-t="rw.chart.title">The next 7 days</h2>
+        <ul class="rw-legend">
+          <li><span class="rw-key rw-key--line" aria-hidden="true"></span><span data-t="rw.legend.line">The middle forecast</span></li>
+          <li><span class="rw-key rw-key--band" aria-hidden="true"></span><span data-t="rw.legend.band">Where most forecasts fall</span></li>
+          <li><span class="rw-key rw-key--dot" aria-hidden="true"></span><span data-t="rw.legend.dot">Highest point</span></li>
+        </ul>
+        <div class="rw-chart" data-chart></div>
+        <p class="rw-chart-note" data-t="rw.chart.note"></p>
+      </section>
+
+      <div class="rw-cards" data-guidance hidden>
+        <section class="rw-not">
+          <h2 data-t="rw.not.title">What this is not</h2>
+          <ul>
+            <li data-t-html="rw.not.1"></li>
+            <li data-t-html="rw.not.2"></li>
+            <li data-t-html="rw.not.3"></li>
+            <li data-t-html="rw.not.4"></li>
+          </ul>
+        </section>
+        <section class="rw-next">
+          <h2 data-t="rw.next.title">What to check next</h2>
+          <ol>
+            <li data-t-html="rw.next.1"></li>
+            <li data-t-html="rw.next.2"></li>
+            <li data-t-html="rw.next.3"></li>
+            <li data-t-html="rw.next.4"></li>
+          </ol>
+        </section>
+      </div>
+
+      <details class="rw-more" data-specialist hidden>
+        <summary data-t="rw.spec.title">For specialists: where these numbers come from</summary>
+        <dl class="rw-facts" data-facts></dl>
+        <p class="rw-raw">
+          <button class="button button--secondary button--compact" type="button" data-raw data-t="rw.spec.raw">Download the exact GEOGLOWS response</button>
+          <span data-t="rw.spec.rawNote"></span>
+        </p>
+        <div class="rw-table-wrap">
+          <table class="rw-table">
+            <caption data-t="rw.spec.caption"></caption>
+            <thead>
+              <tr><th scope="col" data-t="rw.spec.time">Time</th><th scope="col" data-t="rw.spec.median">Middle (median)</th><th scope="col" data-t="rw.spec.p25">Low end (25th percentile)</th><th scope="col" data-t="rw.spec.p75">High end (75th percentile)</th></tr>
+            </thead>
+            <tbody data-table></tbody>
+          </table>
+        </div>
+      </details>
+
+      <details class="rw-more" data-feed hidden>
+        <summary data-t="rw.feed.title">Feed preview: what Global Risk would receive (not sent)</summary>
+        <p class="rw-feed-note" data-t-html="rw.feed.note"></p>
+        <pre class="rw-json" data-feed-json></pre>
+      </details>
+
+      <section class="hd" data-hd hidden aria-labelledby="hd-heading">
+        <p class="hd__stripe" data-t="hd.stripe">Practice example · made-up ground · not Bang Bua Thong</p>
+        <h2 id="hd-heading" data-t="hd.title">Practice: how a flood-depth map would work</h2>
+        <p class="hd__intro" data-t="hd.intro"></p>
+
+        <div class="hd__control">
+          <label for="hd-stage"><span data-t="hd.if1">If the river rose</span> <output data-hd-value for="hd-stage">3.0</output> <span data-t="hd.if2">metres above its channel</span></label>
+          <input id="hd-stage" type="range" min="0" max="5" step="0.1" value="3" data-hd-stage />
+          <div class="hd__ticks" aria-hidden="true"><span>0 m</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5 m</span></div>
+        </div>
+
+        <p class="hd__answer" data-hd-answer aria-live="polite"></p>
+
+        <div class="hd__layout">
+          <div>
+            <div class="hd__map" data-hd-map></div>
+            <label class="hd__toggle"><input type="checkbox" data-hd-numbers /> <span data-t="hd.numbers">Show each square's height</span></label>
+          </div>
+          <div>
+            <ul class="hd__legend" data-hd-legend></ul>
+            <p class="hd__cell" data-hd-cell data-t="hd.cellPrompt">Tap or point at a square to see its numbers.</p>
+          </div>
+        </div>
+
+        <h3 class="hd__sub" data-t="hd.side">Side view across the valley</h3>
+        <p class="hd__subnote" data-t="hd.sideNote"></p>
+        <div class="hd__profile" data-hd-profile></div>
+
+        <details class="rw-more hd__example">
+          <summary data-t="hd.example">The rule, worked through for water 3 metres up</summary>
+          <p class="hd__rule" data-t="hd.rule"></p>
+          <div class="rw-table-wrap">
+            <table class="rw-table">
+              <thead><tr><th scope="col" data-t="hd.th.place">Place</th><th scope="col" data-t="hd.th.ground">Ground above river (m)</th><th scope="col" data-t="hd.th.depth">Water depth (m)</th><th scope="col" data-t="hd.th.result">Result</th></tr></thead>
+              <tbody data-hd-example></tbody>
+            </table>
+          </div>
+        </details>
+
+        <div class="hd__limits">
+          <h3 data-t="hd.limits">Why there is no real Bang Bua Thong map yet</h3>
+          <ul>
+            <li data-t-html="hd.limit.1"></li>
+            <li data-t="hd.limit.2"></li>
+            <li data-t="hd.limit.3"></li>
+            <li data-t="hd.limit.4"></li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

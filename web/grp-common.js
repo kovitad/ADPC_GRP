@@ -150,6 +150,7 @@ window.GRP = (() => {
     { key: "data", label: "Source data", href: "/data-inspector.html", attr: "data-data-menu", hidden: true },
     { key: "library", label: "Data library", href: "/data-library.html", attr: "data-library-menu", hidden: true },
     { key: "platform", label: "Platform", href: "/platform.html", attr: "data-platform-menu", hidden: true },
+    { key: "pilot", label: "Pilot", href: "/pilot.html", attr: "data-pilot-menu", hidden: true },
   ];
   const PAGE_KEYS = {
     "/planning.html": "planning",
@@ -160,6 +161,7 @@ window.GRP = (() => {
     "/data-inspector.html": "data",
     "/data-preview.html": "data",
     "/data-library.html": "library",
+    "/pilot.html": "pilot",
   };
 
   let mePromise = null;
@@ -234,6 +236,8 @@ window.GRP = (() => {
         nav.querySelector('[data-nav="data"]').hidden = !(isHubAdmin || identity.is_platform_admin);
         nav.querySelector('[data-nav="library"]').hidden = !(isHubAdmin || identity.is_platform_admin);
         nav.querySelector('[data-nav="platform"]').hidden = !identity.is_platform_admin;
+        // ADR-0036: the River Watch pilot is for Admins while it is a pilot.
+        nav.querySelector('[data-nav="pilot"]').hidden = !(isHubAdmin || identity.is_platform_admin);
       })
       .catch(() => {});
   };

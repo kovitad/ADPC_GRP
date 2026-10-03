@@ -113,6 +113,16 @@ MATRIX = {
     # ADR-0034: the Planning layer picker follows the planning conversation: every planning role
     # reads its own Hub's list, a Platform Admin with no planning membership has none.
     "global_risk_layers": (401, 200, 200, 200, 403),
+    # ADR-0036: the River Watch pilot is for Admins. An unknown reach is not found, after the
+    # caller is authorized, so no matrix case reaches GEOGLOWS.
+    "river_watch_reaches": (401, 403, 200, 200, 200),
+    "river_watch_forecast": (401, 403, 404, 404, 404),
+    "river_watch_feed_preview": (401, 403, 404, 404, 404),
+    "river_watch_raw": (401, 403, 404, 404, 404),
+    # Phase B1 practice example: made-up data, Admins only like the rest of the Pilot tab.
+    "hand_practice": (401, 403, 200, 200, 200),
+    "river_watch_districts": (401, 403, 200, 200, 200),
+    "river_watch_district": (401, 403, 404, 404, 404),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -180,6 +190,17 @@ MATRIX_OPERATION_IDS = {
         "refresh_contribution_api_v1_contributions__contribution_id__refresh_post"
     ),
     "global_risk_layers": "global_risk_layers_api_v1_planning_global_risk_layers_get",
+    "river_watch_reaches": "list_reaches_api_v1_pilot_river_watch_reaches_get",
+    "river_watch_forecast": "river_forecast_api_v1_pilot_river_watch__reach_id__get",
+    "river_watch_feed_preview": (
+        "river_feed_preview_api_v1_pilot_river_watch__reach_id__feed_preview_get"
+    ),
+    "river_watch_raw": "river_raw_response_api_v1_pilot_river_watch__reach_id__raw__run__get",
+    "hand_practice": "hand_practice_api_v1_pilot_hand_demo_get",
+    "river_watch_districts": "list_districts_api_v1_pilot_river_watch_districts_get",
+    "river_watch_district": (
+        "read_district_api_v1_pilot_river_watch_districts__admin_code__get"
+    ),
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
@@ -479,6 +500,13 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "on_global_risk": ("GET", "/api/v1/contributions/on-global-risk", None),
         "refresh_contribution": ("POST", f"/api/v1/contributions/{user_id}/refresh", None),
         "global_risk_layers": ("GET", "/api/v1/planning/global-risk-layers", None),
+        "river_watch_reaches": ("GET", "/api/v1/pilot/river-watch/reaches", None),
+        "river_watch_forecast": ("GET", "/api/v1/pilot/river-watch/1", None),
+        "river_watch_feed_preview": ("GET", "/api/v1/pilot/river-watch/1/feed-preview", None),
+        "river_watch_raw": ("GET", "/api/v1/pilot/river-watch/1/raw/2026100100", None),
+        "hand_practice": ("GET", "/api/v1/pilot/hand-demo?stage_m=3", None),
+        "river_watch_districts": ("GET", "/api/v1/pilot/river-watch/districts", None),
+        "river_watch_district": ("GET", "/api/v1/pilot/river-watch/districts/no-such", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)

@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 2 October 2026 (River Watch pilot tab, ADR-0036, uncommitted; see Section 0). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -114,6 +114,116 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24 September-2 October 2026, `main` at `14e4993` plus this note)
+
+### 2 October (latest): River Watch pilot tab (ADR-0036), not committed
+
+- **What it is.** A new **Pilot** tab (`/pilot.html`), shown to Hub Admins and Platform Admins
+  only, that reads the live, public GEOGLOWS river forecast and explains it in plain language:
+  - a headline sentence ("expected to RISE until Tue 6 Oct, then go down again");
+  - the peak in cubic metres per second, compared with Olympic pools or bathtubs;
+  - the middle half of the forecasts, and the forecast run in Bangkok time;
+  - the source line;
+  - a seven-day SVG chart;
+  - "What this is not" and "What to check next" boxes;
+  - specialist provenance, with the exact GEOGLOWS response to download;
+  - a feed preview that is **not sent** and is built from the same summary as the card.
+- **Plans:**
+  - `docs/pilot/2026-10-02_Bang_Bua_Thong_GEOGLOWS_River_Watch_Plan.md`, the owner's plan,
+    version 2.1. Phase A is the River Watch card, built here. Phase B is a HAND flood-depth
+    experiment from Daniel's workflow and the 11-slide architecture deck.
+  - `docs/pilot/2026-10-02_Pilot_Tab_Phase_B_HAND_Plan.md`, the Phase B plan for the Pilot tab.
+    **B1 is built** (ADR-0037, below); B2 to B4 are not.
+    - Possible now, with no keys: B1, a synthetic depth demo with a slider; B2, a synthetic
+      GeoTIFF pipeline in the worker; B3, a readiness panel.
+    - Blocked: B4, real Q-derived depth. It needs a reviewed reach, HAND or bare-earth terrain, a
+      Q-to-H curve on the same vertical reference, a hydraulic reviewer and validation evidence,
+      which are data and decisions rather than API keys.
+    - Copernicus GLO-30 is reachable without a key, but it is a surface model and poor in towns.
+      No HAND tool is installed.
+  - The earlier separate Phase A tab plan is no longer in `docs/pilot`; ADR-0036 records that
+    build.
+- **Owner choices:** show both exploratory reaches, `430537201` (near Nonthaburi) and
+  `430392813` (near Bang Bua Thong town), labelled "not confirmed" and given no river name. The
+  tab is for Admins only.
+- **Code:**
+  - `core/river_watch.py`: pure parsing, checks and the one summary shared by the card and the
+    feed preview.
+  - `api/river_watch.py`: four `protected` `AdminUser` routes under `/api/v1/pilot/river-watch`
+    (`reaches`, the card, `feed-preview` and `raw/{run}`), an allow-list, a per-process cache per
+    (reach, run) that keeps the raw bytes, a run-list check every 30 minutes, and a fall-back to
+    the previous run when the newest fails and nothing is held.
+  - `web/pilot.*`, plus the Pilot item in `grp-common.js`, now `?v=20261002a` on every page.
+- **Facts measured on 2 October:**
+  - the median series is blank at hourly steps and is never filled from `high_res`;
+  - `/dates` answers CSV;
+  - `gen_date` is the retrieval time;
+  - the run is pinned with `date=YYYYMMDD`;
+  - `returnperiods` is broken upstream, so there is no "high" line.
+- **Verified:**
+  - 757 tests pass and 2 skip, including 40 new River Watch tests and 4 new permission-matrix
+    routes. Ruff is clean.
+  - The API image was rebuilt and serves the routes (401 without a session).
+  - Live fetches for both reaches succeeded.
+  - The page was rendered in headless Chromium with the real API output and a stubbed sign-in,
+    at desktop and 504 px widths, in the latest, older and unavailable states.
+  - **Not verified:** a signed-in browser pass on the real stack. Minting a local session cookie
+    was blocked, so the owner should open `/pilot.html` after signing in.
+- **B1 practice slider (ADR-0037), built the same day:**
+  - `core/hand_depth.py` holds the one depth rule: edge = 0 and not wet; missing, negative or
+    outside = unknown; NumPy `depth_block` imported lazily.
+  - The made-up 12 × 20 grid is served by `api/hand_demo.py` at `GET /api/v1/pilot/hand-demo`
+    (`protected`, Admins).
+  - `web/pilot-practice.js` draws the dashed "Practice example · made-up ground" section: a
+    0-5 m slider, a colour grid with counts, a side view, the H = 3 m worked rule and a "why no
+    real map" box.
+  - 777 tests pass and 2 skip; ruff is clean.
+  - The page was rendered headless with a stubbed sign-in at 1.2 m and 3.0 m, desktop and
+    504 px. It has not been seen signed in.
+- **Thai version (same day):** the whole Pilot page is now in Thai and English, with a ไทย/EN
+  switch.
+  - Text lives in `web/pilot-i18n.js` (`PilotText`): static elements use `data-t` or
+    `data-t-html`, and the scripts call `say(...)`.
+  - The default is Thai. The choice is remembered in `localStorage`, and `?lang=en` overrides it.
+  - Dates, numbers and Thai day names use `th-TH`.
+  - Server text (river spot names, worked-example places) is mapped by key on the client. The
+    specialist scope note and GEOGLOWS error details stay in English.
+  - Wording follows the owner's Thai Product Manager guide
+    (`docs/pilot/2026-10-02_Bang_Bua_Thong_Flood_Pilot_Product_Manager_Guide_TH.docx`).
+  - All 123 keys exist in both languages. Rendered headless in Thai and English.
+  - The other improvements from that guide are agreed but not built yet:
+    - a "flow, level, depth" explainer;
+    - a "missing link" picture showing the flow-to-height step;
+    - an example of why heights must share a reference point;
+    - separate software and real-world status tags;
+    - four plain caveats;
+    - a glossary.
+- **River map and plain names (same day, ADR-0036 amendment):**
+  - "Where is this river spot?" draws the GEOGLOWS model line in orange over OpenStreetMap
+    tiles, with the named canals nearby highlighted in blue, using Leaflet from unpkg as Planning
+    does.
+  - The line and canal geometry are stored in `core/data/river_watch_reaches.json`, which records
+    its sources and is packaged through `package-data`. `/reaches` returns it as `map`.
+  - `430537201` is now labelled "Big river near Nonthaburi: probably the Chao Phraya (not
+    confirmed)". Its line sits on the wide river on the map, and its catchment is about
+    148,000 km².
+  - `430392813` is "Small canal near Bang Bua Thong town", about 147 km² over 10.6 km, near
+    Khlong Lam Ri and Khlong Lak Khon.
+  - Overpass was down, so the canal names came from Nominatim.
+  - The terms of the Esri Living Atlas GEOGLOWS layer still need to be confirmed.
+- **Bangkok by district (same day, ADR-0036 amendment):**
+  - The Pilot page has two modes: "บางบัวทอง (2 จุด)" and "กรุงเทพฯ รายเขต".
+  - The data was captured once with `python -m grpcli.river_watch_capture --province Bangkok`
+    into `core/data/river_watch_bangkok.json`. It covers 50 districts and 58 GEOGLOWS segments:
+    17 districts on the Chao Phraya, 11 with only small streams, and 22 with no model river.
+  - New routes: `/pilot/river-watch/districts` and `/districts/{code}`.
+  - The main river is the one draining the most land. Inland districts carry a red caution box.
+  - Pitfall: in Git Bash, prefix `docker exec … /tmp/...` with `MSYS_NO_PATHCONV=1`. Otherwise
+    the path is rewritten to a Windows path, and the capture fails only when it writes its output.
+- **Not done, by design:** no feed registration, no public endpoint, no thresholds or warnings,
+  and no link to Planning or RP100. Next:
+  - a hydrologist picks one reach;
+  - settle the GEOGLOWS licence (CC BY-NC-SA 4.0 or CC BY 4.0);
+  - ask Global Risk how a feed's run time, valid time and reach scope are handled.
 
 ### 2 October (later): Mangrove Sprint Lab, a separate project
 

@@ -36,6 +36,9 @@ gis = [
 [tool.setuptools.packages.find]
 include = ["api*", "core*", "grpcli*", "worker*"]
 
+[tool.setuptools.package-data]
+core = ["data/*.json"]
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]

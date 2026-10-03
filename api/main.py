@@ -15,11 +15,13 @@ from api import (
     contributions,
     data_inspector,
     data_library,
+    hand_demo,
     health,
     maps,
     planning,
     planning_summary,
     platform,
+    river_watch,
     uploads,
 )
 from api.errors import register_error_handlers
@@ -54,6 +56,8 @@ for module in (
     sig,
     data_inspector,
     data_library,
+    river_watch,
+    hand_demo,
 ):
     app.include_router(module.router, prefix="/api/v1")
 
