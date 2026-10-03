@@ -75,3 +75,10 @@ and hospitals, to be replaced by authoritative BMA lists when available.
   - a road network and routing, so access can move beyond "unknown";
   - officer confirmation of access;
   - authoritative facility lists.
+
+## Amendment, 3 October 2026 (later)
+
+- The owner added **Bang Kapi (1006) and Lat Krabang (1011)** to the demo area, which is now four
+  districts. The districts do not touch, so the capture asks Overpass for one box per district.
+- The re-run file holds **94 facilities**: Bang Sue 12, Chatuchak 40, Bang Kapi 22 and
+  Lat Krabang 20.

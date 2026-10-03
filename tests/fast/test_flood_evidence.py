@@ -317,7 +317,9 @@ def test_demo_corridor_names_known_bangkok_districts() -> None:
     from core.river_watch import bangkok_outlines
 
     names = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
-    assert [names[code] for code in CONFIG.demo_corridor["areas"]] == ["Bang Sue", "Chatuchak"]
+    assert [names[code] for code in CONFIG.demo_corridor["areas"]] == [
+        "Bang Sue", "Chatuchak", "Bang Kapi", "Lat Krabang"
+    ]
 
 
 def test_a_road_is_found_by_its_short_id_in_the_latest_snapshot(session, storage) -> None:

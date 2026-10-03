@@ -9,14 +9,16 @@
   ],
   "demo_corridor": {
     "title": {
-      "en": "Demo corridor: Bang Sue and Chatuchak",
-      "th": "พื้นที่สาธิต: บางซื่อและจตุจักร"
+      "en": "Demo area: Bang Sue, Chatuchak, Bang Kapi, Lat Krabang",
+      "th": "พื้นที่สาธิต: บางซื่อ จตุจักร บางกะปิ ลาดกระบัง"
     },
     "areas": [
       "1029",
-      "1030"
+      "1030",
+      "1006",
+      "1011"
     ],
-    "chosen": "Product Owner, 3 October 2026"
+    "chosen": "Product Owner, 3 October 2026 (Bang Sue and Chatuchak); Bang Kapi and Lat Krabang added the same day"
   },
   "map": {
     "center": [

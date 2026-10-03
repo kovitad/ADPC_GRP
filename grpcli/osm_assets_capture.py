@@ -66,12 +66,13 @@ def capture(pilot_id: str) -> Path:
     config = pilot_config(pilot_id)
     codes = config.demo_corridor["areas"]
     areas = [a for a in bangkok_outlines() if a["admin_code"] in codes]
-    south, west, north, east = _bounds([a["outline"] for a in areas])
-    query = (
-        "[out:json][timeout:90];"
-        f'nwr["amenity"~"^({"|".join(AMENITIES)})$"]({south},{west},{north},{east});'
-        "out center tags;"
+    # One box per district: the districts need not touch, and one big box would fetch the gaps.
+    wanted = "|".join(AMENITIES)
+    boxes = "".join(
+        f'nwr["amenity"~"^({wanted})$"]({",".join(map(str, _bounds([a["outline"]])))});'
+        for a in areas
     )
+    query = f"[out:json][timeout:120];({boxes});out center tags;"
     request = urllib.request.Request(
         OVERPASS,
         data=urllib.parse.urlencode({"data": query}).encode(),

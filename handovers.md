@@ -117,6 +117,11 @@ RP20/RP50 rasters and methods exist.
 
 ### 3 October (latest): facilities near flooding, slice 4 (ADR-0040), and the sign-in fix
 
+- **Demo area widened (later the same day):** the owner added Bang Kapi (1006) and Lat Krabang
+  (1011) to `demo_corridor`, which now covers four districts. The OSM capture was re-run with one
+  box per district and now holds 94 facilities. The BMA camera request now names all four
+  districts.
+
 - **Sign-in was "unavailable".** Restarting with raw `docker compose up` drops the shell-only
   `SERVIR_AUTH_CLIENT_ID`. **Always restart with `scripts/docker-desktop.ps1`.** After using the
   launcher, `/api/v1/auth/login` redirects to SERVIR again.

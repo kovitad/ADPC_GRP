@@ -3,16 +3,28 @@
   "provider": "OpenStreetMap contributors",
   "license": "ODbL 1.0",
   "attribution": "© OpenStreetMap contributors, ODbL",
-  "query": "[out:json][timeout:90];nwr[\"amenity\"~\"^(school|hospital|clinic)$\"](13.7946,100.50633,13.85893,100.59112);out center tags;",
-  "osm_timestamp": "2026-10-03T03:27:51Z",
-  "captured_at": "2026-10-03T03:28:49+00:00",
+  "query": "[out:json][timeout:120];(nwr[\"amenity\"~\"^(school|hospital|clinic)$\"](13.73827,100.60102,13.81937,100.67903);nwr[\"amenity\"~\"^(school|hospital|clinic)$\"](13.79785,100.50633,13.84963,100.54503);nwr[\"amenity\"~\"^(school|hospital|clinic)$\"](13.7946,100.53712,13.85893,100.59112);nwr[\"amenity\"~\"^(school|hospital|clinic)$\"](13.68956,100.70672,13.80039,100.87883););out center tags;",
+  "osm_timestamp": "2026-10-03T03:59:10Z",
+  "captured_at": "2026-10-03T04:00:11+00:00",
   "areas": [
    "1029",
-   "1030"
+   "1030",
+   "1006",
+   "1011"
   ],
   "note": "Crowd-mapped. Labelled as OSM wherever shown; replace with an authoritative BMA list when one is available."
  },
  "assets": [
+  {
+   "asset_id": "osm:node/11186732582",
+   "asset_type": "clinic",
+   "name": "La Purita CLINIC (ลา พูริต้า คลินิก) สาขารัชดาภิเษก",
+   "name_en": "",
+   "lat": 13.7663075,
+   "lon": 100.6324673,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
   {
    "asset_id": "osm:node/12435141401",
    "asset_type": "clinic",
@@ -41,6 +53,16 @@
    "lat": 13.8052897,
    "lon": 100.5742103,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/14239312935",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "",
+   "lat": 13.7504198,
+   "lon": 100.7461908,
+   "district_code": "1011",
    "source": "OpenStreetMap"
   },
   {
@@ -114,6 +136,16 @@
    "source": "OpenStreetMap"
   },
   {
+   "asset_id": "osm:way/1037473327",
+   "asset_type": "clinic",
+   "name": "",
+   "name_en": "",
+   "lat": 13.7798957,
+   "lon": 100.6419805,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
    "asset_id": "osm:node/2440347102",
    "asset_type": "hospital",
    "name": "โรงพยาบาลเมโย",
@@ -131,6 +163,36 @@
    "lat": 13.8189754,
    "lon": 100.5756447,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/5679154233",
+   "asset_type": "hospital",
+   "name": "Serene Hospital",
+   "name_en": "",
+   "lat": 13.7404216,
+   "lon": 100.6536188,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/7856632101",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลลาดกระบัง",
+   "name_en": "Lat Krabang Hospital",
+   "lat": 13.7222822,
+   "lon": 100.7848808,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/9583012584",
+   "asset_type": "hospital",
+   "name": "",
+   "name_en": "",
+   "lat": 13.7610564,
+   "lon": 100.6361759,
+   "district_code": "1006",
    "source": "OpenStreetMap"
   },
   {
@@ -154,6 +216,16 @@
    "source": "OpenStreetMap"
   },
   {
+   "asset_id": "osm:way/1263239587",
+   "asset_type": "hospital",
+   "name": "ศูนย์บริการสาธารณสุข 46 สาขาขุมทอง",
+   "name_en": "",
+   "lat": 13.70061,
+   "lon": 100.853358,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
    "asset_id": "osm:way/1350679705",
    "asset_type": "hospital",
    "name": "ศูนย์บริการสาธารณะสุข 3 บางซื่อ",
@@ -171,6 +243,16 @@
    "lat": 13.8068562,
    "lon": 100.5229925,
    "district_code": "1029",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1426886300",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลพระจอมเกล้าเจ้าคุณทหาร",
+   "name_en": "King Mongkut Chaokhunthahan Hospital",
+   "lat": 13.7319767,
+   "lon": 100.7889975,
+   "district_code": "1011",
    "source": "OpenStreetMap"
   },
   {
@@ -194,6 +276,16 @@
    "source": "OpenStreetMap"
   },
   {
+   "asset_id": "osm:way/258733174",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาล รามคำแหง",
+   "name_en": "Ramkhamhaeng Hospital",
+   "lat": 13.7580245,
+   "lon": 100.6368222,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
    "asset_id": "osm:way/31134625",
    "asset_type": "hospital",
    "name": "โรงพยาบาลวิภาวดี",
@@ -201,6 +293,16 @@
    "lat": 13.8461353,
    "lon": 100.5619709,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/338834358",
+   "asset_type": "hospital",
+   "name": "โรงพยาบาลเวชธานี อินเตอร์เนชันแนล",
+   "name_en": "Vejthani International Hospital",
+   "lat": 13.7721804,
+   "lon": 100.6369087,
+   "district_code": "1006",
    "source": "OpenStreetMap"
   },
   {
@@ -304,6 +406,26 @@
    "source": "OpenStreetMap"
   },
   {
+   "asset_id": "osm:node/4676444901",
+   "asset_type": "school",
+   "name": "",
+   "name_en": "Assumption University in Hua Mak",
+   "lat": 13.7550007,
+   "lon": 100.6276466,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:node/5208985421",
+   "asset_type": "school",
+   "name": "Abac",
+   "name_en": "",
+   "lat": 13.7548844,
+   "lon": 100.6276628,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
    "asset_id": "osm:node/897205017",
    "asset_type": "school",
    "name": "อนุบาลสุดารักษ์",
@@ -321,6 +443,166 @@
    "lat": 13.844216,
    "lon": 100.5710825,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1216274732",
+   "asset_type": "school",
+   "name": "โรงเรียนมัธยมวัดบึงทองหลาง",
+   "name_en": "Mattayom Watbuengthonglang School",
+   "lat": 13.79424,
+   "lon": 100.6262798,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1216274733",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดบึงทองหลาง",
+   "name_en": "Watbuengthonglang School",
+   "lat": 13.7951007,
+   "lon": 100.6254061,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1253115265",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดลาดกระบัง",
+   "name_en": "",
+   "lat": 13.7268735,
+   "lon": 100.752504,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1253869641",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดบำรุงรื่น",
+   "name_en": "",
+   "lat": 13.7426112,
+   "lon": 100.7556467,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1253873446",
+   "asset_type": "school",
+   "name": "โรงเรียนเทพศิรินทร์ร่มเกล้า",
+   "name_en": "",
+   "lat": 13.7464503,
+   "lon": 100.7578903,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1257741000",
+   "asset_type": "school",
+   "name": "โรงเรียนยอดดวงใจ",
+   "name_en": "",
+   "lat": 13.7374466,
+   "lon": 100.768291,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1263150264",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดขุมทอง",
+   "name_en": "Wat Khum Thong School",
+   "lat": 13.7221408,
+   "lon": 100.8517286,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1263150303",
+   "asset_type": "school",
+   "name": "โรงเรัยนขุมทอง",
+   "name_en": "",
+   "lat": 13.7414796,
+   "lon": 100.8530238,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1263239632",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดราชโกษา",
+   "name_en": "Wat Ratchakosa School",
+   "lat": 13.6994891,
+   "lon": 100.8512191,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1323679306",
+   "asset_type": "school",
+   "name": "โรงเรียนเตรียมอุดมศึกษาพัฒนาการสุวรรณภูมิ",
+   "name_en": "",
+   "lat": 13.7778163,
+   "lon": 100.7649129,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1328167192",
+   "asset_type": "school",
+   "name": "โรงเรียนพรตพิทยพยัต",
+   "name_en": "Protpittayapayat School",
+   "lat": 13.7262495,
+   "lon": 100.7859136,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1328167199",
+   "asset_type": "school",
+   "name": "โรงเรียนเชิดเจิมศิลป์",
+   "name_en": "",
+   "lat": 13.7250051,
+   "lon": 100.7856221,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1378242546",
+   "asset_type": "school",
+   "name": "โรงเรียนนานาชาตินีวาอเมริกัน",
+   "name_en": "Niva International School",
+   "lat": 13.8027194,
+   "lon": 100.6297706,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1394926783",
+   "asset_type": "school",
+   "name": "โรงเรียนนานาชาติไบรท์ตันคอลเลจ กรุงเทพฯ",
+   "name_en": "Brighton College Bangkok",
+   "lat": 13.7534185,
+   "lon": 100.6730557,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1394948752",
+   "asset_type": "school",
+   "name": "โรงเรียนนานาชาติแมนดาริน",
+   "name_en": "",
+   "lat": 13.7642804,
+   "lon": 100.6616253,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1394948753",
+   "asset_type": "school",
+   "name": "โรงเรียนนานาชาติเพ็ญสมิทธ์",
+   "name_en": "",
+   "lat": 13.7626154,
+   "lon": 100.663793,
+   "district_code": "1006",
    "source": "OpenStreetMap"
   },
   {
@@ -444,6 +726,76 @@
    "source": "OpenStreetMap"
   },
   {
+   "asset_id": "osm:way/1479125128",
+   "asset_type": "school",
+   "name": "โรงเรียนพระมารดานิจจานุเคราะห์",
+   "name_en": "Our Lady of Perpetual Help School",
+   "lat": 13.789924,
+   "lon": 100.6397587,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1484570295",
+   "asset_type": "school",
+   "name": "ศูนย์การเรียนรู้ระดับแขวงลาดกระบัง",
+   "name_en": "",
+   "lat": 13.7217498,
+   "lon": 100.735897,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1493025523",
+   "asset_type": "school",
+   "name": "โรงเรียนมาเรียลัย",
+   "name_en": "Saint Mary College",
+   "lat": 13.7258729,
+   "lon": 100.7920238,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1499793264",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดพลมาณีย์",
+   "name_en": "Wat Phon Mani School",
+   "lat": 13.7229542,
+   "lon": 100.7982717,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1543169882",
+   "asset_type": "school",
+   "name": "โรงเรียนมัธยมบ้านบางกะปิ",
+   "name_en": "Matthayombanbangkapi School",
+   "lat": 13.7714167,
+   "lon": 100.6467374,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1543169883",
+   "asset_type": "school",
+   "name": "โรงเรียนบ้านบางกะปิ",
+   "name_en": "Banbangkapi School",
+   "lat": 13.7722261,
+   "lon": 100.6463291,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1543169885",
+   "asset_type": "school",
+   "name": "โรงเรียนพร้อมมิตรพิทยา",
+   "name_en": "Prommitpittaya School",
+   "lat": 13.7705982,
+   "lon": 100.6553278,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
    "asset_id": "osm:way/1546667786",
    "asset_type": "school",
    "name": "โรงเรียนเพชรรัชต์",
@@ -451,6 +803,26 @@
    "lat": 13.849376,
    "lon": 100.5446532,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1558373677",
+   "asset_type": "school",
+   "name": "โรงเรียนสาธิตมหาวิทยาลัยรามคำแหง (ฝ่ายมัธยม)",
+   "name_en": "Ramkhamhaeng University Demonstration School",
+   "lat": 13.753352,
+   "lon": 100.6184145,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/1558373678",
+   "asset_type": "school",
+   "name": "โรงเรียนสาธิตมหาวิทยาลัยรามคำแหง (ฝ่ายประถม)",
+   "name_en": "Ramkhamhaeng University Demonstration School (Elementary Level)",
+   "lat": 13.755007,
+   "lon": 100.6144097,
+   "district_code": "1006",
    "source": "OpenStreetMap"
   },
   {
@@ -484,6 +856,26 @@
    "source": "OpenStreetMap"
   },
   {
+   "asset_id": "osm:way/285177790",
+   "asset_type": "school",
+   "name": "โรงเรียนสารสาสน์วิเทศร่มเกล้า",
+   "name_en": "Sarasas Wittaed Romklao School",
+   "lat": 13.7487461,
+   "lon": 100.7427218,
+   "district_code": "1011",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/31141099",
+   "asset_type": "school",
+   "name": "โรงเรียนบางกะปิ",
+   "name_en": "Bangkapi School",
+   "lat": 13.7709681,
+   "lon": 100.6510901,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
    "asset_id": "osm:way/32089660",
    "asset_type": "school",
    "name": "โรงเรียนสาธิตแห่งมหาวิทยาลัยเกษตรศาสตร์",
@@ -491,6 +883,26 @@
    "lat": 13.8516078,
    "lon": 100.5679605,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/390637286",
+   "asset_type": "school",
+   "name": "โรงเรียนเทพลีลา",
+   "name_en": "Thepleela School",
+   "lat": 13.7583454,
+   "lon": 100.6154379,
+   "district_code": "1006",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/516314059",
+   "asset_type": "school",
+   "name": "โรงเรียนวัดปลูกศรัทธา",
+   "name_en": "",
+   "lat": 13.7270787,
+   "lon": 100.7683175,
+   "district_code": "1011",
    "source": "OpenStreetMap"
   },
   {
@@ -511,6 +923,16 @@
    "lat": 13.8222198,
    "lon": 100.5663203,
    "district_code": "1030",
+   "source": "OpenStreetMap"
+  },
+  {
+   "asset_id": "osm:way/625500762",
+   "asset_type": "school",
+   "name": "Tippawas School Playground",
+   "name_en": "",
+   "lat": 13.7801899,
+   "lon": 100.8024682,
+   "district_code": "1011",
    "source": "OpenStreetMap"
   },
   {
