@@ -124,8 +124,8 @@ RP20/RP50 rasters and methods exist.
   clear message.
 - **Map:** one switch per source (roads, reports by original source, facilities, cameras by
   provider, outline), remembered in `localStorage`.
-- **Not yet checked in a browser:** the Chrome extension was not connected. The owner should check
-  the switches and the new-tab link.
+- **Checked by the owner (3 October):** the layer switches work, and bmatraffic cameras open and
+  play in a new tab.
 
 ### 3 October: Global Risk live-feed plan (plan only)
 
