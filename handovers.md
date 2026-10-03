@@ -157,7 +157,7 @@ RP20/RP50 rasters and methods exist.
 - **v1 scope:** incident records only, with confidence and reasons. No report text, usernames,
   camera links, Longdo events or rain.
 - **Next:** the owner answers the 6 decisions at the end of the plan. Then Step 1 (the endpoint,
-  tests and ADR-0051) can be built locally under Gate A.
+  tests and ADR-0052) can be built locally under Gate A.
 
 ### 3 October: bmatraffic.com cameras first (ADR-0050)
 

@@ -98,7 +98,7 @@ If the Floodboard terms are not clear, v1 publishes only a **synthetic** feed (s
   - `valid_until` is set;
   - excluded sources never appear;
   - anonymous access works, and write methods are refused.
-- ADR-0051 records the access decision (the first public pilot route), the field list and the exclusions.
+- ADR-0052 records the access decision (the first public pilot route), the field list and the exclusions.
 
 **Owner decision:** making this route public is new. Until a host is ready, we could keep it `protected` and switch it to public only once that host exists.
 
