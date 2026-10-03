@@ -304,6 +304,8 @@
       row(say("cov.cctv"), say("cov.test"), say("cov.cctv.detail.test", { n: cams.length }), "warn");
     } else if (!cams.length) {
       row(say("cov.cctv"), say("cov.not"), say("cov.cctv.detail"), "none");
+    } else {
+      row(say("cov.cctv"), say("cov.bma"), say("cov.cctv.detail.bma", { n: number(cams.length) }), "warn");
     }
     if (state.assets && state.assets.assets.length) {
       const stamp = state.assets.source.osm_timestamp;
@@ -806,6 +808,9 @@
         say(`cam.status.${c.status}`),
         say(`cam.mode.${c.access_mode}`),
       ].join(" · ")));
+      if (c.related_sensor_ids && c.related_sensor_ids.length) {
+        li.append(el("span", "fl-cam__meta", say("cam.sensor", { id: c.related_sensor_ids.join(", ") })));
+      }
       const why = c.reasons.map((r) => say(`cam.reason.${r}`)).join(", ");
       li.append(el("span", "fl-cam__role", c.role === "officer_can_look" ? say("cam.look") : say("cam.cannot", { reasons: why })));
       if (c.viewer_url && !c.placeholder) {

@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 import api.access
 import api.permissions
+import core.flood_evidence.reviews as reviews_module
 from api.dependencies import database_session
 from api.main import app
 from api.rate_limits import limiter
@@ -21,7 +22,7 @@ from api.sessions import CSRF_COOKIE, set_session_cookie
 from api.settings import Settings
 from core.access_models import AppUser, AuditEvent, Base, Hub
 from core.flood_evidence.assets import asset_registry
-from core.flood_evidence.cameras import camera_registry
+from core.flood_evidence.cameras import camera_registry, parse_camera
 from core.flood_evidence.config import pilot_config
 from core.flood_evidence.incident_store import incident_detail, list_incidents
 from core.flood_evidence.models import FloodIncident, FloodReview
@@ -144,12 +145,33 @@ def test_another_hub_and_a_platform_admin_without_membership_cannot_write(world)
     [
         {"action": "flooded_probably"},
         {"action": "dry_seen", "note": "x" * (NOTE_MAX + 1)},
-        {"action": "dry_seen", "camera_id": camera_registry("bangkok")[0].camera_id},
+        {"action": "dry_seen", "camera_id": "bma:NO-SUCH-CAMERA"},
     ],
 )
-def test_unknown_actions_long_notes_and_placeholder_cameras_are_refused(world, body) -> None:
+def test_unknown_actions_long_notes_and_unknown_cameras_are_refused(world, body) -> None:
     assert _client(world, "officer@example.test").post(_review_url(world), json=body).status_code \
         == 422
+
+
+def test_a_placeholder_camera_cannot_be_named_in_a_review(world, monkeypatch) -> None:
+    placeholder = parse_camera({
+        "camera_id": "placeholder:x", "provider": "PLACEHOLDER", "provider_camera_id": "x",
+        "name": {"en": "Test"}, "lat": 13.84, "lon": 100.54, "access_mode": "external_viewer",
+        "viewer_url": None, "status": "unknown", "ingestion_allowed": False, "cv_allowed": False,
+        "placeholder": True,
+    })
+    monkeypatch.setattr(reviews_module, "camera_registry", lambda _id: (placeholder,))
+    answer = _client(world, "officer@example.test").post(
+        _review_url(world), json={"action": "dry_seen", "camera_id": "placeholder:x"})
+    assert answer.status_code == 422
+
+
+def test_a_real_bma_camera_can_be_named_in_a_review(world) -> None:
+    camera = camera_registry("bangkok")[0]
+    answer = _client(world, "officer@example.test").post(
+        _review_url(world), json={"action": "flooding_seen", "camera_id": camera.camera_id})
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["reviews"][0]["camera_id"] == camera.camera_id
 
 
 def test_facility_access_is_confirmed_then_withdrawn_and_never_set_to_accessible(world) -> None:

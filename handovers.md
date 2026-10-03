@@ -115,7 +115,20 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): retention (ADR-0045), and the backup capture hung
+### 3 October (latest): real BMA cameras (ADR-0046)
+
+- **Source:** BMA's flood site serves its camera list without a login. The owner approved it for
+  the demo.
+- **Built:** `grpcli/bma_cameras_capture.py` wrote 872 cameras inside Bangkok to
+  `core/data/flood_pilot_bangkok_cameras.json`, with the source, SHA-256 and "terms not
+  confirmed". The raw download is in `.local/bma_cameras.json`.
+- **How cameras are used:** each is an `external_viewer` with a live-view link opened in a new
+  tab, status unknown, never ingested. The page shows the BMA sensor each camera watches.
+- **Live:** cameras sit 30 m from the top conflicting Lat Krabang incident (sensor `FL.LKB.01`).
+- **The BMA request** is now about permission (terms, embedding, status, headings).
+- **Tests:** 1,048 pass and 2 skip.
+
+### 3 October: retention (ADR-0045), and the backup capture hung
 
 - **Retention:**
   - raw downloads 14 days (whole UTC day folders, deleted only after the commit; fetch rows and

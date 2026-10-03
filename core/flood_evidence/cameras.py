@@ -176,7 +176,10 @@ def parse_camera(item: dict[str, Any]) -> Camera:
 
 
 def parse_registry(raw: dict[str, Any]) -> tuple[Camera, ...]:
-    cameras = tuple(parse_camera(item) for item in raw.get("cameras", []))
+    """Every camera, after merging the file's shared ``defaults``; each is checked in full."""
+
+    defaults = raw.get("defaults") or {}
+    cameras = tuple(parse_camera({**defaults, **item}) for item in raw.get("cameras", []))
     ids = [c.camera_id for c in cameras]
     if len(ids) != len(set(ids)):
         raise CameraRegistryError("Camera IDs repeat")

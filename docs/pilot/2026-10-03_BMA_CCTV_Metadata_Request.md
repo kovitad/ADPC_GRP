@@ -1,8 +1,20 @@
-# Request to BMA: CCTV camera information for the GRP Bangkok flood pilot
+# Request to BMA: permission to use CCTV information in the GRP Bangkok flood pilot
 
 **Date:** 3 October 2026
 **From:** the SERVIR Global Risk Platform (GRP) pilot team, ADPC
 **Status:** draft for the Product Owner to send. Nothing has been sent from GRP.
+
+> **Update, 3 October 2026 (later).** BMA's flood site already publishes its camera list (camera
+> ID, location, linked flood sensor and a live-view link) without a login. With the Product
+> Owner's approval, the Gate A local demo now uses that list (ADR-0046). It shows each camera's
+> location and sensor, and opens the live view on the provider's site in a new tab; GRP never
+> embeds, relays, records or analyses video. **This request is therefore now mainly for
+> permission and status:**
+> - may GRP use the camera list and link to the live views (and on what terms, with what
+>   attribution)?
+> - may GRP show the live view inside its own page (embedding)?
+> - how should GRP check whether a camera is working?
+> - can BMA share which way each camera faces?
 
 ## Thai version (ฉบับภาษาไทย)
 

@@ -48,16 +48,30 @@ def _real(**changes):
     return item
 
 
-def test_shipped_registry_is_placeholders_only_and_never_evidence() -> None:
+def test_shipped_registry_is_bma_cameras_that_are_links_never_evidence() -> None:
     cameras = camera_registry("bangkok")
-    assert cameras and all(c.placeholder for c in cameras)
+    assert len(cameras) > 500 and not any(c.placeholder for c in cameras)
+    assert {c.provider for c in cameras} == {"BMA_DDS"}
     for camera in cameras:
-        assert not frame_capable(camera)
-        assert camera.viewer_url is None
+        assert not frame_capable(camera) and not camera.ingestion_allowed and not camera.cv_allowed
+        assert camera.access_mode == "external_viewer" and camera.viewer_url.startswith("https://")
+        assert camera.stream_url is None and camera.snapshot_url is None
         role, reasons = corroboration_role(camera, ROAD, NOW)
-        assert role == CANNOT_CONFIRM and "placeholder" in reasons
+        assert role == CANNOT_CONFIRM and "status_unknown" in reasons
+    assert sum(1 for c in cameras if c.related_sensor_ids) > 0.9 * len(cameras)
     raw = json.loads((DATA / "flood_pilot_bangkok_cameras.json").read_text(encoding="utf-8"))
-    assert "not a real camera" in raw["cameras"][0]["name"]["en"]
+    assert "not confirmed" in raw["_source"]["terms"].lower() and raw["_source"]["sha256"]
+
+
+def test_shared_defaults_are_merged_and_each_camera_still_checked() -> None:
+    defaults = {k: v for k, v in _real().items() if k not in {"camera_id", "lat", "lon"}}
+    cameras = parse_registry({"defaults": defaults, "cameras": [
+        {"camera_id": "a", "lat": 13.84, "lon": 100.54}, {"camera_id": "b", "lat": 13.85,
+                                                           "lon": 100.55}]})
+    assert [c.camera_id for c in cameras] == ["a", "b"] and cameras[0].viewer_url
+    with pytest.raises(CameraRegistryError):
+        parse_registry({"defaults": defaults, "cameras": [
+            {"camera_id": "c", "lat": 13.84, "lon": 100.54, "viewer_url": "http://x"}]})
 
 
 @pytest.mark.parametrize(
