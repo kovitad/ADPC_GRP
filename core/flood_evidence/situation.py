@@ -140,6 +140,26 @@ def current_roads(
     }
 
 
+def road_by_id(
+    session: Session, config: PilotConfig, as_of: datetime, road_id: str
+) -> dict[str, Any] | None:
+    """One segment of the latest good snapshot, by the short ID the page shows."""
+
+    source = next((s for s in config.sources if s.adapter == ROADS_ADAPTER), None)
+    snapshot = _latest(session, config, source.source_id, as_of, True) if source else None
+    if snapshot is None:
+        return None
+    row = session.scalars(
+        select(FloodObservation).where(
+            FloodObservation.last_fetch_id == snapshot.id,
+            FloodObservation.record_key.startswith(road_id, autoescape=True),
+        )
+    ).first()
+    if row is None:
+        return None
+    return _road_feature(row, freshness(utc(row.reported_at), as_of, config.freshness_minutes))
+
+
 def recent_reports(
     session: Session, config: PilotConfig, as_of: datetime, hours: int
 ) -> dict[str, Any]:

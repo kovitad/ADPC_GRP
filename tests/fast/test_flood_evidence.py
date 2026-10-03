@@ -318,3 +318,14 @@ def test_demo_corridor_names_known_bangkok_districts() -> None:
 
     names = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
     assert [names[code] for code in CONFIG.demo_corridor["areas"]] == ["Bang Sue", "Chatuchak"]
+
+
+def test_a_road_is_found_by_its_short_id_in_the_latest_snapshot(session, storage) -> None:
+    from core.flood_evidence.situation import road_by_id
+
+    at = _newest_road_time()
+    _ingest(session, storage, ROADS_SOURCE, ROADS, at)
+    road = current_roads(session, CONFIG, at, include_all=True)["features"][0]
+    found = road_by_id(session, CONFIG, at, road["properties"]["id"])
+    assert found["geometry"] == road["geometry"]
+    assert road_by_id(session, CONFIG, at, "0" * 16) is None

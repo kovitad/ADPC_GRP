@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-2, ADR-0038, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-3, ADR-0038/0039, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,30 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): Bangkok Live Risk Intelligence, slices 1-2 (ADR-0038)
+### 3 October (later): CCTV P0 for the Bang Sue and Chatuchak corridor (ADR-0039)
+
+- **Corridor:** the owner chose Bang Sue (1029) and Chatuchak (1030). It is `demo_corridor` in
+  `core/data/flood_pilot_bangkok.json` and the page's default view. At 10:10 it had 15 roads with
+  flooding reported, all from Traffy reports through Floodboard.
+- **Camera list:** the owner will ask BMA for it. The request is drafted in Thai and English in
+  `docs/pilot/2026-10-03_BMA_CCTV_Metadata_Request.md`; nothing has been sent from GRP.
+- **Built:**
+  - `core/flood_evidence/cameras.py`: a registry that fails closed, `frame_capable`,
+    `corroboration_role` (at best "an officer can look") and `nearby_cameras`.
+  - `core/data/flood_pilot_bangkok_cameras.json`: three labelled **placeholder** cameras near
+    Pracha Chuen and Soi Phahon Yothin 37.
+  - Routes `/cameras` and `/roads/{road_id}/cameras`.
+  - On the page: camera markers (hollow for test entries), and a CCTV row in the evidence card
+    giving distance, health, mode and every reason a camera cannot confirm.
+  - A coverage row saying "test entries only".
+- **Tests:** 23 camera tests, including tweak scenarios 4 (a camera facing away) and 5 (a
+  viewer-only camera never reaches frame code). The road lookup is also tested.
+- **Next:**
+  - When BMA answers, replace the placeholders with real entries (`external_viewer` or `embed`,
+    following BMA's permission). Then decide how camera health is checked.
+  - Slice 4: OSM schools, hospitals and clinics in the corridor.
+
+### 3 October: Bangkok Live Risk Intelligence, slices 1-2 (ADR-0038)
 
 - **Branch `pilot/river-watch-and-bangkok-flood`, not pushed.**
   - `0d8c285` commits the 2 October Pilot work (River Watch, HAND practice, Thai).

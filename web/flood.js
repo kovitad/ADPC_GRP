@@ -14,7 +14,7 @@
   const OPACITY = { current: 0.95, recent: 0.9, aging: 0.7, stale: 0.45, expired: 0.55, future: 0.5 };
   const state = {
     config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
-    situation: null, roads: null, reports: null, selected: null,
+    situation: null, roads: null, reports: null, selected: null, cameras: null,
   };
   const say = PilotText.t;
   let map = null;
@@ -22,6 +22,8 @@
   let reportLayer = null;
   let outlineLayer = null;
   let selectedLayer = null;
+  let cameraLayer = null;
+  let evidenceToken = 0;
 
   const clock = (iso) => new Intl.DateTimeFormat(PilotText.locale(), {
     timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
@@ -33,6 +35,12 @@
     return say("ago.day", { n: Math.round(minutes / 1440) });
   };
   const number = (value) => new Intl.NumberFormat(PilotText.locale()).format(value);
+  const textOf = (text) => {
+    const span = document.createElement("span");
+    span.textContent = text;
+    return span;
+  };
+  const cameraName = (c) => c.name[PilotText.lang()] || c.name.en;
   const sourceName = (id) => (say(`src.${id}`) === `src.${id}` ? id : say(`src.${id}`));
 
   const showBanner = (message) => {
@@ -116,7 +124,7 @@
 
   const drawMap = () => {
     ensureMap();
-    [roadLayer, reportLayer, outlineLayer, selectedLayer].forEach((layer) => layer && map.removeLayer(layer));
+    [roadLayer, reportLayer, outlineLayer, selectedLayer, cameraLayer].forEach((layer) => layer && map.removeLayer(layer));
     selectedLayer = null;
     const area = currentArea();
     outlineLayer = area
@@ -142,12 +150,23 @@
       onEachFeature: (feature, layer) => {
         const p = feature.properties;
         // Leaflet renders a string tooltip as HTML; provider names go in as text only.
-        const tip = document.createElement("span");
-        tip.textContent = p.name || p.name_en || say(p.road_class === "zone" ? "ev.zone" : "ev.unnamed");
-        layer.bindTooltip(tip, { sticky: true });
+        layer.bindTooltip(textOf(p.name || p.name_en || say(p.road_class === "zone" ? "ev.zone" : "ev.unnamed")), { sticky: true });
         layer.on("click", () => showEvidence(feature));
       },
     }).addTo(map);
+    cameraLayer = window.L.layerGroup(
+      (state.cameras ? state.cameras.cameras : [])
+        .filter((c) => inArea({ type: "Point", coordinates: [c.lon, c.lat] }))
+        .map((c) => {
+          const colour = c.status === "online" ? "#1e6b33" : c.status === "offline" ? "#a61e1e" : "#4a555b";
+          const marker = window.L.circleMarker([c.lat, c.lon], {
+            radius: 7, color: colour, weight: 2.5, dashArray: c.placeholder ? "3 3" : null,
+            fillColor: colour, fillOpacity: c.placeholder ? 0 : 0.6,
+          });
+          marker.bindTooltip(textOf(cameraName(c)), { sticky: true });
+          return marker;
+        }),
+    ).addTo(map);
     if (area && outlineLayer) map.fitBounds(outlineLayer.getBounds(), { padding: [20, 20] });
   };
 
@@ -168,6 +187,7 @@
     item({ background: OLD }, say("leg.old"));
     item({ background: "repeating-linear-gradient(90deg,#e8590c 0 3px,transparent 3px 8px)" }, say("leg.derived"));
     item({ background: "#7950f2", borderRadius: "50%", width: "0.6rem", height: "0.6rem" }, say("leg.report"));
+    item({ border: "2px dashed #4a555b", borderRadius: "50%", width: "0.7rem", height: "0.7rem" }, say("leg.camera"));
   };
 
   // --- Cards and coverage --------------------------------------------------------------------
@@ -217,7 +237,12 @@
       row(say(s.source_id === "floodboard_roads" ? "cov.fb.roads" : "cov.fb.reports"), say(`cov.${s.state}`), detail, tone);
     });
     row(say("cov.bma"), say("cov.not"), say("cov.bma.detail"), "none");
-    row(say("cov.cctv"), say("cov.not"), say("cov.cctv.detail"), "none");
+    const cams = state.cameras ? state.cameras.cameras : [];
+    if (cams.length && state.cameras.placeholders_only) {
+      row(say("cov.cctv"), say("cov.test"), say("cov.cctv.detail.test", { n: cams.length }), "warn");
+    } else if (!cams.length) {
+      row(say("cov.cctv"), say("cov.not"), say("cov.cctv.detail"), "none");
+    }
     row(say("cov.assets"), say("cov.not"), say("cov.assets.detail"), "none");
     row(say("cov.geoglows"), say("cov.elsewhere"), say("cov.geoglows.detail"), "none");
     $("[data-coverage-note]").textContent = `${say("cov.note")} ${say("cov.note.bbt")}`;
@@ -239,6 +264,49 @@
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
     return node;
+  };
+
+  // The CCTV row: nearby cameras from the server, each with every reason it cannot confirm.
+  const fillCameras = async (row, roadId) => {
+    const token = ++evidenceToken;
+    let answer;
+    try {
+      answer = await GRP.request(`${API}/roads/${roadId}/cameras`);
+    } catch (error) {
+      answer = null;
+    }
+    if (token !== evidenceToken) return;
+    row.replaceChildren(el("strong", "", say("ev.row.cctv")));
+    if (!answer) {
+      row.append(el("span", "", say("ev.row.cctv.v")));
+      return;
+    }
+    if (!answer.cameras.length) {
+      row.append(el("span", "", say("cam.none", { r: answer.radius_m })));
+      return;
+    }
+    const items = el("ul", "fl-cams");
+    answer.cameras.slice(0, 3).forEach((c) => {
+      const li = el("li", "fl-cam");
+      li.append(el("span", "fl-cam__name", cameraName(c)));
+      li.append(el("span", "fl-cam__meta", [
+        say("cam.dist", { n: number(c.distance_m) }),
+        say(`cam.status.${c.status}`),
+        say(`cam.mode.${c.access_mode}`),
+      ].join(" · ")));
+      const why = c.reasons.map((r) => say(`cam.reason.${r}`)).join(", ");
+      li.append(el("span", "fl-cam__role", c.role === "officer_can_look" ? say("cam.look") : say("cam.cannot", { reasons: why })));
+      if (c.viewer_url && !c.placeholder) {
+        const link = el("a", "fl-cam__open", say("cam.open"));
+        link.href = c.viewer_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        li.append(link);
+      }
+      items.append(li);
+    });
+    row.append(items);
+    if (answer.cameras.some((c) => c.placeholder)) row.append(el("span", "fl-cam__note", say("cam.placeholderNote")));
   };
 
   const highlight = (feature) => {
@@ -311,9 +379,12 @@
     } else {
       evidenceRow(say("ev.row.near"), say("ev.row.near.none"), "missing");
     }
-    evidenceRow(say("ev.row.cctv"), say("ev.row.cctv.v"), "missing");
+    const cctv = el("li", "fl-row fl-row--missing");
+    cctv.append(el("strong", "", say("ev.row.cctv")), el("span", "", say("cam.loading")));
+    list.append(cctv);
     evidenceRow(say("ev.row.check"), say("ev.row.check.v"), "pending");
     box.append(list);
+    fillCameras(cctv, p.id);
 
     box.append(el("h3", "fl-evidence__sub", say("ev.affected")));
     box.append(el("p", "fl-muted", say("ev.affected.v")));
@@ -400,8 +471,11 @@
     .then(async (identity) => {
       const isAdmin = identity.is_platform_admin || identity.memberships.some((m) => m.role === "admin");
       $("[data-river-link]").hidden = !isAdmin;
-      const [config, areas] = await Promise.all([GRP.request(API), GRP.request(`${API}/areas`)]);
+      const [config, areas, cameras] = await Promise.all([
+        GRP.request(API), GRP.request(`${API}/areas`), GRP.request(`${API}/cameras`),
+      ]);
       state.config = config;
+      state.cameras = cameras;
       state.areas = areas.areas;
       const asked = params.get("area");
       if (asked === "all" || state.areas.some((a) => a.admin_code === asked)) state.area = asked;

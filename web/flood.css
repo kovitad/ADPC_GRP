@@ -59,3 +59,10 @@
   .fl-evidence { max-height: none; }
 }
 .fl-coverage .rw-table th, .fl-coverage .rw-table td { text-align: left; vertical-align: top; }
+.fl-cams { display: grid; gap: 0.4rem; margin: 0.3rem 0 0; padding: 0; list-style: none; }
+.fl-cam { display: grid; gap: 0.1rem; padding-top: 0.3rem; border-top: 1px dashed #d5dde1; }
+.fl-cam__name { font-weight: var(--weight-semibold); }
+.fl-cam__meta { color: var(--ink-500); }
+.fl-cam__role { color: var(--ink-700); }
+.fl-cam__open { justify-self: start; color: var(--servir-blue-dark); }
+.fl-cam__note { margin-top: 0.3rem; color: #8a5a00; }

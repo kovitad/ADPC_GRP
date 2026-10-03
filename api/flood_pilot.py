@@ -10,6 +10,7 @@ verdict is served as ``provider_verdict`` and is labelled as Floodboard's estima
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -19,11 +20,14 @@ from api.dependencies import DatabaseSession
 from api.errors import access_not_authorized, not_found, validation_failed
 from api.permissions import SignedInMember
 from api.sessions import CurrentPrincipal
+from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
-from core.flood_evidence.situation import current_roads, recent_reports, situation
+from core.flood_evidence.situation import current_roads, recent_reports, road_by_id, situation
 from core.river_watch import bangkok_outlines
 
 router = APIRouter(prefix="/pilot/flood", tags=["pilot"])
+ROAD_ID = re.compile(r"^[0-9a-f]{16}$")
+DEFAULT_CAMERA_RADIUS_M = 400
 
 
 def may_open(principal: CurrentPrincipal, config: PilotConfig) -> bool:
@@ -144,3 +148,44 @@ def read_reports(
 def read_areas(config: FloodPilot) -> dict[str, Any]:
     areas = bangkok_outlines() if config.pilot_id == "bangkok" else []
     return {"areas": sorted(areas, key=lambda a: a["name"])}
+
+
+@router.get(
+    "/{pilot_id}/cameras",
+    summary="The pilot's camera registry: location, health, access mode and official viewer",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_cameras(config: FloodPilot) -> dict[str, Any]:
+    cameras = camera_registry(config.pilot_id)
+    return {
+        "cameras": [camera.public() for camera in cameras],
+        "placeholders_only": bool(cameras) and all(c.placeholder for c in cameras),
+        "default_radius_m": DEFAULT_CAMERA_RADIUS_M,
+    }
+
+
+@router.get(
+    "/{pilot_id}/roads/{road_id}/cameras",
+    summary="Cameras near one road, nearest first, with every reason each cannot confirm it",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_road_cameras(
+    config: FloodPilot,
+    session: DatabaseSession,
+    road_id: str,
+    radius_m: Annotated[int, Query(ge=50, le=1000)] = DEFAULT_CAMERA_RADIUS_M,
+    as_of: AsOf = None,
+) -> dict[str, Any]:
+    if not ROAD_ID.fullmatch(road_id):
+        raise not_found()
+    moment = _as_of(as_of)
+    road = road_by_id(session, config, moment, road_id)
+    if road is None:
+        raise not_found()
+    return {
+        "road_id": road_id,
+        "radius_m": radius_m,
+        "cameras": nearby_cameras(
+            camera_registry(config.pilot_id), road["geometry"], moment, radius_m
+        ),
+    }
