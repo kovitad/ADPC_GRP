@@ -311,3 +311,10 @@ def test_as_of_refuses_the_future_and_naive_times() -> None:
 def test_unknown_pilot_has_no_config() -> None:
     assert pilot_config("../etc") is None
     assert CONFIG.hubs == ("adpc",)
+
+
+def test_demo_corridor_names_known_bangkok_districts() -> None:
+    from core.river_watch import bangkok_outlines
+
+    names = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
+    assert [names[code] for code in CONFIG.demo_corridor["areas"]] == ["Bang Sue", "Chatuchak"]

@@ -28,6 +28,8 @@ class PilotConfig:
     pilot_id: str
     title: dict[str, str]
     hubs: tuple[str, ...]
+    # The owner's chosen demo corridor: area codes from the pilot's area list, and its title.
+    demo_corridor: dict[str, Any]
     map: dict[str, Any]
     freshness_minutes: dict[str, int]
     report_window_hours: dict[str, int]
@@ -60,6 +62,7 @@ def _parse(raw: dict[str, Any]) -> PilotConfig:
         pilot_id=raw["pilot_id"],
         title=dict(raw["title"]),
         hubs=hubs,
+        demo_corridor=dict(raw.get("demo_corridor") or {}),
         map=dict(raw["map"]),
         freshness_minutes=bands,
         report_window_hours={k: int(v) for k, v in raw["report_window_hours"].items()},

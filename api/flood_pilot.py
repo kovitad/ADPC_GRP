@@ -88,6 +88,7 @@ def read_flood_pilot(config: FloodPilot) -> dict[str, Any]:
     return {
         "pilot_id": config.pilot_id,
         "title": config.title,
+        "demo_corridor": config.demo_corridor,
         "map": config.map,
         "freshness_minutes": config.freshness_minutes,
         "report_window_hours": config.report_window_hours,

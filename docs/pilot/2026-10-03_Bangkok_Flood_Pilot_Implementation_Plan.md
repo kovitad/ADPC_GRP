@@ -295,6 +295,12 @@ the one decision still open in section 7.
 - **Access: add Hub operators.** Hub members can view the Bangkok flood mode and verify incidents.
   Admins keep configuration. This needs an ADR and permission-matrix changes in slice 1. The
   River Watch and HAND sections stay Admin-only.
+- **Demo corridor: Bang Sue (1029) and Chatuchak (1030)** (chosen later on 3 October). It is
+  stored as `demo_corridor` in `core/data/flood_pilot_bangkok.json`, so it changes without code,
+  and it is the page's default view. At 10:10 it showed 15 roads with flooding reported now: 10
+  in Bang Sue around Prachachuen and 5 in Chatuchak around Phahonyothin 37. **All of it was Traffy
+  evidence through Floodboard, with no BMA sensor**, which makes cameras (slice 3) the most useful
+  next corroboration there.
 - **First build: slices 1 and 2**, after the existing Pilot work is committed (slice 0).
 
 **Still open:**

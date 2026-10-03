@@ -1,10 +1,46 @@
 {
   "pilot_id": "bangkok",
-  "title": {"en": "Bangkok flood pilot", "th": "นำร่องน้ำท่วมกรุงเทพฯ"},
-  "hubs": ["adpc"],
-  "map": {"center": [13.75, 100.55], "zoom": 11, "bbox": [100.32, 13.49, 100.94, 13.96]},
-  "freshness_minutes": {"current": 30, "recent": 120, "aging": 360, "stale": 720},
-  "report_window_hours": {"default": 6, "max": 24},
+  "title": {
+    "en": "Bangkok flood pilot",
+    "th": "นำร่องน้ำท่วมกรุงเทพฯ"
+  },
+  "hubs": [
+    "adpc"
+  ],
+  "demo_corridor": {
+    "title": {
+      "en": "Demo corridor: Bang Sue and Chatuchak",
+      "th": "พื้นที่สาธิต: บางซื่อและจตุจักร"
+    },
+    "areas": [
+      "1029",
+      "1030"
+    ],
+    "chosen": "Product Owner, 3 October 2026"
+  },
+  "map": {
+    "center": [
+      13.75,
+      100.55
+    ],
+    "zoom": 11,
+    "bbox": [
+      100.32,
+      13.49,
+      100.94,
+      13.96
+    ]
+  },
+  "freshness_minutes": {
+    "current": 30,
+    "recent": 120,
+    "aging": 360,
+    "stale": 720
+  },
+  "report_window_hours": {
+    "default": 6,
+    "max": 24
+  },
   "sources": [
     {
       "source_id": "floodboard_roads",

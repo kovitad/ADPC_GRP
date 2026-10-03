@@ -13,7 +13,7 @@
   const OLD = "#8a959b";
   const OPACITY = { current: 0.95, recent: 0.9, aging: 0.7, stale: 0.45, expired: 0.55, future: 0.5 };
   const state = {
-    config: null, areas: [], area: "all", vehicle: "sedan", all: false,
+    config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null,
   };
   const say = PilotText.t;
@@ -70,17 +70,23 @@
     const url = new URL(window.location.href);
     url.searchParams.delete("area");
     url.searchParams.delete("road");
-    if (state.area !== "all") url.searchParams.set("area", state.area);
+    if (state.area !== "corridor") url.searchParams.set("area", state.area);
     if (state.selected) url.searchParams.set("road", state.selected.properties.id);
     window.history.replaceState(null, "", url);
   };
 
-  const currentArea = () => state.areas.find((a) => a.admin_code === state.area) || null;
+  // "all", one district code, or "corridor": the owner's demo corridor from the pilot config.
+  const corridorCodes = () => (state.config && state.config.demo_corridor ? state.config.demo_corridor.areas || [] : []);
+  const currentAreas = () => {
+    if (state.area === "corridor") return state.areas.filter((a) => corridorCodes().includes(a.admin_code));
+    return state.areas.filter((a) => a.admin_code === state.area);
+  };
+  const currentArea = () => currentAreas()[0] || null;
   const inArea = (geometry) => {
-    const area = currentArea();
-    if (!area) return true;
+    const areas = currentAreas();
+    if (!areas.length) return true;
     const points = geometry.type === "Point" ? [geometry.coordinates] : vertices(geometry);
-    return points.some((p) => insideArea(p, area.outline));
+    return points.some((p) => areas.some((area) => insideArea(p, area.outline)));
   };
   const visibleRoads = () => (state.roads ? state.roads.features.filter((f) => inArea(f.geometry)) : []);
   const visibleReports = () => (state.reports ? state.reports.features.filter((f) => inArea(f.geometry)) : []);
@@ -114,7 +120,10 @@
     selectedLayer = null;
     const area = currentArea();
     outlineLayer = area
-      ? window.L.geoJSON(area.outline, {
+      ? window.L.geoJSON({
+          type: "FeatureCollection",
+          features: currentAreas().map((a) => ({ type: "Feature", geometry: a.outline, properties: {} })),
+        }, {
           style: { color: "#0d2534", weight: 2, dashArray: "6 5", fill: true, fillOpacity: 0.03 },
           interactive: false,
         }).addTo(map)
@@ -357,6 +366,12 @@
     const all = el("option", "", say("fl.area.all"));
     all.value = "all";
     select.append(all);
+    const corridor = state.config && state.config.demo_corridor;
+    if (corridor && corridorCodes().length) {
+      const option = el("option", "", corridor.title[PilotText.lang()] || corridor.title.en);
+      option.value = "corridor";
+      select.append(option);
+    }
     const nameOf = (a) => (PilotText.lang() === "th" ? a.name_th : a.name);
     [...state.areas]
       .sort((a, b) => nameOf(a).localeCompare(nameOf(b), PilotText.locale()))
@@ -388,7 +403,9 @@
       const [config, areas] = await Promise.all([GRP.request(API), GRP.request(`${API}/areas`)]);
       state.config = config;
       state.areas = areas.areas;
-      if (state.areas.some((a) => a.admin_code === params.get("area"))) state.area = params.get("area");
+      const asked = params.get("area");
+      if (asked === "all" || state.areas.some((a) => a.admin_code === asked)) state.area = asked;
+      if (state.area === "corridor" && !corridorCodes().length) state.area = "all";
       fillAreas();
       await load();
       window.setInterval(load, REFRESH_MS);

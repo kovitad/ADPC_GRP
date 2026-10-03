@@ -133,7 +133,8 @@ RP20/RP50 rasters and methods exist.
     6 replay, 7 AI.
 - **Owner decisions (3 October):** capture now; OSM for schools and hospitals; Hub operators can
   open the view; build slices 1 and 2 first.
-  - **Still open:** the demo corridor.
+  - **Demo corridor, decided later the same day:** Bang Sue and Chatuchak. It is `demo_corridor` in
+    the pilot config and the page's default view. Its evidence was Traffy-only at 10:10.
 - **Facts measured on 3 October:**
   - Floodboard's `roads.geojson` and `reports.csv` are CC BY 4.0 and need no key.
   - Roads have no IDs; GRP uses a geometry SHA-256.
@@ -171,8 +172,9 @@ RP20/RP50 rasters and methods exist.
     English, an evidence card (`?road=`), and Bang Khen at 504 px (`?area=1005`).
   - **Not verified:** a signed-in browser pass on the real stack.
 - **Next:**
-  1. The owner picks the demo corridor.
-  2. Slice 3: manual CCTV `external_viewer` entries for that corridor.
+  1. Slice 3: manual CCTV `external_viewer` entries for Bang Sue and Chatuchak. Wait for the
+     owner's answer on where the camera list comes from.
+  2. (Corridor chosen: Bang Sue and Chatuchak.)
   3. Slice 4: OSM schools, hospitals and clinics, with states `potentially_exposed` and
      `access_unknown`.
   4. Add a retention rule for raw fetches before Gate B (about 43 MB a day gzipped).
