@@ -16,7 +16,7 @@
     config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
     assets: null, facility: null, incidents: null, incident: null, allIncidents: false,
-    canWrite: false,
+    canWrite: false, changes: null, window: 60,
   };
   const say = PilotText.t;
   let map = null;
@@ -301,6 +301,64 @@
     }
     row(say("cov.geoglows"), say("cov.elsewhere"), say("cov.geoglows.detail"), "none");
     $("[data-coverage-note]").textContent = `${say("cov.note")} ${say("cov.note.bbt")}`;
+  };
+
+  // --- What changed (slice 7a): computed by the server, no AI ---------------------------------
+  const CHANGE_KINDS = ["new", "grew", "conflict_started", "access_to_check", "confidence_down",
+    "confidence_up", "reactivated", "receded", "shrank", "closed", "officer_reviews"];
+
+  const loadChanges = async () => {
+    const box = $("[data-changes]");
+    try {
+      state.changes = await GRP.request(`${API}/changes?area=${encodeURIComponent(state.area)}&since_minutes=${state.window}`);
+    } catch (error) {
+      state.changes = null;
+      box.replaceChildren(el("p", "fl-muted", say("fl.error")));
+      return;
+    }
+    drawChanges();
+  };
+
+  const drawChanges = () => {
+    const box = $("[data-changes]");
+    box.replaceChildren();
+    const c = state.changes;
+    if (!c) {
+      box.append(el("p", "fl-muted", say("ch.loading")));
+      return;
+    }
+    if (c.window_starts_before_tracking && c.tracked_since) {
+      box.append(el("p", "fl-tracked", say("ch.tracked", { time: clock(c.tracked_since) })));
+    }
+    const list = el("ul", "fl-changes__list");
+    const byId = new Map((state.incidents ? state.incidents.incidents : []).map((i) => [i.incident_id, i]));
+    CHANGE_KINDS.forEach((kind) => {
+      const ids = (c.incidents || {})[kind] || [];
+      if (!ids.length) return;
+      const li = el("li", "");
+      li.append(el("span", "fl-changes__what", say(`ch.${kind}`, { n: ids.length })));
+      const chips = el("span", "fl-chips");
+      ids.slice(0, 4).forEach((id) => {
+        const incident = byId.get(id);
+        if (!incident) return;
+        const chip = el("button", "fl-linkbtn", incidentName(incident));
+        chip.type = "button";
+        chip.addEventListener("click", () => showIncident(id));
+        chips.append(chip);
+      });
+      li.append(chips);
+      list.append(li);
+    });
+    const assetsById = new Map((state.assets ? state.assets.assets : []).map((a) => [a.asset_id, a]));
+    const names = (ids) => ids.map((id) => assetsById.get(id)).filter(Boolean).map(facilityName).join(", ");
+    const fac = c.facilities || {};
+    if ((fac.newly_near_flooding || []).length) list.append(el("li", "", say("ch.fac.new", { list: names(fac.newly_near_flooding) })));
+    if ((fac.no_longer_near_flooding || []).length) list.append(el("li", "", say("ch.fac.gone", { list: names(fac.no_longer_near_flooding) })));
+    if (!list.children.length) box.append(el("p", "fl-muted", say("ch.none")));
+    else box.append(list);
+    if (c.demo_area_active_then != null && c.demo_area_active_now != null) {
+      box.append(el("p", "fl-muted", say("ch.active", { then: c.demo_area_active_then, now: c.demo_area_active_now })));
+    }
   };
 
   // --- Incidents (slice 5a) ---------------------------------------------------------------
@@ -807,6 +865,7 @@
     if (!state.situation || !state.roads) return;
     drawCards();
     drawIncidents();
+    drawChanges();
     drawCoverage();
     drawLegend();
     drawMap();
@@ -856,6 +915,7 @@
         GRP.request(`${API}/incidents`),
       ]);
       Object.assign(state, { situation, roads, reports, assets, incidents });
+      loadChanges();
       showBanner("");
       drawAll();
     } catch (error) {
@@ -890,8 +950,13 @@
     select.value = state.area;
   };
 
+  $("[data-ch-window]").addEventListener("change", (event) => {
+    state.window = Number(event.target.value);
+    loadChanges();
+  });
   $("[data-area]").addEventListener("change", (event) => {
     state.area = event.target.value;
+    loadChanges();
     state.selected = null;
     setUrl();
     $("[data-evidence]").replaceChildren(el("p", "fl-evidence__empty", say("ev.empty")));

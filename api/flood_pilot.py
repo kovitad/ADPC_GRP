@@ -11,7 +11,7 @@ verdict is served as ``provider_verdict`` and is labelled as Floodboard's estima
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -23,6 +23,7 @@ from api.errors import access_not_authorized, not_found, validation_failed
 from api.permissions import SignedInMember
 from api.sessions import CurrentPrincipal
 from core.access_models import AuditEvent, AuditResult
+from core.flood_evidence.briefing import build_facts, get_situation_changes
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
@@ -359,3 +360,49 @@ def post_facility_access(
         session, config, "facility", body.asset_id, now,
         reviewer_names(session, config, "facility", body.asset_id),
     )}
+
+
+Area = Annotated[str, Query(max_length=16, pattern=r"^(all|corridor|\d{4})$")]
+SinceMinutes = Annotated[int, Query(ge=10, le=1440)]
+
+
+def road_names(session, config: PilotConfig, now: datetime) -> dict[str, str]:
+    names = {}
+    for feature in current_roads(session, config, now)["features"]:
+        p = feature["properties"]
+        names[p["id"]] = p.get("name_en") or p.get("name") or ""
+    return names
+
+
+@router.get(
+    "/{pilot_id}/changes",
+    summary="What changed in an area over a window, from stored events and snapshots",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_changes(
+    config: FloodPilot, session: DatabaseSession, area: Area = "corridor",
+    since_minutes: SinceMinutes = 60,
+) -> dict[str, Any]:
+    now = datetime.now(UTC)
+    try:
+        return get_situation_changes(session, config, area, now - timedelta(minutes=since_minutes),
+                                     now)
+    except LookupError as error:
+        raise validation_failed("Unknown area") from error
+
+
+@router.get(
+    "/{pilot_id}/facts",
+    summary="The labelled facts an answer about an area may use (no AI)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_facts(
+    config: FloodPilot, session: DatabaseSession, area: Area = "corridor",
+    since_minutes: SinceMinutes = 60,
+) -> dict[str, Any]:
+    now = datetime.now(UTC)
+    try:
+        return build_facts(session, config, area, now - timedelta(minutes=since_minutes), now,
+                           road_names(session, config, now))
+    except LookupError as error:
+        raise validation_failed("Unknown area") from error

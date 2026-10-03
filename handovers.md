@@ -115,7 +115,20 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): officer checks, slice 5b (ADR-0042)
+### 3 October (latest): what changed and the fact bundle, slice 7a (ADR-0043)
+
+- **Built:** `core/flood_evidence/briefing.py`, with tools named after the tweak and `build_facts`
+  (labels S, C, I1–I15, F1…, L).
+- **Routes:** `/changes` and `/facts`, with `area` and `since_minutes`.
+- **On the page:** a "What changed" panel with windows of 30 minutes, 1 hour, 3 hours and
+  6 hours.
+- **The first incident run is a baseline,** at 11:08 Bangkok time on 3 October. Windows before it
+  say so.
+- **Tests:** 5 tests. 963 pass and 2 skip.
+- **Next, slice 7b:** the AI question with a groundedness gate, falling back to the computed
+  answer.
+
+### 3 October: officer checks, slice 5b (ADR-0042)
 
 - **Built:**
   - `core/flood_evidence/reviews.py` and table `flood_review` (migration `20261003_0025`).

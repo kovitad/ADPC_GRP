@@ -140,6 +140,8 @@ MATRIX = {
     # membership reads but never writes; no incident exists here, so members get 404.
     "flood_incident_review": (401, 404, 404, 403, 403),
     "flood_facility_access": (401, 404, 404, 403, 403),
+    "flood_changes": (401, 200, 200, 403, 200),
+    "flood_facts": (401, 200, 200, 403, 200),
     # No road is stored in the fixture, so allowed callers are told it is not found.
     "flood_road_cameras": (401, 404, 404, 403, 404),
     # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
@@ -240,6 +242,8 @@ MATRIX_OPERATION_IDS = {
     "flood_facility_access": (
         "post_facility_access_api_v1_pilot_flood__pilot_id__facilities_access_post"
     ),
+    "flood_changes": "read_changes_api_v1_pilot_flood__pilot_id__changes_get",
+    "flood_facts": "read_facts_api_v1_pilot_flood__pilot_id__facts_get",
     "flood_road_cameras": (
         "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
     ),
@@ -568,6 +572,8 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             "POST", "/api/v1/pilot/flood/bangkok/facilities/access",
             {"asset_id": "osm:node/0", "action": "access_disrupted"},
         ),
+        "flood_changes": ("GET", "/api/v1/pilot/flood/bangkok/changes", None),
+        "flood_facts": ("GET", "/api/v1/pilot/flood/bangkok/facts", None),
         "flood_road_cameras": (
             "GET", "/api/v1/pilot/flood/bangkok/roads/0123456789abcdef/cameras", None
         ),
