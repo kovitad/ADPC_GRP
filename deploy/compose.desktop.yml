@@ -50,6 +50,8 @@ services:
       # ADR-0049: Longdo Weather rain context; the key file is written by the launcher from .env.
       LONGDO_WEATHER_ENABLED: "true"
       LONGDO_API_KEY_FILE: /run/grp-secrets/longdo_api_key
+      # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only.
+      BMATRAFFIC_RELAY_ENABLED: "true"
       # Draft methods run only here, for the SYNTHETIC test case (never on servers).
       ALLOW_DRAFT_METHODS: "true"
       # Local testing clicks through pages quickly; servers keep the Section 13.1 limit of 60.

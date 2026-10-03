@@ -947,6 +947,7 @@
     livePlayer.video.removeAttribute("src");
     livePlayer.video.load();
     window.clearTimeout(livePlayer.timer);
+    if (livePlayer.img) livePlayer.img.removeAttribute("src");
     livePlayer.box.replaceChildren();
     livePlayer = null;
   };
@@ -963,8 +964,60 @@
     return hlsLoading;
   };
 
+  // ADR-0051: pictures relayed by GRP (bmatraffic.com, local demo only), about one a second. The
+  // next picture is asked for only after the last one arrived, and asking stops after 10 minutes.
+  const FRAME_MS = 1000;
+  const FRAMES_FOR_MS = 10 * 60 * 1000;
+
+  const playFrames = (camera, box) => {
+    const img = document.createElement("img");
+    img.className = "fl-live__frame fl-live__frame--img";
+    img.alt = cameraName(camera);
+    const status = el("p", "fl-live__status", say("cam.connecting"));
+    const credit = el("p", "fl-live__credit", say("cam.relay", { source: camera.source_label }));
+    box.replaceChildren(img, status, credit);
+    const player = { video: document.createElement("video"), box, hls: null, timer: null, img };
+    livePlayer = player;
+    const started = Date.now();
+    let failures = 0;
+    const next = () => {
+      if (livePlayer !== player) return;
+      if (Date.now() - started > FRAMES_FOR_MS) {
+        status.textContent = say("cam.paused");
+        const again = el("button", "button button--secondary button--compact", say("cam.continue"));
+        again.type = "button";
+        again.addEventListener("click", () => playFrames(camera, box));
+        status.append(" ", again);
+        return;
+      }
+      img.src = `${camera.live.url}?t=${Date.now()}`;
+    };
+    img.addEventListener("load", () => {
+      if (livePlayer !== player) return;
+      failures = 0;
+      status.textContent = "";
+      status.classList.remove("is-bad");
+      player.timer = window.setTimeout(next, FRAME_MS);
+    });
+    img.addEventListener("error", () => {
+      if (livePlayer !== player) return;
+      failures += 1;
+      if (failures >= 3) {
+        status.textContent = say("cam.failed");
+        status.classList.add("is-bad");
+        return;
+      }
+      player.timer = window.setTimeout(next, FRAME_MS * 2);
+    });
+    next();
+  };
+
   const playLive = async (camera, box) => {
     stopLive();
+    if (camera.live.kind === "frames") {
+      playFrames(camera, box);
+      return;
+    }
     if (camera.live.kind === "iframe") {
       // The provider's own player page (bmatraffic.com), embedded as the owner asked. Sandboxed:
       // it may run its own scripts but never navigate this page or open windows.
@@ -1020,64 +1073,17 @@
     }
   };
 
-  // A provider whose player works only on its own site gets a small window beside the map. The
-  // first time, the window opens the provider's home page so the provider sets its own session the
-  // normal way (bmatraffic.com shows a blank picture without one), then moves to the camera.
-  const VIEWER_START = { BMA_TRAFFIC: "http://www.bmatraffic.com/index.aspx" };
-  const START_WAIT_MS = 2500;
-  let viewerWindow = null;
-  let viewerStarted = new Set();
-
-  const openViewerWindow = (camera) => {
-    const width = 460;
-    const height = 340;
-    const left = Math.max(0, window.screenX + window.outerWidth - width - 24);
-    const top = Math.max(0, window.screenY + 140);
-    const reuse = viewerWindow && !viewerWindow.closed;
-    const win = reuse ? viewerWindow
-      : window.open("", "grp-camera", `popup,width=${width},height=${height},left=${left},top=${top}`);
-    if (!win) return false;
-    if (!reuse) {
-      // Still about:blank and ours: cut the link back to this page before the provider loads.
-      try { win.opener = null; } catch (error) { /* already cut */ }
-      viewerStarted = new Set();
-    }
-    viewerWindow = win;
-    const start = VIEWER_START[camera.provider];
-    if (start && !viewerStarted.has(camera.provider)) {
-      viewerStarted.add(camera.provider);
-      win.location.href = start;
-      window.setTimeout(() => {
-        if (viewerWindow === win && !win.closed) win.location.href = camera.viewer_url;
-      }, START_WAIT_MS);
-    } else {
-      win.location.href = camera.viewer_url;
-    }
-    try { win.focus(); } catch (error) { /* some browsers refuse; the window is still open */ }
-    return true;
-  };
-
   const liveControls = (camera) => {
     const wrap = el("div", "fl-live");
     if (!camera.live) {
-      // No in-page player (bmatraffic.com: its pictures need a bmatraffic session, which a browser
-      // never sends from inside another site). Open the provider's own page in a small window.
+      // No in-page player: bmatraffic.com when the local demo relay (ADR-0051) is off. Its pictures
+      // need a bmatraffic session, which a browser never sends from inside another site.
       if (!camera.placeholder && /^https?:\/\//.test(camera.viewer_url || "")) {
-        const button = el("button", "button button--secondary button--compact", say("cam.window"));
-        button.type = "button";
-        const note = el("p", "fl-muted", say("cam.window.hint", { source: camera.source_label }));
-        const link = el("a", "fl-live__tab", say("cam.tab"));
+        const link = el("a", "button button--secondary button--compact", say("cam.tab"));
         link.href = camera.viewer_url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        button.addEventListener("click", () => {
-          const opened = openViewerWindow(camera);
-          note.textContent = opened
-            ? say("cam.window.hint", { source: camera.source_label })
-            : say("cam.window.blocked");
-          note.classList.toggle("is-bad", !opened);
-        });
-        wrap.append(button, note, link);
+        wrap.append(link, el("p", "fl-muted", say("cam.tab.hint", { source: camera.source_label })));
       }
       return wrap;
     }

@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     # ADR-0049: Longdo Weather rain context for live flood pilots. The key lives in a secret file.
     longdo_weather_enabled: bool = False
     longdo_api_key_file: Path = Path(".local/secrets/longdo_api_key")
+    # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only; off on
+    # servers until BMA gives permission.
+    bmatraffic_relay_enabled: bool = False
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None

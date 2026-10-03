@@ -16,6 +16,19 @@
 > - how should GRP check whether a camera is working?
 > - can BMA share which way each camera faces?
 
+> **Update, 3 October 2026 (evening): bmatraffic.com.** BMA's traffic CCTV site
+> (www.bmatraffic.com) shows a camera only to a visitor with a session on its own site, so its
+> player cannot show inside another site's page. For the **local demo only**, GRP now opens one
+> visitor session and passes on pictures (ADR-0051):
+>
+> - about one picture a second, only while an officer is watching, shared by all viewers;
+> - never stored or analysed, and stopped after 10 minutes unless the officer continues.
+>
+> It is switched off everywhere else. **One more question for BMA:** may GRP pass on
+> bmatraffic.com pictures like this beyond the local demo? If so, is there a preferred way,
+> such as a snapshot address that does not need a session, an HTTPS address, or a limit on how
+> often GRP should ask?
+
 ## Thai version (ฉบับภาษาไทย)
 
 เรียน สำนักการระบายน้ำ กรุงเทพมหานคร
@@ -24,7 +37,8 @@
 
 เราต้องการแสดง **ตำแหน่งกล้อง CCTV ของ กทม. ใกล้ถนนที่มีรายงานน้ำท่วม** และให้เจ้าหน้าที่กด **เปิดหน้าดูกล้องทางการของ กทม.** ได้โดยตรง
 
-- GRP จะ **ไม่ดึงภาพหรือวิดีโอ** ไม่บันทึกภาพ และไม่ประมวลผลภาพใด ๆ
+- GRP จะ **ไม่บันทึกภาพ** และไม่ประมวลผลภาพใด ๆ
+- ในการสาธิตบนเครื่องของทีมเท่านั้น GRP ส่งต่อภาพจาก www.bmatraffic.com ประมาณวินาทีละภาพ เฉพาะขณะที่เจ้าหน้าที่เปิดดู และไม่บันทึก เราขออนุญาตก่อนใช้ในวงกว้าง และขอทราบวิธีที่ กทม. ต้องการ เช่น ที่อยู่ภาพนิ่งที่ไม่ต้องใช้ session หรือที่อยู่แบบ HTTPS
 - หากในอนาคตจะใช้ภาพนิ่งหรือการวิเคราะห์ภาพ เราจะขออนุญาตแยกต่างหาก
 
 ขอความอนุเคราะห์ข้อมูลกล้องในสี่เขตนี้ (หรือทั้งกรุงเทพฯ หากสะดวกกว่า) ตามรายการด้านล่าง และขอทราบเงื่อนไขการใช้และการแสดงที่มาของข้อมูล
@@ -38,7 +52,11 @@ reported, with the time and source of each piece of evidence.
 We would like to show **where BMA CCTV cameras are near reported flooding**, and let an officer
 **open BMA's official camera viewer** from there.
 
-- GRP will **not fetch, store or analyse any image or video**.
+- GRP will **not store or analyse any image or video**.
+- In the team's local demo only, GRP passes on pictures from www.bmatraffic.com, about one a
+  second, only while an officer is watching, and never stores them. We ask permission before any
+  wider use, and how BMA would prefer it done: for example, a snapshot address that needs no
+  session, or an HTTPS address.
 - Any later use of snapshots or image analysis would be a separate, explicit request.
 
 We ask for the following information for cameras in these four districts, or for all of Bangkok

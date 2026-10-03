@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 from pydantic import BaseModel, Field
 
 from api.ai_gateway import run_ai_call
@@ -23,7 +23,7 @@ from api.dependencies import DatabaseSession
 from api.errors import GrpError, access_not_authorized, not_found, validation_failed
 from api.langfuse import send_ai_call
 from api.permissions import SignedInMember
-from api.rate_limits import limiter
+from api.rate_limits import limiter, rate_limited
 from api.sessions import CurrentPrincipal
 from api.settings import get_settings
 from core.access_models import AuditEvent, AuditResult
@@ -35,6 +35,13 @@ from core.flood_evidence.answer import (
     instructions_for,
 )
 from core.flood_evidence.briefing import build_facts, get_situation_changes
+from core.flood_evidence.camera_relay import PROVIDER as RELAY_PROVIDER
+from core.flood_evidence.camera_relay import (
+    RelayBusy,
+    RelayUnavailable,
+    shared_relay,
+    with_relay,
+)
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
@@ -73,6 +80,15 @@ from core.river_watch import bangkok_outlines
 router = APIRouter(prefix="/pilot/flood", tags=["pilot"])
 ROAD_ID = re.compile(r"^[0-9a-f]{16}$")
 DEFAULT_CAMERA_RADIUS_M = 400
+FRAMES_PER_PERSON_PER_MINUTE = 150
+
+
+def relay_for(config: PilotConfig):
+    """The local demo relay's live view for bmatraffic cameras, when it is switched on."""
+
+    if not get_settings().bmatraffic_relay_enabled:
+        return None
+    return lambda camera: with_relay(camera, config.pilot_id)
 
 
 def may_open(principal: CurrentPrincipal, config: PilotConfig) -> bool:
@@ -254,8 +270,9 @@ def read_areas(config: FloodPilot) -> dict[str, Any]:
 )
 def read_cameras(config: FloodPilot) -> dict[str, Any]:
     cameras = camera_registry(config.base_id)
+    decorate = relay_for(config) or (lambda camera: camera)
     return {
-        "cameras": [camera.public() for camera in cameras],
+        "cameras": [decorate(camera.public()) for camera in cameras],
         "placeholders_only": bool(cameras) and all(c.placeholder for c in cameras),
         "default_radius_m": DEFAULT_CAMERA_RADIUS_M,
     }
@@ -283,9 +300,48 @@ def read_road_cameras(
         "road_id": road_id,
         "radius_m": radius_m,
         "cameras": nearby_cameras(
-            camera_registry(config.base_id), road["geometry"], moment, radius_m
+            camera_registry(config.base_id), road["geometry"], moment, radius_m,
+            decorate=relay_for(config),
         ),
     }
+
+
+@router.get(
+    "/{pilot_id}/cameras/{camera_id}/frame.jpg",
+    summary="The latest picture from one bmatraffic.com camera, through the local demo relay",
+    openapi_extra={"x-grp-access": "protected"},
+    response_class=Response,
+)
+def read_camera_frame(
+    config: FloodPilot, principal: SignedInMember, camera_id: str
+) -> Response:
+    """ADR-0051: on demand, shared and cached for a second, never stored. Off unless enabled."""
+
+    if not get_settings().bmatraffic_relay_enabled:
+        raise not_found()
+    camera = next((c for c in camera_registry(config.base_id)
+                   if c.camera_id == camera_id and c.provider == RELAY_PROVIDER
+                   and not c.placeholder), None)
+    if camera is None:
+        raise not_found()
+    limiter.check("camera_frames_per_person_per_minute", str(principal.user_id),
+                  FRAMES_PER_PERSON_PER_MINUTE, 60)
+    try:
+        frame = shared_relay().frame(camera.provider_camera_id)
+    except RelayBusy:
+        raise rate_limited(retry_after=1) from None
+    except (RelayUnavailable, ValueError):
+        raise GrpError(502, "CAMERA_UNAVAILABLE",
+                       "The camera site is not answering right now.") from None
+    return Response(
+        content=frame.body,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Retrieved-At": frame.retrieved_at.isoformat(timespec="seconds"),
+        },
+    )
 
 
 @router.get(
@@ -338,7 +394,8 @@ def read_incident(
         ],
     }
     cameras = (
-        nearby_cameras(camera_registry(config.base_id), footprint, now, DEFAULT_CAMERA_RADIUS_M)
+        nearby_cameras(camera_registry(config.base_id), footprint, now, DEFAULT_CAMERA_RADIUS_M,
+                       decorate=relay_for(config))
         if footprint["coordinates"] else []
     )
     weather = latest_weather(session, config)

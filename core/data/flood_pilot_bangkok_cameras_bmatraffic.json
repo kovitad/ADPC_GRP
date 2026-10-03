@@ -6,7 +6,7 @@
  "records_received": 522,
  "records_kept": 520,
  "terms": "Public site, no terms stated, no robots.txt. Embedding approved by the Product Owner for the Gate A local demo on 3 October 2026; confirm with BMA before wider use. Plain http only.",
- "use": "Location, names and a link that opens the site's own player page in a new tab. The player shows a picture only to a browser with a bmatraffic.com session, which a browser never sends from inside another site, so it cannot play inside GRP (checked 3 October 2026). GRP never fetches, records or analyses the video; internal IP addresses are dropped."
+ "use": "Location, names and a link that opens the site's own player page in a new tab. The player shows a picture only to a browser with a bmatraffic.com session, which a browser never sends from inside another site, so it cannot play inside GRP directly (checked 3 October 2026). In the local demo only, GRP's relay passes on about one picture a second while an officer watches (ADR-0051), never stored or analysed; elsewhere the link opens bmatraffic.com in a new tab. Internal IP addresses are dropped."
 },
 "defaults": {
  "provider": "BMA_TRAFFIC",

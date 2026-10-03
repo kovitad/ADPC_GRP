@@ -115,7 +115,23 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): camera fixes and source switches on the map
+### 3 October (latest): bmatraffic pictures inside the page (ADR-0051)
+
+- **Window failed:** the small window stayed on bmatraffic's home page. Cutting its `opener`
+  also stopped GRP from sending it on to the camera. It has been removed.
+- **Owner's choice:** a relay for the local demo only.
+  - `core/flood_evidence/camera_relay.py` and `GET .../cameras/{camera_id}/frame.jpg`.
+  - On demand, shared, at most one picture a second per camera and 8 a second overall, kept in
+    memory only.
+  - `BMATRAFFIC_RELAY_ENABLED` is set only in `compose.desktop.yml`; when it is off, cameras keep
+    the new-tab link.
+  - The page refreshes an image inside the card and pauses after 10 minutes.
+- **Live check:** camera 1362 gave a real 21.6 KB picture through the running app.
+  Not yet checked in a browser (the Chrome extension was not connected).
+- **BMA request:** now says what the demo does and asks permission before wider use (Gate B).
+- **Tests:** 1,087 passed, 2 skipped; Ruff clean.
+
+### 3 October: camera fixes and source switches on the map
 
 - **bmatraffic was blank in GRP:** its pictures need a bmatraffic session cookie (`SameSite=Lax`),
   which a browser never sends from inside our page. The cameras now open in a new tab. They are

@@ -158,6 +158,8 @@ MATRIX = {
     "flood_weather": (401, 200, 200, 403, 200),
     # No road is stored in the fixture, so allowed callers are told it is not found.
     "flood_road_cameras": (401, 404, 404, 403, 404),
+    # ADR-0051: the relay is off unless switched on, so members get 404 here.
+    "flood_camera_frame": (401, 404, 404, 403, 404),
     # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
     "flood_unknown_pilot": (401, 404, 404, 404, 404),
 }
@@ -280,6 +282,9 @@ MATRIX_OPERATION_IDS = {
     "flood_weather": "read_weather_api_v1_pilot_flood__pilot_id__weather_get",
     "flood_road_cameras": (
         "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
+    ),
+    "flood_camera_frame": (
+        "read_camera_frame_api_v1_pilot_flood__pilot_id__cameras__camera_id__frame_jpg_get"
     ),
     "flood_unknown_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
 }
@@ -640,6 +645,9 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "flood_road_cameras": (
             "GET", "/api/v1/pilot/flood/bangkok/roads/0123456789abcdef/cameras", None
         ),
+        "flood_camera_frame": (
+            "GET", "/api/v1/pilot/flood/bangkok/cameras/bmatraffic%3A1362/frame.jpg", None
+        ),
         "flood_unknown_pilot": ("GET", "/api/v1/pilot/flood/no-such", None),
     }
     method, path, body = requests[route]
@@ -738,3 +746,38 @@ def test_person_is_rate_limited_after_sixty_requests_a_minute(world) -> None:
 
     assert statuses[:60] == [200] * 60
     assert statuses[60] == 429
+
+
+def test_the_camera_relay_serves_only_bmatraffic_pictures_when_switched_on(
+    world, monkeypatch
+) -> None:
+    import api.flood_pilot as flood_module
+    from core.flood_evidence.camera_relay import BmatrafficRelay
+
+    picture = b"\xff\xd8" + b"x" * 20_000
+    enabled = world["settings"].model_copy(update={"bmatraffic_relay_enabled": True})
+    monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
+    asked: list[str] = []
+
+    def site(path: str) -> tuple[int, str, bytes]:
+        asked.append(path)
+        return (200, "image/jpeg", picture) if path.startswith("/show.aspx") else (
+            200, "text/html", b"<html>")
+
+    monkeypatch.setattr(flood_module, "shared_relay", lambda: BmatrafficRelay(fetch=site))
+    limiter.reset()
+    client, headers = _client(world, "planner")
+    base = "/api/v1/pilot/flood/bangkok/cameras"
+    response = client.get(f"{base}/bmatraffic%3A1362/frame.jpg", headers=headers)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.content == picture
+    # Only registry cameras from bmatraffic: another provider or an unknown ID never reaches it.
+    asked.clear()
+    for camera_id in ("bma%3AAC-DD-2-B-C1", "bmatraffic%3A99999999", "bmatraffic%3Aabc"):
+        assert client.get(f"{base}/{camera_id}/frame.jpg", headers=headers).status_code == 404
+    assert asked == []
+    cameras = client.get(base, headers=headers).json()["cameras"]
+    kinds = {(c["provider"], (c["live"] or {}).get("kind")) for c in cameras}
+    assert ("BMA_TRAFFIC", "frames") in kinds and ("BMA_TRAFFIC", None) not in kinds

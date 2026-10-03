@@ -14,7 +14,8 @@ names, viewing direction and location; the internal IP address in the list is ne
 The player page cannot play inside GRP: its pictures come from ``show.aspx``, which sends a real
 frame only to a browser holding a bmatraffic.com session cookie (``SameSite=Lax``), and a browser
 never sends that cookie from inside another site's frame. GRP therefore links to the player in a
-new tab and never works around the session check. The site answers only over plain http.
+new tab; in the local demo only, ``core.flood_evidence.camera_relay`` passes the pictures on
+(ADR-0051). The site answers only over plain http.
 """
 
 from __future__ import annotations
@@ -94,8 +95,10 @@ def build(raw: bytes, retrieved_at: str) -> dict[str, Any]:
             "use": "Location, names and a link that opens the site's own player page in a new "
                    "tab. The player shows a picture only to a browser with a bmatraffic.com "
                    "session, which a browser never sends from inside another site, so it cannot "
-                   "play inside GRP (checked 3 October 2026). GRP never fetches, records or "
-                   "analyses the video; internal IP addresses are dropped.",
+                   "play inside GRP directly (checked 3 October 2026). In the local demo only, "
+                   "GRP's relay passes on about one picture a second while an officer watches "
+                   "(ADR-0051), never stored or analysed; elsewhere the link opens "
+                   "bmatraffic.com in a new tab. Internal IP addresses are dropped.",
         },
         "defaults": {
             "provider": "BMA_TRAFFIC",

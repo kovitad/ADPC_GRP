@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -32,9 +33,9 @@ FRAME_MODES = frozenset({"snapshot", "hls", "mjpeg", "webrtc"})
 VIEWER_MODES = frozenset({"external_viewer", "embed"})
 LIVE_KINDS = frozenset({"hls", "mp4", "iframe"})
 # Nearby cameras that play inside GRP come first, quicker players before slower ones. bmatraffic
-# cameras have no in-page player (its pictures need a session a framed page never has), so they
-# come after these and open on bmatraffic.com in a new tab.
-LIVE_PREFERENCE = {"hls": 0, "mp4": 1, "iframe": 2}
+# cameras play inside GRP only through the local demo relay ("frames", ADR-0051); without it they
+# have no in-page player and open on bmatraffic.com in a new tab.
+LIVE_PREFERENCE = {"hls": 0, "frames": 1, "mp4": 2, "iframe": 3}
 STATUSES = frozenset({"online", "offline", "unknown"})
 PLACEHOLDER = "PLACEHOLDER"
 HEALTH_FRESH = timedelta(minutes=30)
@@ -294,8 +295,11 @@ def nearby_cameras(
     geometry: dict[str, Any],
     as_of: datetime,
     radius_m: float,
+    decorate: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Cameras within ``radius_m`` of any point of the geometry, nearest and healthiest first."""
+    """Cameras within ``radius_m`` of any point of the geometry, nearest and healthiest first.
+
+    ``decorate`` may add a live view (the local demo relay) before the cameras are ranked."""
 
     points = _points(geometry)
     found = []
@@ -306,7 +310,7 @@ def nearby_cameras(
         role, reasons = corroboration_role(camera, geometry, as_of)
         found.append(
             {
-                **camera.public(),
+                **(decorate or (lambda c: c))(camera.public()),
                 "distance_m": round(distance),
                 "role": role,
                 "reasons": reasons,
