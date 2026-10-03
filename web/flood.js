@@ -361,6 +361,101 @@
     }
   };
 
+  // --- Ask (slice 7b): computed facts first; AI wording only if it passed the server's gate --
+  const ASK_SUGGESTIONS = ["ask.q1", "ask.q2", "ask.q3", "ask.q4"];
+  let lastAnswer = null;
+
+  // Model text is never parsed as HTML: text goes in as text, and only [label] tokens become
+  // buttons that open the cited incident, facility or section.
+  const citedText = (text, labels) => {
+    const box = el("div", "fl-answer__text");
+    text.split("\n").forEach((line) => {
+      const p = el("p", "");
+      let last = 0;
+      line.replace(/\[([A-Z]\d{0,2})\]/g, (match, label, offset) => {
+        p.append(document.createTextNode(line.slice(last, offset)));
+        const ref = labels[label];
+        const chip = el("button", "fl-cite", label);
+        chip.type = "button";
+        if (ref && ref.kind === "incident") {
+          chip.addEventListener("click", () => showIncident(ref.ref));
+        } else if (ref && ref.kind === "facility") {
+          chip.addEventListener("click", () => {
+            const asset = state.assets && state.assets.assets.find((a) => a.asset_id === ref.ref);
+            if (asset) showFacility(asset);
+          });
+        } else if (ref) {
+          chip.title = say(`ask.cite.${label}`);
+          const target = { S: "[data-cards]", C: ".fl-changes", L: ".fl-coverage" }[label];
+          chip.addEventListener("click", () => { const node = $(target); if (node) node.scrollIntoView({ behavior: "smooth" }); });
+        }
+        p.append(chip);
+        last = offset + match.length;
+        return match;
+      });
+      p.append(document.createTextNode(line.slice(last)));
+      box.append(p);
+    });
+    return box;
+  };
+
+  const drawAnswer = () => {
+    const box = $("[data-ask-result]");
+    box.replaceChildren();
+    const answer = lastAnswer;
+    if (!answer) return;
+    if (answer.ai) {
+      const card = el("section", "fl-answer fl-answer--ai");
+      card.append(el("h3", "", say("ask.ai")), citedText(answer.ai.text, answer.labels));
+      card.append(el("p", "fl-muted", `${say("ask.ai.note")} (${answer.ai.model})`));
+      box.append(card);
+    } else if (answer.withheld) {
+      const reason = answer.withheld.reason;
+      const known = say(`ask.withheld.${reason}`) !== `ask.withheld.${reason}`;
+      const problems = (answer.withheld.problems || []).map((p) => say(`ask.problem.${p}`)).join(", ");
+      box.append(el("p", "fl-tracked", known ? say(`ask.withheld.${reason}`, { problems }) : say("ask.withheld.other")));
+    }
+    const computed = el("section", "fl-answer");
+    computed.append(el("h3", "", say("ask.computed")), citedText(answer.computed, answer.labels));
+    box.append(computed);
+    const details = el("details", "rw-more");
+    details.append(el("summary", "", say("ask.facts", { n: answer.facts.length })));
+    details.append(el("pre", "rw-json", answer.facts.map((f) => JSON.stringify(f)).join("\n")));
+    box.append(details);
+  };
+
+  const drawSuggestions = () => {
+    const box = $("[data-ask-suggestions]");
+    box.replaceChildren();
+    ASK_SUGGESTIONS.forEach((key) => {
+      const chip = el("button", "fl-chip fl-ask__chip", say(key));
+      chip.type = "button";
+      chip.addEventListener("click", () => { $("[data-ask-q]").value = say(key); });
+      box.append(chip);
+    });
+    if (!$("[data-ask-q]").value) $("[data-ask-q]").value = say("ask.q1");
+  };
+
+  const askQuestion = async () => {
+    const question = $("[data-ask-q]").value.trim();
+    if (!question) return;
+    const button = $("[data-ask]");
+    const status = $("[data-ask-status]");
+    button.disabled = true;
+    status.textContent = say("ask.working");
+    try {
+      lastAnswer = await post(`${API}/ask`, {
+        question, area: state.area, since_minutes: state.window, lang: PilotText.lang(),
+      });
+      status.textContent = "";
+      drawAnswer();
+    } catch (error) {
+      status.textContent = say("ask.failed", { msg: error.message || "" });
+    } finally {
+      button.disabled = false;
+    }
+  };
+
   // --- Incidents (slice 5a) ---------------------------------------------------------------
   const confidenceBadge = (confidence) => el("span", `fl-conf fl-conf--${confidence}`, say(`inc.conf.${confidence}`));
 
@@ -965,8 +1060,16 @@
   $("[data-vehicle]").addEventListener("change", (event) => { state.vehicle = event.target.value; drawAll(); });
   $("[data-all]").addEventListener("change", (event) => { state.all = event.target.checked; load(); });
   $("[data-refresh]").addEventListener("click", load);
+  $("[data-ask]").addEventListener("click", askQuestion);
   $("[data-inc-more]").addEventListener("click", () => { state.allIncidents = !state.allIncidents; drawIncidents(); });
-  PilotText.onChange(() => { fillAreas(); drawAll(); });
+  PilotText.onChange(() => {
+    $("[data-ask-q]").value = "";
+    drawSuggestions();
+    drawAnswer();
+    fillAreas();
+    drawAll();
+  });
+  drawSuggestions();
 
   GRP.bindSignOut();
   GRP.me()

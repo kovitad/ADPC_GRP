@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-5, ADR-0038 to 0042, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-5 and 7, ADR-0038 to 0043, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,22 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-3 October 2026)
 
-### 3 October (latest): what changed and the fact bundle, slice 7a (ADR-0043)
+### 3 October (latest): grounded questions, slice 7b (ADR-0043)
+
+- **Built:**
+  - `core/flood_evidence/answer.py`: the prompt, the gate and the bilingual computed answer.
+  - `POST /pilot/flood/{id}/ask`. It always returns the computed answer, with AI wording only
+    when it passes the gate.
+  - On the page: the "Ask about the situation" section.
+- **Fixed before shipping:** the gateway's `channel` must be `web` or `mcp`.
+- **Tests:** 17 tests with a fake provider. 985 pass and 2 skip.
+- **Not verified:** a live AI answer. No provider call was made, to spare the owner's allowance.
+- **Next:**
+  - Slice 6, replay of the captured flood.
+  - Real BMA and CCTV data once access is granted.
+  - Retention for raw fetches before Gate B.
+
+### 3 October: what changed and the fact bundle, slice 7a (ADR-0043)
 
 - **Built:** `core/flood_evidence/briefing.py`, with tools named after the tweak and `build_facts`
   (labels S, C, I1–I15, F1…, L).

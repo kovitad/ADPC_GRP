@@ -9,12 +9,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260928a" />
     <link rel="stylesheet" href="/pilot.css?v=20261003a" />
-    <link rel="stylesheet" href="/flood.css?v=20261003f" />
+    <link rel="stylesheet" href="/flood.css?v=20261003g" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20261003a" defer></script>
     <script src="/pilot-i18n.js?v=20261003a" defer></script>
-    <script src="/flood-i18n.js?v=20261003h" defer></script>
-    <script src="/flood.js?v=20261003h" defer></script>
+    <script src="/flood-i18n.js?v=20261003i" defer></script>
+    <script src="/flood.js?v=20261003i" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -94,6 +94,19 @@
         </div>
         <div data-changes aria-live="polite"></div>
         <p class="fl-muted" data-t="ch.computed">Computed from stored evidence; no AI.</p>
+      </section>
+
+      <section class="fl-ask" aria-labelledby="fl-ask-h">
+        <h2 id="fl-ask-h" data-t="ask.title">Ask about the situation</h2>
+        <p class="fl-inc-intro" data-t="ask.intro"></p>
+        <div class="fl-ask__chips" data-ask-suggestions></div>
+        <label class="fl-ask__label" for="fl-ask-q" data-t="ask.label">Your question</label>
+        <div class="fl-ask__row">
+          <textarea id="fl-ask-q" class="fl-ask__q" maxlength="300" rows="2" data-ask-q></textarea>
+          <button type="button" class="button button--primary" data-ask data-t="ask.button">Ask</button>
+        </div>
+        <p class="fl-review__status" data-ask-status aria-live="polite"></p>
+        <div data-ask-result aria-live="polite"></div>
       </section>
 
       <div class="fl-main">

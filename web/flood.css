@@ -115,3 +115,16 @@
 .fl-changes__list { display: grid; gap: 0.35rem; margin: 0.6rem 0 0.3rem; padding-left: 1.1rem; font-size: 0.86rem; }
 .fl-changes__what { font-weight: 600; margin-right: 0.4rem; }
 .fl-tracked { margin: 0.5rem 0 0; padding: 0.4rem 0.6rem; border-radius: 6px; background: #fff7e3; color: #6b4500; font-size: 0.82rem; }
+.fl-ask { margin-top: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--white); }
+.fl-ask h2 { margin: 0; font-size: 1.1rem; }
+.fl-ask__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
+.fl-ask__chip { border: 1px solid var(--line); cursor: pointer; text-align: left; }
+.fl-ask__label { display: block; margin-top: 0.7rem; font-size: 0.82rem; color: var(--ink-700); }
+.fl-ask__row { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 0.25rem; }
+.fl-ask__q { flex: 1; min-width: 0; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 0.9rem; }
+.fl-answer { margin-top: 0.7rem; padding: 0.8rem 0.9rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: #fbfcfc; }
+.fl-answer--ai { border-color: #b9d3e6; background: #f4f9fc; }
+.fl-answer h3 { margin: 0 0 0.4rem; font-size: 0.9rem; }
+.fl-answer__text p { margin: 0 0 0.35rem; font-size: 0.88rem; line-height: 1.55; overflow-wrap: anywhere; }
+.fl-cite { margin: 0 0.15rem; padding: 0 0.35rem; border: 1px solid #9cc0da; border-radius: 4px; background: #fff; color: var(--servir-blue-dark); font: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+@media (max-width: 600px) { .fl-ask__row { flex-direction: column; } .fl-ask__row .button { width: 100%; } }

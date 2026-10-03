@@ -15,14 +15,25 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field
 
+from api.ai_gateway import run_ai_call
 from api.dependencies import DatabaseSession
-from api.errors import access_not_authorized, not_found, validation_failed
+from api.errors import GrpError, access_not_authorized, not_found, validation_failed
+from api.langfuse import send_ai_call
 from api.permissions import SignedInMember
+from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
+from api.settings import get_settings
 from core.access_models import AuditEvent, AuditResult
+from core.flood_evidence.answer import (
+    PROMPT_VERSION,
+    build_prompt,
+    computed_answer,
+    gate,
+    instructions_for,
+)
 from core.flood_evidence.briefing import build_facts, get_situation_changes
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
@@ -406,3 +417,74 @@ def read_facts(
                            road_names(session, config, now))
     except LookupError as error:
         raise validation_failed("Unknown area") from error
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=300)
+    area: str = Field(default="corridor", max_length=16, pattern=r"^(all|corridor|\d{4})$")
+    since_minutes: int = Field(default=60, ge=10, le=1440)
+    lang: Literal["th", "en"] = "th"
+
+
+# Tests replace this with a fake provider; it is never a different real provider.
+PROVIDER_CALL = None
+
+
+@router.post(
+    "/{pilot_id}/ask",
+    summary="Answer a question from computed facts; AI wording only when it passes the gate",
+    openapi_extra={"x-grp-access": "protected"},
+)
+async def ask(
+    config: FloodPilot,
+    principal: SignedInMember,
+    session: DatabaseSession,
+    body: AskRequest,
+    background: BackgroundTasks,
+) -> dict[str, Any]:
+    """The computed answer always comes back. AI wording is added only for a pilot-Hub member,
+    within the AI allowance, and only when every claim is cited and every number is a fact."""
+
+    now = datetime.now(UTC)
+    try:
+        since = now - timedelta(minutes=body.since_minutes)
+        bundle = build_facts(session, config, body.area, since, now,
+                             road_names(session, config, now))
+    except LookupError as error:
+        raise validation_failed("Unknown area") from error
+    facts = bundle["facts"]
+    result: dict[str, Any] = {
+        "question": body.question,
+        "lang": body.lang,
+        "facts": facts,
+        "labels": bundle["labels"],
+        "computed": computed_answer(facts, body.lang),
+        "ai": None,
+        "withheld": None,
+    }
+    try:
+        hub_id = pilot_hub(principal, config)
+    except GrpError:
+        result["withheld"] = {"reason": "not_a_pilot_member", "problems": []}
+        return result
+    hub_code = next(m.hub_code for m in principal.memberships if m.hub_id == hub_id)
+    settings = get_settings()
+    try:
+        limiter.check("ai_requests_per_person_per_hour", str(principal.user_id),
+                      settings.rate_limits["ai_requests_per_person_per_hour"], 3600)
+        answer = await run_ai_call(
+            session, settings, user_id=principal.user_id, hub_id=hub_id, hub_code=hub_code,
+            instructions=instructions_for(body.lang), prompt=build_prompt(body.question, facts),
+            prompt_version=PROMPT_VERSION, channel="web", provider_call=PROVIDER_CALL,
+            export=lambda record: background.add_task(send_ai_call, settings, record),
+        )
+    except GrpError as error:
+        result["withheld"] = {"reason": error.code, "problems": []}
+        return result
+    problems = gate(answer.text, facts, body.question)
+    if problems:
+        result["withheld"] = {"reason": "not_grounded", "problems": problems}
+        return result
+    result["ai"] = {"text": answer.text, "model": answer.model,
+                    "label": "AI wording of the computed facts. Check the cited evidence."}
+    return result
