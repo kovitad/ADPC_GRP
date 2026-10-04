@@ -315,11 +315,13 @@ def test_unknown_pilot_has_no_config() -> None:
     assert CONFIG.hubs == ("adpc",)
 
 
-def test_demo_corridor_names_known_bangkok_districts() -> None:
+def test_demo_area_is_every_bangkok_district_and_rain_stays_on_four() -> None:
     from core.river_watch import bangkok_outlines
 
     names = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
-    assert [names[code] for code in CONFIG.demo_corridor["areas"]] == [
+    assert sorted(CONFIG.demo_corridor["areas"]) == sorted(names)
+    assert len(names) == 50
+    assert [names[code] for code in CONFIG.rain_areas] == [
         "Bang Sue", "Chatuchak", "Bang Kapi", "Lat Krabang"
     ]
 

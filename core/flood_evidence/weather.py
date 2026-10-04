@@ -127,7 +127,7 @@ def observation_time(client: LongdoWeather) -> datetime:
 
 
 def _scopes(session: Session, config: PilotConfig, now: datetime) -> list[dict[str, Any]]:
-    codes = set(config.demo_corridor.get("areas") or [])
+    codes = set(config.rain_areas)
     scopes = []
     for area in bangkok_outlines():
         if area["admin_code"] not in codes:

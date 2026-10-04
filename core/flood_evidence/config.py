@@ -31,6 +31,8 @@ class PilotConfig:
     hubs: tuple[str, ...]
     # The owner's chosen demo corridor: area codes from the pilot's area list, and its title.
     demo_corridor: dict[str, Any]
+    # District codes that get their own rain record (ADR-0049). Defaults to the demo area.
+    rain_areas: tuple[str, ...]
     map: dict[str, Any]
     freshness_minutes: dict[str, int]
     report_window_hours: dict[str, int]
@@ -77,6 +79,8 @@ def _parse(raw: dict[str, Any]) -> PilotConfig:
         title=dict(raw["title"]),
         hubs=hubs,
         demo_corridor=dict(raw.get("demo_corridor") or {}),
+        rain_areas=tuple((raw.get("rain_areas") or raw.get("demo_corridor") or {}).get("areas")
+                         or ()),
         map=dict(raw["map"]),
         freshness_minutes=bands,
         report_window_hours={k: int(v) for k, v in raw["report_window_hours"].items()},

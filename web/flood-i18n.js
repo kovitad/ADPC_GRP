@@ -367,7 +367,7 @@ PilotText.extend({
     "fac.nearest": "Nearest road with flooding",
     "fac.osm": "From OpenStreetMap (crowd-mapped), not an official BMA list.",
     "fac.rule": "Distances are demo settings, not validated rules ({v}).",
-    "ev.affected.none": "No school, hospital or clinic within {m} m of this road (OpenStreetMap, demo corridor only).",
+    "ev.affected.none": "No school, hospital or clinic within {m} m of this road (OpenStreetMap, demo area only).",
     "ev.affected.list": "{n} within {m} m (OpenStreetMap):",
     "leg.fac.exposed": "Facility, flooding nearby",
     "leg.fac.review": "Facility, access to check",
