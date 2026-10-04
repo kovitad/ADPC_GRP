@@ -19,6 +19,8 @@ SYNTHETIC_DEMO = "synthetic_demo"
 EVIDENCE_CLASSES = (OBSERVED, PROVIDER_DERIVED, FORECAST, STATIC_SCENARIO, SYNTHETIC_DEMO)
 VEHICLES = ("motorbike", "sedan", "pickup", "truck")
 VERDICTS = ("ok", "caution", "risky", "blocked")
+# A value replaced by its SHA-256 in a cleaned capture (no text or IDs that can identify people).
+HASHED = "sha256:"
 
 
 class SourceFormatError(ValueError):
@@ -50,10 +52,19 @@ def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def record_key(external_id: str) -> str:
-    """A fixed-length key for an external ID, which can be a long URL."""
+def hashed_value(value: str) -> str | None:
+    """The SHA-256 inside a ``sha256:<hex>`` value that a cleaned capture wrote, or None."""
 
-    return sha256_text(external_id)
+    if value.startswith(HASHED) and len(value) == len(HASHED) + 64:
+        return value[len(HASHED):]
+    return None
+
+
+def record_key(external_id: str) -> str:
+    """A fixed-length key for an external ID, which can be a long URL. A cleaned capture stores
+    the ID as ``sha256:<key>`` already, so it keys the same as the original ID."""
+
+    return hashed_value(external_id) or sha256_text(external_id)
 
 
 def state_hash(draft: ObservationDraft) -> str:

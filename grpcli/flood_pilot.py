@@ -83,15 +83,30 @@ def pull_now(pilot_id: str = "bangkok") -> None:
                   f"{fetch.new_states} new states")
 
 
+def archive_now(pilot_id: str = "bangkok") -> None:
+    """Write every finished day not yet in the research archive (ADR-0055)."""
+
+    from core.flood_evidence.archive import export_pending
+
+    config = pilot_config(pilot_id)
+    storage = LocalStorage(get_settings().storage_root)
+    with Session(get_engine()) as session:
+        written = export_pending(session, storage, config)
+    print(f"research archive: wrote {', '.join(written) or 'nothing new'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Flood pilot commands (ADR-0038)")
     commands = parser.add_subparsers(dest="command", required=True)
     capture = commands.add_parser("ingest-capture", help="load saved Floodboard captures")
     capture.add_argument("root", type=Path)
     commands.add_parser("pull", help="pull every source once now")
+    commands.add_parser("archive", help="write finished days to the research archive")
     args = parser.parse_args()
     if args.command == "ingest-capture":
         ingest_capture(args.root)
+    elif args.command == "archive":
+        archive_now()
     else:
         pull_now()
 

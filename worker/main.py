@@ -19,6 +19,7 @@ from core.boundary_import import (
 from core.data_import_jobs import ImportClaim, claim_next_import, fail_import, version_id_for_import
 from core.data_library_models import DataImportJob
 from core.db import get_engine, read_secret, session_scope
+from core.flood_evidence.archive import export_pending as archive_flood_days
 from core.flood_evidence.config import PILOT_IDS, pilot_config
 from core.flood_evidence.ingest import pull_due
 from core.flood_evidence.replay import run_one_step as replay_step
@@ -73,8 +74,10 @@ def run() -> None:
     while not stop_event.is_set():
         if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
             release_reservations_once()
-            # ADR-0045: flood-pilot retention, at most once an hour.
+            # ADR-0045: flood-pilot retention, at most once an hour. The research archive
+            # (ADR-0055) goes first, so a finished day is kept before anything is removed.
             if time.monotonic() - last_retention >= RETENTION_SECONDS:
+                run_flood_archive(storage)
                 run_flood_retention(storage)
                 last_retention = time.monotonic()
             last_housekeeping = time.monotonic()
@@ -124,6 +127,20 @@ def run_flood_pulls(storage: LocalStorage) -> None:
                 pull_due(session, storage, config)
         except Exception:
             logger.exception("Flood pilot %s pull failed; will retry", pilot_id)
+
+
+def run_flood_archive(storage: LocalStorage) -> None:
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                written = archive_flood_days(session, storage, config)
+            if written:
+                logger.info("Flood research archive %s: wrote %s", pilot_id, ", ".join(written))
+        except Exception:
+            logger.exception("Flood research archive %s failed; will retry", pilot_id)
 
 
 def run_flood_retention(storage: LocalStorage) -> None:

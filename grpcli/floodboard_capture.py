@@ -9,9 +9,12 @@ Each pull writes ``<out>/<UTC timestamp>/`` with ``roads.geojson``, ``reports.cs
 reports export only covers about the last 24 hours, so history is lost unless it is captured.
 
 The default folder ``.local/capture/floodboard`` is ignored by Git. Report text can quote news
-and Traffy complaints with other terms and personal details, so nothing captured is committed;
-redacted fixtures are made from it separately. One request per export per interval stays well
-inside the provider's cache headers (30 seconds for roads, 4 hours for reports).
+and Traffy complaints with other terms and personal details, so ``reports.csv`` is cleaned before
+it is written: ``id`` and ``text`` become their SHA-256 and ``url`` is emptied (research archive
+design, 4 October 2026). ``--clean-existing`` cleans folders captured before that.
+
+One request per export per interval stays well inside the provider's cache headers (30 seconds
+for roads, 4 hours for reports).
 """
 
 from __future__ import annotations
@@ -26,6 +29,8 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from core.flood_evidence.floodboard import clean_reports_csv
 
 EXPORTS = {
     "roads.geojson": "https://www.floodboard.org/api/export/roads.geojson",
@@ -61,16 +66,22 @@ def capture_once(out_root: Path, now: datetime | None = None) -> Path:
             files[name] = {"url": url, "error": str(error)}
             logger.warning("Floodboard %s failed: %s", name, error)
             continue
+        entry: dict[str, Any] = {"url": url, "status": status, "bytes": len(body),
+                                 "headers": headers, "fetched_at": datetime.now(UTC).isoformat()}
+        if body and name == "reports.csv":
+            entry["upstream_sha256"] = hashlib.sha256(body).hexdigest()
+            try:
+                body = clean_reports_csv(body)
+                entry["cleaned"] = ["id", "text", "url"]
+            except Exception as error:
+                # Never keep the uncleaned file: report text can identify people.
+                logger.warning("Floodboard reports.csv not cleaned, not kept: %s", error)
+                entry["error"] = f"not cleaned: {error}"
+                body = b""
         if body:
             (folder / name).write_bytes(body)
-        files[name] = {
-            "url": url,
-            "status": status,
-            "bytes": len(body),
-            "sha256": hashlib.sha256(body).hexdigest() if body else None,
-            "headers": headers,
-            "fetched_at": datetime.now(UTC).isoformat(),
-        }
+        entry["sha256"] = hashlib.sha256(body).hexdigest() if body else None
+        files[name] = entry
     manifest = {
         "source": "floodboard",
         "license": "CC BY 4.0",
@@ -82,13 +93,39 @@ def capture_once(out_root: Path, now: datetime | None = None) -> Path:
     return folder
 
 
+def clean_existing(out_root: Path) -> int:
+    """Clean ``reports.csv`` in folders captured before cleaning started. Returns the count."""
+
+    cleaned = 0
+    for path in sorted(out_root.glob("*/reports.csv")):
+        manifest_path = path.parent / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        entry = manifest["files"].get("reports.csv", {})
+        if entry.get("cleaned"):
+            continue
+        body = path.read_bytes()
+        clean = clean_reports_csv(body)
+        path.write_bytes(clean)
+        entry.update(upstream_sha256=entry.get("sha256") or hashlib.sha256(body).hexdigest(),
+                     sha256=hashlib.sha256(clean).hexdigest(), cleaned=["id", "text", "url"],
+                     cleaned_at=datetime.now(UTC).isoformat())
+        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        cleaned += 1
+    return cleaned
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=Path(".local/capture/floodboard"))
     parser.add_argument("--every-minutes", type=float, default=20.0)
     parser.add_argument("--once", action="store_true", help="capture one pull and stop")
+    parser.add_argument("--clean-existing", action="store_true",
+                        help="clean reports.csv in earlier folders, then stop")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.clean_existing:
+        logger.info("Cleaned %d earlier reports.csv files", clean_existing(args.out))
+        return
     interval = max(args.every_minutes, MIN_INTERVAL_MINUTES) * 60
     while True:
         try:

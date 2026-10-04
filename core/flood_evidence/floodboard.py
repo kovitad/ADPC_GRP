@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from core.flood_evidence.observation import (
+    HASHED,
     OBSERVED,
     PROVIDER_DERIVED,
     REPORT,
@@ -32,6 +33,7 @@ from core.flood_evidence.observation import (
     VERDICTS,
     ObservationDraft,
     SourceFormatError,
+    hashed_value,
     sha256_text,
 )
 
@@ -234,9 +236,31 @@ def parse_reports(body: bytes) -> list[ObservationDraft]:
             else PROVIDER_DERIVED if source in DERIVED_SOURCES else OBSERVED,
             provider_judgement={"current_weight": _number(row["current_weight"], "current_weight")},
             depth_cm=_depth(row["depth_cm"], "depth_cm"),
-            text_sha256=sha256_text(report_text) if report_text else None,
+            text_sha256=(hashed_value(report_text) or sha256_text(report_text))
+            if report_text else None,
         )
     return list(drafts.values())
+
+
+def clean_reports_csv(body: bytes) -> bytes:
+    """A copy of ``reports.csv`` safe to keep: ``id`` and ``text`` become their SHA-256 and
+    ``url`` is emptied. ``parse_reports`` reads it to the same record keys and states, so a
+    cleaned capture can still be loaded. Already-cleaned rows are left as they are."""
+
+    reader = csv.DictReader(io.StringIO(body.decode("utf-8-sig"), newline=""))
+    if tuple(reader.fieldnames or ()) != REPORT_COLUMNS:
+        raise SourceFormatError("reports.csv columns changed")
+    out = io.StringIO(newline="")
+    writer = csv.DictWriter(out, fieldnames=REPORT_COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    for row in reader:
+        for column in ("id", "text"):
+            value = row[column].strip() if column == "id" else row[column] or ""
+            if value and hashed_value(value) is None:
+                row[column] = HASHED + sha256_text(value)
+        row["url"] = ""
+        writer.writerow(row)
+    return out.getvalue().encode("utf-8")
 
 
 PARSERS = {"floodboard_roads": parse_roads, "floodboard_reports": parse_reports}
