@@ -152,6 +152,14 @@ RP20/RP50 rasters and methods exist.
   - the URL must be anonymous;
   - unknown manifest fields are refused.
   The maintainer questions were rewritten around these points.
+- **DDPM reports design (design only):** `docs/pilot/2026-10-04_DDPM_Planner_Reports_Design.md`.
+  - Four reports by horizon (pre-season, days ahead, live, after-action) from one fact bundle per
+    area, window and audience.
+  - GEOGLOWS is river context only (never Bangkok street flooding) and has no thresholds without
+    a scientific ADR.
+  - Bangkok has only 8 DDPM evacuation centres and 55 volunteer centres in the baseline.
+  - Insurance: decide on an event archive now, because retention deletes history.
+  - Six owner decisions, D1-D6.
 - **Camera check (planned, not built):** water, partial water or dry, for up to 2 cameras per
   active incident every 15 minutes, through `api/ai_gateway.py`. About $1.70 a day at worst with
   Claude Haiku 4.5. Gate B before it enters the feed.
