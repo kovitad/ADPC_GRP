@@ -1554,7 +1554,9 @@
   let liveSummary = null;
   let liveSelection = null;
   let liveFitted = false;
-  const liveRenderer = window.L.canvas({ padding: 0.4 });
+  // One canvas for every point layer: a second canvas covers the first and swallows its clicks,
+  // so live points stopped opening cards once a district's centres were drawn.
+  const liveRenderer = centerRenderer;
 
   const bangkokClock = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-GB", {
     timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit",
