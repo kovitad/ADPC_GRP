@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260928a" />
-    <link rel="stylesheet" href="/planning.css?v=20261004f" />
+    <link rel="stylesheet" href="/planning.css?v=20261004g" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20261003a" defer></script>
-    <script src="/planning.js?v=20261004f" defer></script>
+    <script src="/planning.js?v=20261004g" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -137,21 +137,43 @@
           Use my location
         </button>
 
-        <button class="pw-fab pw-fab--run" type="button" data-run-toggle aria-expanded="false" aria-label="Configure and run an assessment">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14" /><circle cx="9" cy="5" r="2" /><circle cx="15" cy="12" r="2" /><circle cx="11" cy="19" r="2" /></svg>
-          Data &amp; run
-        </button>
-        <button class="pw-fab pw-fab--layers" type="button" data-layers-toggle aria-expanded="false" aria-label="Map layers">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
-          Layers
-        </button>
+        <!-- One dock for Layers, Details and Run (docs/pilot/2026-10-04_Planner_Map_Panels_UX_Design.md). -->
+        <div class="pw-dock" data-dock data-tab="">
+          <nav class="pw-dock__rail" role="tablist" aria-label="Map panels">
+            <button class="pw-dock__tab" type="button" role="tab" data-dock-tab="layers" data-layers-toggle aria-selected="false" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
+              <span>Layers</span>
+            </button>
+            <button class="pw-dock__tab" type="button" role="tab" data-dock-tab="details" aria-selected="false" aria-expanded="false" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
+              <span>Details</span>
+            </button>
+            <button class="pw-dock__tab" type="button" role="tab" data-dock-tab="run" data-run-toggle aria-selected="false" aria-expanded="false" aria-label="Configure and run an assessment">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14" /><circle cx="9" cy="5" r="2" /><circle cx="15" cy="12" r="2" /><circle cx="11" cy="19" r="2" /></svg>
+              <span>Run</span>
+            </button>
+          </nav>
+          <div class="pw-dock__panel" data-dock-panel hidden>
+            <div class="pw-dock__head">
+              <strong data-dock-title>Layers</strong>
+              <button class="pw-dock__fold" type="button" data-dock-fold aria-label="Fold the panel" title="Fold the panel (Esc)">»</button>
+            </div>
+            <div class="pw-dock__body" data-dock-body>
         <div class="pw-layers" data-map-layers hidden>
+          <details class="pw-section" data-section="base" open>
+          <summary>Base map and boundaries</summary>
+          <div class="pw-section__body">
           <label class="pw-scenario-label" for="area-level">Planning boundary level</label>
           <select id="area-level" data-area-level aria-label="Planning boundary level">
             <option value="district">District</option>
             <option value="subdistrict">Sub-district (inside selected district)</option>
           </select>
           <label class="pw-toggle"><input type="checkbox" data-layer="districts" /><span data-boundary-layer-title>District boundaries</span></label>
+          </div>
+          </details>
+          <details class="pw-section" data-section="assessment">
+          <summary>Assessment</summary>
+          <div class="pw-section__body">
           <div class="pw-layer-choice">
             <label class="pw-toggle"><input type="checkbox" data-layer="flood" /><span data-flood-title>Flood depth</span></label>
             <label class="pw-scenario-label" for="flood-scenario">Scenario</label>
@@ -166,15 +188,22 @@
             <span><i class="pw-dot" style="--c:#6b7280"></i>N/A — no data</span>
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
-          <div class="pw-live-group" data-live-flood hidden>
-            <div class="pw-live-group__head">
+          </div>
+          </details>
+          <details class="pw-section pw-live-group" data-section="live" data-live-flood hidden>
+            <summary>
               <span>Live layer (Bangkok, Nonthaburi)</span>
               <span class="pw-live-group__when" data-live-when></span>
-            </div>
+            </summary>
+            <div class="pw-section__body">
             <div class="pw-live-switches" data-live-switches></div>
+            <div class="pw-live-list" data-live-list hidden></div>
             <p class="pw-muted" data-live-flood-note></p>
-            <div class="pw-live-list" data-live-list hidden aria-label="Live now"></div>
-          </div>
+            </div>
+          </details>
+          <details class="pw-section" data-section="globalrisk">
+          <summary>Global Risk and vulnerability</summary>
+          <div class="pw-section__body">
           <div data-supporting-layer-controls></div>
           <div data-vulnerability-layer-controls></div>
           <div class="pw-sensitivity-legend" data-sensitivity-legend hidden>
@@ -187,7 +216,14 @@
           </div>
           <p class="pw-muted" data-map-preview-note hidden></p>
           <p class="pw-muted" data-vulnerability-note>Not available yet.</p>
+          </div>
+          </details>
         </div>
+
+              <section class="pw-details" data-details hidden aria-live="polite">
+                <div class="pw-details__nav" data-details-nav></div>
+                <div class="pw-details__body" data-details-body></div>
+              </section>
 
         <aside class="pw-run" data-run hidden aria-label="Configure and run assessment">
           <div class="pw-run__head">
@@ -233,6 +269,9 @@
             </section>
           </div>
         </aside>
+            </div>
+          </div>
+        </div>
 
         <div class="pw-place-chip" data-place-chip hidden></div>
 

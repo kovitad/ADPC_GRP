@@ -125,14 +125,248 @@
   map.getPane("grpSensitivityMask").style.pointerEvents = "none";
   // ADR-0056: live reported flooding sits above the scenario layers, with its own legend.
   map.createPane("grpLiveFlood").style.zIndex = "430";
+  // Centres and supporting points sit above the district shapes, so a filled district never
+  // swallows their clicks. SVG passes clicks on empty space through to the district.
+  map.createPane("grpPoints").style.zIndex = "420";
   let sensitivityMask = null;
-  const centerRenderer = window.L.canvas({ padding: 0.35 });
   const centerMarkers = new Map();
   let centerFilter = "all";
   let centerLoadRevision = 0;
   const placeLayer = window.L.featureGroup().addTo(map);
   let floodOverlay = null;
   let floodPicture = null;
+
+  // ---------- the map dock: Layers, Details and Run in one panel ----------
+  // docs/pilot/2026-10-04_Planner_Map_Panels_UX_Design.md: nothing floats on the map except a
+  // hover name. Every card opens in the Details tab, one at a time, and the dock folds away.
+  const DOCK_PREF = "grp.planning.dock";
+  const SECTIONS_PREF = "grp.planning.layerSections";
+  const PICK_RADIUS_PX = 12;
+  const canHover = () => window.matchMedia("(hover: hover)").matches;
+  const isPhone = () => window.matchMedia("(max-width: 600px)").matches;
+  const dockEl = $("[data-dock]");
+  const dockPanel = $("[data-dock-panel]");
+  const dockBody = $("[data-dock-body]");
+  const detailsNav = $("[data-details-nav]");
+  const detailsBody = $("[data-details-body]");
+  const detailsTab = $('[data-dock-tab="details"]');
+  const DOCK_TITLES = { layers: "Layers", details: "Details", run: "Data & run" };
+  const DOCK_PANES = { layers: "[data-map-layers]", details: "[data-details]", run: "[data-run]" };
+  let dockTab = null;
+  let tabBeforeDetails = null;
+  let detailsCurrent = null;
+  const selectionRing = window.L.circleMarker([0, 0], {
+    pane: "grpLiveFlood", radius: 13, color: "#2563eb", weight: 3, fill: false, interactive: false,
+  });
+
+  const rememberDock = () => {
+    try {
+      window.localStorage.setItem(DOCK_PREF, dockTab === "details" ? (tabBeforeDetails || "") : (dockTab || ""));
+    } catch (_error) {
+      // Not remembered in this browser.
+    }
+  };
+
+  const setDockTab = (tab) => {
+    dockTab = tab || null;
+    dockEl.dataset.tab = dockTab || "";
+    dockPanel.hidden = !dockTab;
+    Object.entries(DOCK_PANES).forEach(([key, selector]) => {
+      const pane = $(selector);
+      if (pane) pane.hidden = key !== dockTab;
+    });
+    document.querySelectorAll("[data-dock-tab]").forEach((button) => {
+      const on = button.dataset.dockTab === dockTab;
+      button.setAttribute("aria-selected", String(on));
+      button.setAttribute("aria-expanded", String(on));
+    });
+    if (dockTab) $("[data-dock-title]").textContent = DOCK_TITLES[dockTab];
+    if (dockTab) dockBody.scrollTop = 0;
+    rememberDock();
+  };
+
+  // Move the map only when the selected point would sit under the dock.
+  const keepClearOfDock = (latlng) => {
+    if (dockPanel.hidden) return;
+    const mapBox = map.getContainer().getBoundingClientRect();
+    const panelBox = dockPanel.getBoundingClientRect();
+    const point = map.latLngToContainerPoint(latlng);
+    if (isPhone()) {
+      const free = panelBox.top - mapBox.top;
+      if (point.y > free - 24) map.panBy([0, point.y - free / 2], { duration: 0.3 });
+    } else {
+      const free = panelBox.left - mapBox.left;
+      if (point.x > free - 24) map.panBy([point.x - free / 2, 0], { duration: 0.3 });
+    }
+  };
+
+  const closeDetails = () => {
+    const current = detailsCurrent;
+    detailsCurrent = null;
+    selectionRing.remove();
+    detailsNav.replaceChildren();
+    detailsBody.replaceChildren();
+    detailsTab.disabled = true;
+    if (current && current.onClose) current.onClose();
+    if (dockTab === "details") setDockTab(tabBeforeDetails);
+  };
+
+  const showDetails = ({ node, latlng = null, onOpen = null, onClose = null, back = null }) => {
+    if (detailsCurrent) {
+      const previous = detailsCurrent;
+      detailsCurrent = null;
+      if (previous.onClose) previous.onClose();
+    }
+    if (dockTab !== "details") tabBeforeDetails = dockTab;
+    detailsNav.replaceChildren();
+    if (back) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pw-details__back";
+      button.textContent = `‹ ${back.label}`;
+      button.addEventListener("click", back.onClick);
+      detailsNav.append(button);
+    }
+    detailsBody.replaceChildren(node);
+    detailsCurrent = { onClose };
+    detailsTab.disabled = false;
+    setDockTab("details");
+    if (latlng) {
+      selectionRing.setLatLng(latlng).addTo(map);
+      keepClearOfDock(latlng);
+    } else {
+      selectionRing.remove();
+    }
+    if (onOpen) onOpen();
+  };
+
+  // A layer whose click opens a card in Details. Points stacked on one spot get a pick list.
+  const openItem = (layer, { back = null, latlng = null } = {}) => {
+    const item = layer.grpItem;
+    showDetails({
+      node: item.build(),
+      latlng: latlng || (layer.getLatLng ? layer.getLatLng() : null),
+      onOpen: item.onOpen,
+      onClose: item.onClose,
+      back,
+    });
+  };
+
+  const showPickList = (layers, latlng) => {
+    const box = document.createElement("div");
+    box.className = "pw-pick-list";
+    const kinds = {};
+    layers.forEach((layer) => { kinds[layer.grpItem.kind] = (kinds[layer.grpItem.kind] || 0) + 1; });
+    const head = document.createElement("p");
+    head.className = "pw-pick-list__head";
+    head.textContent = `${layers.length} here: ${Object.entries(kinds)
+      .map(([kind, n]) => `${n} ${kind.toLowerCase()}${n === 1 ? "" : "s"}`).join(", ")}`;
+    box.append(head);
+    layers.forEach((layer) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "pw-pick-list__row";
+      row.style.setProperty("--c", layer.grpItem.colour || "#6b7280");
+      const kind = document.createElement("small");
+      kind.textContent = layer.grpItem.kind;
+      const name = document.createElement("span");
+      name.textContent = layer.grpItem.label || "Unnamed";
+      row.append(kind, name);
+      row.addEventListener("click", () => openItem(layer, {
+        latlng: layer.getLatLng ? null : latlng,
+        back: { label: `Back to ${layers.length} here`, onClick: () => showPickList(layers, latlng) },
+      }));
+      box.append(row);
+    });
+    showDetails({ node: box, latlng });
+  };
+
+  const onItemClick = (event, layer) => {
+    window.L.DomEvent.stop(event);
+    const here = map.latLngToContainerPoint(event.latlng);
+    const hits = [];
+    map.eachLayer((other) => {
+      if (other === layer || !other.grpItem || !other.getLatLng) return;
+      if (map.latLngToContainerPoint(other.getLatLng()).distanceTo(here) <= PICK_RADIUS_PX) hits.push(other);
+    });
+    if (!hits.length) {
+      openItem(layer, { latlng: layer.getLatLng ? null : event.latlng });
+      return;
+    }
+    showPickList([layer, ...hits], layer.getLatLng ? layer.getLatLng() : event.latlng);
+  };
+
+  const bindDetails = (layer, item) => {
+    layer.grpItem = item;
+    layer.on("click", (event) => onItemClick(event, layer));
+    if (item.label && canHover()) {
+      layer.bindTooltip(item.label, { direction: "top", offset: [0, -6], className: "pw-hover-name" });
+    }
+    return layer;
+  };
+
+  document.querySelectorAll("[data-dock-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.dockTab;
+      if (tab === "run" && dockTab !== "run") syncRunPanelLater();
+      setDockTab(dockTab === tab ? null : tab);
+    });
+  });
+  $("[data-dock-fold]").addEventListener("click", () => setDockTab(null));
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    if (detailsCurrent) closeDetails();
+    else if (dockTab) setDockTab(null);
+  });
+  // Reopen Layers if it was left open; Details and Run always start closed.
+  try {
+    if (window.localStorage.getItem(DOCK_PREF) === "layers") setDockTab("layers");
+  } catch (_error) {
+    // Starts folded.
+  }
+  // The run panel's contents are synced by its own code, defined further down.
+  let syncRunPanelLater = () => {};
+
+  // Layer sections remember whether they are open.
+  (() => {
+    let saved = {};
+    try {
+      saved = JSON.parse(window.localStorage.getItem(SECTIONS_PREF) || "{}") || {};
+    } catch (_error) {
+      saved = {};
+    }
+    document.querySelectorAll("[data-section]").forEach((section) => {
+      if (typeof saved[section.dataset.section] === "boolean") section.open = saved[section.dataset.section];
+      section.addEventListener("toggle", () => {
+        saved[section.dataset.section] = section.open;
+        try {
+          window.localStorage.setItem(SECTIONS_PREF, JSON.stringify(saved));
+        } catch (_error) {
+          // Not remembered in this browser.
+        }
+      });
+    });
+  })();
+
+  // Place messages are a toast: they hide after eight seconds and can be closed.
+  (() => {
+    const chip = $("[data-place-chip]");
+    if (!chip) return;
+    let timer = null;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "pw-place-chip__close";
+    close.setAttribute("aria-label", "Close");
+    close.textContent = "×";
+    close.addEventListener("click", () => { chip.hidden = true; });
+    new MutationObserver(() => {
+      if (chip.hidden) return;
+      if (!chip.contains(close)) chip.prepend(close);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => { chip.hidden = true; }, 8000);
+    }).observe(chip, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+  })();
 
   const safeHttps = (value) => {
     try {
@@ -627,8 +861,14 @@
       layer.bindTooltip(`${boundary.name}${boundary.synthetic ? " · synthetic" : ""}`, { sticky: true });
       layer.on("click", (event) => {
         window.L.DomEvent.stop(event);
+        // Clicking the selected district again closes an open card, or shows its profile.
+        if (state.selected && state.selected.id === boundary.id) {
+          if (detailsCurrent) closeDetails();
+          else showAreaProfile(boundary);
+          return;
+        }
         selectBoundary(boundary, { announce: true });
-        showAreaProfile(boundary, layer);
+        showAreaProfile(boundary);
       });
       districtLayer.addLayer(layer);
     });
@@ -658,8 +898,8 @@
       .filter(Boolean)
       .join(" · ");
     const head =
-      `<strong>${title}</strong><br><span class="pw-area-pop__level">${levelLabel}` +
-      (province ? ` · ${province}` : "") +
+      `<strong>${escapeHtml(title)}</strong><br><span class="pw-area-pop__level">${levelLabel}` +
+      (province ? ` · ${escapeHtml(province)}` : "") +
       `</span>`;
     // Recorded evacuation centres by kind of place. Shown even when population is missing,
     // because the two come from different deliveries and either can be absent alone.
@@ -672,11 +912,11 @@
           centers.by_type
             .map(
               (item) =>
-                `<tr><th scope="row">${item.label}</th><td>${numberText(item.count)}</td></tr>`,
+                `<tr><th scope="row">${escapeHtml(item.label)}</th><td>${numberText(item.count)}</td></tr>`,
             )
             .join("") +
           `</tbody></table>` +
-          `<p class="pw-area-pop__caveat">${centers.caveat || ""}</p>`
+          `<p class="pw-area-pop__caveat">${escapeHtml(centers.caveat)}</p>`
         : centers
           ? `<p class="pw-area-pop__none">No evacuation centres are recorded for this area.</p>`
           : "";
@@ -702,7 +942,7 @@
             `${numberText(exposure.villages_in_zone_without_population)} village(s) inside the ` +
             `extent have no usable population figure, so People is an undercount.</p>`
           : "") +
-        `<p class="pw-area-pop__caveat">${exposure.caveat || ""}</p>`
+        `<p class="pw-area-pop__caveat">${escapeHtml(exposure.caveat)}</p>`
       : "";
     // A headline the popup can always show without covering the map. Everything else folds away:
     // three stacked tables made the popup taller than the viewport on a district click.
@@ -753,9 +993,9 @@
       : "";
     const detail =
       `<table class="pw-area-pop__table"><tbody>${rows}</tbody></table>${note}` +
-      `<p class="pw-area-pop__caveat">${source.label || "Registered village population"}` +
-      (source.edition ? ` · edition ${source.edition}` : "") +
-      `. ${source.caveat || ""}</p>${exposureRows}${centerRows}`;
+      `<p class="pw-area-pop__caveat">${escapeHtml(source.label || "Registered village population")}` +
+      (source.edition ? ` · edition ${escapeHtml(source.edition)}` : "") +
+      `. ${escapeHtml(source.caveat)}</p>${exposureRows}${centerRows}`;
     return `<div class="pw-area-pop">${head}${headlineRow}${fold(detail)}${tail}</div>`;
   };
 
@@ -805,11 +1045,19 @@
     return profile;
   };
 
-  const showAreaProfile = async (boundary, layer) => {
-    layer
-      .bindPopup(`<div class="pw-area-pop"><strong>${boundary.name}</strong><br>Loading…</div>`)
-      .openPopup();
-    layer.setPopupContent(areaProfileHtml(boundary, await ensureAreaProfile(boundary)));
+  const showAreaProfile = async (boundary) => {
+    const box = document.createElement("div");
+    const loading = document.createElement("div");
+    loading.className = "pw-area-pop";
+    const title = document.createElement("strong");
+    title.textContent = boundary.name;
+    loading.append(title, document.createElement("br"), document.createTextNode("Loading…"));
+    box.append(loading);
+    showDetails({ node: box });
+    const html = areaProfileHtml(boundary, await ensureAreaProfile(boundary));
+    // Every text value in the profile is escaped by areaProfileHtml.
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    if (detailsBody.contains(box)) box.replaceChildren(...parsed.body.childNodes);
   };
 
   const selectBoundary = (
@@ -1048,6 +1296,11 @@
     });
   };
 
+  const plainCard = (node) => {
+    node.classList.add("pw-live-card", "pw-plain-card");
+    return node;
+  };
+
   const popup = (title, lines) => {
     const node = document.createElement("div");
     const strong = document.createElement("strong");
@@ -1108,13 +1361,13 @@
     return lines;
   };
 
-  const activateCenter = (featureId, { moveMap = true } = {}) => {
+  const activateCenter = (featureId, { moveMap = true, open = moveMap } = {}) => {
     state.activeCenterId = featureId;
     const center = state.centerRows.find((item) => item.feature_id === featureId);
     const marker = centerMarkers.get(featureId);
+    if (open && marker) openItem(marker);
     if (moveMap && center && marker) {
       map.flyTo([center.lat, center.lon], Math.max(map.getZoom(), 15), { duration: 0.45 });
-      marker.openPopup();
     }
     const rows = Array.from($("[data-centre-list]").children);
     rows.forEach((row) => row.classList.toggle("is-active", row.dataset.featureId === featureId));
@@ -1240,16 +1493,20 @@
     centers.forEach((center) => {
       const assessed = center.status !== "not_assessed";
       const marker = window.L.circleMarker([center.lat, center.lon], {
-        renderer: assessed ? undefined : centerRenderer,
+        pane: "grpPoints",
         radius: assessed ? 8 : 5,
         color: assessed ? "#fff" : "#374151",
         weight: assessed ? 2 : 1,
         fillColor: assessed ? STATUS_COLOR[center.status] : "#fff",
         fillOpacity: 0.95,
-      })
-        .bindPopup(() => popup(center.name, statusDetail(center)))
-        .on("click", () => activateCenter(center.feature_id, { moveMap: false }))
-        .addTo(centersLayer);
+      });
+      bindDetails(marker, {
+        kind: "Evacuation centre",
+        label: center.name,
+        colour: assessed ? STATUS_COLOR[center.status] : "#374151",
+        build: () => plainCard(popup(center.name, statusDetail(center))),
+        onOpen: () => activateCenter(center.feature_id, { moveMap: false, open: false }),
+      }).addTo(centersLayer);
       centerMarkers.set(center.feature_id, marker);
     });
   };
@@ -1312,13 +1569,19 @@
     collection.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       const properties = feature.properties;
-      window.L.circleMarker([lat, lon], {
+      bindDetails(window.L.circleMarker([lat, lon], {
+        pane: "grpPoints",
         radius: source.role === "village_locations" ? 3 : 5,
         color: "#fff",
         weight: 1,
         fillColor: supportingColour(source.role),
         fillOpacity: 0.9,
-      }).bindPopup(popup(properties.name, [source.title_th || source.title])).addTo(group);
+      }), {
+        kind: source.title || "Point",
+        label: properties.name,
+        colour: supportingColour(source.role),
+        build: () => plainCard(popup(properties.name, [source.title_th || source.title])),
+      }).addTo(group);
     });
     const toggle = document.querySelector(`[data-supporting-version="${source.version_id}"]`);
     if (toggle?.checked) group.addTo(map);
@@ -1725,7 +1988,6 @@
     } else if (!liveData.cameras) {
       buttons.push({ label: "Show cameras nearby", onClick: async () => {
         await ensureSource("cameras");
-        map.closePopup();
         openIncident(incident.incident_id);
       } });
     }
@@ -1883,61 +2145,6 @@
     return { node: card, picture };
   };
 
-  const popupOptions = { maxWidth: 300, minWidth: 240, className: "pw-live-pop", autoPanPadding: [24, 24] };
-
-  // Phones: a sheet at the bottom of the screen, outside the map, so the card is never cut off.
-  const isPhone = () => window.matchMedia("(max-width: 600px)").matches;
-  const liveSheet = document.createElement("div");
-  liveSheet.className = "pw-live-sheet";
-  liveSheet.hidden = true;
-  liveSheet.setAttribute("role", "dialog");
-  liveSheet.setAttribute("aria-label", "Live detail");
-  const liveSheetClose = document.createElement("button");
-  liveSheetClose.type = "button";
-  liveSheetClose.className = "pw-live-sheet__close";
-  liveSheetClose.setAttribute("aria-label", "Close");
-  liveSheetClose.textContent = "×";
-  const liveSheetBody = document.createElement("div");
-  liveSheet.append(liveSheetClose, liveSheetBody);
-  document.body.append(liveSheet);
-  let liveSheetOnClose = null;
-  const hideSheet = () => {
-    if (liveSheet.hidden) return;
-    liveSheet.hidden = true;
-    liveSheetBody.replaceChildren();
-    const done = liveSheetOnClose;
-    liveSheetOnClose = null;
-    if (done) done();
-  };
-  const showSheet = (node, onOpen, onClose) => {
-    hideSheet();
-    liveSheetBody.replaceChildren(node);
-    liveSheet.hidden = false;
-    liveSheetOnClose = onClose || null;
-    if (onOpen) onOpen();
-    liveSheetClose.focus();
-  };
-  liveSheetClose.addEventListener("click", hideSheet);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") hideSheet();
-  });
-
-  const attachCard = (layer, build, { onOpen, onClose } = {}) => {
-    layer.bindPopup(() => build(), popupOptions);
-    layer.on("popupopen", () => {
-      if (isPhone()) {
-        const node = build();
-        layer.closePopup();
-        showSheet(node, onOpen, onClose);
-        return;
-      }
-      if (onOpen) onOpen();
-    });
-    layer.on("popupclose", () => {
-      if (!isPhone() && onClose) onClose();
-    });
-  };
-
   const liveRoadStyle = (props, faded) => {
     if (!props.incident_id) {
       return { color: props.cleared ? "#16a34a" : "#9ca3af", weight: faded ? 2 : 3, opacity: faded ? 0.2 : 0.7, dashArray: "4 5" };
@@ -1960,13 +2167,19 @@
         style: (feature) => liveRoadStyle(feature.properties, false),
         onEachFeature: (feature, line) => {
           const incident = incidentById(feature.properties.incident_id);
+          const name = feature.properties.name_en || feature.properties.name || "Unnamed road";
           if (incident) {
-            attachCard(line, () => incidentCard(incident), {
+            bindDetails(line, {
+              kind: "Flooded road",
+              label: name,
+              colour: LIVE_COLOURS[incident.confidence],
+              build: () => incidentCard(incident),
               onOpen: () => highlightIncident(incident.incident_id),
               onClose: () => highlightIncident(null),
             });
           } else {
-            attachCard(line, () => roadCard(feature.properties));
+            bindDetails(line, { kind: "Road report", label: name, colour: "#9ca3af",
+              build: () => roadCard(feature.properties) });
           }
         },
       });
@@ -1980,7 +2193,8 @@
           renderer: liveRenderer, radius: 4, color: "#fff", weight: 1, fillColor: spec.colour,
           fillOpacity: f.properties.cleared ? 0.35 : 0.9,
         });
-        attachCard(marker, () => reportCard(f.properties));
+        bindDetails(marker, { kind: "Report", label: f.properties.underlying_source || spec.label,
+          colour: spec.colour, build: () => reportCard(f.properties) });
         marker.addTo(group);
       });
       return group;
@@ -2000,7 +2214,8 @@
           fillColor: kind.colour, fillOpacity: 0.9,
         });
         marker.liveIncidentIds = f.incident_ids;
-        attachCard(marker, () => facilityCard(f));
+        bindDetails(marker, { kind: (LIVE_FACILITY[f.asset_type] || { label: "Facility" }).label,
+          label: f.name || "Unnamed", colour: kind.colour, build: () => facilityCard(f) });
         marker.addTo(group);
       });
       return group;
@@ -2014,11 +2229,15 @@
         });
         marker.liveCameraId = c.camera_id;
         let open = null;
-        attachCard(marker, () => {
-          if (open && open.picture) open.picture.stop();
-          open = cameraCard(c);
-          return open.node;
-        }, {
+        bindDetails(marker, {
+          kind: "Camera",
+          label: localName(c.name) || "Camera",
+          colour: spec.colour,
+          build: () => {
+            if (open && open.picture) open.picture.stop();
+            open = cameraCard(c);
+            return open.node;
+          },
           onOpen: () => open && open.picture && open.picture.start(),
           onClose: () => open && open.picture && open.picture.stop(),
         });
@@ -2101,7 +2320,7 @@
     }));
   };
 
-  const openIncident = (incidentId) => {
+  const openIncident = (incidentId, { back = null } = {}) => {
     const lines = [];
     liveLayers.roads?.eachLayer((line) => {
       if (line.feature.properties.incident_id === incidentId) lines.push(line);
@@ -2109,7 +2328,7 @@
     if (!lines.length) return;
     const bounds = window.L.featureGroup(lines).getBounds();
     map.flyToBounds(bounds.pad(0.6), { maxZoom: 16, duration: 0.5 });
-    map.once("moveend", () => lines[0].openPopup(bounds.getCenter()));
+    map.once("moveend", () => openItem(lines[0], { latlng: bounds.getCenter(), back }));
   };
 
   const renderLiveNote = () => {
@@ -2129,10 +2348,7 @@
   };
 
   // The "Live now" list: incidents and facilities near them, reachable with a keyboard.
-  const renderLiveList = () => {
-    const list = $("[data-live-list]");
-    if (!list) return;
-    list.replaceChildren();
+  const liveNowRows = () => {
     const rows = [];
     if (liveOn.has("roads") && liveData.roads) {
       incidents().filter((i) => i.status === "active").slice(0, 12).forEach((incident) => {
@@ -2140,7 +2356,7 @@
         rows.push({
           label: `${road ? road.properties.name_en || road.properties.name : "Unnamed roads"} · ${(LIVE_CONFIDENCE[incident.confidence] || "").replace(" confidence", "").toLowerCase()}`,
           colour: LIVE_COLOURS[incident.confidence],
-          onClick: () => openIncident(incident.incident_id),
+          open: (back) => openIncident(incident.incident_id, { back }),
         });
       });
     }
@@ -2149,27 +2365,51 @@
         rows.push({
           label: `${(LIVE_FACILITY[f.asset_type] || { label: f.asset_type }).label}: ${f.name || "unnamed"} · ${f.nearest_distance_m ?? "?"} m`,
           colour: "#f97316",
-          onClick: () => {
+          open: (back) => {
             map.flyTo([f.lat, f.lon], Math.max(map.getZoom(), 16), { duration: 0.5 });
+            showDetails({ node: facilityCard(f), latlng: [f.lat, f.lon], back });
           },
         });
       });
     }
-    list.hidden = !rows.length;
-    if (!rows.length) return;
+    return rows;
+  };
+
+  // The "Live now" list opens in Details, reachable with a keyboard.
+  const showLiveNow = () => {
+    const rows = liveNowRows();
+    const box = document.createElement("div");
+    box.className = "pw-live-list";
     const head = document.createElement("div");
     head.className = "pw-live-list__head";
-    head.textContent = "Live now";
-    list.append(head);
-    rows.forEach(({ label, colour, onClick }) => {
+    head.textContent = rows.length ? "Live now" : "Nothing reported now. No report is not proof that it is dry.";
+    box.append(head);
+    const back = { label: "Back to Live now", onClick: showLiveNow };
+    rows.forEach(({ label, colour, open }) => {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "pw-live-list__row";
       if (colour) row.style.setProperty("--c", colour);
       row.textContent = label;
-      row.addEventListener("click", onClick);
-      list.append(row);
+      row.addEventListener("click", () => open(back));
+      box.append(row);
     });
+    showDetails({ node: box });
+  };
+
+  const renderLiveList = () => {
+    const holder = $("[data-live-list]");
+    if (!holder) return;
+    holder.replaceChildren();
+    const count = liveNowRows().length;
+    holder.hidden = !count;
+    if (!count) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pw-live-card__button pw-live-now";
+    button.textContent = `Live now (${count}) ›`;
+    button.addEventListener("click", showLiveNow);
+    holder.append(button);
   };
 
   const renderLiveSwitches = () => {
@@ -2262,11 +2502,7 @@
   }, 5 * 60 * 1000);
 
   // The map's layer panel. The chat's Global Risk layer picker is [data-layers] (ADR-0034).
-  $("[data-layers-toggle]").addEventListener("click", (event) => {
-    const panel = $("[data-map-layers]");
-    panel.hidden = !panel.hidden;
-    event.currentTarget.setAttribute("aria-expanded", String(!panel.hidden));
-  });
+  // The Layers and Run tabs are handled by the dock (see "the map dock" above).
 
   $("[data-area-level]").addEventListener("change", async (event) => {
     const nextLevel = event.currentTarget.value;
@@ -2302,7 +2538,6 @@
 
   // ---------- configure and run ----------
   const runPanel = $("[data-run]");
-  const runToggle = $("[data-run-toggle]");
   const runHazard = $("[data-run-hazard]");
   const runCenters = $("[data-run-centers]");
   const runSubmit = $("[data-run-submit]");
@@ -2337,14 +2572,14 @@
   ].filter(Boolean).join(" · ");
 
   const setRunPanelOpen = (open) => {
-    runPanel.hidden = !open;
-    runToggle.setAttribute("aria-expanded", String(open));
     if (open) {
-      $("[data-map-layers]").hidden = true;
-      $("[data-layers-toggle]").setAttribute("aria-expanded", "false");
       syncRunPanel();
+      setDockTab("run");
+    } else if (dockTab === "run") {
+      setDockTab(null);
     }
   };
+  syncRunPanelLater = () => syncRunPanel();
 
   const syncRunPanel = () => {
     $("[data-run-area]").textContent = state.selected
@@ -2487,7 +2722,6 @@
     }
   };
 
-  runToggle.addEventListener("click", () => setRunPanelOpen(runPanel.hidden));
   $("[data-run-close]").addEventListener("click", () => setRunPanelOpen(false));
   runHazard.addEventListener("change", async () => {
     $("[data-flood-scenario]").value = runHazard.value;
@@ -4833,6 +5067,10 @@
 
   let mapClickBusy = false;
   map.on("click", async (event) => {
+    if (detailsCurrent) {
+      closeDetails();
+      return;
+    }
     if (mapClickBusy) return;
     mapClickBusy = true;
     try {

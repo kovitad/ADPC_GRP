@@ -1483,3 +1483,76 @@ a.pw-chip-button { display: inline-block; }
 .pw-live-swatch--outline { width: 12px; height: 9px; border-radius: 2px; background: none; border: 1.5px solid var(--c); box-shadow: none; }
 .pw-live-roadlegend { margin: 0 0 0.25rem 2.2rem; }
 
+
+/* ---------- the map dock: Layers, Details and Run (Planner map panels design, 4 Oct 2026) ---------- */
+.pw-dock { position: absolute; z-index: 1000; top: 0; right: 0; bottom: 0; display: flex; flex-direction: row-reverse; align-items: flex-start; pointer-events: none; }
+.pw-dock > * { pointer-events: auto; }
+.has-evidence .pw-dock { right: min(460px, 100%); }
+.pw-dock__rail { display: flex; flex-direction: column; gap: 6px; padding: 14px 10px 14px 6px; }
+.pw-dock__tab { display: grid; place-items: center; gap: 2px; width: 58px; height: 54px; padding: 6px 0 4px; border: 0; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgb(18 48 64 / 16%); color: var(--pw-ink); font: inherit; font-size: 0.66rem; font-weight: 700; cursor: pointer; }
+.pw-dock__tab svg { width: 18px; height: 18px; fill: none; stroke: var(--pw-forest); stroke-width: 2; stroke-linecap: round; }
+.pw-dock__tab[aria-selected="true"] { background: var(--pw-forest); color: #fff; }
+.pw-dock__tab[aria-selected="true"] svg { stroke: #fff; }
+.pw-dock__tab:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.pw-dock__tab:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.pw-dock__panel { display: flex; flex-direction: column; width: 360px; max-height: calc(100% - 28px); margin: 14px 0; border-radius: 14px; background: #fff; box-shadow: 0 10px 28px rgb(16 40 36 / 20%); overflow: hidden; animation: pw-slide-in 0.18s ease-out; }
+.pw-dock__panel[hidden] { display: none; }
+.pw-dock__head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.55rem 0.7rem 0.5rem 1rem; border-bottom: 1px solid var(--pw-line); font-size: 0.9rem; }
+.pw-dock__fold { width: 30px; height: 30px; border: 0; border-radius: 50%; background: #f1f4f3; color: var(--pw-ink); font-size: 1rem; cursor: pointer; }
+.pw-dock__fold:hover { background: #e3ebe9; }
+.pw-dock__body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+.pw-dock .pw-layers { position: static; width: auto; max-width: none; max-height: none; padding: 0.3rem 0.9rem 0.8rem; border-radius: 0; box-shadow: none; overflow: visible; }
+.pw-dock .pw-run { position: static; width: auto; border-left: 0; box-shadow: none; animation: none; }
+.pw-dock [data-run-close] { display: none; }
+.pw-dock .pw-run__head { padding-top: 0.6rem; }
+
+/* Layer sections fold, and remember it. A legend shows only while its layer is on. */
+.pw-section { border-bottom: 1px solid #edf1f0; }
+.pw-section:last-child { border-bottom: 0; }
+.pw-section[hidden] { display: none; }
+.pw-section > summary { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.6rem 0 0.5rem; list-style: none; cursor: pointer; color: #374151; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.pw-section > summary::-webkit-details-marker { display: none; }
+.pw-section > summary::after { content: "▸"; margin-left: auto; color: var(--pw-muted); }
+.pw-section[open] > summary::after { content: "▾"; }
+.pw-section > summary .pw-live-group__when { margin-left: auto; }
+.pw-section__body { display: grid; gap: 0.4rem; padding: 0 0 0.7rem; }
+.pw-dock .pw-live-group { border-top: 0; margin-top: 0; padding-top: 0; display: block; }
+.pw-layer-choice:has([data-layer="flood"]:not(:checked)) + .pw-legend { display: none; }
+.pw-live-switch:has(input:not(:checked)) + .pw-live-roadlegend { display: none; }
+.pw-live-now { justify-self: start; margin: 0.2rem 0 0; font-weight: 700; }
+[data-live-list] { border: 0; background: none; padding: 0; margin: 0; max-height: none; }
+
+/* Details: one card at a time. */
+.pw-details { padding: 0.75rem 1rem 1rem; }
+.pw-details__nav:empty { display: none; }
+.pw-details__back { margin: 0 0 0.55rem; padding: 0.2rem 0.55rem 0.2rem 0.35rem; border: 1px solid #c7d2de; border-radius: 6px; background: #f5f8fb; color: #1f4e79; font: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+.pw-details .pw-live-card { font-size: 0.85rem; }
+.pw-details .pw-live-card__title { font-size: 0.98rem; }
+.pw-details .pw-live-list { max-height: none; border: 0; background: none; padding: 0; }
+.pw-details .pw-area-pop { max-width: none; }
+.pw-plain-card strong { display: block; margin-bottom: 0.25rem; font-size: 0.98rem; }
+.pw-pick-list { display: grid; gap: 0.3rem; }
+.pw-pick-list__head { margin: 0 0 0.3rem; color: #374151; font-size: 0.82rem; font-weight: 700; }
+.pw-pick-list__row { display: grid; grid-template-columns: 12px 1fr; grid-template-rows: auto auto; column-gap: 0.55rem; align-items: center; width: 100%; padding: 0.45rem 0.55rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #1f2937; font: inherit; text-align: left; cursor: pointer; }
+.pw-pick-list__row::before { content: ""; grid-row: 1 / 3; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgb(0 0 0 / 15%); }
+.pw-pick-list__row small { color: #6b7280; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.pw-pick-list__row span { font-size: 0.82rem; font-weight: 600; }
+.pw-pick-list__row:hover, .pw-pick-list__row:focus-visible { background: #f3f7fb; outline: none; border-color: #c7d2de; }
+.pw-hover-name { padding: 2px 7px; font-size: 0.74rem; font-weight: 600; }
+
+/* Place messages: a toast at the bottom of the map, closed with × or after eight seconds. */
+.pw-map .pw-place-chip { top: auto; bottom: 22px; left: 50%; transform: translateX(-50%); width: max-content; max-width: min(460px, calc(100% - 120px)); padding: 0.55rem 2.2rem 0.55rem 0.85rem; z-index: 950; }
+.pw-map:has(.pw-dock__panel:not([hidden])) .pw-place-chip { left: calc((100% - 434px) / 2); }
+.pw-map:has(.pw-result:not([hidden])) .pw-place-chip { bottom: 190px; }
+.pw-place-chip__close { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border: 0; border-radius: 50%; background: #f1f4f3; color: var(--pw-ink); font-size: 0.95rem; line-height: 1; cursor: pointer; }
+.pw-map:has(.pw-dock__panel:not([hidden])) .pw-result { left: calc((100% - 434px) / 2); }
+
+/* Phones: the rail sits under the search box and the panel is a sheet at the bottom. */
+@media (max-width: 600px) {
+  .pw-dock { inset: 0; display: block; }
+  .pw-dock__rail { position: absolute; top: 62px; right: 0; padding: 0 8px; }
+  .pw-dock__tab { width: 50px; height: 48px; }
+  .pw-dock__panel { position: absolute; left: 6px; right: 6px; bottom: 6px; width: auto; max-height: 62%; margin: 0; }
+  .pw-map .pw-place-chip, .pw-map:has(.pw-dock__panel:not([hidden])) .pw-place-chip { left: 50%; max-width: calc(100% - 24px); }
+  .pw-map:has(.pw-dock__panel:not([hidden])) .pw-place-chip { display: none; }
+}

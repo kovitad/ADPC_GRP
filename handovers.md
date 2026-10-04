@@ -296,6 +296,22 @@ point it details out, careful about UX".
 **After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
 (DDPM reports).
 
+#### BUILT: one map dock replaces the floating cards (ADR-0060, 4 October 2026)
+
+- **Why:** the owner reported cards floating, covering each other and not folding.
+- **What:** a right-hand dock with three tabs (Layers, Details, Run).
+  - Every card opens in Details, one at a time, with a ring on the point.
+  - Stacked points show a pick list.
+  - The district profile opens in the dock.
+  - Layers fold into four remembered sections; "Live now" opens in Details.
+  - Place messages are a toast.
+  - Phones get a bottom sheet.
+- **Also fixed:** camera points inside a selected district could not be clicked. Points are now
+  SVG panes above the district shapes.
+- **Design:** `docs/pilot/2026-10-04_Planner_Map_Panels_UX_Design.md`.
+- **Checked:** in the headless harness (desktop and phone width). Not yet checked signed in,
+  including the district profile and the Run tab.
+
 #### BUILT: GEOGLOWS river outlook in the district summary (ADR-0059, 4 October 2026)
 
 - **What:** section 7, "River outlook (GEOGLOWS, exploratory)", in English and Thai. It has:
