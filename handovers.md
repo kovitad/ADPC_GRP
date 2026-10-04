@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 4 October 2026. Whole Bangkok (ADR-0053); daily research archive (ADR-0055); live flood evidence in the Planner, steps 1-4 (ADR-0056); Global Risk live-feed plan revised against its source code; DDPM reports design; proposal for the dev team in `docs/proposals/`. Branch `pilot/river-watch-and-bangkok-flood`, not pushed. **Next agent: read Section 0, "4 October (latest): roadmap input for the dev team", first.** Before that: 3 October 2026 (Bangkok flood pilot slices 1-7, ADR-0038 to 0051).
+**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "4 October (evening, latest)", first, then "4 October (morning): roadmap input for the dev team".**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,118 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-4 October 2026)
 
-### 4 October (latest): roadmap input for the dev team
+### 4 October (evening, latest): Nonthaburi, the Planner map and GEOGLOWS in the summary
+
+Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**: the owner runs
+`git push -u origin pilot/river-watch-and-bangkok-flood` (the agent's push was blocked).
+1,149 tests pass, 2 skip; Ruff is clean.
+
+#### Commits this session (oldest first)
+
+| Commit | What | Record |
+| --- | --- | --- |
+| `3f8eb43` | Nonthaburi live sources validated, and the expansion planned | `docs/pilot/` validation |
+| `219bd01` | Live pilot extended to Nonthaburi (56 districts) with Pak Kret's 52 public cameras | ADR-0057 |
+| `5ae53e6`, `f51d4b6` | Layers button fixes: a cached page, and a selector shared with the chat picker | ADR-0058 |
+| `010f24d` | Planner "Live layer": 13 switches, one per source, all off by default, whole area | ADR-0058 |
+| `defd13b` | District summary section 7: GEOGLOWS river outlook, labelled exploratory, in English and Thai | ADR-0059 |
+| `01f4e3d`, `833d2f9` | Camera points could not be clicked; points are now SVG panes above the district shapes | ADR-0060 |
+| `6f8818e` | One map dock (Layers, Details, Run) replaces the floating cards | ADR-0060 |
+
+#### What the owner can see now
+
+- **Planner map:**
+  - Layers → "Live layer (Bangkok, Nonthaburi)", with 13 switches: roads with flooding reported,
+    five report kinds, OSM facilities, DDPM centres, four camera providers and district outlines.
+  - A click on any point opens its card in the dock's **Details** tab. Stacked points show a
+    pick list.
+  - The dock folds with `»` or Esc. Layers sections fold and are remembered.
+  - Phones get a bottom sheet.
+- **District summary (Word, English and Thai)**, nine sections:
+  1. At a glance
+  2. Map
+  3. Evacuation centres
+  4. People
+  5. Global Risk evidence
+  6. Live reported flooding, with bmatraffic pictures
+  7. River outlook (GEOGLOWS, exploratory)
+  8. What this cannot tell you
+  9. Sources and versions
+- **River outlook coverage:**
+  - 28 of 50 Bangkok districts (their River Watch main reach);
+  - Nonthaburi: 1204 uses the Bang Bua Thong canal, and 1201, 1202 and 1206 use the Chao Phraya;
+  - other districts get a one-line gap.
+- **Checked on real data on 4 October:**
+  - Bang Phlat: falling, peak about 8,312 m³/s;
+  - Bang Bua Thong: rising, peak about 1.2 m³/s.
+
+#### How the running stack was updated (no rebuild)
+
+- **Memory is tight** (about 1.4 GB free), so no image rebuild. `core/` and `api/` were copied
+  into `grp-desktop-api-1` (and the worker where it mattered) with `docker cp`, then the
+  container was restarted.
+- **`web/` is a live bind mount**, so page changes need only Ctrl+F5. The page version tag is now
+  `?v=20261004g`.
+- **Rebuild the images** with `scripts/docker-desktop.ps1` when memory allows, so the copied
+  files become permanent. Never use a raw `compose up`: it drops `SERVIR_AUTH_CLIENT_ID`.
+- **Sign-in:** one "Sign-in is temporarily unavailable" screen on 4 October was a transient
+  failure to reach the AuthKit staging issuer. The settings were intact and the next attempt
+  signed in.
+
+#### Owner actions
+
+1. **Push the branch** (command above).
+2. **Signed-in browser checks.** None of today's Planner changes has been checked signed in:
+   - the dock;
+   - a camera card under a selected district;
+   - the pick list;
+   - the district profile in Details;
+   - the Run tab;
+   - a summary download with section 7;
+   - the Live layer switches.
+3. **Send the drafts:**
+   - the Floodboard credit note;
+   - the Global Risk maintainer questions;
+   - the BMA addition;
+   - the Pak Kret request;
+   - the Nakhon Nonthaburi feed request.
+4. **Decide:**
+   - D1 (DDPM sample reports);
+   - D2 (who the live report is for, and the officer checks);
+   - D3 (hydrologist-confirmed reaches; the summary says "not confirmed" until then);
+   - D5;
+   - the Ubuntu host;
+   - where the archive backup goes;
+   - how the baseline centres layer treats the 309 flagged DDPM records (recommended: show them
+     marked "location doubtful", and report them to DDPM).
+
+#### Next to implement (in order)
+
+1. **Fix whatever the signed-in checks find** in the dock (ADR-0060). If panning is slow with
+   every switch on (about 3,000 SVG points), give the dense camera and facility layers their own
+   canvas pane with click forwarding, or cluster them by zoom.
+2. **Retry the OSM capture for Nonthaburi.** Overpass returned 504s on 4 October:
+   `python -m grpcli.osm_assets_capture --pilot bangkok`.
+3. **Planner plan step 5:** the feed endpoint `GET /api/v1/pilot/flood/{pilot_id}/feed.json`
+   (backlog E1-1, ADR-0052), on the same fact builder, protected until a host exists.
+4. **W3, DDPM reports:** the shared fact bundle, then the live shift report.
+5. **Camera check** (water, partial water or dry): after BMA's permission. Keep Pak Kret pictures
+   on screen only, never in reports, until the municipality replies.
+6. **Rebuild the images, then deploy to the Ubuntu host** when it exists.
+
+#### Known gaps
+
+- **Overpass:** the Nonthaburi OSM facilities are not captured yet.
+- **BMA flood cameras** (872): their relay fails, so they have no picture in GRP; the card links
+  to the official viewer.
+- **GEOGLOWS reaches are chosen by rule** and not confirmed by a hydrologist. Bang Yai and Sai
+  Noi have no reach. River Watch content is now visible to planners in the summary only
+  (ADR-0059 widens ADR-0036).
+- **Headless browser harness:** used for every page check today, with a stub server and real
+  recorded data, kept in the session scratchpad. It cannot narrow a window below about 500 px,
+  so phone checks ran at 500 px.
+
+### 4 October (morning): roadmap input for the dev team
 
 This repo is the owner's exploratory test bed. This section is written so the owner can turn it
 into a roadmap for the dev team: what was proven, the workstreams, and the open decisions.
@@ -181,7 +292,7 @@ Facts that shape the roadmap:
   - an event (after-action) summary from the archive.
 - **Blocked by:** DDPM sample reports (D1) and who the Bangkok live report is for (D2).
 
-**W4. River forecasts (GEOGLOWS)** (Phase A built; display only)
+**W4. River forecasts (GEOGLOWS)** (Phase A built; since 4 October evening also in the district summary, labelled exploratory, ADR-0059)
 - **Next:**
   - hydrologist-confirmed reaches and the districts each affects (D3);
   - a daily reach summary, which is the easiest first Global Risk contribution, since it is daily
