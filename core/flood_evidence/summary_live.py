@@ -10,6 +10,7 @@ Pictures go into the document only; GRP keeps no copy. Nothing here touches an a
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -44,6 +45,16 @@ def _clock(value: datetime | None) -> str | None:
     return value.astimezone(BANGKOK).strftime("%d %b %Y %H:%M") if value else None
 
 
+def _camera_name(camera: dict[str, Any]) -> Any:
+    """The registry name, or the camera's number when the name is blank or only punctuation."""
+
+    name = camera.get("name")
+    texts = name.values() if isinstance(name, dict) else [name]
+    if any(re.search(r"\w", str(text or "")) for text in texts):
+        return name
+    return f"Camera {camera.get('provider_camera_id') or camera['camera_id']}"
+
+
 def _cameras(session: Session, live: dict[str, Any], now: datetime,
              get_frame: FrameGetter) -> list[dict[str, Any]]:
     """The camera nearest each listed incident, with a picture for up to MAX_PICTURES of them."""
@@ -75,7 +86,8 @@ def _cameras(session: Session, live: dict[str, Any], now: datetime,
         camera = next((c for c in near if c["provider"] == BMATRAFFIC
                        and str(c.get("provider_camera_id") or "").isdigit()), near[0])
         used.add(camera["camera_id"])
-        item = {"incident": label, "name": camera.get("name"), "distance_m": camera["distance_m"],
+        item = {"incident": label, "name": _camera_name(camera),
+                "distance_m": camera["distance_m"],
                 "source": camera.get("source_label") or camera["provider"],
                 "viewer_url": camera.get("viewer_url"), "picture": None, "picture_at": None,
                 "picture_note": None}

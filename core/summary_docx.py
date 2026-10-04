@@ -15,6 +15,7 @@ source lines) stay as written, and the Thai document says so.
 
 from __future__ import annotations
 
+import re
 from io import BytesIO
 from typing import Any
 
@@ -289,6 +290,20 @@ def t(key: str, lang: str, **values: Any) -> str:
     return text.format(**values) if values else text
 
 
+def _local(value: Any, lang: str) -> str:
+    """A text that may come in both languages, such as a camera name."""
+
+    if isinstance(value, dict):
+        # The other language when this one is blank or only punctuation (such as "- · -").
+        order = ("th", "en") if lang == "th" else ("en", "th")
+        for code in order:
+            text = str(value.get(code) or "")
+            if re.search(r"\w", text):
+                return text
+        return ""
+    return "" if value is None else str(value)
+
+
 def _label(table: dict[str, dict[str, str]], key: Any, lang: str) -> str:
     entry = table.get(str(key))
     return entry["th" if lang == "th" else "en"] if entry else str(key)
@@ -415,7 +430,7 @@ def _live_section(document: Any, live: dict[str, Any] | None, lang: str) -> None
     document.add_heading(t("live_incidents", lang), level=2)
     incidents = live.get("incidents") or []
     if incidents:
-        _table(document, ["", t("h_roads", lang), t("h_confidence", lang), t("h_reports", lang),
+        _table(document, ["#", t("h_roads", lang), t("h_confidence", lang), t("h_reports", lang),
                           t("h_deepest", lang), t("h_last", lang)], [
             [i["id"], ", ".join(i.get("roads") or []),
              _label(CONFIDENCE, i.get("confidence"), lang), i.get("reports"),
@@ -460,15 +475,19 @@ def _live_section(document: Any, live: dict[str, Any] | None, lang: str) -> None
                 continue
             document.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
             _para(document, t("live_camera_caption", lang, incident=camera["incident"],
-                              name=camera.get("name") or "", distance=camera["distance_m"],
+                              name=_local(camera.get("name"), lang),
+                              distance=camera["distance_m"],
                               credit=camera.get("credit") or camera.get("source") or "",
                               when=camera.get("picture_at") or ""), style="Caption")
-        _table(document, [t("h_incident", lang), t("h_camera", lang), t("h_distance", lang),
-                          t("h_source", lang), t("h_live_view", lang)], [
-            [c["incident"], c.get("name"), c["distance_m"], c.get("source"),
-             c.get("viewer_url") or ("" if c.get("picture") else t("no_picture", lang))]
-            for c in cameras
-        ], lang)
+        header = [t("h_incident", lang), t("h_camera", lang), t("h_distance", lang),
+                  t("h_source", lang)]
+        rows = [[c["incident"], _local(c.get("name"), lang), c["distance_m"],
+                 _local(c.get("source"), lang)] for c in cameras]
+        if any(c.get("viewer_url") for c in cameras):
+            header.append(t("h_live_view", lang))
+            for row, c in zip(rows, cameras, strict=True):
+                row.append(c.get("viewer_url") or "")
+        _table(document, header, rows, lang)
         _note(document, t("live_camera_note", lang))
 
     _note(document, t("live_credit", lang, credit=live.get("credit") or ""))

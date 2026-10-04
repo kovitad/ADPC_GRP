@@ -126,3 +126,18 @@ def test_the_thai_summary_translates_fixed_text_and_keeps_the_rules(stored) -> N
 def test_outside_bangkok_the_live_section_is_one_plain_line() -> None:
     text = _text(render_summary(_facts({"available": False, "reason": "outside_coverage"}), "en"))
     assert "6. Live reported flooding" in text and "covers Bangkok only" in text
+
+
+def test_a_camera_without_a_real_name_is_called_by_its_number() -> None:
+    assert summary_live._camera_name({"name": " - · - ", "provider_camera_id": "1362",
+                                      "camera_id": "bmatraffic:1362"}) == "Camera 1362"
+    named = {"en": "On Nut Road", "th": "ถนนอ่อนนุช"}
+    assert summary_live._camera_name({"name": named, "camera_id": "x"}) == named
+
+
+def test_a_blank_name_in_one_language_falls_back_to_the_other() -> None:
+    from core.summary_docx import _local
+
+    name = {"en": "- · -", "th": "อุโมงค์ทางลอดพระราม 9"}
+    assert _local(name, "en") == "อุโมงค์ทางลอดพระราม 9"
+    assert _local({"en": "On Nut Road", "th": "ถนนอ่อนนุช"}, "en") == "On Nut Road"
