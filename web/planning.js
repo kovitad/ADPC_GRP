@@ -123,6 +123,10 @@
   map.createPane("grpSensitivity").style.zIndex = "350";
   map.createPane("grpSensitivityMask").style.zIndex = "380";
   map.getPane("grpSensitivityMask").style.pointerEvents = "none";
+  // ADR-0056: live reported flooding sits above the scenario layers, with its own legend.
+  map.createPane("grpLiveFlood").style.zIndex = "430";
+  const liveFloodLayer = window.L.featureGroup();
+  let liveFloodRevision = 0;
   let sensitivityMask = null;
   const centerRenderer = window.L.canvas({ padding: 0.35 });
   const centerMarkers = new Map();
@@ -861,6 +865,7 @@
     $("[data-place-chip]").hidden = true;
     districtLayer.eachLayer((layer) => layer.setStyle(boundaryStyle(layer.boundaryId === boundary.id)));
     syncSensitivityView();
+    syncLiveFlood();
     const layer = districtLayer.getLayers().find((item) => item.boundaryId === boundary.id);
     if (layer) map.flyToBounds(layer.getBounds(), { padding: [60, 60], duration: 0.6 });
     renderContext();
@@ -1493,6 +1498,98 @@
     });
   });
 
+  // ---------- live reported flooding (ADR-0056) ----------
+  // Bangkok areas only. Stored Floodboard incidents for the area's district: context with a time,
+  // never part of an assessment, and not a flood map.
+  const LIVE_COLOURS = { conflicting: "#7c3aed", high: "#b91c1c", medium: "#ea580c", low: "#ca8a04" };
+  const bangkokTime = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", {
+    timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  }) : "unknown");
+
+  const livePopup = (props) => {
+    const box = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = props.name_en || props.name || "Unnamed road";
+    const lines = [
+      `Confidence: ${props.confidence}${props.status === "receding" ? " (receding)" : ""}`,
+      props.depth_cm != null ? `Deepest reported: ${props.depth_cm} cm` : "No depth reported",
+      `Last report: ${bangkokTime(props.reported_at)}`,
+      "Reported flooding, not verified on the ground.",
+    ];
+    box.append(title, ...lines.map((text) => {
+      const line = document.createElement("div");
+      line.textContent = text;
+      return line;
+    }));
+    return box;
+  };
+
+  const loadLiveFlood = async (boundary) => {
+    const revision = ++liveFloodRevision;
+    const note = $("[data-live-flood-note]");
+    note.textContent = "Loading live reports…";
+    const params = new URLSearchParams({ boundary_id: boundary.id });
+    if (state.hubCode) params.set("hub_code", state.hubCode);
+    try {
+      const payload = await GRP.request(`/api/v1/maps/live-flood?${params}`);
+      if (revision !== liveFloodRevision) return;
+      liveFloodLayer.clearLayers();
+      $("[data-live-flood-legend]").hidden = !payload.available;
+      if (!payload.available) {
+        note.textContent = payload.note;
+        return;
+      }
+      window.L.geoJSON(payload.roads, {
+        pane: "grpLiveFlood",
+        style: (feature) => {
+          const receding = feature.properties.status === "receding";
+          return {
+            color: LIVE_COLOURS[feature.properties.confidence] || "#6b7280",
+            weight: 5,
+            opacity: receding ? 0.55 : 0.9,
+            dashArray: receding ? "6 6" : null,
+          };
+        },
+        onEachFeature: (feature, line) => line.bindPopup(livePopup(feature.properties)),
+      }).addTo(liveFloodLayer);
+      const count = payload.incidents.length;
+      const parts = [
+        `As of ${bangkokTime(payload.snapshot_retrieved_at)} (Bangkok time): `
+          + `${count} incident${count === 1 ? "" : "s"} with flooding reported in ${payload.district_name}.`,
+      ];
+      if (payload.rolled_up_from) parts.push("Shown for the whole district, not only this sub-district.");
+      parts.push(payload.note, ...payload.gaps, `Source: ${payload.credit}.`);
+      note.textContent = parts.join(" ");
+    } catch (error) {
+      if (revision === liveFloodRevision) note.textContent = `Live reports are not available: ${error.message}`;
+    }
+  };
+
+  function syncLiveFlood() {
+    const boundary = state.selected;
+    const inBangkok = Boolean(boundary && String(boundary.admin_code || "").startsWith("10"));
+    $("[data-live-flood]").hidden = !inBangkok;
+    const on = inBangkok && $("[data-live-flood-toggle]").checked;
+    if (!on) {
+      liveFloodRevision += 1;
+      liveFloodLayer.clearLayers();
+      liveFloodLayer.remove();
+      $("[data-live-flood-legend]").hidden = true;
+      if (!inBangkok) $("[data-live-flood-note]").textContent = "";
+      return;
+    }
+    liveFloodLayer.addTo(map);
+    loadLiveFlood(boundary);
+  }
+
+  $("[data-live-flood-toggle]").addEventListener("change", syncLiveFlood);
+  // A live layer goes stale: refresh it every five minutes while it is on.
+  window.setInterval(() => {
+    if (state.selected && $("[data-live-flood-toggle]").checked && !$("[data-live-flood]").hidden) {
+      loadLiveFlood(state.selected);
+    }
+  }, 5 * 60 * 1000);
+
   $("[data-layers-toggle]").addEventListener("click", (event) => {
     const panel = $("[data-layers]");
     panel.hidden = !panel.hidden;
@@ -1513,6 +1610,7 @@
     state.areaLevel = nextLevel;
     state.boundaries = payload.boundaries;
     state.selected = null;
+    syncLiveFlood();
     // Nothing is selected at the new level, so the People tab must go back to its prompt rather
     // than keep the previous level's figures on screen (backlog U1).
     state.areaProfile = null;
@@ -1878,6 +1976,7 @@
       // Never leave a different district selected while the panel describes this result. Clearing
       // is worse than useless only if we say nothing, so say it (backlog U5).
       state.selected = null;
+      syncLiveFlood();
       state.explicitSelection = false;
       state.areaProfile = null;
       state.areaProfileId = null;
@@ -4443,6 +4542,7 @@
         // browser last used, which is usually not the assessment's, so drop it rather than show a
         // different district while the assessment loads (backlog U5).
         state.selected = null;
+        syncLiveFlood();
         state.explicitSelection = false;
         state.areaProfile = null;
         state.areaProfileId = null;

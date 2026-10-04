@@ -91,6 +91,7 @@ MATRIX = {
     "hazard_overlay": (401, 404, 404, 404, 403),
     "vulnerability_overlay": (401, 404, 404, 404, 403),
     "dataset_features": (401, 404, 404, 404, 403),
+    "live_flood": (401, 404, 404, 404, 403),
     # ADR-0029: a planning conversation is its owner's, in a Hub they plan for. Every planning
     # role reads its own; a Platform Admin with no planning membership has none to read.
     "read_conversation": (401, 200, 200, 200, 403),
@@ -216,6 +217,7 @@ MATRIX_OPERATION_IDS = {
         "vulnerability_overlay_api_v1_maps_vulnerability__version_id__overlay_png_get"
     ),
     "dataset_features": "dataset_features_api_v1_maps_datasets__version_id__features_get",
+    "live_flood": "live_flood_api_v1_maps_live_flood_get",
     "read_conversation": "read_conversation_api_v1_planning_conversation_get",
     "clear_conversation": "clear_conversation_api_v1_planning_conversation_delete",
     "centre_indicator_values": "centre_indicator_values_api_v1_maps_centres_indicator_values_post",
@@ -563,6 +565,7 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             None,
         ),
         "dataset_features": ("GET", f"/api/v1/maps/datasets/{user_id}/features", None),
+        "live_flood": ("GET", f"/api/v1/maps/live-flood?boundary_id={user_id}", None),
         "read_conversation": ("GET", "/api/v1/planning/conversation", None),
         "clear_conversation": ("DELETE", "/api/v1/planning/conversation", None),
         "centre_indicator_values": (

@@ -15,6 +15,7 @@ from api.planning_access import planner_membership
 from api.settings import get_settings
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import CentreIndicatorValue
+from core.flood_evidence.planner_layer import live_layer
 from core.hazard_overlay import legend
 from core.storage import LocalStorage
 
@@ -397,3 +398,23 @@ def centre_indicator_values(
         })
         values.setdefault(str(feature_id), {})[key] = value
     return {"indicators": list(indicators.values()), "values": values}
+
+
+@router.get(
+    "/live-flood",
+    summary="Live reported flooding on roads for a Bangkok planning area (not a flood map)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def live_flood(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    boundary_id: UUID,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """ADR-0056 step 2: stored incidents for the area's district, never part of an assessment."""
+
+    hub = planner_membership(principal, hub_code)
+    boundary = session.get(Boundary, boundary_id)
+    if boundary is None or not boundary.is_supported:
+        raise not_found()
+    return live_layer(session, hub.hub_code, boundary.admin_code, boundary.admin_level)

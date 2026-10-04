@@ -159,6 +159,17 @@
             <span><i class="pw-dot" style="--c:#6b7280"></i>N/A — no data</span>
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
+          <div class="pw-layer-choice" data-live-flood hidden>
+            <label class="pw-toggle"><input type="checkbox" data-live-flood-toggle /><span>Reported flooding on roads (live, not a flood map)</span></label>
+            <div class="pw-legend" data-live-flood-legend hidden>
+              <span><i class="pw-dot" style="--c:#7c3aed"></i>Conflicting reports</span>
+              <span><i class="pw-dot" style="--c:#b91c1c"></i>High confidence</span>
+              <span><i class="pw-dot" style="--c:#ea580c"></i>Medium confidence</span>
+              <span><i class="pw-dot" style="--c:#ca8a04"></i>Low confidence</span>
+              <span>Dashed: receding, no current report</span>
+            </div>
+            <p class="pw-muted" data-live-flood-note></p>
+          </div>
           <div data-supporting-layer-controls></div>
           <div data-vulnerability-layer-controls></div>
           <div class="pw-sensitivity-legend" data-sensitivity-legend hidden>
