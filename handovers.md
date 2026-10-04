@@ -221,6 +221,71 @@ it, so do it before W2 submission)
 - **Rules:** live data never enters an assessment; sub-districts roll up to their district; no
   warnings. ADR-0056.
 
+#### NEXT TO IMPLEMENT: facilities and cameras on the Planner's live map (W7b)
+
+**Status:** designed and ready to build; not started. Design:
+`docs/pilot/2026-10-04_Planner_Live_Map_UX_Design.md`, which has ASCII mock-ups of every card.
+The owner asked for "evacuation centres near flood points and cameras, and when I click each
+point it details out, careful about UX".
+
+**What the planner gets** (Bangkok areas, under the existing live switch):
+- **Two sub-switches**, each with a count: "Facilities with flooding reported nearby" and
+  "Cameras near reported flooding". The time shows beside the heading and turns amber after
+  2 hours.
+- **DDPM evacuation centres with flooding nearby:** the existing pin gets an orange ring and a
+  wave badge, not a second pin.
+- **Schools, hospitals and clinics:** ringed letter markers.
+- **Cameras:** a glyph with a green dot when GRP can show a picture, grey otherwise. They are
+  grouped per incident at district zoom and shown one by one from zoom 15.
+- **Cards** all follow one pattern: title, plain meaning, facts, related-item buttons, "what this
+  is not", source and time. They are at most 300 px wide, and a bottom sheet on a phone.
+  - **Incident:** the confidence word with its reason in plain words, depth, reports, last
+    report, and "nearby facilities/cameras" buttons.
+  - **DDPM centre:** a separate "LIVE · as of" block above the existing assessment content; the
+    two never mix.
+  - **Facility:** the distance, and access "not confirmed" (amber when a frontage road is closed
+    or risky).
+  - **Camera:** a live picture through the relay, refreshing every 10 s while open, pausable,
+    stopped on close or after 10 minutes; the official viewer link otherwise. The note says "an
+    empty road is not proof it is dry".
+- **A "Live now" list** in the panel, which can be used with a keyboard and flies to each item.
+- **States:** loading, no incidents ("no report is not proof that it is dry"), stale, camera
+  failure, sub-district roll-up.
+
+**Build steps:**
+1. **API** (`core/flood_evidence/planner_layer.py`, `GET /api/v1/maps/live-flood`). Add:
+   - `facilities`: `potentially_exposed` in the district, with incident links and the computed
+     access state; no officer-confirmed state (D2);
+   - `cameras`: within 400 m of incident roads, deduplicated, at most 40, with the name in both
+     languages, `picture_url` only for relay cameras, and the viewer link.
+
+   Tests cover these. No new route.
+2. **Map** (`web/planning.js`, `planning.html`, `planning.css`): sub-switches with counts, ringed
+   markers, rings on DDPM pins, camera grouping by zoom, the grouped legend, and remembering
+   choices.
+3. **Cards:** incident, facility, the DDPM live block and camera, with picture refresh and pause.
+   Built with DOM only, never raw HTML from data.
+4. **"Live now" list** in the panel.
+5. **Browser check** on Suan Luang (pictures) and Lat Krabang (none), at desktop and phone widths,
+   with screenshots.
+6. ADR-0056 amendment, then the handover.
+
+**Rules:**
+- not a flood map, not a warning;
+- live data never enters the assessment;
+- "flooding reported nearby", never "flooded";
+- access is never assumed;
+- no officer checks;
+- credits for Floodboard, OSM, DDPM and BMA traffic cameras.
+
+**Owner questions before building** (the recommended answer comes first):
+- sub-switches on by default (yes / off);
+- group cameras at district zoom (yes / always individual);
+- include the "Live now" list now (yes / later).
+
+**After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
+(DDPM reports).
+
 #### Open decisions (owner)
 
 | ID | Decision | Unblocks |
