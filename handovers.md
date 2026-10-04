@@ -296,6 +296,27 @@ point it details out, careful about UX".
 **After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
 (DDPM reports).
 
+#### PLANNED: expand the live pilot to Nonthaburi (validated 4 October 2026)
+
+See `docs/pilot/2026-10-04_Nonthaburi_Expansion_Validation_and_Plan.md`. **Validated:**
+- Floodboard already covers all six districts: 314 road segments and 82 reports in 24 hours.
+- Pak Kret municipality has **52 working cameras** (JPEG, no login; a test picture was live).
+- Longdo/iTIC has 21 Nonthaburi cameras, which are the same Pak Kret ones.
+- **64 usable DDPM evacuation centres**, against none in Bangkok.
+
+**Rejected:**
+- the World Flood CCTV aggregator (cameras it doesn't own; automated use discouraged);
+- the Nakhon Nonthaburi GIS (no public interface; would need reverse-engineering);
+- the old BMA cpudapp link (404; bmatraffic.com is already used).
+
+**Gap:** cameras exist only in Pak Kret.
+
+**Code changes:** outlines from the GRP boundary table, area checks instead of the `10` prefix, a
+Pak Kret camera registry and relay, OSM capture, and naming. About a day of work.
+
+**Waiting on the owner:** go-ahead; how to handle Pak Kret's terms (none stated); whether to
+request a feed from Nakhon Nonthaburi.
+
 #### Open decisions (owner)
 
 | ID | Decision | Unblocks |
