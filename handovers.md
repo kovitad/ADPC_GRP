@@ -296,6 +296,25 @@ point it details out, careful about UX".
 **After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
 (DDPM reports).
 
+#### BUILT: Planner "Live layer" with one switch per source (ADR-0058, 4 October 2026)
+
+- **What:** Layers → "Live layer (Bangkok, Nonthaburi)", 13 switches, all off by default:
+  - roads with flooding reported;
+  - five report kinds;
+  - OSM facilities and DDPM centres;
+  - four camera providers;
+  - outlines.
+
+  Counts are shown, and the incident, facility and camera cards keep working.
+- **Routes:** `GET /api/v1/maps/live-flood/summary` and `.../sources/{name}`, trimmed with no
+  officer data.
+- **Checked:** with real data in a headless test server. Not yet checked signed in.
+- **Fixed today:**
+  - the Layers button had opened the chat's Global Risk picker, because two elements shared
+    `data-layers` since `894eca1`;
+  - a cached page could break start-up;
+  - version tags are now checked by a test.
+
 #### BUILT: the live pilot covers Nonthaburi (ADR-0057, 4 October 2026)
 
 - **Coverage:** 56 districts. Outlines come from `core/data/flood_pilot_bangkok_areas.json`;

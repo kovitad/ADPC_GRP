@@ -125,11 +125,6 @@
   map.getPane("grpSensitivityMask").style.pointerEvents = "none";
   // ADR-0056: live reported flooding sits above the scenario layers, with its own legend.
   map.createPane("grpLiveFlood").style.zIndex = "430";
-  map.createPane("grpLiveMarkers").style.zIndex = "640";
-  const liveFloodLayer = window.L.featureGroup();
-  const liveFacilityLayer = window.L.featureGroup();
-  const liveCameraLayer = window.L.featureGroup();
-  let liveFloodRevision = 0;
   let sensitivityMask = null;
   const centerRenderer = window.L.canvas({ padding: 0.35 });
   const centerMarkers = new Map();
@@ -1501,11 +1496,11 @@
     });
   });
 
-  // ---------- live reported flooding (ADR-0056; W7b design) ----------
-  // Bangkok areas only. Stored Floodboard incidents, facilities with flooding reported nearby and
-  // the cameras near it, for the area's district. Context with a time: never part of an
-  // assessment, not a flood map and not a warning. Every card is built from DOM nodes, never from
-  // HTML strings, because names come from outside sources.
+  // ---------- Live layer (ADR-0056, ADR-0058) ----------
+  // Every live source for the whole pilot area (Bangkok and Nonthaburi), one switch each, all off
+  // by default. A source loads only when its switch is first ticked. Context with a time: never
+  // part of an assessment, not a flood map and not a warning. Cards are built from DOM nodes,
+  // never from HTML strings, because names come from outside sources.
   const LIVE_COLOURS = { conflicting: "#7c3aed", high: "#b91c1c", medium: "#ea580c", low: "#ca8a04" };
   const LIVE_CONFIDENCE = {
     conflicting: "Conflicting evidence", high: "High confidence",
@@ -1526,22 +1521,41 @@
     itic: "iTIC", longdo_user: "Longdo users",
   };
   const LIVE_FACILITY = {
-    evacuation_centre: { label: "DDPM evacuation centre", letter: "E" },
-    hospital: { label: "Hospital", letter: "H" },
-    clinic: { label: "Clinic", letter: "C" },
-    school: { label: "School", letter: "S" },
+    evacuation_centre: { label: "DDPM evacuation centre", colour: "#0f766e" },
+    hospital: { label: "Hospital", colour: "#be123c" },
+    clinic: { label: "Clinic", colour: "#9333ea" },
+    school: { label: "School", colour: "#2563eb" },
   };
+  // Switch key -> label, the source it loads from, and its swatch.
+  const LIVE_SWITCHES = [
+    { key: "roads", label: "Roads with flooding reported (Floodboard)", source: "roads", swatch: "line", colour: "#ea580c" },
+    { key: "rep_traffy", label: "Reports: Traffy Fondue", source: "reports", colour: "#0891b2" },
+    { key: "rep_crowd", label: "Reports: public, via Floodboard", source: "reports", colour: "#db2777" },
+    { key: "rep_bma", label: "Reports: BMA sensors", source: "reports", colour: "#1d4ed8" },
+    { key: "rep_longdo", label: "Reports: Longdo, iTIC, Highways", source: "reports", colour: "#65a30d" },
+    { key: "rep_other", label: "Reports: news and clusters (not counted)", source: "reports", colour: "#9ca3af" },
+    { key: "fac_osm", label: "Schools, hospitals and clinics (OSM)", source: "facilities", colour: "#2563eb" },
+    { key: "fac_ddpm", label: "DDPM evacuation centres", source: "facilities", colour: "#0f766e" },
+    { key: "cam_traffic", label: "Cameras: BMA Traffic", source: "cameras", colour: "#111827" },
+    { key: "cam_bma", label: "Cameras: BMA flood cameras (via BMA's relay)", source: "cameras", colour: "#4b5563" },
+    { key: "cam_longdo", label: "Cameras: iTIC and Longdo", source: "cameras", colour: "#374151" },
+    { key: "cam_pakkret", label: "Cameras: Pak Kret municipality", source: "cameras", colour: "#1f2937" },
+    { key: "cam_other", label: "Cameras: others", source: "cameras", colour: "#6b7280" },
+    { key: "outline", label: "District outlines", source: "outlines", swatch: "outline", colour: "#334155" },
+  ];
   const LIVE_STALE_MINUTES = 120;
-  const LIVE_CAMERA_ZOOM = 15;
+  const LIVE_CAMERA_RADIUS_M = 400;
   const LIVE_PICTURE_SECONDS = 10;
   const LIVE_PICTURE_MAX_MINUTES = 10;
-  const LIVE_PREFS = "grp.planning.liveLayers";
-  let livePayload = null;
+  const LIVE_PREFS = "grp.planning.liveLayer.on";
+  const liveData = {};          // source name -> payload
+  const liveLoading = {};       // source name -> promise
+  const liveLayers = {};        // switch key -> Leaflet layer
+  let liveSummary = null;
   let liveSelection = null;
+  let liveFitted = false;
+  const liveRenderer = window.L.canvas({ padding: 0.4 });
 
-  const bangkokTime = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", {
-    timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-  }) : "unknown");
   const bangkokClock = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-GB", {
     timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit",
   }) : "unknown");
@@ -1554,22 +1568,24 @@
     }
     return String(value || "");
   };
-
-  const readLivePrefs = () => {
-    try {
-      return { facilities: true, cameras: true, ...JSON.parse(window.localStorage.getItem(LIVE_PREFS) || "{}") };
-    } catch (_error) {
-      return { facilities: true, cameras: true };
-    }
+  const metres = (lon1, lat1, lon2, lat2) => {
+    const rad = Math.PI / 180;
+    const x = (lon2 - lon1) * rad * Math.cos(((lat1 + lat2) / 2) * rad);
+    const y = (lat2 - lat1) * rad;
+    return Math.hypot(x, y) * 6371000;
   };
-  const liveSub = (name) => $(`[data-live-sub="${name}"]`);
-  const liveSubOn = (name) => Boolean(liveSub(name) && liveSub(name).checked);
-  const saveLivePrefs = () => {
+
+  const liveOn = (() => {
     try {
-      window.localStorage.setItem(LIVE_PREFS, JSON.stringify({
-        facilities: liveSubOn("facilities"),
-        cameras: liveSubOn("cameras"),
-      }));
+      const saved = JSON.parse(window.localStorage.getItem(LIVE_PREFS) || "[]");
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch (_error) {
+      return new Set();
+    }
+  })();
+  const saveLiveOn = () => {
+    try {
+      window.localStorage.setItem(LIVE_PREFS, JSON.stringify([...liveOn]));
     } catch (_error) {
       // Not remembered in this browser; the switches still work.
     }
@@ -1641,17 +1657,30 @@
     return box;
   };
 
+  const snapshotIso = () => (liveData.roads && liveData.roads.snapshot_retrieved_at)
+    || (liveSummary && liveSummary.snapshot_retrieved_at);
   const liveStaleLine = () => {
-    const minutes = minutesSince(livePayload && livePayload.snapshot_retrieved_at);
+    const minutes = minutesSince(snapshotIso());
     return minutes != null && minutes > LIVE_STALE_MINUTES ? `This is ${ageText(minutes)} old.` : null;
   };
-  const liveAsOf = () => `as of ${bangkokClock(livePayload && livePayload.snapshot_retrieved_at)}`;
+  const liveAsOf = () => `as of ${bangkokClock(snapshotIso())}`;
 
-  const relatedTo = (incidentId) => ({
-    facilities: (livePayload.facilities || []).filter((f) => f.incident_ids.includes(incidentId)),
-    cameras: (livePayload.cameras || []).filter((c) => c.incident_ids.includes(incidentId)),
-  });
-  const incidentById = (id) => (livePayload.incidents || []).find((i) => i.incident_id === id);
+  const incidents = () => (liveData.roads && liveData.roads.incidents) || [];
+  const incidentById = (id) => incidents().find((i) => i.incident_id === id);
+  const incidentLines = (incidentId) => ((liveData.roads && liveData.roads.roads.features) || [])
+    .filter((f) => f.properties.incident_id === incidentId);
+  const camerasNear = (incidentId) => {
+    const points = incidentLines(incidentId).flatMap((f) => (f.geometry.type === "MultiLineString"
+      ? f.geometry.coordinates.flat() : f.geometry.coordinates));
+    if (!points.length || !liveData.cameras) return [];
+    return liveData.cameras.cameras
+      .map((c) => ({ camera: c, distance: Math.min(...points.map(([lon, lat]) => metres(c.lon, c.lat, lon, lat))) }))
+      .filter((item) => item.distance <= LIVE_CAMERA_RADIUS_M)
+      .sort((a, b) => (Boolean(b.camera.picture_url) - Boolean(a.camera.picture_url)) || (a.distance - b.distance))
+      .slice(0, 8);
+  };
+  const facilitiesNear = (incidentId) => ((liveData.facilities && liveData.facilities.facilities) || [])
+    .filter((f) => f.incident_ids.includes(incidentId));
 
   const focusItems = (points) => {
     if (!points.length) return;
@@ -1660,36 +1689,41 @@
   };
 
   const incidentCard = (incident) => {
-    const roads = [...new Set((livePayload.roads.features || [])
-      .filter((f) => f.properties.incident_id === incident.incident_id)
-      .map((f) => f.properties.name_en || f.properties.name)
-      .filter(Boolean))];
+    const roads = [...new Set(incidentLines(incident.incident_id)
+      .map((f) => f.properties.name_en || f.properties.name).filter(Boolean))];
     const families = (incident.source_families || []).map((f) => LIVE_FAMILIES[f] || f);
-    const why = (incident.reasons || [])
-      .filter((r) => !r.startsWith("source_types:"))
-      .map((r) => LIVE_REASONS[r])
-      .filter(Boolean);
-    const meaning = [
-      families.length ? `Reported by ${families.join(", ")}.` : "",
-      ...why,
-    ].filter(Boolean).join(" ");
-    const related = relatedTo(incident.incident_id);
+    const why = (incident.reasons || []).filter((r) => !r.startsWith("source_types:"))
+      .map((r) => LIVE_REASONS[r]).filter(Boolean);
+    const meaning = [families.length ? `Reported by ${families.join(", ")}.` : "", ...why]
+      .filter(Boolean).join(" ");
+    const near = facilitiesNear(incident.incident_id);
+    const cams = camerasNear(incident.incident_id);
     const buttons = [];
-    if (related.facilities.length) {
+    if (near.length) {
       buttons.push({
-        label: `${related.facilities.length} facilit${related.facilities.length === 1 ? "y" : "ies"} nearby`,
-        onClick: () => { highlightIncident(incident.incident_id); focusItems(related.facilities); },
-      });
-    }
-    if (related.cameras.length) {
-      buttons.push({
-        label: `${related.cameras.length} camera${related.cameras.length === 1 ? "" : "s"} nearby`,
+        label: `${near.length} facilit${near.length === 1 ? "y" : "ies"} nearby`,
         onClick: () => {
+          ["fac_osm", "fac_ddpm"].forEach((key) => setLiveSwitch(key, true));
           highlightIncident(incident.incident_id);
-          if (map.getZoom() < LIVE_CAMERA_ZOOM) map.setZoom(LIVE_CAMERA_ZOOM);
-          focusItems(related.cameras);
+          focusItems(near);
         },
       });
+    }
+    if (cams.length) {
+      buttons.push({
+        label: `${cams.length} camera${cams.length === 1 ? "" : "s"} nearby`,
+        onClick: () => {
+          [...new Set(cams.map((c) => c.camera.group))].forEach((key) => setLiveSwitch(key, true));
+          highlightIncident(incident.incident_id);
+          focusItems(cams.map((c) => c.camera));
+        },
+      });
+    } else if (!liveData.cameras) {
+      buttons.push({ label: "Show cameras nearby", onClick: async () => {
+        await ensureSource("cameras");
+        map.closePopup();
+        openIncident(incident.incident_id);
+      } });
     }
     return liveCard({
       title: `Flooding reported · ${roads.slice(0, 2).join(", ") || "unnamed roads"}`,
@@ -1710,21 +1744,38 @@
     });
   };
 
+  const roadCard = (props) => liveCard({
+    title: props.name_en || props.name || "Unnamed road",
+    badge: { text: props.cleared ? "Reported cleared" : `Older report · ${props.freshness}`, colour: props.cleared ? "#16a34a" : "#6b7280" },
+    meaning: props.cleared
+      ? "A recent report says this road has been cleared."
+      : "Flooding was reported here, but the evidence is too old to count as now.",
+    facts: [
+      ["Last report", props.reported_at ? new Date(props.reported_at).toLocaleString("en-GB", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "unknown"],
+      ["Depth reported", props.depth_cm != null ? `${props.depth_cm} cm` : "no depth reported"],
+    ],
+    notThis: "Not part of a current incident; not part of the assessment",
+    source: `Floodboard (CC BY 4.0) · ${liveAsOf()}`,
+  });
+
+  const reportCard = (props) => liveCard({
+    title: `Report · ${props.underlying_source || "unknown source"}`,
+    badge: { text: props.cleared ? "Says cleared" : `Freshness: ${props.freshness}`, colour: props.cleared ? "#16a34a" : "#0891b2" },
+    meaning: props.cleared ? "This report says the ground is dry or cleared." : "A report of flooding at this point.",
+    facts: [
+      ["Reported", props.observed_at ? new Date(props.observed_at).toLocaleString("en-GB", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "unknown"],
+      ["Depth", props.depth_cm != null ? `${props.depth_cm} cm` : "not given"],
+    ],
+    notThis: "One report; reports of one kind are not independent confirmation",
+    source: "Floodboard reports (CC BY 4.0); text and names are not kept",
+  });
+
   const facilityCard = (facility) => {
     const kind = LIVE_FACILITY[facility.asset_type] || { label: facility.asset_type };
-    const access = facility.access_state === "access_under_review"
-      ? (facility.frontage === "frontage_road_closed"
-        ? "Access under review: a road at the entrance is reported closed."
-        : "Access under review: a road at the entrance is rated risky for trucks.")
-      : "Access not confirmed: GRP has no road network.";
+    const exposed = facility.exposure_state === "potentially_exposed";
     const buttons = [];
     const incident = incidentById(facility.incident_ids[0]);
-    if (incident) {
-      buttons.push({ label: "Show the incident", onClick: () => openIncident(incident.incident_id) });
-    }
-    const camera = (livePayload.cameras || []).find((c) =>
-      c.incident_ids.some((id) => facility.incident_ids.includes(id)));
-    if (camera) buttons.push({ label: "Nearest camera", onClick: () => openCamera(camera.camera_id) });
+    if (incident) buttons.push({ label: "Show the incident", onClick: () => openIncident(incident.incident_id) });
     if (facility.asset_type === "evacuation_centre") {
       const featureId = facility.asset_id.replace(/^ddpm:/, "");
       if (centerMarkers.has(featureId)) {
@@ -1734,20 +1785,25 @@
     const accessLine = document.createElement("p");
     accessLine.className = facility.access_state === "access_under_review"
       ? "pw-live-card__access pw-live-card__access--review" : "pw-live-card__access";
-    accessLine.textContent = access;
+    accessLine.textContent = !exposed ? "Access not assessed: no flooding reported nearby."
+      : facility.access_state === "access_under_review"
+        ? (facility.frontage === "frontage_road_closed"
+          ? "Access under review: a road at the entrance is reported closed."
+          : "Access under review: a road at the entrance is rated risky for trucks.")
+        : "Access not confirmed: GRP has no road network.";
     return liveCard({
-      title: facility.name || facility.name_en || `Unnamed ${kind.label.toLowerCase()}`,
-      badge: { text: `LIVE · ${kind.label}`, colour: "#c2410c" },
-      meaning: facility.nearest_distance_m != null
-        ? `Flooding reported on a road ${facility.nearest_distance_m} m away.`
-        : "Flooding reported on a road nearby.",
+      title: facility.name || `Unnamed ${kind.label.toLowerCase()}`,
+      badge: { text: `${exposed ? "LIVE · " : ""}${kind.label}`, colour: exposed ? "#c2410c" : kind.colour || "#6b7280" },
+      meaning: exposed
+        ? (facility.nearest_distance_m != null
+          ? `Flooding reported on a road ${facility.nearest_distance_m} m away.`
+          : "Flooding reported on a road nearby.")
+        : "No flooding reported nearby now. No report is not proof that it is dry.",
       extra: accessLine,
       buttons,
-      notThis: facility.asset_type === "evacuation_centre"
-        ? "Reported nearby, not flooded; the assessment result above is separate"
-        : "Reported nearby, not flooded; not an official facility list",
+      notThis: exposed ? "Reported nearby, not flooded" : "Not part of the assessment",
       source: `${facility.source} · ${liveAsOf()}`,
-      stale: liveStaleLine(),
+      stale: exposed ? liveStaleLine() : null,
     });
   };
 
@@ -1756,8 +1812,7 @@
     const frame = document.createElement("figure");
     frame.className = "pw-live-camera";
     const img = document.createElement("img");
-    img.alt = `Live picture from ${localName(camera.name) || "a BMA traffic camera"}`;
-    img.loading = "lazy";
+    img.alt = `Live picture from ${localName(camera.name) || "a camera"}`;
     const caption = document.createElement("figcaption");
     const controls = document.createElement("div");
     controls.className = "pw-live-camera__controls";
@@ -1770,11 +1825,9 @@
     frame.append(img, caption, controls);
     let timer = null;
     let started = 0;
-    const load = () => {
-      img.src = `${camera.picture_url}?t=${Date.now()}`;
-    };
+    const load = () => { img.src = `${camera.picture_url}?t=${Date.now()}`; };
     img.addEventListener("load", () => {
-      caption.textContent = `BMA traffic camera (bmatraffic.com) · ${new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+      caption.textContent = `${camera.source} · ${new Date().toLocaleTimeString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
       frame.classList.remove("is-failed");
     });
     img.addEventListener("error", () => {
@@ -1806,10 +1859,8 @@
   };
 
   const cameraCard = (camera) => {
-    const incident = incidentById(camera.incident_ids[0]);
     const picture = camera.picture_url ? cameraPicture(camera) : null;
     const buttons = [];
-    if (incident) buttons.push({ label: "Show the incident", onClick: () => openIncident(incident.incident_id) });
     if (camera.viewer_url) buttons.push({ label: "Official live view ↗", href: camera.viewer_url });
     let extra = picture ? picture.node : null;
     if (!picture) {
@@ -1820,7 +1871,6 @@
     const card = liveCard({
       title: localName(camera.name) || "Camera",
       badge: { text: camera.picture_url ? "Camera · picture in GRP" : "Camera · official viewer", colour: camera.picture_url ? "#047857" : "#6b7280" },
-      meaning: `${camera.distance_m} m from reported flooding.`,
       extra,
       buttons,
       notThis: "One moment, one angle: an empty road in a picture is not proof that it is dry",
@@ -1829,31 +1879,7 @@
     return { node: card, picture };
   };
 
-  const cameraIcon = (camera) => window.L.divIcon({
-    className: `pw-live-cam${camera.picture_url ? " pw-live-cam--picture" : ""}`,
-    html: '<span class="pw-live-cam__glyph" aria-hidden="true"></span>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-  });
-  const facilityIcon = (facility) => {
-    const kind = LIVE_FACILITY[facility.asset_type] || { letter: "?" };
-    const evac = facility.asset_type === "evacuation_centre";
-    return window.L.divIcon({
-      className: `pw-live-fac${evac ? " pw-live-fac--evac" : ""}`,
-      html: `<span class="pw-live-fac__letter">${evac ? "" : kind.letter}</span><span class="pw-live-fac__wave" aria-hidden="true"></span>`,
-      iconSize: evac ? [30, 30] : [24, 24],
-      iconAnchor: evac ? [15, 15] : [12, 12],
-    });
-  };
-  const groupIcon = (count) => window.L.divIcon({
-    className: "pw-live-camgroup",
-    html: `<span>${Number(count)}</span>`,
-    iconSize: [30, 22],
-    iconAnchor: [15, 11],
-  });
-
   const popupOptions = { maxWidth: 300, minWidth: 240, className: "pw-live-pop", autoPanPadding: [24, 24] };
-  const liveMarkers = { roads: new Map(), facilities: new Map(), cameras: new Map() };
 
   // Phones: a sheet at the bottom of the screen, outside the map, so the card is never cut off.
   const isPhone = () => window.matchMedia("(max-width: 600px)").matches;
@@ -1908,27 +1934,10 @@
     });
   };
 
-  const drawLiveRoads = () => {
-    liveFloodLayer.clearLayers();
-    liveMarkers.roads.clear();
-    window.L.geoJSON(livePayload.roads, {
-      pane: "grpLiveFlood",
-      style: (feature) => liveRoadStyle(feature.properties, false),
-      onEachFeature: (feature, line) => {
-        const incident = incidentById(feature.properties.incident_id);
-        if (!incident) return;
-        attachCard(line, () => incidentCard(incident), {
-          onOpen: () => highlightIncident(incident.incident_id),
-          onClose: () => highlightIncident(null),
-        });
-        const list = liveMarkers.roads.get(incident.incident_id) || [];
-        list.push(line);
-        liveMarkers.roads.set(incident.incident_id, list);
-      },
-    }).addTo(liveFloodLayer);
-  };
-
   const liveRoadStyle = (props, faded) => {
+    if (!props.incident_id) {
+      return { color: props.cleared ? "#16a34a" : "#9ca3af", weight: faded ? 2 : 3, opacity: faded ? 0.2 : 0.7, dashArray: "4 5" };
+    }
     const receding = props.status === "receding";
     return {
       color: LIVE_COLOURS[props.confidence] || "#6b7280",
@@ -1938,274 +1947,314 @@
     };
   };
 
-  const drawLiveFacilities = () => {
-    liveFacilityLayer.clearLayers();
-    liveMarkers.facilities.clear();
-    (livePayload.facilities || []).forEach((facility) => {
-      const kind = LIVE_FACILITY[facility.asset_type] || { label: facility.asset_type };
-      const marker = window.L.marker([facility.lat, facility.lon], {
-        icon: facilityIcon(facility),
-        pane: "grpLiveMarkers",
-        title: `${kind.label}: ${facility.name || "unnamed"}, flooding reported ${facility.nearest_distance_m ?? "?"} m away`,
-        alt: kind.label,
-        keyboard: true,
-        riseOnHover: true,
+  // Build the Leaflet layer for one switch from its loaded source.
+  const buildLiveLayer = (key) => {
+    const spec = LIVE_SWITCHES.find((s) => s.key === key);
+    if (key === "roads") {
+      const group = window.L.geoJSON(liveData.roads.roads, {
+        pane: "grpLiveFlood",
+        style: (feature) => liveRoadStyle(feature.properties, false),
+        onEachFeature: (feature, line) => {
+          const incident = incidentById(feature.properties.incident_id);
+          if (incident) {
+            attachCard(line, () => incidentCard(incident), {
+              onOpen: () => highlightIncident(incident.incident_id),
+              onClose: () => highlightIncident(null),
+            });
+          } else {
+            attachCard(line, () => roadCard(feature.properties));
+          }
+        },
       });
-      attachCard(marker, () => facilityCard(facility));
-      marker.addTo(liveFacilityLayer);
-      liveMarkers.facilities.set(facility.asset_id, marker);
-    });
+      return group;
+    }
+    if (spec.source === "reports") {
+      const group = window.L.layerGroup();
+      liveData.reports.reports.features.filter((f) => f.properties.group === key).forEach((f) => {
+        const [lon, lat] = f.geometry.coordinates;
+        const marker = window.L.circleMarker([lat, lon], {
+          renderer: liveRenderer, radius: 4, color: "#fff", weight: 1, fillColor: spec.colour,
+          fillOpacity: f.properties.cleared ? 0.35 : 0.9,
+        });
+        attachCard(marker, () => reportCard(f.properties));
+        marker.addTo(group);
+      });
+      return group;
+    }
+    if (spec.source === "facilities") {
+      const group = window.L.layerGroup();
+      const wanted = key === "fac_ddpm"
+        ? (f) => f.asset_type === "evacuation_centre"
+        : (f) => f.asset_type !== "evacuation_centre";
+      liveData.facilities.facilities.filter(wanted).forEach((f) => {
+        const exposed = f.exposure_state === "potentially_exposed";
+        const kind = LIVE_FACILITY[f.asset_type] || { colour: "#6b7280" };
+        const marker = window.L.circleMarker([f.lat, f.lon], {
+          renderer: liveRenderer,
+          radius: exposed ? 7 : (f.asset_type === "evacuation_centre" ? 5 : 3.5),
+          color: exposed ? "#f97316" : "#fff", weight: exposed ? 3 : 1,
+          fillColor: kind.colour, fillOpacity: 0.9,
+        });
+        marker.liveIncidentIds = f.incident_ids;
+        attachCard(marker, () => facilityCard(f));
+        marker.addTo(group);
+      });
+      return group;
+    }
+    if (spec.source === "cameras") {
+      const group = window.L.layerGroup();
+      liveData.cameras.cameras.filter((c) => c.group === key).forEach((c) => {
+        const marker = window.L.circleMarker([c.lat, c.lon], {
+          renderer: liveRenderer, radius: 4, color: c.picture_url ? "#10b981" : "#fff",
+          weight: c.picture_url ? 2 : 1, fillColor: spec.colour, fillOpacity: 0.9,
+        });
+        marker.liveCameraId = c.camera_id;
+        let open = null;
+        attachCard(marker, () => {
+          if (open && open.picture) open.picture.stop();
+          open = cameraCard(c);
+          return open.node;
+        }, {
+          onOpen: () => open && open.picture && open.picture.start(),
+          onClose: () => open && open.picture && open.picture.stop(),
+        });
+        marker.addTo(group);
+      });
+      return group;
+    }
+    if (key === "outline") {
+      return window.L.geoJSON(liveData.outlines.outlines, {
+        pane: "grpLiveFlood", interactive: false,
+        style: { color: spec.colour, weight: 1.2, opacity: 0.7, fill: false },
+      });
+    }
+    return null;
   };
 
-  const drawLiveCameras = () => {
-    liveCameraLayer.clearLayers();
-    liveMarkers.cameras.clear();
-    const cameras = livePayload.cameras || [];
-    if (map.getZoom() < LIVE_CAMERA_ZOOM) {
-      // District zoom: one numbered badge per incident keeps the map readable.
-      (livePayload.incidents || []).forEach((incident) => {
-        const near = cameras.filter((c) => c.incident_ids[0] === incident.incident_id);
-        if (!near.length || !incident.center) return;
-        window.L.marker([incident.center[1], incident.center[0]], {
-          icon: groupIcon(near.length), pane: "grpLiveMarkers", keyboard: true,
-          title: `${near.length} camera${near.length === 1 ? "" : "s"} near this incident; zoom in to see them`,
-        }).on("click", () => {
-          map.flyToBounds(window.L.latLngBounds(near.map((c) => [c.lat, c.lon])).pad(0.5),
-            { maxZoom: 17, duration: 0.5 });
-        }).addTo(liveCameraLayer);
-      });
+  const ensureSource = (source) => {
+    if (liveData[source]) return Promise.resolve(liveData[source]);
+    if (!liveLoading[source]) {
+      const params = new URLSearchParams();
+      if (state.hubCode) params.set("hub_code", state.hubCode);
+      liveLoading[source] = GRP.request(`/api/v1/maps/live-flood/sources/${source}?${params}`)
+        .then((payload) => {
+          if (payload.available) liveData[source] = payload;
+          return liveData[source];
+        })
+        .finally(() => { delete liveLoading[source]; });
+    }
+    return liveLoading[source];
+  };
+
+  const setLiveSwitch = async (key, on) => {
+    const box = document.querySelector(`[data-live-switch="${key}"]`);
+    if (box) box.checked = on;
+    if (on) liveOn.add(key); else liveOn.delete(key);
+    saveLiveOn();
+    const spec = LIVE_SWITCHES.find((s) => s.key === key);
+    if (!on) {
+      liveLayers[key]?.remove();
+      renderLiveList();
       return;
     }
-    cameras.forEach((camera) => {
-      const marker = window.L.marker([camera.lat, camera.lon], {
-        icon: cameraIcon(camera), pane: "grpLiveMarkers", keyboard: true, riseOnHover: true,
-        title: `Camera: ${localName(camera.name) || "unnamed"}${camera.picture_url ? " (picture in GRP)" : " (official viewer)"}`,
-      });
-      let open = null;
-      attachCard(marker, () => {
-        if (open && open.picture) open.picture.stop();
-        open = cameraCard(camera);
-        return open.node;
-      }, {
-        onOpen: () => open && open.picture && open.picture.start(),
-        onClose: () => open && open.picture && open.picture.stop(),
-      });
-      marker.addTo(liveCameraLayer);
-      liveMarkers.cameras.set(camera.camera_id, marker);
-    });
+    const note = $("[data-live-flood-note]");
+    if (note) note.textContent = "Loading live reports…";
+    try {
+      await ensureSource(spec.source);
+      if (!liveData[spec.source] || !liveOn.has(key)) return;
+      if (!liveLayers[key]) liveLayers[key] = buildLiveLayer(key);
+      liveLayers[key]?.addTo(map);
+      // With no district selected, the first live source brings Bangkok and Nonthaburi into view.
+      if (!state.selected && !liveFitted && (key === "roads" || key === "outline")) {
+        const bounds = liveLayers[key].getBounds?.();
+        if (bounds && bounds.isValid()) {
+          liveFitted = true;
+          map.flyToBounds(bounds.pad(0.05), { duration: 0.6 });
+        }
+      }
+      renderLiveNote();
+      renderLiveList();
+    } catch (error) {
+      if (note) note.textContent = `Live reports are not available: ${error.message}`;
+    }
   };
 
   // Selecting an incident keeps its roads, facilities and cameras bright and fades the rest.
   const highlightIncident = (incidentId) => {
     liveSelection = incidentId;
-    liveMarkers.roads.forEach((lines, id) => {
-      lines.forEach((line) => line.setStyle(liveRoadStyle(line.feature.properties, Boolean(incidentId) && id !== incidentId)));
+    liveLayers.roads?.eachLayer((line) => {
+      line.setStyle(liveRoadStyle(line.feature.properties,
+        Boolean(incidentId) && line.feature.properties.incident_id !== incidentId));
     });
-    const dim = (marker, ids) => {
-      const element = marker.getElement && marker.getElement();
-      if (element) element.classList.toggle("is-faded", Boolean(incidentId) && !ids.includes(incidentId));
-    };
-    (livePayload.facilities || []).forEach((f) => {
-      const marker = liveMarkers.facilities.get(f.asset_id);
-      if (marker) dim(marker, f.incident_ids);
-    });
-    (livePayload.cameras || []).forEach((c) => {
-      const marker = liveMarkers.cameras.get(c.camera_id);
-      if (marker) dim(marker, c.incident_ids);
-    });
+    const nearIds = new Set(incidentId ? camerasNear(incidentId).map((c) => c.camera.camera_id) : []);
+    ["fac_osm", "fac_ddpm"].forEach((key) => liveLayers[key]?.eachLayer((marker) => {
+      marker.setStyle({ opacity: !incidentId || marker.liveIncidentIds.includes(incidentId) ? 1 : 0.2,
+        fillOpacity: !incidentId || marker.liveIncidentIds.includes(incidentId) ? 0.9 : 0.15 });
+    }));
+    LIVE_SWITCHES.filter((s) => s.source === "cameras").forEach((s) => liveLayers[s.key]?.eachLayer((marker) => {
+      marker.setStyle({ opacity: !incidentId || nearIds.has(marker.liveCameraId) ? 1 : 0.2,
+        fillOpacity: !incidentId || nearIds.has(marker.liveCameraId) ? 0.9 : 0.15 });
+    }));
   };
 
   const openIncident = (incidentId) => {
-    const lines = liveMarkers.roads.get(incidentId) || [];
+    const lines = [];
+    liveLayers.roads?.eachLayer((line) => {
+      if (line.feature.properties.incident_id === incidentId) lines.push(line);
+    });
     if (!lines.length) return;
     const bounds = window.L.featureGroup(lines).getBounds();
     map.flyToBounds(bounds.pad(0.6), { maxZoom: 16, duration: 0.5 });
     map.once("moveend", () => lines[0].openPopup(bounds.getCenter()));
   };
-  const openFacility = (assetId) => {
-    const facility = (livePayload.facilities || []).find((f) => f.asset_id === assetId);
-    if (!facility) return;
-    map.flyTo([facility.lat, facility.lon], Math.max(map.getZoom(), 16), { duration: 0.5 });
-    map.once("moveend", () => liveMarkers.facilities.get(assetId)?.openPopup());
-  };
-  const openCamera = (cameraId) => {
-    const camera = (livePayload.cameras || []).find((c) => c.camera_id === cameraId);
-    if (!camera) return;
-    map.flyTo([camera.lat, camera.lon], Math.max(map.getZoom(), LIVE_CAMERA_ZOOM + 1), { duration: 0.5 });
-    map.once("moveend", () => liveMarkers.cameras.get(cameraId)?.openPopup());
+
+  const renderLiveNote = () => {
+    const note = $("[data-live-flood-note]");
+    if (!note) return;
+    const parts = [];
+    if (liveData.roads) {
+      const active = incidents().filter((i) => i.status === "active").length;
+      parts.push(active
+        ? `${active} active incident${active === 1 ? "" : "s"} across Bangkok and Nonthaburi.`
+        : "No active incident reported now. No report is not proof that it is dry.");
+    }
+    parts.push("Reported flooding, not a flood map, not a warning, and not part of any assessment.");
+    const stale = liveStaleLine();
+    if (stale) parts.push(stale);
+    note.textContent = parts.join(" ");
   };
 
-  // The "Live now" list: every item reachable without precise clicking, and with a keyboard.
+  // The "Live now" list: incidents and facilities near them, reachable with a keyboard.
   const renderLiveList = () => {
     const list = $("[data-live-list]");
     if (!list) return;
     list.replaceChildren();
-    if (!livePayload || !livePayload.available) {
-      list.hidden = true;
-      return;
-    }
-    list.hidden = false;
-    const section = (title, items) => {
-      const head = document.createElement("div");
-      head.className = "pw-live-list__head";
-      head.textContent = title;
-      list.append(head);
-      if (!items.length) {
-        const none = document.createElement("div");
-        none.className = "pw-muted pw-live-list__none";
-        none.textContent = "None";
-        list.append(none);
-      }
-      items.forEach(({ label, colour, onClick }) => {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "pw-live-list__row";
-        if (colour) row.style.setProperty("--c", colour);
-        row.textContent = label;
-        row.addEventListener("click", onClick);
-        list.append(row);
+    const rows = [];
+    if (liveOn.has("roads") && liveData.roads) {
+      incidents().filter((i) => i.status === "active").slice(0, 12).forEach((incident) => {
+        const road = incidentLines(incident.incident_id).find((f) => f.properties.name_en || f.properties.name);
+        rows.push({
+          label: `${road ? road.properties.name_en || road.properties.name : "Unnamed roads"} · ${(LIVE_CONFIDENCE[incident.confidence] || "").replace(" confidence", "").toLowerCase()}`,
+          colour: LIVE_COLOURS[incident.confidence],
+          onClick: () => openIncident(incident.incident_id),
+        });
       });
-    };
-    const incidents = livePayload.incidents || [];
-    const roadName = (incident) => {
-      const road = (livePayload.roads.features || []).find((f) =>
-        f.properties.incident_id === incident.incident_id && (f.properties.name_en || f.properties.name));
-      return road ? (road.properties.name_en || road.properties.name) : "unnamed roads";
-    };
-    section(`Incidents (${incidents.length})`, incidents.slice(0, 15).map((incident) => ({
-      label: `${roadName(incident)} · ${(LIVE_CONFIDENCE[incident.confidence] || "").replace(" confidence", "").toLowerCase()}`,
-      colour: LIVE_COLOURS[incident.confidence],
-      onClick: () => openIncident(incident.incident_id),
-    })));
-    const showFacilities = liveSubOn("facilities");
-    const showCameras = liveSubOn("cameras");
-    if (showFacilities) {
-      section(`Facilities near reported flooding (${(livePayload.facilities || []).length})`,
-        (livePayload.facilities || []).map((f) => ({
+    }
+    if ((liveOn.has("fac_osm") || liveOn.has("fac_ddpm")) && liveData.facilities) {
+      liveData.facilities.facilities.filter((f) => f.exposure_state === "potentially_exposed").slice(0, 10).forEach((f) => {
+        rows.push({
           label: `${(LIVE_FACILITY[f.asset_type] || { label: f.asset_type }).label}: ${f.name || "unnamed"} · ${f.nearest_distance_m ?? "?"} m`,
-          onClick: () => openFacility(f.asset_id),
-        })));
+          colour: "#f97316",
+          onClick: () => {
+            map.flyTo([f.lat, f.lon], Math.max(map.getZoom(), 16), { duration: 0.5 });
+          },
+        });
+      });
     }
-    if (showCameras) {
-      const withPictures = (livePayload.cameras || []).filter((c) => c.picture_url);
-      section(`Cameras with a picture in GRP (${withPictures.length} of ${(livePayload.cameras || []).length})`,
-        withPictures.slice(0, 10).map((c) => ({
-          label: `${localName(c.name) || "Camera"} · ${c.distance_m} m`,
-          onClick: () => openCamera(c.camera_id),
-        })));
-    }
-  };
-
-  const renderLiveHeader = () => {
-    const when = $("[data-live-when]");
-    if (!when) return;
-    const minutes = minutesSince(livePayload && livePayload.snapshot_retrieved_at);
-    when.textContent = livePayload && livePayload.available
-      ? `as of ${bangkokClock(livePayload.snapshot_retrieved_at)}${minutes > LIVE_STALE_MINUTES ? ` (${ageText(minutes)} ago)` : ""}`
-      : "";
-    when.classList.toggle("is-stale", Boolean(minutes > LIVE_STALE_MINUTES));
-    const counts = { facilities: livePayload && livePayload.facilities, cameras: livePayload && livePayload.cameras };
-    Object.entries(counts).forEach(([name, items]) => {
-      const node = $(`[data-live-count="${name}"]`);
-      if (node) node.textContent = livePayload && livePayload.available ? `(${(items || []).length})` : "";
+    list.hidden = !rows.length;
+    if (!rows.length) return;
+    const head = document.createElement("div");
+    head.className = "pw-live-list__head";
+    head.textContent = "Live now";
+    list.append(head);
+    rows.forEach(({ label, colour, onClick }) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "pw-live-list__row";
+      if (colour) row.style.setProperty("--c", colour);
+      row.textContent = label;
+      row.addEventListener("click", onClick);
+      list.append(row);
     });
   };
 
-  const applyLiveSublayers = () => {
-    const on = $("[data-live-flood-toggle]").checked && livePayload && livePayload.available;
-    document.querySelectorAll("[data-live-sub]").forEach((box) => { box.disabled = !$("[data-live-flood-toggle]").checked; });
-    const show = (layer, wanted) => (on && wanted ? layer.addTo(map) : layer.remove());
-    show(liveFacilityLayer, liveSubOn("facilities"));
-    show(liveCameraLayer, liveSubOn("cameras"));
-    renderLiveList();
+  const renderLiveSwitches = () => {
+    const box = $("[data-live-switches]");
+    if (!box) return;
+    box.replaceChildren();
+    const counts = (liveSummary && liveSummary.counts) || {};
+    LIVE_SWITCHES.forEach((spec) => {
+      const count = counts[spec.key] || 0;
+      if (spec.key === "cam_other" && !count) return;
+      const label = document.createElement("label");
+      label.className = "pw-toggle pw-live-switch";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.dataset.liveSwitch = spec.key;
+      input.checked = liveOn.has(spec.key);
+      input.addEventListener("change", () => setLiveSwitch(spec.key, input.checked));
+      const swatch = document.createElement("i");
+      swatch.className = `pw-live-swatch pw-live-swatch--${spec.swatch || "dot"}`;
+      swatch.style.setProperty("--c", spec.colour);
+      const text = document.createElement("span");
+      text.textContent = spec.label;
+      const number = document.createElement("span");
+      number.className = "pw-live-switch__count";
+      number.textContent = count.toLocaleString("en-GB");
+      label.append(input, swatch, text, number);
+      box.append(label);
+      if (spec.key === "roads") {
+        const legend = document.createElement("div");
+        legend.className = "pw-legend pw-live-roadlegend";
+        [["conflicting", "Conflicting"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]].forEach(([k, t]) => {
+          const item = document.createElement("span");
+          const line = document.createElement("i");
+          line.className = "pw-line";
+          line.style.setProperty("--c", LIVE_COLOURS[k]);
+          item.append(line, document.createTextNode(`${t} confidence`));
+          legend.append(item);
+        });
+        const old = document.createElement("span");
+        const oldLine = document.createElement("i");
+        oldLine.className = "pw-line pw-line--dashed";
+        oldLine.style.setProperty("--c", "#9ca3af");
+        old.append(oldLine, document.createTextNode("Older or cleared report"));
+        legend.append(old);
+        box.append(legend);
+      }
+    });
   };
 
-  const loadLiveFlood = async (boundary) => {
-    const revision = ++liveFloodRevision;
-    const note = $("[data-live-flood-note]");
-    note.textContent = "Loading live reports…";
-    const params = new URLSearchParams({ boundary_id: boundary.id });
+  const loadLiveSummary = async () => {
+    const params = new URLSearchParams();
     if (state.hubCode) params.set("hub_code", state.hubCode);
     try {
-      const payload = await GRP.request(`/api/v1/maps/live-flood?${params}`);
-      if (revision !== liveFloodRevision) return;
-      livePayload = payload;
-      liveFloodLayer.clearLayers();
-      liveFacilityLayer.clearLayers();
-      liveCameraLayer.clearLayers();
-      $("[data-live-flood-legend]").hidden = !payload.available;
-      renderLiveHeader();
-      if (!payload.available) {
-        note.textContent = payload.note;
-        applyLiveSublayers();
-        return;
-      }
-      drawLiveRoads();
-      drawLiveFacilities();
-      drawLiveCameras();
-      if (liveSelection) highlightIncident(liveSelection);
-      const count = payload.incidents.length;
-      const parts = [count
-        ? `${count} incident${count === 1 ? "" : "s"} with flooding reported in ${payload.district_name}.`
-        : `No flooding reported in ${payload.district_name} now. No report is not proof that it is dry.`];
-      if (payload.rolled_up_from) parts.push("Shown for the whole district, not only this sub-district.");
-      parts.push(...payload.gaps, `Source: ${payload.credit}.`);
-      note.textContent = parts.join(" ");
-      applyLiveSublayers();
-    } catch (error) {
-      if (revision === liveFloodRevision) note.textContent = `Live reports are not available: ${error.message}`;
+      liveSummary = await GRP.request(`/api/v1/maps/live-flood/summary?${params}`);
+    } catch (_error) {
+      liveSummary = null;
     }
+    const when = $("[data-live-when]");
+    if (when && liveSummary && liveSummary.available) {
+      const minutes = minutesSince(liveSummary.snapshot_retrieved_at);
+      when.textContent = `as of ${bangkokClock(liveSummary.snapshot_retrieved_at)}${minutes > LIVE_STALE_MINUTES ? ` (${ageText(minutes)} ago)` : ""}`;
+      when.classList.toggle("is-stale", minutes > LIVE_STALE_MINUTES);
+    }
+    renderLiveSwitches();
+    renderLiveNote();
   };
 
+  // Shown whenever the person's Hub is in the pilot; independent of the selected district.
+  let liveStarted = false;
   function syncLiveFlood() {
-    const boundary = state.selected;
-    // ADR-0057: the pilot's districts (Bangkok and Nonthaburi), from the map layers response.
-    const inBangkok = Boolean(boundary
-      && (state.liveAreas || []).includes(String(boundary.admin_code || "").slice(0, 4)));
-    if (!$("[data-live-flood]") || !$("[data-live-flood-toggle]")) return;
-    $("[data-live-flood]").hidden = !inBangkok;
-    const on = inBangkok && $("[data-live-flood-toggle]").checked;
-    if (!on) {
-      liveFloodRevision += 1;
-      hideSheet();
-      livePayload = null;
-      liveSelection = null;
-      [liveFloodLayer, liveFacilityLayer, liveCameraLayer].forEach((layer) => {
-        layer.clearLayers();
-        layer.remove();
+    const group = $("[data-live-flood]");
+    if (!group) return;
+    const enabled = (state.liveAreas || []).length > 0;
+    group.hidden = !enabled;
+    if (!enabled || liveStarted) return;
+    liveStarted = true;
+    loadLiveSummary().then(() => {
+      [...liveOn].forEach((key) => {
+        if (LIVE_SWITCHES.some((s) => s.key === key)) setLiveSwitch(key, true);
       });
-      $("[data-live-flood-legend]").hidden = true;
-      renderLiveHeader();
-      renderLiveList();
-      document.querySelectorAll("[data-live-sub]").forEach((box) => { box.disabled = !$("[data-live-flood-toggle]").checked; });
-      if (!inBangkok) $("[data-live-flood-note]").textContent = "";
-      return;
-    }
-    liveFloodLayer.addTo(map);
-    loadLiveFlood(boundary);
+    });
   }
 
-  (() => {
-    const prefs = readLivePrefs();
-    if (liveSub("facilities")) liveSub("facilities").checked = prefs.facilities;
-    if (liveSub("cameras")) liveSub("cameras").checked = prefs.cameras;
-  })();
-  $("[data-live-flood-toggle]")?.addEventListener("change", syncLiveFlood);
-  document.querySelectorAll("[data-live-sub]").forEach((box) => box.addEventListener("change", () => {
-    saveLivePrefs();
-    applyLiveSublayers();
-  }));
-  map.on("zoomend", () => {
-    if (livePayload && livePayload.available) {
-      drawLiveCameras();
-      if (liveSelection) highlightIncident(liveSelection);
-    }
-  });
-  // A live layer goes stale: refresh it every five minutes while it is on.
+  // Live data goes stale: refresh what is loaded every five minutes.
   window.setInterval(() => {
-    if (state.selected && $("[data-live-flood-toggle]").checked && !$("[data-live-flood]").hidden) {
-      loadLiveFlood(state.selected);
-    }
+    if (!liveStarted) return;
+    Object.keys(liveData).forEach((source) => { delete liveData[source]; });
+    Object.keys(liveLayers).forEach((key) => { liveLayers[key]?.remove(); delete liveLayers[key]; });
+    loadLiveSummary().then(() => [...liveOn].forEach((key) => setLiveSwitch(key, true)));
   }, 5 * 60 * 1000);
 
   // The map's layer panel. The chat's Global Risk layer picker is [data-layers] (ADR-0034).
@@ -4252,8 +4301,7 @@
         if (boundary && (!state.selected || state.selected.id !== boundary.id)) {
           selectBoundary(boundary, { explicit: true, preserveAssessment: true });
         }
-        $("[data-live-flood-toggle]").checked = true;
-        syncLiveFlood();
+        setLiveSwitch("roads", true);
       })];
     } else if (payload.mode === "needs_area_confirmation" && payload.place) {
       const confirmation = { place: payload.place, message, publish };
@@ -5122,6 +5170,7 @@
       state.supportingLayers = layers.supporting_points || [];
       state.vulnerabilityLayers = layers.vulnerability || [];
       state.liveAreas = layers.live_flood_areas || [];
+      syncLiveFlood();
       state.centersVersion = state.centerVersions.find((layer) => layer.is_current && !layer.synthetic)
         || state.centerVersions.find((layer) => !layer.synthetic)
         || state.centerVersions[0]

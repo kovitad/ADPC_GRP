@@ -1,5 +1,6 @@
 """Map layers for the Planning workspace: flood overlay picture, centers, placeholders."""
 
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -15,6 +16,7 @@ from api.planning_access import planner_membership
 from api.settings import get_settings
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import CentreIndicatorValue
+from core.flood_evidence import planner_sources
 from core.flood_evidence.planner_layer import live_layer
 from core.hazard_overlay import legend
 from core.storage import LocalStorage
@@ -431,3 +433,37 @@ def live_flood(
         raise not_found()
     return live_layer(session, hub.hub_code, boundary.admin_code, boundary.admin_level,
                       relay=get_settings().bmatraffic_relay_enabled)
+
+
+@router.get(
+    "/live-flood/summary",
+    summary="Counts for every live map source over the whole pilot area (Bangkok, Nonthaburi)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def live_flood_summary(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """ADR-0058: the Live layer's switches show these counts before anything is drawn."""
+
+    hub = planner_membership(principal, hub_code)
+    return planner_sources.summary(session, hub.hub_code, get_settings().bmatraffic_relay_enabled)
+
+
+@router.get(
+    "/live-flood/sources/{name}",
+    summary="One live map source for the whole pilot area, without officer checks",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def live_flood_source(
+    name: Literal["roads", "reports", "facilities", "cameras", "outlines"],
+    principal: SignedInMember,
+    session: DatabaseSession,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """ADR-0058: loaded when its switch is first ticked; never part of an assessment."""
+
+    hub = planner_membership(principal, hub_code)
+    return planner_sources.source(session, hub.hub_code, name,
+                                  get_settings().bmatraffic_relay_enabled)

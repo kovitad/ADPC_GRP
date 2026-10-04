@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -224,8 +225,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Global Risk metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260929b" in page
-    assert "/planning.css?v=20260929c" in page
+    # Versioned so a browser never mixes a cached page with a new script (that broke Layers).
+    assert re.search(r"/planning\.js\?v=\d{8}[a-z]", page)
+    assert re.search(r"/planning\.css\?v=\d{8}[a-z]", page)
     assert "Local upload" in script
     assert "Platform baseline" in script
     assert "Synthetic demo" in script

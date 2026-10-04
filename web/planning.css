@@ -419,7 +419,8 @@
   right: 14px;
   display: grid;
   gap: 0.4rem;
-  width: 250px;
+  width: 310px;
+  max-width: calc(100% - 28px);
   padding: 0.9rem 1rem;
   border-radius: var(--pw-radius);
   background: #fff;
@@ -1472,3 +1473,13 @@ a.pw-chip-button { display: inline-block; }
 .pw-live-sheet[hidden] { display: none; }
 .pw-live-sheet__close { position: sticky; top: 0; float: right; border: 0; background: #f3f4f6; width: 32px; height: 32px; border-radius: 50%; font-size: 20px; line-height: 1; cursor: pointer; margin: -4px -6px 0 8px; }
 .pw-live-sheet .pw-live-card { font-size: 0.9rem; }
+
+/* Live layer switches (ADR-0058): one row per source, swatch, label, count. */
+.pw-live-switches { display: grid; gap: 0.15rem; }
+.pw-live-switch { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 0.4rem; font-weight: 500; font-size: 0.76rem; }
+.pw-live-switch__count { color: #52645f; font-variant-numeric: tabular-nums; }
+.pw-live-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(0, 0, 0, 0.15); }
+.pw-live-swatch--line { width: 14px; height: 0; border-radius: 2px; border-top: 4px solid var(--c); background: none; box-shadow: none; }
+.pw-live-swatch--outline { width: 12px; height: 9px; border-radius: 2px; background: none; border: 1.5px solid var(--c); box-shadow: none; }
+.pw-live-roadlegend { margin: 0 0 0.25rem 2.2rem; }
+
