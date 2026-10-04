@@ -335,6 +335,8 @@ point it details out, careful about UX".
     `data-layers` since `894eca1`;
   - a cached page could break start-up;
   - version tags are now checked by a test.
+  - live points did not open cards once a district was selected, because the centres' canvas
+    covered the live canvas; all point layers now share one canvas (`01f4e3d`).
 
 #### BUILT: the live pilot covers Nonthaburi (ADR-0057, 4 October 2026)
 
