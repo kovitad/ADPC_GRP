@@ -8,10 +8,10 @@
     <title>Planning | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20260928a" />
-    <link rel="stylesheet" href="/planning.css?v=20261004b" />
+    <link rel="stylesheet" href="/planning.css?v=20261004c" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/grp-common.js?v=20261003a" defer></script>
-    <script src="/planning.js?v=20261004b" defer></script>
+    <script src="/planning.js?v=20261004c" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -145,7 +145,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></svg>
           Layers
         </button>
-        <div class="pw-pick" data-layers hidden>
+        <div class="pw-layers" data-map-layers hidden>
           <label class="pw-scenario-label" for="area-level">Planning boundary level</label>
           <select id="area-level" data-area-level aria-label="Planning boundary level">
             <option value="district">District</option>
@@ -166,7 +166,7 @@
             <span><i class="pw-dot" style="--c:#6b7280"></i>N/A — no data</span>
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
-          <div class="pw-layer-choice pw-live-group" data-live-flood hidden>
+          <div class="pw-live-group" data-live-flood hidden>
             <div class="pw-live-group__head">
               <span>Live (Bangkok, Nonthaburi)</span>
               <span class="pw-live-group__when" data-live-when></span>

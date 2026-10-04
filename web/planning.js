@@ -2208,8 +2208,9 @@
     }
   }, 5 * 60 * 1000);
 
+  // The map's layer panel. The chat's Global Risk layer picker is [data-layers] (ADR-0034).
   $("[data-layers-toggle]").addEventListener("click", (event) => {
-    const panel = $("[data-layers]");
+    const panel = $("[data-map-layers]");
     panel.hidden = !panel.hidden;
     event.currentTarget.setAttribute("aria-expanded", String(!panel.hidden));
   });
@@ -2286,7 +2287,7 @@
     runPanel.hidden = !open;
     runToggle.setAttribute("aria-expanded", String(open));
     if (open) {
-      $("[data-layers]").hidden = true;
+      $("[data-map-layers]").hidden = true;
       $("[data-layers-toggle]").setAttribute("aria-expanded", "false");
       syncRunPanel();
     }

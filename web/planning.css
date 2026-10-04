@@ -425,6 +425,11 @@
   background: #fff;
   box-shadow: 0 10px 28px rgba(16, 40, 36, 0.2);
   font-size: 0.8rem;
+  /* The live section (ADR-0056) can be long: scroll inside the panel, never off the map. */
+  max-height: calc(100% - 84px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 .pw-toggle { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; cursor: pointer; }
 .pw-toggle input { accent-color: var(--pw-forest); width: 16px; height: 16px; }
@@ -1398,7 +1403,8 @@ a.pw-chip-button { display: inline-block; }
 .pw-number.is-missing strong { color: var(--pw-muted); }
 
 /* ---------- live reported flooding (ADR-0056, W7b) ---------- */
-.pw-live-group { border-top: 1px solid #e5e7eb; padding-top: 0.5rem; margin-top: 0.4rem; }
+.pw-live-group { display: grid; gap: 0.35rem; border-top: 1px solid #e5e7eb; padding-top: 0.5rem; margin-top: 0.4rem; }
+.pw-live-group[hidden] { display: none; }
 .pw-live-group__head { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #374151; margin-bottom: 0.25rem; }
 .pw-live-group__when { font-weight: 500; text-transform: none; letter-spacing: 0; color: #52645f; }
 .pw-live-group__when.is-stale { color: #b45309; font-weight: 700; }
