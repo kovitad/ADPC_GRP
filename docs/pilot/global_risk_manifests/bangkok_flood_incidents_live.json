@@ -1,0 +1,37 @@
+{
+  "_status": "DRAFT, 4 October 2026. Not submitted. Needs the public host URL, Gate B for camera_check, and the owner's yes (Gate C).",
+  "dataset": "bangkok_flood_incidents_live",
+  "title": "Bangkok flood incidents (live, whole city)",
+  "description": "Open flood incidents on Bangkok roads, grouped by the ADPC GRP Bangkok flood pilot from Floodboard road ratings and public reports (BMA, Traffy Fondue and crowd). One record per incident, with a confidence word and its reasons, the districts and roads it touches, and counts of schools, hospitals and clinics with flooding reported nearby. Estimates from crowd and agency reports: not a flood map, not water-level sensors and not verified on the ground. Covers all 50 Bangkok districts.",
+  "source": "ADPC GRP Bangkok flood pilot (derived from Floodboard: BMA, Traffy Fondue and public reports; facilities from OpenStreetMap)",
+  "validation": "unvalidated",
+  "residency": "external call-out",
+  "cadence": "every 5 minutes",
+  "adapter": "generic_json",
+  "fetch": {
+    "url": "https://<public-host>/api/v1/pilot/flood/bangkok/feed.json",
+    "records_path": "records",
+    "as_of_field": "last_evidence_at",
+    "fields": {
+      "incident_id": "incident_id",
+      "status": "status",
+      "confidence": "confidence",
+      "reasons": "confidence_reasons",
+      "families": "source_families",
+      "districts": "district_names_en",
+      "roads": "road_names_en",
+      "lat": "lat",
+      "lon": "lon",
+      "max_depth_cm": "max_depth_cm",
+      "reports": "report_count",
+      "facilities_nearby": "facilities_nearby",
+      "first_seen": "first_seen",
+      "last_evidence_at": "last_evidence_at"
+    }
+  },
+  "pack": "risk",
+  "hazards": ["flood", "flashflood"],
+  "countries": ["Thailand"],
+  "license": "CC BY 4.0 (derived from Floodboard, CC BY 4.0; facility counts from OpenStreetMap, ODbL)",
+  "usage_notes": "Confidence is a word with reasons, not a probability. 'Facilities nearby' means flooding was reported near them, not that they are flooded. Check the feed's valid_until: older data is stale. Rain is not included. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
+}

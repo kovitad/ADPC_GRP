@@ -1,18 +1,30 @@
 # Bangkok flood live feed to Global Risk: plan
 
-Status: plan only, 3 October 2026. Nothing has been submitted or registered, and no endpoint has been built.
+Status: plan, revised on 4 October 2026 after the owner's decisions (end of this file). Nothing
+has been submitted or registered. The endpoint is not built yet.
 
 ## Goal
 
-Publish a small, honest, machine-readable live feed from the Bangkok flood pilot. Global Risk registers it once as a contributed feed, and any MCP client can then read it with `feeds_query`, for example: "which incidents in Bang Sue are active and how confident are we?"
+Give planners anywhere a live, honest picture of flooding in **the whole of Bangkok** through
+Global Risk's MCP tools. We send Global Risk **text only, once**: a short manifest. Global Risk
+then fetches our feed live each time someone asks, so there is no repeated submission and no
+cost per update.
 
-## What Global Risk already supports (read on 3 October 2026)
+Example question from any MCP client: "Which Bangkok districts have active flooding now, how
+sure are we, and what do the cameras see?" Global Risk calls `feeds_query`, which pulls our feed.
 
-`platform_capabilities` lists one contributed live feed of exactly the kind we need: `usgs_quakes_m45_month`.
+## The standard Global Risk uses (read on 4 October 2026)
+
+`platform_capabilities` lists every feed in one declarative shape. The closest match is the
+contributed USGS earthquake feed:
 
 ```yaml
+title: USGS M4.5+ earthquakes (past month, global)
+source: USGS
+validation: single-agency
+residency: external call-out      # Global Risk fetches the URL at query time
+cadence: continuous
 adapter: generic_json
-residency: external call-out        # Global Risk fetches our URL at query time
 fetch:
   url: https://earthquake.usgs.gov/.../4.5_month.geojson
   records_path: features
@@ -20,172 +32,238 @@ fetch:
   fields: {magnitude: properties.mag, place: properties.place, time: properties.time}
 pack: risk
 hazards: [earthquake, tsunami]
+usage_notes: "... NOT filtered to Southeast Asia ..."
 contributed: true
 ```
 
-So the pattern is: we serve a public JSON document, and Global Risk stores only a declarative manifest that says where to fetch it and which fields to keep. Our data stays with us, and every `feeds_query` is a live pull.
+What this means for us:
 
-Two consequences:
+- **The manifest is the only thing we submit.** It is a small JSON text with these fields. Our
+  data stays on our server and every query is a live pull.
+- **The other option costs more.** `residency: platform-hosted copy` (used by
+  `btb_station_rainfall`) stores a fixed file with its SHA-256. A live feed would then need a new
+  submission and review for every update. We do not use it.
+- **Review comes before going live.** `contribute_submit` now says a clean submission is
+  **staged**. Only we and the reviewers can see it until a reviewer approves it. This gives us a
+  safe test before anyone else sees it (ADR-0032 described auto-approval; the tool text now says
+  otherwise, so we confirm this with the maintainers).
+- **Global Risk must reach our URL.** Docker Desktop cannot be reached from outside, so a public
+  HTTPS host is still the real blocker (Step 3).
 
-1. **Global Risk must be able to reach the URL.** The pilot runs on Docker Desktop, which Global Risk cannot reach. A real feed therefore needs a public HTTPS host first (the Ubuntu deployment, or a small static mirror). This is the main blocker, not the code.
-2. **Registration is permanent and probably public at once.** ADR-0032 notes that this deployment auto-approves contributions and that a name can never be overwritten. One wrong name or one wrong licence stays forever.
+## What goes in the feed (v1, whole Bangkok)
 
-## What goes in the feed
+One document, `feed.json`, with two record lists. Each list can be registered as its own
+manifest, because a manifest reads exactly one `records_path`.
 
-One record per **active or recently closed incident** (the pilot's main product, already deduplicated and confidence-rated). Road and report rows stay inside GRP.
+### `records`: one per open incident
 
 | Field | From | Note |
 | --- | --- | --- |
 | `incident_id` | incident store | stable across snapshots |
-| `status` | incident | active, receding, closed |
-| `confidence` | incident | low, medium, high or conflicting; a word, never a probability |
-| `confidence_reasons` | incident | short codes, e.g. `two_families`, `official_source` |
-| `source_families` | incident | e.g. `["traffy","crowd"]`; counts only, no usernames |
-| `report_count` | incident | |
-| `road_names` | Floodboard road keys | the public road names only |
-| `district_code`, `district_name_en`, `district_name_th` | outlines | |
-| `lon`, `lat`, `bbox` | incident | centre and box; no line geometry in v1 |
-| `max_depth_cm` | observations | only when a source gave a number; otherwise `null` |
+| `status` | incident | `active` or `receding` |
+| `confidence` | incident | `low`, `medium`, `high` or `conflicting`; a word, never a number |
+| `confidence_reasons` | incident | short codes such as `two_families` and `official_source` |
+| `source_families` | incident | such as `["traffy","crowd"]`; names of source types only |
+| `district_codes`, `district_names_en`, `district_names_th` | outlines | every district its roads touch |
+| `road_names_en`, `road_names_th` | Floodboard roads | public road names, empty ones dropped |
+| `lon`, `lat`, `bbox` | incident | centre and box; no line geometry |
+| `max_depth_cm` | Floodboard only | `null` when no Floodboard source gave a number |
+| `report_count` | Floodboard only | reports from Floodboard sources |
+| `facilities_nearby` | exposure | counts by type: `{school, hospital, clinic}`; "flooding reported nearby", never "flooded" |
+| `camera_check` | camera check (Step 2) | `water`, `partial_water`, `dry` or `cannot_tell`, with `checked_at` and `cameras_checked`; `null` until built |
 | `first_seen`, `last_evidence_at` | incident | ISO UTC |
-| `facilities_nearby` | exposure | counts by type (school, hospital, clinic) only; "flooding reported nearby", never "flooded" |
-| `evidence_class` | pilot | always `crowd_and_official_mix` or narrower; never `verified` |
+| `evidence_class` | pilot | `crowd_only`, `official_only` or `crowd_and_official_mix`; never `verified` |
 
-At the feed level (outside `records`):
+Records are in a fixed, neutral order (`first_seen`, then `incident_id`). Order must never leak
+an officer's judgement.
 
-- `run_at`: when the document was made;
-- `as_of`: the newest evidence time;
-- `valid_until`: `run_at` plus 15 minutes, so a reader can tell when the feed is stale;
-- `coverage`: the four demo districts, with their codes;
-- `sources`: each upstream with its licence and credit;
-- `limits`: the standing caveats in plain words (estimates, not a flood map; no sensors; rain is not flooding).
+### `districts`: one per Bangkok district, all 50
 
-This answers the questions ADR-0036 left open: run time is `run_at`, valid time is `valid_until`, and reach scope is `coverage`.
+| Field | Note |
+| --- | --- |
+| `district_code`, `district_name_en`, `district_name_th` | every district appears, even with no incidents |
+| `active_incidents`, `receding_incidents` | counts |
+| `worst_confidence` | highest-concern word among active incidents, or `null` |
+| `facilities_nearby` | counts by type across its incidents |
+| `camera_check_summary` | counts of `water`, `partial_water`, `dry` and `cannot_tell` |
+| `as_of` | copied from the feed level, so the district manifest has a time field of its own |
+
+A district with zero incidents says `0`. It is never missing, so absence is never read as "no
+data".
+
+### Feed-level fields
+
+- `run_at`: when the incidents were last computed (the worker run), not the request time.
+- `as_of`: the newest evidence time.
+- `valid_until`: `run_at` plus 15 minutes. A reader can tell when the feed is stale, even if our
+  worker has stopped.
+- `coverage`: Bangkok, 50 districts.
+- `sources`: each upstream source with its licence and credit, read from the pilot config.
+- `limits`: the standing caveats in plain words. These are estimates, not a flood map. There are
+  no water-level sensors. Rain is not flooding. Camera checks are a machine's reading of one
+  picture.
+
+If no incident run exists yet, the feed is empty, with `run_at` and `valid_until` set to `null`.
 
 ### Left out on purpose
 
-- **Report text, contributor names, photos and IDs.** We never store them, so they cannot leak.
-- **Camera URLs.** BMA, Longdo and bmatraffic have not given written permission to redistribute them (Gate B). The feed may later say `cameras_within_400m: 2` once terms allow.
-- **Longdo Weather rain.** The terms are "provided as is", with no redistribution right confirmed. Rain stays in GRP's own page.
-- **Longdo events.** Same reason. Incidents whose evidence includes Longdo or DOH events keep them in `source_families`, but the event content stays out.
-- **Officer reviews.** These are internal judgements and stay protected.
+These stay out until the gates below are passed:
 
-### Licence check before anything is published
+- **Report text, contributor names, photos and IDs.** We never store them.
+- **Officer reviews and anything officer-confirmed**, including `verification`, `access_to_check`
+  and facility access states. These are internal.
+- **Camera URLs, camera IDs and pictures.** Only the one-word camera check result can be added,
+  after Gate B.
+- **Longdo rain and Longdo event content.** The redistribution terms are not stated. Incidents
+  keep `doh`, `itic` or `longdo_user` in `source_families`, but `max_depth_cm`, `report_count`
+  and `last_evidence_at` are computed from Floodboard sources only, so no Longdo value leaks.
 
-Each source has to allow redistribution of facts derived from it. The incident record is derived data, but the credit and licence must still pass through:
+### Licence status
 
-| Source | Status for the feed |
+| Source | For the feed |
 | --- | --- |
-| Floodboard roads and reports (BMA, Traffy, crowd) | need to confirm the exact licence text on floodboard; record it in `sources` |
-| Longdo events (DOH, iTIC, users) | **excluded until written terms** |
-| BMA DDS, bmatraffic, Longdo cameras | **excluded until written terms** |
-| OSM facilities | ODbL: credit "© OpenStreetMap contributors"; counts only |
+| Floodboard roads | CC BY 4.0, redistribution allowed with attribution (recorded in the pilot config). A short confirmation is drafted. |
+| Floodboard reports | CC BY 4.0 for the export; quoted text is not cleared, and we never use it |
+| OSM facilities | ODbL; credit "© OpenStreetMap contributors"; counts only |
+| Longdo events and rain | excluded until written terms |
+| BMA, bmatraffic and Longdo cameras | excluded until written terms; this covers the camera check result too |
 
-If the Floodboard terms are not clear, v1 publishes only a **synthetic** feed (see Step 3).
+## The camera check: water, partial water or dry
+
+The owner asked for a simple, cheap reading of what the live cameras see.
+
+**What it does.** For each **active** incident, take the latest picture from up to **2 cameras
+within 400 m**. A vision model answers with one word: `water`, `partial_water`, `dry` or
+`cannot_tell`. Night, glare, a blank frame or an unclear view give `cannot_tell`.
+
+**How it stays cheap:**
+
+| Rule | Effect |
+| --- | --- |
+| Active incidents only, never all 1,413 cameras | about 44 incidents at a busy moment (4 October capture) |
+| At most 2 cameras per incident | about 88 pictures per round |
+| One round every 15 minutes, while the incident is active | at most about 350 checks an hour |
+| Picture shrunk to 320 × 180 before sending | about 80 image tokens |
+| A fixed short prompt, answer limited to a few tokens | about 160 input and 5 output tokens per check |
+| Skip if the picture is unchanged (same hash) or the camera answered in the last 15 minutes | fewer calls when flooding is steady |
+
+Estimate with Claude Haiku 4.5 ($1 per million input tokens, $5 per million output tokens):
+about $0.0002 a check, so **about $0.07 an hour, or $1.70 a day, in the worst case of
+continuous heavy flooding**. A dry day costs close to nothing, because no incident is active.
+
+**Rules that keep it honest:**
+
+- It runs in the worker, never in a web request, and goes through `api/ai_gateway.py`, the only
+  module allowed to call an AI provider. The gateway speaks an OpenAI-style API today; a vision
+  call needs a small extension there.
+- The result is labelled as a machine reading of one picture, with time and camera count. It is
+  shown beside the officer checks and **does not change the confidence word in v1**.
+- Pictures are never stored. Only the word, the time and a hash of the picture are kept.
+- First source: bmatraffic pictures through the local relay (ADR-0051), which already arrive as
+  JPEG. Longdo HLS would need a frame grab and comes later.
+- A daily cap (for example 5,000 checks) stops cost running away. When it is reached, the result
+  is `cannot_tell` with the reason `daily_cap`.
 
 ## Steps
 
-### Step 1: a GRP feed endpoint (in the repo, safe)
+### Step 1: the feed endpoint (local, Gate A)
 
-- `GET /api/v1/pilot/flood/{pilot_id}/feed.json`, labelled `x-grp-access: public`, read-only, and served from the latest stored snapshot only. The web request does no upstream or GIS work, keeping to the worker rule.
-- Live pilots only. Replays answer 404, so a replay can never leak into Global Risk.
-- `Cache-Control: max-age=60`, an `ETag` from the snapshot hash, and a small rate limit.
-- New code `core/flood_evidence/feed.py` builds the document from `list_incidents`, exposure and the config. It is a pure function, so it can be tested offline.
-- Tests (`tests/fast/test_flood_feed.py` and the permission matrix):
-  - the shape is a list of flat records;
-  - no free text and no usernames;
-  - no camera or rain fields;
-  - a replay returns 404;
-  - `valid_until` is set;
-  - excluded sources never appear;
-  - anonymous access works, and write methods are refused.
-- ADR-0052 records the access decision (the first public pilot route), the field list and the exclusions.
+- `GET /api/v1/pilot/flood/{pilot_id}/feed.json`, labelled `x-grp-access: protected` for now
+  (decision 2).
+  - Hub members get 200, other Hubs 403, anonymous callers 401.
+  - The pilot comes from `pilot_config` only. A replay ID never resolves, so it gives 404.
+  - Access is one small dependency, so making the route public later is a one-line change.
+- `core/flood_evidence/feed.py` builds the document as a pure function from stored incidents,
+  roads, reports, exposure and the config. Records are built from an explicit allow-list of
+  fields.
+- Serialisation is deterministic (sorted keys and records). The `ETag` is a hash of the body,
+  `If-None-Match` gives 304, and the response sends `Cache-Control: private, max-age=60`.
+- Tests:
+  - shape, empty state and all 50 districts present;
+  - no free text, usernames, camera or rain fields;
+  - an incident with an officer review gives a **byte-identical** feed to one without;
+  - Longdo-only reports change no number;
+  - an incident crossing a district border lists both districts;
+  - replay gives 404, and the permission cases above.
+- ADR-0052 records the route, the fields and the exclusions.
 
-**Owner decision:** making this route public is new. Until a host is ready, we could keep it `protected` and switch it to public only once that host exists.
+### Step 2: the camera check (local, Gate A for the build, Gate B to publish it)
 
-### Step 2: a public host (deployment, needs approval)
+- `core/flood_evidence/camera_check.py`, a worker job, a small table for results, and the
+  gateway extension.
+- Tests with a fake provider: the four labels, the cap, unchanged-picture skipping, and no
+  picture stored.
+- ADR-0054. It goes into the feed only after Gate B.
 
-Pick one:
+### Step 3: the public host (decision 3: the Ubuntu GRP deployment over HTTPS)
 
-- **A. The Ubuntu GRP deployment over HTTPS (recommended).** The feed comes straight from the live database.
-- **B. A static mirror.** The worker writes `feed.json` every 5 minutes to object storage behind HTTPS. This is simpler to expose and keeps the API private, but adds one more moving part.
+- Run the Ubuntu deployment for the first time and choose a permanent domain. The manifest points
+  at it for good.
+- Flip the feed route to `public` in the same change, with a rate limit.
+- Fallback if the VM is slow to arrive: the worker writes `feed.json` every 5 minutes to static
+  HTTPS storage. This needs the owner's yes, because it is a new moving part.
 
-Either way the URL must be stable for good, because the Global Risk manifest points at it permanently.
+### Step 4: staged test on Global Risk (Gate C, explicit yes at the time)
 
-### Step 3: a dry run against Global Risk (needs approval, Gate A)
+1. The manifests are already drafted in `docs/pilot/global_risk_manifests/`. Review them
+   together.
+2. Send the maintainer questions (`docs/pilot/2026-10-04_Global_Risk_Maintainer_Questions.md`).
+3. Submit the incidents manifest. It is **staged**, visible only to us and the reviewers.
+4. Check it with `feeds_query("bangkok_flood_incidents_live")` and `contribute_status`.
+5. If the shape is wrong, withdraw it with `contribute_status(action="withdraw")` before review.
 
-1. Write the manifest locally in `deliverables/global_risk/bangkok_flood_incidents.manifest.json` and review it together. Nothing is sent.
-2. Ask the Global Risk maintainers whether the `feed` kind accepts an external `generic_json` URL. The kind exists in `contribute_submit`, but its required fields were not visible. Also ask whether a **test namespace** exists.
-3. If there is no test namespace, the first submission is a deliberately synthetic, clearly named feed (e.g. `grp_pilot_feed_contract_test`, described "SYNTHETIC, contract test"). It points at a fixed synthetic file, which proves the adapter reads our shape without spending the real name.
-4. `contribute_status` and `feeds_query` check that the records come back as expected.
+### Step 5: go live
 
-### Step 4: register the real feed (needs explicit approval)
+- A reviewer approves it. Then submit the districts manifest
+  (`bangkok_flood_districts_live`) the same way.
+- Planners anywhere use `feeds_query`. Later, `assemble_pack(pack="risk", place="Bangkok",
+  hazard="flood")` could cite the live feed beside the static JRC flood layers.
 
-Proposed manifest (draft):
+## Cost of submitting
 
-```json
-{
-  "dataset": "bangkok_flood_incidents_live",
-  "title": "Bangkok flood incidents (live pilot, four districts)",
-  "description": "Flood incidents on Bangkok roads, grouped from Floodboard road ratings and public reports by the GRP Bangkok pilot. Each record has a confidence word with reasons. Estimates from crowd and agency reports, not a flood map and not verified on the ground. Covers Bang Sue, Chatuchak, Bang Kapi and Lat Krabang only.",
-  "source": "ADPC GRP Bangkok flood pilot (derived from Floodboard: BMA, Traffy Fondue and public reports)",
-  "validation": "unvalidated",
-  "residency": "external call-out",
-  "cadence": "every 5 minutes",
-  "adapter": "generic_json",
-  "fetch": {
-    "url": "https://<public-host>/api/v1/pilot/flood/bangkok/feed.json",
-    "records_path": "records",
-    "as_of_field": "last_evidence_at",
-    "fields": {
-      "incident_id": "incident_id", "status": "status", "confidence": "confidence",
-      "district": "district_name_en", "roads": "road_names", "lat": "lat", "lon": "lon",
-      "max_depth_cm": "max_depth_cm", "reports": "report_count",
-      "families": "source_families", "last_evidence_at": "last_evidence_at"
-    }
-  },
-  "pack": "risk",
-  "hazards": ["flood", "flashflood"],
-  "countries": ["Thailand"],
-  "license": "<confirmed Floodboard licence>",
-  "usage_notes": "Confidence is a word with reasons, not a probability. 'Facilities nearby' means flooding reported near them, not that they are flooded. Check valid_until: older records are stale. Rain is not included."
-}
-```
-
-`validation: "unvalidated"` is deliberate: no field checks have been run yet. It can become `single-agency` only once BMA confirms the data.
-
-### Step 5: use it through MCP (later)
-
-Once the feed is registered:
-
-- `feeds_query("bangkok_flood_incidents_live", {...})` gives any MCP client the current incidents with their confidence.
-- `assemble_pack(pack="risk", place="Bang Sue", hazard="flood")` could cite the feed beside the static flood rasters, so live incidents sit next to the JRC return-period hazard.
-- `publish_answer` and `record_receipt` make an answer replayable. Because a live feed changes, the receipt must keep the `run_at` and hash of the document it cited. Ask the maintainers whether `generic_json` call-outs already keep the fetched bytes.
-- GRP's own `integrations/sig` can then read the feed back as a check that the round trip works.
+- **One-off:** two manifest submissions, about 2 KB of text each. No data is uploaded.
+- **Ongoing:** nothing to Global Risk. Our only costs are the host and, if built, the camera check
+  (about $1.70 a day at most, as above).
 
 ## Risks
 
 | Risk | Mitigation |
 | --- | --- |
-| Name spent on a wrong manifest | synthetic contract test first; draft reviewed by the owner; maintainers asked about a test namespace |
-| Auto-approve makes it public at once | publish nothing that is not already fit to be public; exclusions above |
+| Name spent on a wrong manifest | staged test first, withdraw before review if wrong, owner reviews the draft |
 | Licence breach (Longdo, cameras, rain) | excluded in code and tested; Gate B before any change |
+| Officer judgements leak | allow-listed fields, neutral order, byte-identical test |
 | Readers take estimates as fact | confidence words, `limits`, `usage_notes`, `validation: unvalidated` |
-| Stale feed after a pull outage | `valid_until`; `as_of` from evidence, not from `run_at`; the source health already tracked |
-| Host URL changes later | choose the permanent host before registering |
-| Replay data leaks | the feed route refuses replay IDs, and a test covers it |
-| Load from Global Risk call-outs | cache, ETag, rate limit; the document is precomputed |
+| Camera check wrong at night or in rain | `cannot_tell` is allowed and expected; it never changes confidence in v1 |
+| Camera check cost runs away | active incidents only, 2 cameras, 15 minutes, unchanged-skip, daily cap |
+| Stale feed after an outage | `valid_until` from the worker run, not from the request |
+| Host URL changes | choose the permanent domain before Step 4 |
+| Replay data leaks | the route never resolves replay IDs; tested |
 
 ## Gates
 
-- **Gate A (now, local):** Step 1 only: the endpoint, its tests, the ADR and the manifest draft. No outward calls.
-- **Gate B (terms):** written terms from Floodboard (for redistribution), and later from BMA, Longdo and bmatraffic, before any of their fields are added.
-- **Gate C (publish):** the public host, the synthetic contract test, then the real registration. Each needs the owner's explicit yes at that moment.
+- **Gate A (now, local):** Steps 1 and 2 built and tested, ADRs and drafts written. No outward
+  calls.
+- **Gate B (terms):** written terms from BMA, Longdo and bmatraffic before any camera-derived or
+  Longdo field enters the feed. Floodboard: confirmation of the credit wording.
+- **Gate C (publish):** the public host, then the staged submission, then going live. Each needs
+  the owner's explicit yes at the time.
 
-## Decisions for the owner
+## Decisions for the owner (answered 4 October 2026)
 
-1. **Feed scope.** Is "incidents only" right for v1, or do you also want a per-district summary record (active count, worst confidence)?
-2. **Public route.** Make the feed route `public` now (Step 1), or keep it `protected` until a host exists?
-3. **Host.** Use the Ubuntu deployment (A) or a static mirror (B)?
-4. **Name.** Is `bangkok_flood_incidents_live` acceptable? It can never be changed.
-5. **Floodboard licence.** Who confirms it: you, or should I draft a short request like the BMA one?
-6. **Maintainer questions.** Should I draft the questions to the Global Risk maintainers about the `feed` kind, a test namespace and receipts for live call-outs?
+1. **Feed scope:** incidents **and** a district summary. The summary is a separate `districts`
+   list, registered as its own manifest.
+2. **Public route:** keep it `protected` until the public host exists.
+3. **Host:** the Ubuntu GRP deployment over HTTPS (A).
+4. **Name:** `bangkok_flood_incidents_live` is kept. The district list is
+   `bangkok_flood_districts_live`.
+5. **Floodboard licence:** "don't worry, just do it". A short confirmation request is drafted in
+   `docs/pilot/2026-10-04_Floodboard_Licence_Confirmation.md`. The config already records CC BY
+   4.0, so this confirms the credit wording rather than asking for permission. It has not been
+   sent.
+6. **Maintainer questions:** "just do it". Drafted in
+   `docs/pilot/2026-10-04_Global_Risk_Maintainer_Questions.md`. Not sent.
+
+Also decided on 4 October 2026:
+
+- **Whole Bangkok** (ADR-0053).
+- A simple **camera check** that answers water, partial water or dry, kept cheap.

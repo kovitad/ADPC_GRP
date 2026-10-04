@@ -29,6 +29,18 @@
 > such as a snapshot address that does not need a session, an HTTPS address, or a limit on how
 > often GRP should ask?
 
+> **Update, 4 October 2026: an automatic water check (planned, not built).** The pilot now
+> covers the whole of Bangkok. The Product Owner would like a simple automatic check on camera
+> pictures near reported flooding: one word, **water**, **partial water** or **dry**. Its rules:
+>
+> - at most two cameras per active incident, every 15 minutes, with no picture stored (only the
+>   word, the time and a fingerprint of the picture);
+> - it never replaces an officer's check.
+>
+> This would change the earlier promise that pictures are never analysed, so **GRP asks first**.
+> May GRP run this check on bmatraffic.com pictures? May the one-word result, without pictures,
+> camera links or camera IDs, be shared in a public flood feed?
+
 ## Thai version (ฉบับภาษาไทย)
 
 เรียน สำนักการระบายน้ำ กรุงเทพมหานคร
@@ -40,6 +52,7 @@
 - GRP จะ **ไม่บันทึกภาพ** และไม่ประมวลผลภาพใด ๆ
 - ในการสาธิตบนเครื่องของทีมเท่านั้น GRP ส่งต่อภาพจาก www.bmatraffic.com ประมาณวินาทีละภาพ เฉพาะขณะที่เจ้าหน้าที่เปิดดู และไม่บันทึก เราขออนุญาตก่อนใช้ในวงกว้าง และขอทราบวิธีที่ กทม. ต้องการ เช่น ที่อยู่ภาพนิ่งที่ไม่ต้องใช้ session หรือที่อยู่แบบ HTTPS
 - หากในอนาคตจะใช้ภาพนิ่งหรือการวิเคราะห์ภาพ เราจะขออนุญาตแยกต่างหาก
+- **ขออนุญาตเพิ่มเติม (4 ตุลาคม 2569):** เราต้องการตรวจภาพจากกล้องใกล้จุดที่มีรายงานน้ำท่วมแบบอัตโนมัติ ให้ผลเพียงคำเดียว คือ **มีน้ำ** **มีน้ำบางส่วน** หรือ **แห้ง** โดยใช้ไม่เกิน 2 กล้องต่อเหตุการณ์ ทุก 15 นาที และไม่บันทึกภาพ ผลนี้ไม่แทนการตรวจของเจ้าหน้าที่ กทม. อนุญาตให้ทำเช่นนี้หรือไม่ และอนุญาตให้เผยแพร่ผลคำเดียวนี้ (โดยไม่มีภาพ ลิงก์ หรือรหัสกล้อง) ในฟีดข้อมูลน้ำท่วมสาธารณะหรือไม่
 
 ขอความอนุเคราะห์ข้อมูลกล้องในสี่เขตนี้ (หรือทั้งกรุงเทพฯ หากสะดวกกว่า) ตามรายการด้านล่าง และขอทราบเงื่อนไขการใช้และการแสดงที่มาของข้อมูล
 
