@@ -50,6 +50,75 @@ What this means for us:
 - **Global Risk must reach our URL.** Docker Desktop cannot be reached from outside, so a public
   HTTPS host is still the real blocker (Step 3).
 
+## What the platform source code shows (read on 4 October 2026)
+
+Source: <https://github.com/SERVIR-AI/global-platform>, commit `a8a43c2`. Files:
+`apps/api/src/app/mcp/feeds.py`, `contrib/staging.py`, `contrib/feedspecs.py`,
+`contrib/fetch_policy.py`, `mcp/climate_indices.py` and `risk/synthesis.py`.
+
+**What works in our favour:**
+
+- **The manifest rules are confirmed.** Required fields are `dataset`, `title`, `description`,
+  `source`, `validation`, `residency`, `cadence`, `adapter` and `fetch` (`url`, `records_path`,
+  `fields`). Optional fields are `usage_notes` (500 characters at most), `pack`, `countries`,
+  `hazards`, `license` and `vintage`.
+  - **Unknown fields are refused.** The `_status` line in our drafts must come out before
+    submitting.
+- **Staging is real.** A clean submission is stored as `pending` and served only to us and the
+  reviewers. Approval writes `conf/feeds/<dataset>.yml`.
+  - Withdrawing removes the staged row, so the **same name can be submitted again**. A name is
+    spent only once it is approved.
+- **The submission test is live.** The platform fetches our URL once when we submit. A dead URL
+  or an empty record list is refused, not staged.
+- **Values are read as-is.** `fields` values are dot paths into each record, so lists and nested
+  objects pass through unchanged.
+- **Records are sorted by `as_of_field`**, oldest first. The newest `limit` records are returned
+  (12 by default). A risk brief asks for 3.
+- **Risk briefs read contributed feeds automatically.** `risk/synthesis.py` cites every feed in
+  the `risk` pack whose `hazards` include the hazard asked about. A flood question will cite our
+  feed with no extra work.
+- **The URL must be public.** `http` or `https` is fine, but it may not resolve to a private
+  address, and it cannot carry credentials. The fetch sends no custom headers, so **the feed must
+  be anonymous**. A token is not possible.
+
+**Two problems we must design around:**
+
+1. **A 6-hour cache.** `generic_json` goes through `climate_indices.cached`, whose TTL is 6
+   hours, written for monthly climate indices. Global Risk can therefore serve our "live"
+   incidents up to 6 hours old. It does say so: `stale_data.retrieved_at` is reported, but it is
+   still old data.
+   - We cannot fix this from our side, because unknown manifest fields are refused. **We ask the
+     maintainers for a per-feed TTL** (question 1).
+   - Meanwhile every record carries its own `valid_until`, mapped into `fields`. A reader then
+     sees the record is stale even when it comes from cache.
+2. **An empty list counts as a failure.** If `records` is empty, the adapter treats it as
+   "upstream unavailable". It serves the last good copy marked stale, or declines.
+   - On a dry day, Global Risk would show **old incidents** instead of "no flooding". The
+     submission test would also refuse the feed.
+   - So the **`districts` list (always 50 rows) is submitted first and is the main feed**. The
+     incidents feed goes second, and we ask the maintainers to accept an empty list as a valid
+     answer (question 2).
+
+**Two more things to note:**
+
+- **Not filtered by place.** Risk briefs filter feeds by `hazards` only, not by `countries` or
+  place. A flood brief for any country could cite our Bangkok feed.
+  - `usage_notes` must start with "Bangkok only".
+  - We ask the maintainers whether `countries` can filter risk briefs too (question 4).
+- **Replay.** A receipt keeps only `query_receipt` ("records via URL"), not the fetched bytes.
+  Replaying an answer after the feed has changed cannot show what was cited, so we ask about this
+  (question 5).
+
+**Design changes that follow:**
+
+| Item | Change |
+| --- | --- |
+| District order | `districts` records share one `as_of`, so the sort keeps our order. We publish them **least concern first**, so the default 12, or a brief's 3, are the worst districts |
+| Incident time | `as_of_field: last_evidence_at`, so the newest evidence comes last and is returned first |
+| Staleness | `valid_until` on every record, not only at feed level |
+| Submission order | districts first (never empty), incidents second |
+| `usage_notes` | starts "Bangkok only"; tells readers to pass `{limit: 50}` for every district |
+
 ## What goes in the feed (v1, whole Bangkok)
 
 One document, `feed.json`, with two record lists. Each list can be registered as its own
@@ -72,6 +141,7 @@ manifest, because a manifest reads exactly one `records_path`.
 | `facilities_nearby` | exposure | counts by type: `{school, hospital, clinic}`; "flooding reported nearby", never "flooded" |
 | `camera_check` | camera check (Step 2) | `water`, `partial_water`, `dry` or `cannot_tell`, with `checked_at` and `cameras_checked`; `null` until built |
 | `first_seen`, `last_evidence_at` | incident | ISO UTC |
+| `valid_until` | feed | copied into every record, because Global Risk's adapter reads records only |
 | `evidence_class` | pilot | `crowd_only`, `official_only` or `crowd_and_official_mix`; never `verified` |
 
 Records are in a fixed, neutral order (`first_seen`, then `incident_id`). Order must never leak
@@ -86,7 +156,11 @@ an officer's judgement.
 | `worst_confidence` | highest-concern word among active incidents, or `null` |
 | `facilities_nearby` | counts by type across its incidents |
 | `camera_check_summary` | counts of `water`, `partial_water`, `dry` and `cannot_tell` |
-| `as_of` | copied from the feed level, so the district manifest has a time field of its own |
+| `as_of`, `valid_until` | copied from the feed level into every district record |
+
+Districts are published **least concern first** (no incidents, then low, medium, high,
+conflicting, then by active count). All 50 share one `as_of`, so Global Risk's sort keeps this
+order and its default "newest" tail returns the worst districts.
 
 A district with zero incidents says `0`. It is never missing, so absence is never read as "no
 data".
@@ -211,14 +285,17 @@ continuous heavy flooding**. A dry day costs close to nothing, because no incide
 1. The manifests are already drafted in `docs/pilot/global_risk_manifests/`. Review them
    together.
 2. Send the maintainer questions (`docs/pilot/2026-10-04_Global_Risk_Maintainer_Questions.md`).
-3. Submit the incidents manifest. It is **staged**, visible only to us and the reviewers.
-4. Check it with `feeds_query("bangkok_flood_incidents_live")` and `contribute_status`.
+3. Remove the `_status` line, then submit the **districts** manifest first, because it is never
+   empty. It is **staged**, visible only to us and the reviewers.
+4. Check it with `feeds_query("bangkok_flood_districts_live", {"limit": 50})` and
+   `contribute_status`. Then submit the incidents manifest on a day with flooding, since an empty
+   list is refused.
 5. If the shape is wrong, withdraw it with `contribute_status(action="withdraw")` before review.
 
 ### Step 5: go live
 
-- A reviewer approves it. Then submit the districts manifest
-  (`bangkok_flood_districts_live`) the same way.
+- A reviewer approves both. Before going live, the 6-hour cache must be answered (maintainer
+  question 1); otherwise usage_notes must say values can be up to 6 hours old.
 - Planners anywhere use `feeds_query`. Later, `assemble_pack(pack="risk", place="Bangkok",
   hazard="flood")` could cite the live feed beside the static JRC flood layers.
 

@@ -1,5 +1,5 @@
 {
-  "_status": "DRAFT, 4 October 2026. Not submitted. Submit only after bangkok_flood_incidents_live is approved and the maintainers confirm two manifests may share one URL.",
+  "_status": "DRAFT, 4 October 2026. Not submitted. Submit FIRST (never empty). Remove this _status line before submitting: unknown fields are refused.",
   "dataset": "bangkok_flood_districts_live",
   "title": "Bangkok flood by district (live summary, 50 districts)",
   "description": "One record per Bangkok district, from the ADPC GRP Bangkok flood pilot: the number of active and receding flood incidents, the highest-concern confidence word, and counts of schools, hospitals and clinics with flooding reported nearby. Every district is listed; zero means no incident was found, not missing data. Derived from Floodboard road ratings and public reports. Estimates, not a flood map.",
@@ -19,12 +19,18 @@
       "active": "active_incidents",
       "receding": "receding_incidents",
       "worst_confidence": "worst_confidence",
-      "facilities_nearby": "facilities_nearby"
+      "facilities_nearby": "facilities_nearby",
+      "valid_until": "valid_until"
     }
   },
   "pack": "risk",
-  "hazards": ["flood", "flashflood"],
-  "countries": ["Thailand"],
+  "hazards": [
+    "flood",
+    "flashflood"
+  ],
+  "countries": [
+    "Thailand"
+  ],
   "license": "CC BY 4.0 (derived from Floodboard, CC BY 4.0; facility counts from OpenStreetMap, ODbL)",
-  "usage_notes": "A district with 0 active incidents had no flooding found in the reports, which is not proof that it is dry. Check the feed's valid_until. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
+  "usage_notes": "Bangkok only. Pass {limit: 50} for every district; the default returns the most concerning ones. 0 active incidents means no flooding was found in the reports, not proof that a district is dry. Check valid_until on each record. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
 }

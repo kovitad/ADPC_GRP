@@ -1,5 +1,5 @@
 {
-  "_status": "DRAFT, 4 October 2026. Not submitted. Needs the public host URL, Gate B for camera_check, and the owner's yes (Gate C).",
+  "_status": "DRAFT, 4 October 2026. Not submitted. Submit after the districts feed, on a day with flooding (an empty list is refused). Remove this _status line before submitting: unknown fields are refused.",
   "dataset": "bangkok_flood_incidents_live",
   "title": "Bangkok flood incidents (live, whole city)",
   "description": "Open flood incidents on Bangkok roads, grouped by the ADPC GRP Bangkok flood pilot from Floodboard road ratings and public reports (BMA, Traffy Fondue and crowd). One record per incident, with a confidence word and its reasons, the districts and roads it touches, and counts of schools, hospitals and clinics with flooding reported nearby. Estimates from crowd and agency reports: not a flood map, not water-level sensors and not verified on the ground. Covers all 50 Bangkok districts.",
@@ -26,12 +26,18 @@
       "reports": "report_count",
       "facilities_nearby": "facilities_nearby",
       "first_seen": "first_seen",
-      "last_evidence_at": "last_evidence_at"
+      "last_evidence_at": "last_evidence_at",
+      "valid_until": "valid_until"
     }
   },
   "pack": "risk",
-  "hazards": ["flood", "flashflood"],
-  "countries": ["Thailand"],
+  "hazards": [
+    "flood",
+    "flashflood"
+  ],
+  "countries": [
+    "Thailand"
+  ],
   "license": "CC BY 4.0 (derived from Floodboard, CC BY 4.0; facility counts from OpenStreetMap, ODbL)",
-  "usage_notes": "Confidence is a word with reasons, not a probability. 'Facilities nearby' means flooding was reported near them, not that they are flooded. Check the feed's valid_until: older data is stale. Rain is not included. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
+  "usage_notes": "Bangkok only (50 districts). Confidence is a word with reasons, not a probability. 'Facilities nearby' means flooding reported near them, not that they are flooded. Check valid_until on each record: older is stale. Rain is not included. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
 }

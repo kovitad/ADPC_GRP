@@ -144,6 +144,14 @@ RP20/RP50 rasters and methods exist.
   - `docs/pilot/2026-10-04_Global_Risk_Maintainer_Questions.md`
   - `docs/pilot/global_risk_manifests/*.json`
   - The BMA request now asks before any automatic camera check.
+- **Global Risk source read** (`SERVIR-AI/global-platform` at `a8a43c2`; section "What the
+  platform source code shows" in the plan):
+  - staging, name reuse after a withdrawal, and hazard-based citing in risk briefs are confirmed;
+  - **a 6-hour cache** on `generic_json` blocks real liveness;
+  - **an empty list** is treated as a failure, so the districts feed (always 50 rows) goes first;
+  - the URL must be anonymous;
+  - unknown manifest fields are refused.
+  The maintainer questions were rewritten around these points.
 - **Camera check (planned, not built):** water, partial water or dry, for up to 2 cameras per
   active incident every 15 minutes, through `api/ai_gateway.py`. About $1.70 a day at worst with
   Claude Haiku 4.5. Gate B before it enters the feed.
