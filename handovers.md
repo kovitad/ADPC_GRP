@@ -113,7 +113,39 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-3 October 2026)
+## 0. Start here (sessions of 24 September-4 October 2026)
+
+### 4 October (latest): whole Bangkok, and the Global Risk feed plan revised
+
+- **Checked by the owner:** the in-page bmatraffic pictures look good.
+- **Whole Bangkok (ADR-0053, `100931d`):** `demo_corridor.areas` lists all 50 districts.
+  - OSM facilities captured again: 1,067 in all (707 schools, 183 hospitals, 177 clinics).
+  - Rain stays on the first four districts through the new `rain_areas`, to keep Longdo calls
+    flat.
+  - Measured offline: grouping 0.8 s (44 incidents) and exposure 0.97 s for each snapshot.
+  - Stack rebuilt with `scripts/docker-desktop.ps1`; the API sees 50 districts.
+- **Feed plan revised (`faee8b6`):** `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md` now
+  records the six decisions:
+  - incidents plus a `districts` list;
+  - the route stays `protected` until a host exists;
+  - the Ubuntu host (A);
+  - the name is kept;
+  - the Floodboard and maintainer drafts.
+  - Global Risk's standard is a text manifest (`generic_json`, external call-out). It is
+    submitted once, and the data is pulled live, so nothing is submitted again.
+  - The `contribute_submit` text says submissions are now **staged** until a reviewer approves
+    them.
+- **Drafts, none sent:**
+  - `docs/pilot/2026-10-04_Floodboard_Licence_Confirmation.md`
+  - `docs/pilot/2026-10-04_Global_Risk_Maintainer_Questions.md`
+  - `docs/pilot/global_risk_manifests/*.json`
+  - The BMA request now asks before any automatic camera check.
+- **Camera check (planned, not built):** water, partial water or dry, for up to 2 cameras per
+  active incident every 15 minutes, through `api/ai_gateway.py`. About $1.70 a day at worst with
+  Claude Haiku 4.5. Gate B before it enters the feed.
+- **Next:** Step 1, the feed endpoint (`core/flood_evidence/feed.py`, ADR-0052). The advisor's
+  review notes are in the plan: allow-listed fields, neutral order, Longdo-free numbers, and
+  multi-district incidents. Then Step 2, the camera check (ADR-0054).
 
 ### 3 October (latest): bmatraffic pictures inside the page (ADR-0051)
 
