@@ -248,8 +248,59 @@ T: dict[str, dict[str, str]] = {
     "h_live_view": {"en": "Live view", "th": "ดูภาพสด"},
     "no_picture": {"en": "no picture", "th": "ไม่มีภาพ"},
     "live_credit": {"en": "Sources: {credit}.", "th": "แหล่งข้อมูล: {credit}"},
-    "s7": {"en": "7. What this cannot tell you", "th": "7. ข้อจำกัดของเอกสารนี้"},
-    "s8": {"en": "8. Sources and versions", "th": "8. แหล่งข้อมูลและรุ่นข้อมูล"},
+    "s7": {"en": "8. What this cannot tell you", "th": "8. ข้อจำกัดของเอกสารนี้"},
+    "s8": {"en": "9. Sources and versions", "th": "9. แหล่งข้อมูลและรุ่นข้อมูล"},
+    "r_title": {"en": "7. River outlook (GEOGLOWS, exploratory)",
+                "th": "7. แนวโน้มแม่น้ำ (GEOGLOWS ข้อมูลทดลอง)"},
+    "r_none": {"en": "No GEOGLOWS river reach is linked to this area. Many inner Bangkok districts "
+                     "drain through canals that GEOGLOWS does not model.",
+               "th": "ไม่มีลำน้ำของ GEOGLOWS ที่เชื่อมกับพื้นที่นี้ หลายเขตในกรุงเทพฯ ระบายน้ำผ่านคลอง"
+                     "ที่ GEOGLOWS ไม่ได้จำลอง"},
+    "r_unavailable": {"en": "The GEOGLOWS forecast could not be read for this download "
+                            "({problem}). Try again later.",
+                      "th": "อ่านข้อมูลพยากรณ์ GEOGLOWS ไม่ได้ในการดาวน์โหลดครั้งนี้ ({problem}) "
+                            "โปรดลองใหม่ภายหลัง"},
+    "r_reach": {"en": "River segment {reach}: {why}. Not confirmed by a hydrologist.",
+                "th": "ลำน้ำหมายเลข {reach}: {why} ยังไม่ได้รับการยืนยันจากนักอุทกวิทยา"},
+    "r_likely": {"en": "Probably the {name} (not confirmed).", "th": "น่าจะเป็น{name} (ยังไม่ยืนยัน)"},
+    "r_small": {"en": "This is a small waterway: its modelled flow says little about the district.",
+                "th": "ลำน้ำนี้มีขนาดเล็ก ปริมาณน้ำที่จำลองบอกอะไรเกี่ยวกับพื้นที่ได้น้อย"},
+    "r_headline": {"en": "Over the next 7 days the river flow is forecast to be {trend}.",
+                   "th": "ในอีก 7 วันข้างหน้า คาดว่าปริมาณน้ำในแม่น้ำจะ{trend}"},
+    "r_trend_rise": {"en": "rising", "th": "เพิ่มขึ้น"},
+    "r_trend_steady": {"en": "steady", "th": "ทรงตัว"},
+    "r_trend_fall": {"en": "falling", "th": "ลดลง"},
+    "r_to": {"en": "to", "th": "ถึง"},
+    "r_why_main_by_rule": {"en": "the main river in this district by drainage area, chosen by rule",
+                           "th": "ลำน้ำหลักของเขตนี้ตามพื้นที่รับน้ำ เลือกโดยกฎ"},
+    "r_why_canal_bang_bua_thong": {"en": "the small canal near Bang Bua Thong town, the nearest "
+                                         "exploratory reach",
+                                   "th": "คลองเล็กใกล้ตัวเมืองบางบัวทอง ซึ่งเป็นลำน้ำทดลองที่ใกล้ที่สุด"},
+    "r_why_chao_phraya_nonthaburi": {"en": "the big river near Nonthaburi, the nearest exploratory "
+                                           "reach",
+                                     "th": "แม่น้ำสายใหญ่ใกล้นนทบุรี ซึ่งเป็นลำน้ำทดลองที่ใกล้ที่สุด"},
+    "r_q_latest": {"en": "the newest run", "th": "รอบล่าสุด"},
+    "r_q_older": {"en": "an older run (the newest was not available)",
+                  "th": "รอบที่เก่ากว่า (ไม่มีรอบล่าสุด)"},
+    "r_peak": {"en": "Median peak", "th": "ค่ามัธยฐานสูงสุด"},
+    "r_band": {"en": "Where most forecasts fall at the peak",
+               "th": "ช่วงที่การพยากรณ์ส่วนใหญ่อยู่ ณ จุดสูงสุด"},
+    "r_peak_at": {"en": "Peak expected", "th": "คาดว่าสูงสุดเมื่อ"},
+    "r_now": {"en": "Flow at the start of the window", "th": "ปริมาณน้ำต้นช่วง"},
+    "r_run": {"en": "Forecast run", "th": "รอบการพยากรณ์"},
+    "r_quality": {"en": "Forecast freshness", "th": "ความใหม่ของการพยากรณ์"},
+    "r_chart": {"en": "7-day river flow (cubic metres per second): the line is the median, the "
+                      "band is where most forecasts fall. The axis starts at zero.",
+                "th": "ปริมาณน้ำ 7 วัน (ลูกบาศก์เมตรต่อวินาที) เส้นคือค่ามัธยฐาน แถบคือช่วงที่การ"
+                      "พยากรณ์ส่วนใหญ่อยู่ แกนเริ่มที่ศูนย์"},
+    "r_caveat": {"en": "River flow only: not water level, flood depth, street flooding or a "
+                       "warning. GEOGLOWS has no 'high' threshold here, so the outlook says only "
+                       "rising, steady or falling.",
+                 "th": "เป็นปริมาณน้ำในแม่น้ำเท่านั้น ไม่ใช่ระดับน้ำ ความลึกน้ำท่วม น้ำท่วมบนถนน หรือ"
+                       "การเตือนภัย GEOGLOWS ไม่มีเกณฑ์ \"สูง\" สำหรับที่นี่ จึงบอกได้เพียงเพิ่มขึ้น "
+                       "ทรงตัว หรือลดลง"},
+    "r_source": {"en": "Source: GEOGLOWS River Forecast System (ECMWF), through GRP River Watch.",
+                 "th": "แหล่งข้อมูล: GEOGLOWS River Forecast System (ECMWF) ผ่าน GRP River Watch"},
     "h_role": {"en": "Role", "th": "บทบาท"},
     "h_provider": {"en": "Provider", "th": "ผู้ให้ข้อมูล"},
     "h_version": {"en": "Version", "th": "รุ่น"},
@@ -497,6 +548,60 @@ def _live_section(document: Any, live: dict[str, Any] | None, lang: str) -> None
             _para(document, no_warnings[code], bold=True, size=9.5)
 
 
+def _bangkok_time(iso: str | None) -> str:
+    if not iso:
+        return ""
+    from datetime import datetime, timedelta, timezone
+
+    moment = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return moment.astimezone(timezone(timedelta(hours=7))).strftime("%d %b %Y %H:%M")
+
+
+def _flow(value: float) -> str:
+    return f"{value:,.1f}" if abs(value) < 10 else f"{value:,.0f}"
+
+
+def _river_section(document: Any, river: dict[str, Any] | None, lang: str) -> None:
+    document.add_heading(t("r_title", lang), level=1)
+    if not river or river.get("reason") == "no_reach":
+        _note(document, t("r_none", lang))
+        return
+    reach = river.get("reach") or {}
+    why = t(f"r_why_{reach.get('why')}", lang)
+    _para(document, t("r_reach", lang, reach=reach.get("reach_id"), why=why), size=9.5)
+    likely = reach.get("likely_name_th") if lang == "th" else reach.get("likely_name_en")
+    if likely:
+        _note(document, t("r_likely", lang, name=likely))
+    if reach.get("inland"):
+        _note(document, t("r_small", lang))
+    if not river.get("available"):
+        _warn(document, t("r_unavailable", lang, problem=river.get("problem") or "no answer"))
+        _note(document, t("r_caveat", lang))
+        return
+    summary = river["summary"]
+    _para(document, t("r_headline", lang, trend=t(f"r_trend_{summary['trend']}", lang)), bold=True)
+    unit = "m³/s"
+    rows = [
+        [t("r_now", lang), f"{_flow(summary['first_median_m3s'])} {unit}"],
+        [t("r_peak", lang), f"{_flow(summary['median_peak_m3s'])} {unit}"],
+    ]
+    if summary.get("p25_at_peak_m3s") is not None and summary.get("p75_at_peak_m3s") is not None:
+        rows.append([t("r_band", lang), f"{_flow(summary['p25_at_peak_m3s'])} {t('r_to', lang)} "
+                                        f"{_flow(summary['p75_at_peak_m3s'])} {unit}"])
+    rows += [
+        [t("r_peak_at", lang), _bangkok_time(summary.get("median_peak_valid_at_utc"))],
+        [t("r_run", lang), _bangkok_time(summary.get("issued_at_utc"))],
+        [t("r_quality", lang), t(f"r_q_{summary.get('quality_state') or 'older'}", lang)],
+    ]
+    _table(document, [t("item", lang), t("value", lang)], rows, lang)
+    if river.get("chart"):
+        document.add_picture(BytesIO(river["chart"]), width=Cm(15))
+        document.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        _para(document, t("r_chart", lang), style="Caption")
+    _warn(document, t("r_caveat", lang))
+    _note(document, t("r_source", lang))
+
+
 def render_summary(facts: dict[str, Any], lang: str = "en") -> bytes:
     lang = lang if lang in LANGS else "en"
     document = Document()
@@ -683,11 +788,14 @@ def render_summary(facts: dict[str, Any], lang: str = "en") -> bytes:
     # 6. Live reported flooding (ADR-0056)
     _live_section(document, facts.get("live"), lang)
 
-    # 7. Limits
+    # 7. River outlook (ADR-0059)
+    _river_section(document, facts.get("river"), lang)
+
+    # 8. Limits
     document.add_heading(t("s7", lang), level=1)
     _bullets(document, facts.get("limits") or [])
 
-    # 8. Sources
+    # 9. Sources
     document.add_heading(t("s8", lang), level=1)
     _table(document, [t("h_role", lang), t("h_title", lang), t("h_provider", lang),
                       t("h_version", lang)], facts.get("sources") or [], lang)

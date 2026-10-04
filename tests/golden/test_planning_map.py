@@ -634,7 +634,8 @@ def test_the_district_summary_is_a_word_document_with_every_section(world) -> No
     cells = "\n".join(c.text for t in document.tables for r in t.rows for c in r.cells)
     for heading in ("1. At a glance", "2. Map", "3. Evacuation centres",
                     "Where people could move", "4. People", "5. Global Risk evidence",
-                    "6. What this cannot tell you", "7. Sources and versions"):
+                    "6. Live reported flooding", "7. River outlook (GEOGLOWS, exploratory)",
+                    "8. What this cannot tell you", "9. Sources and versions"):
         assert heading in text
     assert "SYNTHETIC TEST DATA" in text
     assert "does not certify that any place is safe" in text

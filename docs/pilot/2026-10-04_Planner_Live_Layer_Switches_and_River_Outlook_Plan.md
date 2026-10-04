@@ -1,6 +1,6 @@
 # Planner: a "Live layer" with per-source switches, and GEOGLOWS in the district summary
 
-Status: decided 4 October 2026 (whole area, replace the old group, GEOGLOWS shown labelled exploratory). A is built (ADR-0058); B follows. Two owner requests from the same session:
+Status: decided 4 October 2026 (whole area, replace the old group, GEOGLOWS shown labelled exploratory). A is built (ADR-0058); B is built (ADR-0059). Two owner requests from the same session:
 
 - **A.** "Integrate the layer from this one [the pilot page's per-source switches] for Bangkok in
   the Planner map; maybe add a layer called Live layer with these tick boxes; off by default, but

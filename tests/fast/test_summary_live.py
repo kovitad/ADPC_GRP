@@ -105,7 +105,8 @@ def test_the_english_summary_has_the_live_section_after_global_risk_with_a_pictu
     out = render_summary(_facts(live), "en")
     text = _text(out)
     assert text.index("5. Global Risk evidence") < text.index("6. Live reported flooding")
-    assert text.index("6. Live reported flooding") < text.index("7. What this cannot tell you")
+    assert text.index("6. Live reported flooding") < text.index("7. River outlook")
+    assert text.index("7. River outlook") < text.index("8. What this cannot tell you")
     assert "As of 04 Oct 2026 14:10, Bangkok time" in text and "not a warning" in text
     assert "DDPM evacuation centre" in text and "Chalong Krung Road" in text
     assert NO_WARNINGS["en"] in text and NO_WARNINGS["th"] in text
@@ -141,3 +142,36 @@ def test_a_blank_name_in_one_language_falls_back_to_the_other() -> None:
     name = {"en": "- · -", "th": "อุโมงค์ทางลอดพระราม 9"}
     assert _local(name, "en") == "อุโมงค์ทางลอดพระราม 9"
     assert _local({"en": "On Nut Road", "th": "ถนนอ่อนนุช"}, "en") == "On Nut Road"
+
+
+def test_the_river_outlook_section_shows_trend_peak_chart_and_caveats() -> None:
+    from api.river_outlook import chart
+
+    series = [{"valid_at_utc": f"2026-10-0{4 + d}T00:00:00Z", "median_m3s": 900.0 + 60 * d,
+               "p25_m3s": 800.0 + 50 * d, "p75_m3s": 1000.0 + 70 * d} for d in range(5)]
+    png = chart(series)
+    assert png and png[1:4] == b"PNG"
+    river = {"available": True, "chart": png, "problem": None,
+             "reach": {"reach_id": 430537201, "why": "chao_phraya_nonthaburi",
+                       "likely_name_en": "Chao Phraya River", "likely_name_th": "แม่น้ำเจ้าพระยา",
+                       "inland": False},
+             "summary": {"trend": "rise", "first_median_m3s": 900.0, "median_peak_m3s": 1140.0,
+                         "p25_at_peak_m3s": 1000.0, "p75_at_peak_m3s": 1280.0,
+                         "median_peak_valid_at_utc": "2026-10-08T00:00:00Z",
+                         "issued_at_utc": "2026-10-04T00:00:00Z", "quality_state": "latest",
+                         "run": "2026100400"}}
+    facts = {**_facts({"available": False, "reason": "outside_coverage"}), "river": river}
+    english = render_summary(facts, "en")
+    text = _text(english)
+    assert "7. River outlook (GEOGLOWS, exploratory)" in text
+    assert "forecast to be rising" in text and "1,140 m³/s" in text
+    assert "Not confirmed by a hydrologist" in text and "not water level" in text
+    assert len(Document(io.BytesIO(english)).inline_shapes) == 1
+    thai = _text(render_summary(facts, "th"))
+    assert "แนวโน้มแม่น้ำ" in thai and "เพิ่มขึ้น" in thai and "แม่น้ำเจ้าพระยา" in thai
+
+
+def test_an_area_without_a_reach_says_so_plainly() -> None:
+    text = _text(render_summary({**_facts(None), "river": {"available": False,
+                                                           "reason": "no_reach"}}, "en"))
+    assert "No GEOGLOWS river reach is linked to this area" in text

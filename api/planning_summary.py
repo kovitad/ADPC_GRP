@@ -32,6 +32,7 @@ from api.maps import CentreIndicatorRequest, centre_indicator_values, dataset_fe
 from api.permissions import SignedInMember
 from api.planning import _canonical_sig_place
 from api.planning_access import planner_membership
+from api.river_outlook import outlook as river_outlook
 from api.sessions import CurrentPrincipal
 from core.assessment_models import AssessmentFeature, Boundary, Feature
 from core.contribution_models import APPROVED, SigContribution
@@ -357,6 +358,12 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
                     boundary.edition])
     # ADR-0056: live reported flooding for Bangkok, never part of the assessment above.
     live = live_section(session, hub.hub_code, boundary.admin_code, boundary.admin_level)
+    # ADR-0059: the GEOGLOWS river outlook, labelled exploratory.
+    river = river_outlook(boundary.admin_code)
+    if river.get("available"):
+        sources.append(["river outlook (exploratory)",
+                        f"GEOGLOWS reach {river['reach']['reach_id']}",
+                        "GEOGLOWS River Forecast System (ECMWF)", river["summary"]["run"]])
     if live.get("available"):
         sources.append(["live reported flooding (not part of the assessment)",
                         "Floodboard roads and reports, grouped by GRP", "Floodboard, CC BY 4.0",
@@ -389,6 +396,7 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
         "supporting": supporting,
         "global_risk": _global_risk(session, principal, hub.hub_id, boundary),
         "live": live,
+        "river": river,
         "limits": limits,
         "sources": sources,
     }

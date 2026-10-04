@@ -296,6 +296,27 @@ point it details out, careful about UX".
 **After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
 (DDPM reports).
 
+#### BUILT: GEOGLOWS river outlook in the district summary (ADR-0059, 4 October 2026)
+
+- **What:** section 7, "River outlook (GEOGLOWS, exploratory)", in English and Thai. It has:
+  - the trend;
+  - the median peak and band;
+  - the peak and run times;
+  - freshness;
+  - a numpy-drawn chart;
+  - fixed caveats.
+
+  "What this cannot tell you" is now 8, and "Sources" is 9.
+- **Coverage:**
+  - 28 of 50 Bangkok districts, using their River Watch main reach;
+  - Nonthaburi 1204 (canal), and 1201, 1202 and 1206 (Chao Phraya);
+  - other districts get a one-line gap.
+- **Code:** `api/river_outlook.py`, `_river_section` in `core/summary_docx.py`.
+- **Checked:** real data for Bang Phlat and Bang Bua Thong, rendered through Word in both
+  languages. Not yet checked through a signed-in download.
+- **Open:** D3 (reaches confirmed by a hydrologist) still applies; the section says "not
+  confirmed" until then.
+
 #### BUILT: Planner "Live layer" with one switch per source (ADR-0058, 4 October 2026)
 
 - **What:** Layers → "Live layer (Bangkok, Nonthaburi)", 13 switches, all off by default:
