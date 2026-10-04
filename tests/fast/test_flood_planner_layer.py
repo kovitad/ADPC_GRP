@@ -41,6 +41,35 @@ def stored(monkeypatch):
     monkeypatch.setattr(layer, "current_roads", lambda _s, _c, _now, include_all=False: {
         "features": [_road(k * 16) for k in "abcde"],
         "snapshot_retrieved_at": NOW.isoformat()})
+    monkeypatch.setattr(layer, "latest_exposure", lambda _s, _c, _now: {"assets": [
+        _asset("ddpm:1", "evacuation_centre", "1030", ["a" * 16], 90),
+        _asset("osm:node/2", "hospital", "1030", ["b" * 16], 40,
+               access="access_disrupted_confirmed",
+               reasons=["officer_confirmed_access_disrupted", "no_road_network"]),
+        _asset("osm:node/3", "school", "1030", [], None, exposure="no_report_nearby"),
+        _asset("osm:node/4", "school", "1011", ["c" * 16], 30),
+    ]})
+    monkeypatch.setattr(layer, "camera_registry", lambda _pilot: ())
+    monkeypatch.setattr(layer, "nearby_cameras", lambda _reg, _geom, _now, _radius: [
+        _camera("bmatraffic:1362", "BMA_TRAFFIC", "1362", 120),
+        _camera("itic:9", "ITIC", "9", 50),
+    ])
+
+
+def _asset(asset_id, asset_type, district, keys, distance, *, access="access_unknown",
+           exposure="potentially_exposed", reasons=None) -> dict:
+    return {"asset_id": asset_id, "asset_type": asset_type, "name": asset_id, "name_en": "",
+            "lat": 13.82, "lon": 100.55, "district_code": district, "exposure_state": exposure,
+            "access_state": access, "nearest_distance_m": distance, "road_keys": keys,
+            "reasons": reasons or ["no_road_network"], "source": "OpenStreetMap",
+            "officer": {"name": "someone"} if access == "access_disrupted_confirmed" else None}
+
+
+def _camera(camera_id, provider, number, distance) -> dict:
+    return {"camera_id": camera_id, "provider": provider, "provider_camera_id": number,
+            "name": {"en": f"Camera {number}", "th": f"กล้อง {number}"}, "lat": 13.82,
+            "lon": 100.55, "status": "online", "viewer_url": "https://example.test/view",
+            "placeholder": False, "source_label": provider, "distance_m": distance}
 
 
 def test_a_district_gets_its_incidents_including_those_across_its_border() -> None:
@@ -99,3 +128,24 @@ def test_planner_live_facts_refuse_areas_outside_bangkok_and_other_hubs() -> Non
 
     assert live_facts(None, "adpc", "3303", "district")["reason"] == "outside_coverage"
     assert live_facts(None, "other", "1011", "district")["reason"] == "hub_not_enabled"
+
+
+def test_facilities_near_flooding_in_the_district_are_listed_without_officer_states() -> None:
+    result = layer.live_layer(None, "adpc", "1030", "district", NOW)
+    ids = [f["asset_id"] for f in result["facilities"]]
+    assert ids == ["ddpm:1", "osm:node/2"]  # DDPM centres first; no unexposed or other district
+    centre, hospital = result["facilities"]
+    assert centre["incident_ids"] == ["in-chatuchak"] and centre["source"].startswith("DDPM")
+    assert hospital["access_state"] == "access_unknown"
+    assert "officer" not in str(result["facilities"])
+
+
+def test_cameras_are_shared_across_incidents_and_only_relay_cameras_get_a_picture() -> None:
+    with_relay = layer.live_layer(None, "adpc", "1030", "district", NOW, relay=True)
+    first, second = with_relay["cameras"]
+    assert first["camera_id"] == "bmatraffic:1362"
+    assert first["picture_url"].endswith("/cameras/bmatraffic%3A1362/frame.jpg")
+    assert sorted(first["incident_ids"]) == ["in-chatuchak", "on-border"]
+    assert second["picture_url"] is None
+    without = layer.live_layer(None, "adpc", "1030", "district", NOW, relay=False)
+    assert all(c["picture_url"] is None for c in without["cameras"])

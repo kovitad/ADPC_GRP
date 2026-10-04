@@ -417,4 +417,5 @@ def live_flood(
     boundary = session.get(Boundary, boundary_id)
     if boundary is None or not boundary.is_supported:
         raise not_found()
-    return live_layer(session, hub.hub_code, boundary.admin_code, boundary.admin_level)
+    return live_layer(session, hub.hub_code, boundary.admin_code, boundary.admin_level,
+                      relay=get_settings().bmatraffic_relay_enabled)

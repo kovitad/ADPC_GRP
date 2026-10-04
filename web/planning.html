@@ -166,16 +166,34 @@
             <span><i class="pw-dot" style="--c:#6b7280"></i>N/A — no data</span>
             <span><i class="pw-dot pw-dot--hollow"></i>Not assessed yet</span>
           </div>
-          <div class="pw-layer-choice" data-live-flood hidden>
-            <label class="pw-toggle"><input type="checkbox" data-live-flood-toggle /><span>Reported flooding on roads (live, not a flood map)</span></label>
-            <div class="pw-legend" data-live-flood-legend hidden>
-              <span><i class="pw-dot" style="--c:#7c3aed"></i>Conflicting reports</span>
-              <span><i class="pw-dot" style="--c:#b91c1c"></i>High confidence</span>
-              <span><i class="pw-dot" style="--c:#ea580c"></i>Medium confidence</span>
-              <span><i class="pw-dot" style="--c:#ca8a04"></i>Low confidence</span>
-              <span>Dashed: receding, no current report</span>
+          <div class="pw-layer-choice pw-live-group" data-live-flood hidden>
+            <div class="pw-live-group__head">
+              <span>Live (Bangkok)</span>
+              <span class="pw-live-group__when" data-live-when></span>
             </div>
+            <label class="pw-toggle"><input type="checkbox" data-live-flood-toggle /><span>Reported flooding on roads (live, not a flood map)</span></label>
+            <label class="pw-toggle pw-live-group__sub"><input type="checkbox" data-live-sub="facilities" checked disabled /><span>Facilities with flooding reported nearby <span class="pw-muted" data-live-count="facilities"></span></span></label>
+            <label class="pw-toggle pw-live-group__sub"><input type="checkbox" data-live-sub="cameras" checked disabled /><span>Cameras near reported flooding <span class="pw-muted" data-live-count="cameras"></span></span></label>
+            <details class="pw-live-legend" data-live-flood-legend hidden>
+              <summary>Legend</summary>
+              <div class="pw-legend">
+                <strong>Roads: how sure we are</strong>
+                <span><i class="pw-line" style="--c:#7c3aed"></i>Conflicting evidence</span>
+                <span><i class="pw-line" style="--c:#b91c1c"></i>High confidence</span>
+                <span><i class="pw-line" style="--c:#ea580c"></i>Medium confidence</span>
+                <span><i class="pw-line" style="--c:#ca8a04"></i>Low confidence</span>
+                <span><i class="pw-line pw-line--dashed" style="--c:#6b7280"></i>Receding: no current report</span>
+                <strong>Flooding reported nearby</strong>
+                <span><i class="pw-live-key pw-live-key--evac"></i>DDPM evacuation centre (ring on its pin)</span>
+                <span><i class="pw-live-key">H</i>Hospital, clinic (C) or school (S)</span>
+                <strong>Cameras</strong>
+                <span><i class="pw-live-key pw-live-key--cam is-picture"></i>Picture in GRP</span>
+                <span><i class="pw-live-key pw-live-key--cam"></i>Official viewer only</span>
+                <span><i class="pw-live-key pw-live-key--group">3</i>Cameras near an incident; zoom in</span>
+              </div>
+            </details>
             <p class="pw-muted" data-live-flood-note></p>
+            <div class="pw-live-list" data-live-list hidden aria-label="Live now"></div>
           </div>
           <div data-supporting-layer-controls></div>
           <div data-vulnerability-layer-controls></div>

@@ -223,7 +223,17 @@ it, so do it before W2 submission)
 
 #### NEXT TO IMPLEMENT: facilities and cameras on the Planner's live map (W7b)
 
-**Status:** designed and ready to build; not started. Design:
+**Status:** BUILT on 4 October 2026 with the recommended answers (both on, cameras grouped,
+"Live now" list included); see ADR-0056 item 6.
+- On real data: Suan Luang 3 facilities and 16 cameras (3 with pictures); Lat Krabang 2
+  facilities and 19 cameras.
+- The running app was updated by copying the two Python files into the API container and
+  restarting it. `web/` is a live bind mount, so page changes need no rebuild. Rebuild the image
+  properly when memory allows.
+- **Not yet checked in a browser** (the Chrome extension was not connected): the owner's check
+  is the acceptance test.
+
+Design:
 `docs/pilot/2026-10-04_Planner_Live_Map_UX_Design.md`, which has ASCII mock-ups of every card.
 The owner asked for "evacuation centres near flood points and cameras, and when I click each
 point it details out, careful about UX".

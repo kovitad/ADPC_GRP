@@ -98,7 +98,33 @@ Decision D2 (officer checks for Planners) is still open.
      sources and Global Risk stay as written, and the Thai document says so. The page has a
      "ดาวน์โหลดสรุป (ไทย)" button.
    - The assessment section, its result and its receipt are unchanged.
-6. **Rules for the later steps** (from the plan):
+6. **Facilities and cameras on the live map (W7b)**, built 4 October 2026 to
+   `docs/pilot/2026-10-04_Planner_Live_Map_UX_Design.md`, with the recommended answers: both on
+   by default, cameras grouped at district zoom, and the "Live now" list included.
+   - **API.** `GET /api/v1/maps/live-flood` adds `facilities` and `cameras`.
+     - `facilities`: `potentially_exposed` in the district, DDPM centres first. Officer-confirmed
+       access is replaced by the computed state (D2).
+     - `cameras`: within 400 m of the district's incident roads, deduplicated, at most 40.
+       `picture_url` uses the relay route, only when `BMATRAFFIC_RELAY_ENABLED` is on and the
+       camera is a bmatraffic camera.
+     - On real data each response took about 1.3 s and was under 90 KB.
+   - **Map.** A "Live (Bangkok)" group shows the snapshot time (amber after 2 hours) and two
+     remembered sub-switches with counts.
+     - DDPM centres get an orange ring and badge over their existing pin, not a second pin.
+       Other facilities get ringed letters.
+     - Cameras show a green dot when GRP can show a picture. They are grouped per incident below
+       zoom 15.
+     - Opening an incident fades unrelated items.
+   - **Cards.** One pattern, built from DOM nodes only.
+     - The incident card gives the confidence and its reasons in plain words, and buttons for the
+       nearby facilities and cameras.
+     - The facility card gives the distance and access "not confirmed"; the DDPM card also links
+       to the centre's assessment details.
+     - The camera card shows a picture every 10 s, with a pause; it stops on close or after
+       10 minutes.
+     - On phones (600 px or narrower) cards open in a bottom sheet outside the map.
+   - **"Live now" list** under the switches, usable with a keyboard.
+7. **Rules for the later steps** (from the plan):
    - live data never enters a stored assessment or its receipt;
    - the map layer is "Reported flooding on roads (live, not a flood map)";
    - a sub-district shows its parent district's live facts, and says so;
