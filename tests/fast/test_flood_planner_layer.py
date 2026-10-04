@@ -65,7 +65,7 @@ def test_officer_checks_never_reach_the_planner_layer() -> None:
 
 def test_incidents_without_a_district_yet_are_named_as_a_gap() -> None:
     result = layer.live_layer(None, "adpc", "1030", "district", NOW)
-    assert result["gaps"] and "no district yet" in result["gaps"][0]
+    assert result["gaps"] and "cannot be placed" in result["gaps"][0]
 
 
 def test_outside_bangkok_and_other_hubs_are_told_plainly() -> None:

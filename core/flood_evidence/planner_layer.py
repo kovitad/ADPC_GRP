@@ -74,8 +74,9 @@ def live_layer(session: Session, hub_code: str, admin_code: str, admin_level: st
     gaps = []
     unplaced = len(listed["incidents"]) - len(placed)
     if unplaced:
-        gaps.append(f"{unplaced} open incident(s) have no district yet; they get one at the next "
-                    "snapshot.")
+        gaps.append(f"{unplaced} other open incident(s) were last updated before districts were "
+                    "recorded, so they cannot be placed; they get one if flooding is reported "
+                    "there again, or close within two hours.")
     name_en, name_th = names[district]
     return {
         "available": True, "title": LAYER_TITLE, "note": NOTE, "credit": CREDIT,
