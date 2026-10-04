@@ -3360,6 +3360,10 @@
       "Show Global Risk evidence for this district",
       "Explain what the map shows",
     ],
+    live_flood: [
+      "What changed in the last hour?",
+      "Which schools or hospitals have flooding reported nearby?",
+    ],
   };
   const showFollowups = (mode) => {
     const area = state.selected ? state.selected.name : null;
@@ -3617,6 +3621,16 @@
           () => showCentresOnMap(named),
         )];
       }
+    } else if (payload.mode === "live_flood" && payload.live) {
+      // ADR-0056: the answer is about one district; show the same live reports on the map.
+      actions = [chipButton("Show live reported flooding on the map", () => {
+        const boundary = state.boundaries.find((b) => b.id === payload.live.boundary_id);
+        if (boundary && (!state.selected || state.selected.id !== boundary.id)) {
+          selectBoundary(boundary, { explicit: true, preserveAssessment: true });
+        }
+        $("[data-live-flood-toggle]").checked = true;
+        syncLiveFlood();
+      })];
     } else if (payload.mode === "needs_area_confirmation" && payload.place) {
       const confirmation = { place: payload.place, message, publish };
       addMessage("assistant", payload.answer, {

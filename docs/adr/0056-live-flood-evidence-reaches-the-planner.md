@@ -2,10 +2,11 @@
 
 ## Status
 
-Steps 1 and 2 accepted and built on 4 October 2026 at the Product Owner's request ("go ahead
-with step 1", "go ahead with step 2"). Steps 3 and 4 are planned in
+Steps 1-3 accepted and built on 4 October 2026 at the Product Owner's request ("go ahead with
+step 1/2/3"). The owner decided D7 (rain may appear, labelled as context) and D8 (the fixed
+no-warnings wording) on 4 October 2026. Step 4 is planned in
 [`docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`](../pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md).
-They will amend this record once decisions D2, D7 and D8 are made.
+Decision D2 (officer checks for Planners) is still open.
 
 ## Context
 
@@ -37,7 +38,28 @@ They will amend this record once decisions D2, D7 and D8 are made.
    - On the page, the switch "Reported flooding on roads (live, not a flood map)" appears only
      for Bangkok areas. Roads are coloured by confidence word, receding ones are dashed, and the
      legend is separate from the flood scenario. It refreshes every five minutes while on.
-3. **Rules for the later steps** (from the plan):
+3. **Live facts in Planner answers** (step 3).
+   - The router has a `live_flood` mode for questions about flooding now, reported flooding or
+     early warning, for a Bangkok area. Before this, "current conditions" went to `cannot`.
+   - The area is the selected Bangkok boundary, or a Bangkok district named in the message.
+     Anything else gets `live_flood_unavailable` with a plain reason.
+   - Facts come from the pilot's own bundle (`build_facts`) for the district, through
+     `core/flood_evidence/planner_answer.py`. Officer checks, officer-confirmed access and the
+     officer-check count are removed (D2). Rain stays, labelled as context (D7).
+   - AI wording uses the pilot's instructions and gate (ADR-0043). If it fails the gate, the
+     computed answer is shown.
+   - Every answer, computed or AI, ends with the fixed D8 text. It is appended after the gate and
+     never written by the model:
+     - EN: "GRP does not issue flood warnings. For official warnings, follow the Thai
+       Meteorological Department (TMD), the Department of Disaster Prevention and Mitigation
+       (DDPM) and the Bangkok Metropolitan Administration (BMA)."
+     - TH: the same in Thai (`NO_WARNINGS["th"]`). Thai questions get Thai text.
+   - **Live answers are never cached**, so a repeat question always uses the newest snapshot.
+   - A "Show live reported flooding on the map" button turns on the step 2 layer for the same
+     district.
+   - Known limit: incidents in the "check first" list keep the pilot's order, which ranks
+     incidents an officer saw as dry first. The check itself is not shown.
+4. **Rules for the later steps** (from the plan):
    - live data never enters a stored assessment or its receipt;
    - the map layer is "Reported flooding on roads (live, not a flood map)";
    - a sub-district shows its parent district's live facts, and says so;

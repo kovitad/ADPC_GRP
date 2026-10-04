@@ -1875,3 +1875,112 @@ def test_the_same_question_with_other_layers_is_answered_again_not_from_the_cach
     # The stored pack is re-sliced: one Global Risk lookup, two answers.
     assert [name for name, _ in FakeMcp.calls] == ["assemble_pack"]
     assert planning["replies"] == []
+
+
+# --- Live reported flooding for Bangkok (ADR-0056, step 3) ----------------------------------
+
+LIVE_FACTS = [
+    {"id": "S", "kind": "situation", "active_incidents": 4, "conflicting_incidents": 1,
+     "time_now_bangkok": "14:20"},
+    {"id": "C", "kind": "changes", "window_minutes": 60, "tracked_since_bangkok": "09:00",
+     "window_starts_before_tracking": False, "new_incidents": 2, "incidents_grew": 1,
+     "no_longer_reported": 0},
+    {"id": "L", "kind": "limits", "incidents_not_listed": 0},
+]
+
+
+def _bangkok_boundary(planning) -> str:
+    with Session(planning["engine"]) as session:
+        boundary = Boundary(
+            admin_code="1011", admin_level="district", name="LAT KRABANG", name_th="ลาดกระบัง",
+            province_name="BANGKOK", province_name_th="กรุงเทพมหานคร", country_name="Thailand",
+            geom={"type": "Polygon", "coordinates": [[[100.7, 13.7], [100.8, 13.7],
+                                                      [100.8, 13.8], [100.7, 13.7]]]},
+            source="Thailand hierarchy delivery", edition="2025-10",
+            geometry_sha256="d" * 64, is_supported=True,
+        )
+        session.add(boundary)
+        session.commit()
+        return str(boundary.id)
+
+
+@pytest.fixture
+def live(planning):
+    calls = []
+
+    def fake_live_facts(_session, hub_code, admin_code, admin_level, now=None):
+        calls.append((hub_code, admin_code, admin_level))
+        return {"available": True, "district_code": admin_code[:4],
+                "district_name": "Lat Krabang", "district_name_th": "ลาดกระบัง",
+                "rolled_up_from": None, "facts": LIVE_FACTS,
+                "as_of": "2026-10-04T07:20:00+00:00"}
+
+    planning["monkeypatch"].setattr(api.planning, "live_facts", fake_live_facts)
+    return calls
+
+
+def test_a_live_question_about_bangkok_is_worded_from_facts_and_ends_with_no_warnings(
+    planning, live
+) -> None:
+    boundary_id = _bangkok_boundary(planning)
+    planning["replies"].extend([
+        '{"mode": "live_flood", "reply": "", "place": null}',
+        "4 incidents are active now [S], 2 of them new in the last 60 minutes [C].",
+    ])
+    body = _ask(_client(planning, "planner@example.test"),
+                message="Is there flooding in Lat Krabang right now?",
+                boundary_id=boundary_id).json()
+    assert body["mode"] == "live_flood"
+    assert body["answer"].startswith("4 incidents are active now [S]")
+    assert body["answer"].endswith(api.planning.NO_WARNINGS["en"])
+    assert "not a warning" in body["label"] and "AI wording" in body["label"]
+    assert body["live"]["district_code"] == "1011"
+    assert live == [("adpc", "1011", "district")]
+
+
+def test_wording_that_fails_the_gate_falls_back_to_the_computed_answer(planning, live) -> None:
+    boundary_id = _bangkok_boundary(planning)
+    planning["replies"].extend([
+        '{"mode": "live_flood", "reply": "", "place": null}',
+        "About 99 roads will flood soon [S].",
+    ])
+    body = _ask(_client(planning, "planner@example.test"),
+                message="Any flooding now?", boundary_id=boundary_id).json()
+    assert "99" not in body["answer"]
+    assert body["answer"].startswith("Lat Krabang: live reported flooding.")
+    assert body["answer"].endswith(api.planning.NO_WARNINGS["en"])
+    assert "Computed answer" in body["label"]
+
+
+def test_a_thai_question_gets_the_thai_no_warnings_text(planning, live) -> None:
+    boundary_id = _bangkok_boundary(planning)
+    planning["replies"].extend([
+        '{"mode": "live_flood", "reply": "", "place": null}',
+        "not cited, so it is withheld",
+    ])
+    body = _ask(_client(planning, "planner@example.test"),
+                message="ตอนนี้ลาดกระบังน้ำท่วมไหม", boundary_id=boundary_id).json()
+    assert body["answer"].endswith(api.planning.NO_WARNINGS["th"])
+
+
+def test_outside_bangkok_live_questions_are_told_plainly_without_more_ai(planning, live) -> None:
+    planning["replies"].append('{"mode": "live_flood", "reply": "", "place": null}')
+    body = _ask(_client(planning, "planner@example.test"),
+                message="Is it flooding now?", boundary_id=planning["boundary_id"]).json()
+    assert body["mode"] == "live_flood_unavailable"
+    assert "Bangkok only" in body["answer"]
+    assert body["answer"].endswith(api.planning.NO_WARNINGS["en"])
+    assert live == [] and planning["replies"] == []
+
+
+def test_live_answers_are_never_served_from_the_cache(planning, live) -> None:
+    boundary_id = _bangkok_boundary(planning)
+    client = _client(planning, "planner@example.test")
+    for _ in range(2):
+        planning["replies"].extend([
+            '{"mode": "live_flood", "reply": "", "place": null}',
+            "4 incidents are active now [S].",
+        ])
+        body = _ask(client, message="Flooding now?", boundary_id=boundary_id).json()
+        assert body["mode"] == "live_flood"
+    assert len(live) == 2 and planning["replies"] == []

@@ -208,7 +208,7 @@ Facts that shape the roadmap:
   - a separate partner channel.
 - **Limits:** crowd reports are never a payout trigger, and no report states a loss.
 
-**W7. Live flood evidence in the Planner, Bangkok** (steps 1-2 built 4 October: `5f18f81` stores `district_codes` in the worker, and was checked live with 145 of 145 active incidents coded; `75adfbf` adds the Planner live layer `GET /api/v1/maps/live-flood`; steps 3-5 planned; nothing outside the code blocks
+**W7. Live flood evidence in the Planner, Bangkok** (steps 1-2 built 4 October: `5f18f81` stores `district_codes` in the worker, and was checked live with 145 of 145 active incidents coded; `75adfbf` adds the Planner live layer `GET /api/v1/maps/live-flood`; step 3 adds the `live_flood` answer mode (D7 rain yes, D8 wording approved, never cached; Lat Krabang checked on real data); steps 4-5 planned; nothing outside the code blocks
 it, so do it before W2 submission)
 - **Plan:** `docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`.
 - **Steps:**
@@ -234,8 +234,8 @@ it, so do it before W2 submission)
 | Send | Floodboard credit note, maintainer questions, BMA addition (all drafted, none sent) | W1, W2 |
 | Model | Camera-check model (the gateway is OpenAI-style today) | W1 |
 | Backup | Where the archive's external backup goes | W5 |
-| D7 | Rain context and River Watch for Planners (recommend rain yes, River Watch after D3) | W7 |
-| D8 | Approve the fixed "official warnings" wording, Thai and English, and name the channels | W7 |
+| D7 | ~~Rain for Planners~~ decided 4 Oct: yes, labelled as context. River Watch for Planners still waits on D3 | W7 |
+| D8 | ~~Official warnings wording~~ approved 4 Oct (TMD, DDPM, BMA); in `core/flood_evidence/planner_answer.py` | W7 |
 
 #### Decided today
 

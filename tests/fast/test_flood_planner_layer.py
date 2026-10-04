@@ -73,3 +73,29 @@ def test_outside_bangkok_and_other_hubs_are_told_plainly() -> None:
     assert not outside["available"] and outside["reason"] == "outside_coverage"
     other_hub = layer.live_layer(None, "other", "1030", "district", NOW)
     assert not other_hub["available"] and other_hub["reason"] == "hub_not_enabled"
+
+
+def test_planner_facts_drop_officer_judgements_but_keep_computed_values() -> None:
+    from core.flood_evidence.planner_answer import _without_officer_judgements
+
+    facts = [
+        {"id": "S", "kind": "situation", "active_incidents": 3,
+         "facilities_access_confirmed_cut": 1},
+        {"id": "C", "kind": "changes", "officer_checks": 2, "new_incidents": 1},
+        {"id": "I1", "kind": "incident", "officer_check": "officer_saw_dry", "confidence": "low"},
+        {"id": "F1", "kind": "facility", "access": "access_disrupted_confirmed", "name": "A"},
+        {"id": "F2", "kind": "facility", "access": "access_under_review", "name": "B"},
+    ]
+    cleaned = _without_officer_judgements(facts)
+    text = str(cleaned)
+    assert "officer" not in text and "confirmed" not in text
+    assert cleaned[0]["active_incidents"] == 3 and cleaned[2]["confidence"] == "low"
+    assert cleaned[4]["access"] == "access_under_review"
+    assert facts[2]["officer_check"] == "officer_saw_dry"  # the input is not changed
+
+
+def test_planner_live_facts_refuse_areas_outside_bangkok_and_other_hubs() -> None:
+    from core.flood_evidence.planner_answer import live_facts
+
+    assert live_facts(None, "adpc", "3303", "district")["reason"] == "outside_coverage"
+    assert live_facts(None, "other", "1011", "district")["reason"] == "hub_not_enabled"
