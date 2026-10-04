@@ -17,10 +17,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from core.flood_evidence.answer import computed_answer
+from core.flood_evidence.areas import COVERAGE_NAME, all_areas, in_pilot
 from core.flood_evidence.briefing import build_facts
 from core.flood_evidence.config import PilotConfig, pilot_config
 from core.flood_evidence.situation import current_roads
-from core.river_watch import bangkok_outlines
 
 PILOT_ID = "bangkok"
 WINDOW_MINUTES = 60
@@ -42,9 +42,11 @@ def language(message: str) -> str:
     return "th" if THAI.search(message or "") else "en"
 
 
-def is_bangkok(admin_code: str | None) -> bool:
-    code = str(admin_code or "")
-    return code.startswith("10") and len(code) >= 4
+def in_live_area(admin_code: str | None) -> bool:
+    """Whether live reported flooding covers this GRP district or sub-district (ADR-0057)."""
+
+    config = pilot_config(PILOT_ID)
+    return config is not None and in_pilot(config, admin_code)
 
 
 def _without_officer_judgements(facts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -72,10 +74,10 @@ def _road_names(session: Session, config: PilotConfig, now: datetime) -> dict[st
 
 def live_facts(session: Session, hub_code: str, admin_code: str, admin_level: str,
                now: datetime | None = None) -> dict[str, Any]:
-    """The facts a Planner answer may use for a Bangkok area, or why there are none."""
+    """The facts a Planner answer may use for a pilot area, or why there are none."""
 
     config = pilot_config(PILOT_ID)
-    if config is None or not is_bangkok(admin_code):
+    if config is None or not in_pilot(config, admin_code):
         return {"available": False, "reason": "outside_coverage"}
     if hub_code.strip().lower() not in config.hubs:
         return {"available": False, "reason": "hub_not_enabled"}
@@ -85,7 +87,7 @@ def live_facts(session: Session, hub_code: str, admin_code: str, admin_level: st
     now = now or datetime.now(UTC)
     bundle = build_facts(session, config, district, now - timedelta(minutes=WINDOW_MINUTES), now,
                          _road_names(session, config, now))
-    names = {a["admin_code"]: (a["name"], a.get("name_th")) for a in bangkok_outlines()}
+    names = {a["admin_code"]: (a["name"], a.get("name_th")) for a in all_areas(config.base_id)}
     name_en, name_th = names.get(district, (district, None))
     return {
         "available": True, "district_code": district, "district_name": name_en,
@@ -100,9 +102,9 @@ def live_facts(session: Session, hub_code: str, admin_code: str, admin_level: st
 
 def unavailable_answer(reason: str, lang: str) -> str:
     text = {
-        "en": {"outside_coverage": "Live reported flooding covers Bangkok only.",
+        "en": {"outside_coverage": f"Live reported flooding covers {COVERAGE_NAME['en']} only.",
                "hub_not_enabled": "Live reported flooding is not enabled for this Hub."},
-        "th": {"outside_coverage": "ข้อมูลรายงานน้ำท่วมแบบสดครอบคลุมเฉพาะกรุงเทพฯ",
+        "th": {"outside_coverage": f"ข้อมูลรายงานน้ำท่วมแบบสดครอบคลุมเฉพาะ{COVERAGE_NAME['th']}",
                "hub_not_enabled": "ยังไม่ได้เปิดข้อมูลรายงานน้ำท่วมแบบสดสำหรับ Hub นี้"},
     }[lang][reason]
     return f"{text}\n\n{NO_WARNINGS[lang]}"

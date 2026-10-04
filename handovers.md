@@ -296,7 +296,20 @@ point it details out, careful about UX".
 **After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
 (DDPM reports).
 
-#### PLANNED: expand the live pilot to Nonthaburi (validated 4 October 2026)
+#### BUILT: the live pilot covers Nonthaburi (ADR-0057, 4 October 2026)
+
+- **Coverage:** 56 districts. Outlines come from `core/data/flood_pilot_bangkok_areas.json`;
+  `in_pilot()` replaces the `10` prefix checks.
+- **DDPM:** 64 evacuation centres in Nonthaburi.
+- **Pak Kret:** 52 cameras, relayed on screen only. A live picture was checked through the relay.
+- **Drafts to send:** the Pak Kret request and the Nakhon Nonthaburi feed request.
+- **Follow-up:** run `python -m grpcli.osm_assets_capture --pilot bangkok` again when Overpass
+  answers; it timed out on 4 October. Nonthaburi incidents start at the first snapshot after
+  deployment.
+
+The validation and plan below are kept for reference.
+
+#### (Reference) expand the live pilot to Nonthaburi (validated 4 October 2026)
 
 See `docs/pilot/2026-10-04_Nonthaburi_Expansion_Validation_and_Plan.md`. **Validated:**
 - Floodboard already covers all six districts: 314 road segments and 82 reports in 24 hours.

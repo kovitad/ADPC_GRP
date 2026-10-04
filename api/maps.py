@@ -187,8 +187,20 @@ def map_layers(
         "evacuation_centers": centers,
         "supporting_points": supporting_points,
         "vulnerability": vulnerability,
+        # ADR-0057: the districts with live reported flooding, so the page shows its live group
+        # only there. Empty for a Hub the pilot does not include.
+        "live_flood_areas": _live_flood_areas(hub.hub_code),
         "note": "Available source layers are displayed directly; an assessment is optional.",
     }
+
+
+def _live_flood_areas(hub_code: str) -> list[str]:
+    from core.flood_evidence.config import pilot_config
+
+    config = pilot_config("bangkok")
+    if config is None or hub_code.strip().lower() not in config.hubs:
+        return []
+    return sorted(config.demo_corridor.get("areas") or [])
 
 
 # ADR-0030: an indicator a planner cannot read is withheld with the reason, not silently dropped.

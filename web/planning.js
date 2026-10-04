@@ -2154,7 +2154,9 @@
 
   function syncLiveFlood() {
     const boundary = state.selected;
-    const inBangkok = Boolean(boundary && String(boundary.admin_code || "").startsWith("10"));
+    // ADR-0057: the pilot's districts (Bangkok and Nonthaburi), from the map layers response.
+    const inBangkok = Boolean(boundary
+      && (state.liveAreas || []).includes(String(boundary.admin_code || "").slice(0, 4)));
     $("[data-live-flood]").hidden = !inBangkok;
     const on = inBangkok && $("[data-live-flood-toggle]").checked;
     if (!on) {
@@ -5112,6 +5114,7 @@
       state.centerVersions = layers.evacuation_centers || [];
       state.supportingLayers = layers.supporting_points || [];
       state.vulnerabilityLayers = layers.vulnerability || [];
+      state.liveAreas = layers.live_flood_areas || [];
       state.centersVersion = state.centerVersions.find((layer) => layer.is_current && !layer.synthetic)
         || state.centerVersions.find((layer) => !layer.synthetic)
         || state.centerVersions[0]

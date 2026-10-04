@@ -16,14 +16,14 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from core.flood_evidence.areas import COVERAGE_NAME, all_areas, in_pilot
 from core.flood_evidence.camera_relay import PROVIDER as RELAY_PROVIDER
-from core.flood_evidence.camera_relay import frame_url
+from core.flood_evidence.camera_relay import RELAYED_PROVIDERS, frame_url
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import pilot_config
 from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.incident_store import list_incidents
 from core.flood_evidence.situation import current_roads
-from core.river_watch import bangkok_outlines
 
 PILOT_ID = "bangkok"
 LAYER_TITLE = {"en": "Reported flooding on roads (live, not a flood map)",
@@ -50,13 +50,14 @@ def live_layer(session: Session, hub_code: str, admin_code: str, admin_level: st
 
     config = pilot_config(PILOT_ID)
     code = str(admin_code or "")
-    if config is None or not code.startswith("10") or len(code) < 4:
-        return _unavailable("outside_coverage", "Live reported flooding covers Bangkok only.")
+    if config is None or not in_pilot(config, code):
+        return _unavailable("outside_coverage",
+                            f"Live reported flooding covers {COVERAGE_NAME['en']} only.")
     if hub_code.strip().lower() not in config.hubs:
         return _unavailable("hub_not_enabled",
                             "Live reported flooding is not enabled for this Hub.")
     district = code[:4]
-    names = {a["admin_code"]: (a["name"], a.get("name_th")) for a in bangkok_outlines()}
+    names = {a["admin_code"]: (a["name"], a.get("name_th")) for a in all_areas(config.base_id)}
     if district not in names or district not in (config.demo_corridor.get("areas") or []):
         return _unavailable("outside_coverage",
                             "Live reported flooding does not cover this district.")
@@ -162,8 +163,9 @@ def _cameras(config: Any, now: datetime, incidents: list[dict[str, Any]],
                 continue
             item = found.get(camera["camera_id"])
             if item is None:
-                can_picture = (relay and camera["provider"] == RELAY_PROVIDER
-                               and str(camera.get("provider_camera_id") or "").isdigit())
+                can_picture = relay and camera["provider"] in RELAYED_PROVIDERS and (
+                    camera["provider"] != RELAY_PROVIDER
+                    or str(camera.get("provider_camera_id") or "").isdigit())
                 item = found[camera["camera_id"]] = {
                     "camera_id": camera["camera_id"], "name": camera.get("name"),
                     "provider": camera["provider"],

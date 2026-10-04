@@ -34,6 +34,7 @@ from core.flood_evidence.answer import (
     gate,
     instructions_for,
 )
+from core.flood_evidence.areas import pilot_areas
 from core.flood_evidence.briefing import build_facts, get_situation_changes
 from core.flood_evidence.camera_relay import PROVIDER as RELAY_PROVIDER
 from core.flood_evidence.camera_relay import (
@@ -74,8 +75,9 @@ from core.flood_evidence.reviews import (
     reviewer_names,
 )
 from core.flood_evidence.situation import current_roads, recent_reports, road_by_id, situation
+from core.flood_evidence.snapshot_relay import PROVIDERS as SNAPSHOT_PROVIDERS
+from core.flood_evidence.snapshot_relay import shared_snapshot_relay
 from core.flood_evidence.weather import latest_weather
-from core.river_watch import bangkok_outlines
 
 router = APIRouter(prefix="/pilot/flood", tags=["pilot"])
 ROAD_ID = re.compile(r"^[0-9a-f]{16}$")
@@ -255,11 +257,11 @@ def read_reports(
 
 @router.get(
     "/{pilot_id}/areas",
-    summary="Areas an operator can pick, with outlines (Bangkok's 50 districts)",
+    summary="Areas an operator can pick, with outlines (Bangkok and Nonthaburi)",
     openapi_extra={"x-grp-access": "protected"},
 )
 def read_areas(config: FloodPilot) -> dict[str, Any]:
-    areas = bangkok_outlines() if config.base_id == "bangkok" else []
+    areas = pilot_areas(config)
     return {"areas": sorted(areas, key=lambda a: a["name"])}
 
 
@@ -308,26 +310,32 @@ def read_road_cameras(
 
 @router.get(
     "/{pilot_id}/cameras/{camera_id}/frame.jpg",
-    summary="The latest picture from one bmatraffic.com camera, through the local demo relay",
+    summary="The latest picture from one relayed camera (bmatraffic.com or Pak Kret)",
     openapi_extra={"x-grp-access": "protected"},
     response_class=Response,
 )
 def read_camera_frame(
     config: FloodPilot, principal: SignedInMember, camera_id: str
 ) -> Response:
-    """ADR-0051: on demand, shared and cached for a second, never stored. Off unless enabled."""
+    """ADR-0051 and ADR-0057: on demand, shared and cached for a second, never stored. Off
+    unless enabled. Only registry cameras of a relayed provider; the address comes from the
+    registry, never from the request."""
 
     if not get_settings().bmatraffic_relay_enabled:
         raise not_found()
     camera = next((c for c in camera_registry(config.base_id)
-                   if c.camera_id == camera_id and c.provider == RELAY_PROVIDER
-                   and not c.placeholder), None)
+                   if c.camera_id == camera_id and not c.placeholder
+                   and (c.provider == RELAY_PROVIDER
+                        or (c.provider in SNAPSHOT_PROVIDERS and c.snapshot_url))), None)
     if camera is None:
         raise not_found()
     limiter.check("camera_frames_per_person_per_minute", str(principal.user_id),
                   FRAMES_PER_PERSON_PER_MINUTE, 60)
     try:
-        frame = shared_relay().frame(camera.provider_camera_id)
+        if camera.provider in SNAPSHOT_PROVIDERS:
+            frame = shared_snapshot_relay().frame(camera.camera_id, camera.snapshot_url)
+        else:
+            frame = shared_relay().frame(camera.provider_camera_id)
     except RelayBusy:
         raise rate_limited(retry_after=1) from None
     except (RelayUnavailable, ValueError):

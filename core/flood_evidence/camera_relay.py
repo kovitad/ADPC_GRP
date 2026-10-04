@@ -197,9 +197,13 @@ def frame_url(pilot_id: str, camera_id: str) -> str:
     return f"/api/v1/pilot/flood/{pilot_id}/cameras/{quote(camera_id, safe='')}/frame.jpg"
 
 
-def with_relay(camera: dict[str, Any], pilot_id: str) -> dict[str, Any]:
-    """Give a bmatraffic camera an in-page live view through the relay."""
+# Providers whose pictures GRP relays: bmatraffic (sessions) and plain snapshots (ADR-0057).
+RELAYED_PROVIDERS = frozenset({PROVIDER, "PAKKRET_CCTV"})
 
-    if camera.get("provider") != PROVIDER or camera.get("placeholder"):
+
+def with_relay(camera: dict[str, Any], pilot_id: str) -> dict[str, Any]:
+    """Give a relayed camera an in-page live view through the relay."""
+
+    if camera.get("provider") not in RELAYED_PROVIDERS or camera.get("placeholder"):
         return camera
     return {**camera, "live": {"kind": "frames", "url": frame_url(pilot_id, camera["camera_id"])}}

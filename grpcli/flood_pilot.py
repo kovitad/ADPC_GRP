@@ -95,6 +95,48 @@ def archive_now(pilot_id: str = "bangkok") -> None:
     print(f"research archive: wrote {', '.join(written) or 'nothing new'}")
 
 
+def capture_areas(pilot_id: str = "bangkok") -> Path:
+    """Write every pilot district's outline from the GRP boundary table (ADR-0057). Run again after
+    the boundary edition or the pilot's area list changes."""
+
+    from datetime import UTC
+
+    from sqlalchemy import text
+
+    from core.flood_evidence.config import DATA
+
+    config = pilot_config(pilot_id)
+    codes = sorted(config.demo_corridor.get("areas") or [])
+    with Session(get_engine()) as session:
+        rows = session.execute(text(
+            "select distinct on (admin_code) admin_code, name, name_th, province_name, "
+            "province_name_th, edition, ST_AsGeoJSON(geom_simplified_postgis, 6) "
+            "from boundary where admin_level = 'district' and is_supported "
+            "and admin_code = any(:codes) order by admin_code, edition desc"
+        ), {"codes": codes}).all()
+    found = {r[0] for r in rows}
+    missing = [c for c in codes if c not in found]
+    if missing:
+        raise SystemExit(f"No supported boundary for {', '.join(missing)}")
+    areas = [{"admin_code": code, "name": name.title() if name.isupper() else name,
+              "name_th": name_th, "province": (province or "").title(),
+              "province_th": province_th, "outline": json.loads(geometry)}
+             for code, name, name_th, province, province_th, _edition, geometry in rows]
+    payload = {
+        "_source": {
+            "table": "GRP boundary (supported districts, simplified geometry)",
+            "editions": sorted({r[5] for r in rows}),
+            "captured_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "areas": codes,
+        },
+        "areas": areas,
+    }
+    out = DATA / f"flood_pilot_{pilot_id}_areas.json"
+    out.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
+                   encoding="utf-8")
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Flood pilot commands (ADR-0038)")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -102,11 +144,14 @@ def main() -> None:
     capture.add_argument("root", type=Path)
     commands.add_parser("pull", help="pull every source once now")
     commands.add_parser("archive", help="write finished days to the research archive")
+    commands.add_parser("areas", help="capture the pilot districts' outlines from GRP boundaries")
     args = parser.parse_args()
     if args.command == "ingest-capture":
         ingest_capture(args.root)
     elif args.command == "archive":
         archive_now()
+    elif args.command == "areas":
+        print(f"wrote {capture_areas()}")
     else:
         pull_now()
 

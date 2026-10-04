@@ -48,20 +48,23 @@ def _real(**changes):
     return item
 
 
-def test_shipped_cameras_combine_three_sources_and_are_never_evidence() -> None:
+def test_shipped_cameras_combine_four_sources_and_are_never_evidence() -> None:
     cameras = camera_registry("bangkok")
-    providers = ("BMA_TRAFFIC", "BMA_DDS", "ITIC_LONGDO")
+    providers = ("BMA_TRAFFIC", "BMA_DDS", "ITIC_LONGDO", "PAKKRET_CCTV")
     by_provider = {p: [c for c in cameras if c.provider == p] for p in providers}
     assert len(by_provider["BMA_TRAFFIC"]) > 400 and len(by_provider["BMA_DDS"]) > 500
     assert len(by_provider["ITIC_LONGDO"]) > 5
+    assert len(by_provider["PAKKRET_CCTV"]) == 52
     assert len(cameras) == sum(len(v) for v in by_provider.values())
     for camera in cameras:
         assert not camera.placeholder and not frame_capable(camera)
         assert not camera.ingestion_allowed and not camera.cv_allowed
-        assert camera.stream_url is None and camera.snapshot_url is None
+        assert camera.stream_url is None
         assert camera.source_label
-        # bmatraffic cameras have no in-page player; the others play inside GRP.
-        assert bool(camera.live_url) == (camera.provider != "BMA_TRAFFIC")
+        # Pak Kret (ADR-0057) serves a snapshot address that only the relay reads; it is never
+        # ingested. bmatraffic cameras have no in-page player; the others play inside GRP.
+        assert bool(camera.snapshot_url) == (camera.provider == "PAKKRET_CCTV")
+        assert bool(camera.live_url) == (camera.provider not in {"BMA_TRAFFIC", "PAKKRET_CCTV"})
         role, reasons = corroboration_role(camera, ROAD, NOW)
         assert role == CANNOT_CONFIRM and "status_unknown" in reasons
     # Only bmatraffic.com, which declares it serves plain http, may use an http:// link.

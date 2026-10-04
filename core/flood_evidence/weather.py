@@ -26,11 +26,11 @@ import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.flood_evidence.areas import all_areas
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.incident_store import list_incidents
 from core.flood_evidence.ingest import utc
 from core.flood_evidence.models import FloodWeather
-from core.river_watch import bangkok_outlines
 
 logger = logging.getLogger("grp.flood_weather")
 # httpx logs every request URL at INFO; Longdo takes the key in the URL, so never let it log.
@@ -129,7 +129,7 @@ def observation_time(client: LongdoWeather) -> datetime:
 def _scopes(session: Session, config: PilotConfig, now: datetime) -> list[dict[str, Any]]:
     codes = set(config.rain_areas)
     scopes = []
-    for area in bangkok_outlines():
+    for area in all_areas(config.base_id):
         if area["admin_code"] not in codes:
             continue
         polygon = area["outline"]

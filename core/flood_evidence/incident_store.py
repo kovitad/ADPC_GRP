@@ -25,6 +25,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.flood_evidence.areas import pilot_areas
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.geo import boxes_touch, district_codes, expand
@@ -44,7 +45,6 @@ from core.flood_evidence.models import (
 )
 from core.flood_evidence.reviews import history, incident_verification, reviewer_names
 from core.flood_evidence.situation import current_roads, recent_reports
-from core.river_watch import bangkok_outlines
 
 ACTIVE = "active"
 RECEDING = "receding"
@@ -64,7 +64,7 @@ def demo_areas(config: PilotConfig) -> list[tuple[str, dict[str, Any]]]:
     codes = set(config.demo_corridor.get("areas") or [])
     if config.base_id != "bangkok" or not codes:
         return []
-    return [(a["admin_code"], a["outline"]) for a in bangkok_outlines()
+    return [(a["admin_code"], a["outline"]) for a in pilot_areas(config)
             if a["admin_code"] in codes]
 
 

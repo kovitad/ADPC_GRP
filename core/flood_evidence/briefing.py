@@ -21,6 +21,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.flood_evidence.areas import all_areas
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.geo import inside_outline
@@ -35,7 +36,6 @@ from core.flood_evidence.models import (
 )
 from core.flood_evidence.situation import ROADS_ADAPTER, sources_status
 from core.flood_evidence.weather import latest_weather
-from core.river_watch import bangkok_outlines
 
 MAX_INCIDENTS = 15
 BANGKOK = timezone(timedelta(hours=7), "Asia/Bangkok")
@@ -51,7 +51,7 @@ def area_outlines(config: PilotConfig, area: str) -> list[dict[str, Any]] | None
     if area == "all" or config.base_id != "bangkok":
         return None
     codes = set(config.demo_corridor.get("areas") or []) if area == "corridor" else {area}
-    outlines = [a["outline"] for a in bangkok_outlines() if a["admin_code"] in codes]
+    outlines = [a["outline"] for a in all_areas(config.base_id) if a["admin_code"] in codes]
     if not outlines:
         raise LookupError(area)
     return outlines
@@ -362,7 +362,7 @@ def build_facts(
 
     weather = latest_weather(session, config)
     if weather["available"]:
-        districts = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
+        districts = {a["admin_code"]: a["name"] for a in all_areas(config.base_id)}
         codes = area_codes(config, area)
         facts.append({
             "id": "W", "kind": "rain",

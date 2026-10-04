@@ -57,7 +57,7 @@ from core.flood_evidence.answer import instructions_for as live_instructions
 from core.flood_evidence.planner_answer import (
     NO_WARNINGS,
     computed_planner_answer,
-    is_bangkok,
+    in_live_area,
     live_facts,
     unavailable_answer,
 )
@@ -918,10 +918,10 @@ async def _answer_live_flood(
 
     lang = live_language(payload.message)
     base = {"hub_code": hub.hub_code}
-    area = selected if selected is not None and is_bangkok(selected.admin_code) else None
+    area = selected if selected is not None and in_live_area(selected.admin_code) else None
     if area is None and place:
         named = _match_boundary(boundaries, place)
-        if (named is not None and is_bangkok(named.admin_code)
+        if (named is not None and in_live_area(named.admin_code)
                 and _message_names_boundary(payload.message, named)):
             area = named
     if area is None:

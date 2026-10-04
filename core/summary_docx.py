@@ -181,8 +181,8 @@ T: dict[str, dict[str, str]] = {
     "gr_gaps": {"en": "Gaps Global Risk declared", "th": "ช่องว่างข้อมูลที่ Global Risk แจ้ง"},
     "s6": {"en": "6. Live reported flooding (not part of this assessment)",
            "th": "6. รายงานน้ำท่วมแบบสด (ไม่ใช่ส่วนหนึ่งของการประเมินนี้)"},
-    "live_unavailable": {"en": "Live reported flooding covers Bangkok only.",
-                         "th": "ข้อมูลรายงานน้ำท่วมแบบสดครอบคลุมเฉพาะกรุงเทพฯ"},
+    "live_unavailable": {"en": "Live reported flooding covers Bangkok and Nonthaburi only.",
+                         "th": "ข้อมูลรายงานน้ำท่วมแบบสดครอบคลุมเฉพาะกรุงเทพฯ และนนทบุรี"},
     "live_hub": {"en": "Live reported flooding is not enabled for this Hub.",
                  "th": "ยังไม่ได้เปิดข้อมูลรายงานน้ำท่วมแบบสดสำหรับ Hub นี้"},
     "live_stamp": {"en": "As of {when}, Bangkok time. Flooding reported by BMA, Traffy Fondue and "

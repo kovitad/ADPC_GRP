@@ -21,11 +21,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from core.flood_evidence.areas import pilot_areas
 from core.flood_evidence.config import DATA, pilot_config
 from core.flood_evidence.geo import inside_outline
-from core.river_watch import bangkok_outlines
 
 OVERPASS = "https://overpass-api.de/api/interpreter"
+CHUNK = 10  # districts per request
 USER_AGENT = "GRP-flood-pilot-capture/0.1 (ADPC SERVIR pilot)"
 AMENITIES = ("school", "hospital", "clinic")
 
@@ -41,24 +42,35 @@ def _bounds(outlines: list[dict[str, Any]]) -> tuple[float, float, float, float]
     return min(lats), min(lons), max(lats), max(lons)
 
 
-def capture(pilot_id: str) -> Path:
+def capture(pilot_id: str, overpass: str = OVERPASS) -> Path:
     config = pilot_config(pilot_id)
     codes = config.demo_corridor["areas"]
-    areas = [a for a in bangkok_outlines() if a["admin_code"] in codes]
+    areas = pilot_areas(config)
     # One box per district: the districts need not touch, and one big box would fetch the gaps.
+    # Asked in small groups, one after another: 56 boxes in one request timed out (HTTP 504).
     wanted = "|".join(AMENITIES)
-    boxes = "".join(
-        f'nwr["amenity"~"^({wanted})$"]({",".join(map(str, _bounds([a["outline"]])))});'
-        for a in areas
-    )
-    query = f"[out:json][timeout:120];({boxes});out center tags;"
-    request = urllib.request.Request(
-        OVERPASS,
-        data=urllib.parse.urlencode({"data": query}).encode(),
-        headers={"User-Agent": USER_AGENT},
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:
-        answer = json.loads(response.read())
+    elements: dict[tuple[str, int], dict] = {}
+    queries = []
+    stamp = None
+    for start in range(0, len(areas), CHUNK):
+        boxes = "".join(
+            f'nwr["amenity"~"^({wanted})$"]({",".join(map(str, _bounds([a["outline"]])))});'
+            for a in areas[start:start + CHUNK]
+        )
+        query = f"[out:json][timeout:120];({boxes});out center tags;"
+        queries.append(query)
+        request = urllib.request.Request(
+            overpass,
+            data=urllib.parse.urlencode({"data": query}).encode(),
+            headers={"User-Agent": USER_AGENT},
+        )
+        with urllib.request.urlopen(request, timeout=180) as response:
+            part = json.loads(response.read())
+        stamp = stamp or part.get("osm3s", {}).get("timestamp_osm_base")
+        for element in part["elements"]:
+            elements[(element["type"], element["id"])] = element
+    answer = {"elements": list(elements.values()), "osm3s": {"timestamp_osm_base": stamp}}
+    query = "\n".join(queries)
     assets = []
     for element in answer["elements"]:
         tags = element.get("tags", {})
@@ -106,8 +118,10 @@ def capture(pilot_id: str) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Capture OSM facilities for a pilot corridor")
     parser.add_argument("--pilot", default="bangkok")
+    parser.add_argument("--overpass", default=OVERPASS,
+                        help="another public Overpass server when the main one is busy")
     args = parser.parse_args()
-    path = capture(args.pilot)
+    path = capture(args.pilot, args.overpass)
     data = json.loads(path.read_text(encoding="utf-8"))
     print(f"Wrote {len(data['assets'])} assets to {path}")
 

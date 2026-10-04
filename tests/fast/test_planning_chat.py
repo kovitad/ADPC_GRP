@@ -1968,7 +1968,7 @@ def test_outside_bangkok_live_questions_are_told_plainly_without_more_ai(plannin
     body = _ask(_client(planning, "planner@example.test"),
                 message="Is it flooding now?", boundary_id=planning["boundary_id"]).json()
     assert body["mode"] == "live_flood_unavailable"
-    assert "Bangkok only" in body["answer"]
+    assert "Bangkok and Nonthaburi only" in body["answer"]
     assert body["answer"].endswith(api.planning.NO_WARNINGS["en"])
     assert live == [] and planning["replies"] == []
 

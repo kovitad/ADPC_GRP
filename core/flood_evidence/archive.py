@@ -29,6 +29,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.flood_evidence.areas import all_areas
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.ddpm_shelters import pilot_assets
 from core.flood_evidence.geo import district_codes
@@ -44,7 +45,6 @@ from core.flood_evidence.models import (
     FloodWeather,
 )
 from core.flood_evidence.observation import REPORT, ROAD_SEGMENT
-from core.river_watch import bangkok_outlines
 from core.storage import LocalStorage
 
 ARCHIVE_VERSION = "FloodArchive v1"
@@ -98,7 +98,7 @@ _districts = district_codes
 def _areas(config: PilotConfig) -> list[tuple[str, dict]]:
     if config.base_id != "bangkok":
         return []
-    return [(a["admin_code"], a["outline"]) for a in bangkok_outlines()]
+    return [(a["admin_code"], a["outline"]) for a in all_areas(config.base_id)]
 
 
 def _road_rows(rows: list[FloodObservation], areas) -> tuple[list[dict], list[dict]]:
