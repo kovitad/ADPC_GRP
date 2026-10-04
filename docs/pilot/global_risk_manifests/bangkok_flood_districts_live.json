@@ -6,7 +6,7 @@
   "source": "ADPC GRP Bangkok flood pilot (derived from Floodboard: BMA, Traffy Fondue and public reports; facilities from OpenStreetMap)",
   "validation": "unvalidated",
   "residency": "external call-out",
-  "cadence": "every 5 minutes",
+  "cadence": "Floodboard roads checked every 10 minutes; incidents recomputed whenever the export changes",
   "adapter": "generic_json",
   "fetch": {
     "url": "https://<public-host>/api/v1/pilot/flood/bangkok/feed.json",

@@ -124,6 +124,10 @@ RP20/RP50 rasters and methods exist.
     flat.
   - Measured offline: grouping 0.8 s (44 incidents) and exposure 0.97 s for each snapshot.
   - Stack rebuilt with `scripts/docker-desktop.ps1`; the API sees 50 districts.
+  - **Live check:** the first run after the restart (snapshot 03:24 UTC) found 123 active
+    incidents across 21 districts, in 878 ms. The worst were Lat Krabang 21, Saphan Sung 13,
+    Min Buri 13 and Nong Chok 11. The 03:14 run (34) came from the old worker.
+  - Answers still list at most 15 incidents (`MAX_INCIDENTS`) and count the rest as "not listed".
 - **Feed plan revised (`faee8b6`):** `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md` now
   records the six decisions:
   - incidents plus a `districts` list;
@@ -143,9 +147,13 @@ RP20/RP50 rasters and methods exist.
 - **Camera check (planned, not built):** water, partial water or dry, for up to 2 cameras per
   active incident every 15 minutes, through `api/ai_gateway.py`. About $1.70 a day at worst with
   Claude Haiku 4.5. Gate B before it enters the feed.
-- **Next:** Step 1, the feed endpoint (`core/flood_evidence/feed.py`, ADR-0052). The advisor's
-  review notes are in the plan: allow-listed fields, neutral order, Longdo-free numbers, and
-  multi-district incidents. Then Step 2, the camera check (ADR-0054).
+- **Next:** Step 1, the feed endpoint (`core/flood_evidence/feed.py`, ADR-0052). Follow the
+  test list in the plan's Step 1:
+  - allow-listed fields and a neutral order;
+  - Longdo-free numbers;
+  - incidents that cross district borders;
+  - `valid_until` taken from the last good roads fetch.
+  - Then Step 2, the camera check (ADR-0054).
 
 ### 3 October (latest): bmatraffic pictures inside the page (ADR-0051)
 

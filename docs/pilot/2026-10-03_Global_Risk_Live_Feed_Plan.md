@@ -94,16 +94,19 @@ data".
 ### Feed-level fields
 
 - `run_at`: when the incidents were last computed (the worker run), not the request time.
+- `checked_at`: the last successful Floodboard roads fetch. On 4 October 2026 roads were fetched
+  every 10 minutes, but incidents were recomputed only when the export changed (gaps of up to
+  80 minutes), so `run_at` alone would make a healthy feed look stale.
 - `as_of`: the newest evidence time.
-- `valid_until`: `run_at` plus 15 minutes. A reader can tell when the feed is stale, even if our
-  worker has stopped.
+- `valid_until`: `checked_at` plus 30 minutes, which is three missed fetches. A reader can tell
+  when the feed is stale, even if our worker has stopped.
 - `coverage`: Bangkok, 50 districts.
 - `sources`: each upstream source with its licence and credit, read from the pilot config.
 - `limits`: the standing caveats in plain words. These are estimates, not a flood map. There are
   no water-level sensors. Rain is not flooding. Camera checks are a machine's reading of one
   picture.
 
-If no incident run exists yet, the feed is empty, with `run_at` and `valid_until` set to `null`.
+If no incident run exists yet, the feed is empty, with `run_at`, `checked_at` and `valid_until` set to `null`.
 
 ### Left out on purpose
 
@@ -235,7 +238,7 @@ continuous heavy flooding**. A dry day costs close to nothing, because no incide
 | Readers take estimates as fact | confidence words, `limits`, `usage_notes`, `validation: unvalidated` |
 | Camera check wrong at night or in rain | `cannot_tell` is allowed and expected; it never changes confidence in v1 |
 | Camera check cost runs away | active incidents only, 2 cameras, 15 minutes, unchanged-skip, daily cap |
-| Stale feed after an outage | `valid_until` from the worker run, not from the request |
+| Stale feed after an outage | `valid_until` from the last good fetch, not from the request |
 | Host URL changes | choose the permanent domain before Step 4 |
 | Replay data leaks | the route never resolves replay IDs; tested |
 
