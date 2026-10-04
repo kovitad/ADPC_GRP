@@ -137,7 +137,7 @@ Facts that shape the roadmap:
 
 - **Shared codes.** GRP's boundary codes and the flood pilot's are the same (Chatuchak `1030`,
   sub-districts `1030xx`), so live data joins the DDPM baseline directly.
-- **Thin baseline in Bangkok.** It holds only 8 DDPM evacuation centres and 55 volunteer centres
+- **No DDPM shelters in Bangkok.** The delivery names 75 provinces, not Bangkok. The 8 points first counted in Bangkok are records from other provinces whose coordinates land there, all flagged `district_name_mismatch` (309 such records nationwide); they are now left out. There are 55 volunteer centres
   in Bangkok, and no villages. That BMA holds the capital's local data is an inference, to
   confirm with DDPM.
 - **Global Risk feeds have two traps.** `generic_json` feeds are cached for **6 hours**, and an
@@ -208,7 +208,7 @@ Facts that shape the roadmap:
   - a separate partner channel.
 - **Limits:** crowd reports are never a payout trigger, and no report states a loss.
 
-**W7. Live flood evidence in the Planner, Bangkok** (steps 1-2 built 4 October: `5f18f81` stores `district_codes` in the worker, and was checked live with 145 of 145 active incidents coded; `75adfbf` adds the Planner live layer `GET /api/v1/maps/live-flood`; step 3 adds the `live_flood` answer mode (D7 rain yes, D8 wording approved, never cached; Lat Krabang checked on real data); step 4 adds the 8 DDPM evacuation centres to the facility check (read from the data library, not Git); the district summary Word download gains section 6 "Live reported flooding" with up to 4 credited BMA camera pictures, and a Thai version (`lang=th`, button "ดาวน์โหลดสรุป (ไทย)"); the owner reports BMA said camera pictures are public data; pictures come only from bmatraffic cameras within 400 m of a listed incident (checked on real data: Suan Luang 2 pictures; Lat Krabang none, because its nearest cameras are BMA flood cameras whose relay fails); step 5, the feed endpoint, is next; nothing outside the code blocks
+**W7. Live flood evidence in the Planner, Bangkok** (steps 1-2 built 4 October: `5f18f81` stores `district_codes` in the worker, and was checked live with 145 of 145 active incidents coded; `75adfbf` adds the Planner live layer `GET /api/v1/maps/live-flood`; step 3 adds the `live_flood` answer mode (D7 rain yes, D8 wording approved, never cached; Lat Krabang checked on real data); step 4 adds DDPM evacuation centres to the facility check (read from the data library, not Git; flagged and synthetic records left out, so none in Bangkok); the district summary Word download gains section 6 "Live reported flooding" with up to 4 credited BMA camera pictures, and a Thai version (`lang=th`, button "ดาวน์โหลดสรุป (ไทย)"); the owner reports BMA said camera pictures are public data; pictures come only from bmatraffic cameras within 400 m of a listed incident (checked on real data: Suan Luang 2 pictures; Lat Krabang none, because its nearest cameras are BMA flood cameras whose relay fails); step 5, the feed endpoint, is next; nothing outside the code blocks
 it, so do it before W2 submission)
 - **Plan:** `docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`.
 - **Steps:**
@@ -216,7 +216,7 @@ it, so do it before W2 submission)
   2. the live layer "Reported flooding on roads (live, not a flood map)";
   3. live facts in Planner answers, with `snapshot_at` in the cache key and fixed "no warnings"
      wording;
-  4. DDPM shelters in the exposure run (Bangkok has 8);
+  4. DDPM shelters in the exposure run (none in Bangkok once misplaced records are left out);
   5. the feed endpoint on the same fact builder.
 - **Rules:** live data never enters an assessment; sub-districts roll up to their district; no
   warnings. ADR-0056.
@@ -367,7 +367,7 @@ Verified on 4 October 2026:
 - The live layer: Lat Krabang 21 incidents and 112 roads; sub-district 103005 rolls up to
   Chatuchak; 3415 is refused.
 - The live answer for Lat Krabang (computed path).
-- 8 DDPM centres found.
+- 8 DDPM points found in Bangkok, later shown to be misplaced records from other provinces and left out.
 - First archive day: 2.9 MB.
 - Tests: 1,086 pass, 2 skip.
 

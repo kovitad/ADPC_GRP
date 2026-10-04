@@ -69,9 +69,17 @@ Decision D2 (officer checks for Planners) is still open.
      facility reviews and the archive.
    - The same rules apply (ADR-0040): "flooding reported nearby", never "flooded", and access is
      never assumed. Answers label a shelter's source as DDPM.
-   - 8 centres on 4 October 2026, in districts 1003 (3), 1022, 1023, 1028, 1035 and 1044, which
-     makes 1,075 facilities in all. A centre is "not assessed" until the next roads snapshot
-     after deployment.
+   - **Correction, 4 October 2026 (later).** The 8 records first counted "inside Bangkok" were
+     all flagged by the importer as `district_name_mismatch`. DDPM named places in Phetchaburi,
+     Samut Sakhon, Chachoengsao, Samut Prakan and Ubon Ratchathani, but their coordinates land in
+     Bangkok.
+     - Flagged records and synthetic test data are now left out, so **Bangkok has no DDPM
+       centre**.
+     - DDPM's delivery names 75 provinces and not Bangkok. That BMA holds the capital's list is to
+       be confirmed with DDPM.
+     - Nationwide, 309 records have coordinates in a different province from the one DDPM
+       recorded; this is a data-quality issue for DDPM.
+     - The code still adds DDPM centres wherever a correct one falls in the demo area.
 5. **Live section in the district summary, in Thai or English** (4 October 2026, the Product
    Owner's request).
    - `core/flood_evidence/summary_live.py` builds section 6 "Live reported flooding (not part of

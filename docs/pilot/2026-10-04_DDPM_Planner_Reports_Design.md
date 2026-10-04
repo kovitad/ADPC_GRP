@@ -34,7 +34,7 @@ including the data from GEOGLOWS, also insurance companies in the future".
 | --- | --- |
 | GRP and the flood pilot use the same administrative codes | Chatuchak is `1030` in the GRP `boundary` table and in the pilot outlines; its sub-districts are `1030xx` |
 | National baseline | 77 provinces, 928 districts, 7,436 sub-districts; 10,303 shelters, 8,199 volunteer centres, 1,533 early-warning resources, 80,397 villages; RP100 depth and three vulnerability rasters (handover) |
-| DDPM baseline inside Bangkok is thin | 8 evacuation centres and 55 volunteer centres in the current versions; no village points |
+| DDPM baseline has no Bangkok shelters | no DDPM evacuation centre in Bangkok: the delivery names 75 provinces, not Bangkok; the 8 points first counted in Bangkok are flagged records from other provinces with wrong coordinates (309 such records nationwide). 55 volunteer centres; no village points |
 | Live Bangkok picture | 123 active incidents across 21 districts, snapshot of 03:24 UTC; 1,067 OSM facilities (ADR-0053) |
 | GEOGLOWS | a 7-day discharge forecast for 2 exploratory reaches near Bang Bua Thong; no return-period thresholds, because the upstream service fails (ADR-0036) |
 | Global Risk | risk pack with JRC RP10-500 flood layers, OSM assets, 3 vulnerability layers, receipts and a groundedness gate. Contributed feeds are cached for 6 hours, and an empty feed counts as a failure (feed plan, source read) |

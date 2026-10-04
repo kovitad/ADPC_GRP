@@ -6,8 +6,19 @@ for the demo districts. It is read from the database, never copied into the repo
 baseline source data stays out of Git (ADR-0022).
 
 The same exposure rules apply (ADR-0040): "flooding reported nearby", never "flooded", and access
-is never assumed. Bangkok has few DDPM centres in the current baseline (8 on 4 October 2026);
-answers say what the list is.
+is never assumed.
+
+Two kinds of record are left out:
+
+- synthetic test data (provider "GRP synthetic test data"), which is never real;
+- records the importer flagged as ``district_name_mismatch``: DDPM named one place, but the
+  coordinates fall in another, so their location cannot be trusted.
+
+On 4 October 2026 this left **no DDPM centre inside Bangkok**. DDPM's delivery names 75
+provinces and not Bangkok (probably because BMA runs disaster work in the capital; to confirm
+with DDPM). The 8 points that fell inside
+Bangkok were all flagged records from other provinces (Phetchaburi, Samut Sakhon, Chachoengsao,
+Samut Prakan and Ubon Ratchathani) whose coordinates land in Bangkok.
 """
 
 from __future__ import annotations
@@ -22,6 +33,7 @@ from core.flood_evidence.assets import EVACUATION_CENTRE, Asset, asset_registry
 from core.flood_evidence.config import PilotConfig
 
 SHELTER_DATASET_TYPE = "evacuation_centers"
+SYNTHETIC_PROVIDER = "grp synthetic test data"
 SOURCE_LABEL = "DDPM evacuation centre (GRP data library)"
 
 
@@ -32,7 +44,7 @@ def ddpm_shelters(session: Session, config: PilotConfig) -> tuple[Asset, ...]:
     if config.base_id != "bangkok" or not codes:
         return ()
     rows = session.execute(
-        select(Feature, Boundary.admin_code, DatasetVersion.id)
+        select(Feature, Boundary.admin_code, DatasetVersion.id, Dataset.provider)
         .join(DatasetVersion, DatasetVersion.id == Feature.dataset_version_id)
         .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
         .join(Boundary, Boundary.id == Feature.boundary_id)
@@ -46,10 +58,14 @@ def ddpm_shelters(session: Session, config: PilotConfig) -> tuple[Asset, ...]:
         .order_by(Feature.id)
     ).all()
     out = []
-    for feature, admin_code, version_id in rows:
+    for feature, admin_code, version_id, provider in rows:
         district = str(admin_code or "")[:4]
         if district not in codes:
             continue
+        if str(provider or "").casefold() == SYNTHETIC_PROVIDER:
+            continue
+        if (feature.attributes or {}).get("district_name_mismatch"):
+            continue  # the coordinates contradict the place DDPM named
         out.append(Asset(
             asset_id=f"ddpm:{feature.id}",
             asset_type=EVACUATION_CENTRE,

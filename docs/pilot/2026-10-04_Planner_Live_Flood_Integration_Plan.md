@@ -18,7 +18,7 @@ first.
 | Question a planner asks | Source | Coverage today | Honest answer |
 | --- | --- | --- | --- |
 | Where is flooding reported now? | Floodboard incidents and roads | all 50 Bangkok districts | yes, with confidence words and times |
-| Which evacuation centres have flooding reported nearby? | the exposure engine | OSM facilities only today; DDPM shelters need step 4 | after step 4; Bangkok has only 8 DDPM centres |
+| Which evacuation centres have flooding reported nearby? | the exposure engine | OSM facilities only today; DDPM shelters need step 4 | after step 4; DDPM's delivery has no Bangkok centres (the 8 points found were misplaced records), so OSM facilities answer this in Bangkok |
 | Is it raining, and will it in 30 minutes? | Longdo (ADR-0049) | 4 districts plus the busiest incidents | partly; most districts have no rain record |
 | Will the river rise in the next days? | GEOGLOWS (ADR-0036) | 2 exploratory reaches near Bang Bua Thong, **outside Bangkok**; Hub Admins only | not for Bangkok today |
 | Is there a warning? | none | GRP issues no warnings | **never**. The AI describes current conditions and points to official channels in fixed, approved wording |
@@ -81,7 +81,7 @@ first.
 - The exposure engine also assesses the DDPM evacuation centres inside the demo area, from the
   active baseline version, beside OSM facilities.
 - The Planner can then answer "which evacuation centres have flooding reported nearby right now".
-- The page and answers say Bangkok has 8 DDPM centres in the current baseline.
+- DDPM's delivery has no Bangkok centres; the 8 points first found were misplaced records and are left out (correction, 4 October 2026).
 
 **Step 5, the feed endpoint** (Global Risk step 1)
 - It uses the same fact builder. Submission still waits for the host and the maintainers.

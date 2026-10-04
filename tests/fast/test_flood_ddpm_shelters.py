@@ -86,3 +86,27 @@ def test_a_shelter_uses_the_same_exposure_rule_as_any_facility(session) -> None:
     [record] = assess((shelter,), [road], near_m=150, frontage_m=60)
     assert record["exposure_state"] == "potentially_exposed"
     assert record["access_state"] == "access_unknown"
+
+
+def test_flagged_and_synthetic_shelters_are_left_out(session) -> None:
+    from sqlalchemy import select
+
+    lat_krabang = session.scalar(select(Boundary).where(Boundary.admin_code == "1011"))
+    current = session.scalar(select(DatasetVersion).where(DatasetVersion.is_current.is_(True)))
+    synthetic = Dataset(type="evacuation_centers", owner_kind="platform", title="Synthetic",
+                        provider="GRP synthetic test data")
+    session.add(synthetic)
+    session.flush()
+    fake = DatasetVersion(dataset_id=synthetic.id, sha256="b" * 64, meta={}, is_current=True,
+                          readiness="assessment_ready")
+    session.add(fake)
+    session.flush()
+    session.add_all([
+        Feature(dataset_version_id=current.id, boundary_id=lat_krabang.id, name="misplaced",
+                lon=100.75, lat=13.72, attributes={"district_name_mismatch": True,
+                                                   "claimed_province": "เพชรบุรี"}),
+        Feature(dataset_version_id=fake.id, boundary_id=lat_krabang.id, name="made up",
+                lon=100.75, lat=13.72, attributes={"synthetic": True}),
+    ])
+    session.commit()
+    assert [s.name for s in ddpm_shelters(session, CONFIG)] == ["วัดลาดกระบัง"]
