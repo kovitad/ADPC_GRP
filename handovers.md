@@ -115,61 +115,120 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-4 October 2026)
 
-### 4 October (latest): whole Bangkok, and the Global Risk feed plan revised
+### 4 October (latest): roadmap input for the dev team
 
-- **Checked by the owner:** the in-page bmatraffic pictures look good.
-- **Whole Bangkok (ADR-0053, `100931d`):** `demo_corridor.areas` lists all 50 districts.
-  - OSM facilities captured again: 1,067 in all (707 schools, 183 hospitals, 177 clinics).
-  - Rain stays on the first four districts through the new `rain_areas`, to keep Longdo calls
-    flat.
-  - Measured offline: grouping 0.8 s (44 incidents) and exposure 0.97 s for each snapshot.
-  - Stack rebuilt with `scripts/docker-desktop.ps1`; the API sees 50 districts.
-  - **Live check:** the first run after the restart (snapshot 03:24 UTC) found 123 active
-    incidents across 21 districts, in 878 ms. The worst were Lat Krabang 21, Saphan Sung 13,
-    Min Buri 13 and Nong Chok 11. The 03:14 run (34) came from the old worker.
-  - Answers still list at most 15 incidents (`MAX_INCIDENTS`) and count the rest as "not listed".
-- **Feed plan revised (`faee8b6`):** `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md` now
-  records the six decisions:
-  - incidents plus a `districts` list;
-  - the route stays `protected` until a host exists;
-  - the Ubuntu host (A);
-  - the name is kept;
-  - the Floodboard and maintainer drafts.
-  - Global Risk's standard is a text manifest (`generic_json`, external call-out). It is
-    submitted once, and the data is pulled live, so nothing is submitted again.
-  - The `contribute_submit` text says submissions are now **staged** until a reviewer approves
-    them.
-- **Drafts, none sent:**
-  - `docs/pilot/2026-10-04_Floodboard_Licence_Confirmation.md`
-  - `docs/pilot/2026-10-04_Global_Risk_Maintainer_Questions.md`
-  - `docs/pilot/global_risk_manifests/*.json`
-  - The BMA request now asks before any automatic camera check.
-- **Global Risk source read** (`SERVIR-AI/global-platform` at `a8a43c2`; section "What the
-  platform source code shows" in the plan):
-  - staging, name reuse after a withdrawal, and hazard-based citing in risk briefs are confirmed;
-  - **a 6-hour cache** on `generic_json` blocks real liveness;
-  - **an empty list** is treated as a failure, so the districts feed (always 50 rows) goes first;
-  - the URL must be anonymous;
-  - unknown manifest fields are refused.
-  The maintainer questions were rewritten around these points.
-- **DDPM reports design (design only):** `docs/pilot/2026-10-04_DDPM_Planner_Reports_Design.md`.
-  - Four reports by horizon (pre-season, days ahead, live, after-action) from one fact bundle per
-    area, window and audience.
-  - GEOGLOWS is river context only (never Bangkok street flooding) and has no thresholds without
-    a scientific ADR.
-  - Bangkok has only 8 DDPM evacuation centres and 55 volunteer centres in the baseline.
-  - Insurance: decide on an event archive now, because retention deletes history.
-  - Six owner decisions, D1-D6.
-- **Camera check (planned, not built):** water, partial water or dry, for up to 2 cameras per
-  active incident every 15 minutes, through `api/ai_gateway.py`. About $1.70 a day at worst with
-  Claude Haiku 4.5. Gate B before it enters the feed.
-- **Next:** Step 1, the feed endpoint (`core/flood_evidence/feed.py`, ADR-0052). Follow the
-  test list in the plan's Step 1:
-  - allow-listed fields and a neutral order;
-  - Longdo-free numbers;
-  - incidents that cross district borders;
-  - `valid_until` taken from the last good roads fetch.
-  - Then Step 2, the camera check (ADR-0054).
+This repo is the owner's exploratory test bed. This section is written so the owner can turn it
+into a roadmap for the dev team: what was proven, the workstreams, and the open decisions.
+Branch `pilot/river-watch-and-bangkok-flood`, not pushed. 1,064 fast and contract tests pass,
+2 skip; Ruff is clean. Stack rebuilt with `scripts/docker-desktop.ps1`.
+
+#### Done and verified today
+
+| What | Evidence | Record |
+| --- | --- | --- |
+| In-page bmatraffic camera pictures | checked by the owner in a signed-in browser | ADR-0051 |
+| **Whole Bangkok:** 50 districts; rain stays on 4 to keep Longdo calls flat | first live run (03:24 UTC): **123 active incidents across 21 districts**, 878 ms; 1,067 OSM facilities | ADR-0053, `100931d` |
+| **Research archive:** each finished UTC day saved as state-change tables, no personal data | first real day (3 Oct): 2.9 MB; 17,493 road states, 4,316 reports, 158 incidents, 784 incident events, 146 facility changes, 2 labels; no links or provider IDs | ADR-0055, `2e0adf9`, data card `docs/data/flood_research_archive_datacard.md` |
+| Backup capture cleaned | `reports.csv` IDs and text hashed, links dropped; the 29 earlier files cleaned with the owner's yes; capture restarted (PID 11660) | ADR-0055 |
+| Global Risk live-feed plan, revised against its source code | `SERVIR-AI/global-platform` at `a8a43c2` read | `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md` |
+| DDPM reports design | four reports by planning horizon from one fact bundle | `docs/pilot/2026-10-04_DDPM_Planner_Reports_Design.md` |
+
+Facts that shape the roadmap:
+
+- **Shared codes.** GRP's boundary codes and the flood pilot's are the same (Chatuchak `1030`,
+  sub-districts `1030xx`), so live data joins the DDPM baseline directly.
+- **Thin baseline in Bangkok.** It holds only 8 DDPM evacuation centres and 55 volunteer centres
+  in Bangkok, and no villages. That BMA holds the capital's local data is an inference, to
+  confirm with DDPM.
+- **Global Risk feeds have two traps.** `generic_json` feeds are cached for **6 hours**, and an
+  **empty list counts as a failure**. Unknown manifest fields are refused, the URL must be
+  anonymous, and staging and withdrawal work.
+- **GEOGLOWS is rivers only.** It forecasts river flow, not Bangkok street flooding. It has no
+  "high" threshold, because upstream return periods fail, and its 2 reaches are not confirmed.
+
+#### Workstreams (for the roadmap)
+
+**W1. Live flood monitoring, Bangkok** (built; Gate A local demo)
+- **Has:**
+  - Floodboard evidence, incidents and confidence;
+  - facilities, cameras (bmatraffic relay locally) and officer checks;
+  - replay, grounded answers and whole Bangkok.
+- **Next:**
+  - a downloadable **shift report** from the fact bundle;
+  - the **camera check** (water, partial water or dry): up to 2 cameras per active incident every
+    15 minutes, through `api/ai_gateway.py`, about $1.70 a day at worst (example priced with
+    Claude Haiku 4.5). It needs BMA's permission first.
+- **Blocked by:** BMA terms for cameras (request drafted); the relay is local only.
+
+**W2. Global Risk live feed** (planned; drafts ready)
+- **Has:** the plan; two manifest drafts (`docs/pilot/global_risk_manifests/`); maintainer
+  questions; the Floodboard credit note.
+- **Next:**
+  - **Step 1:** the feed endpoint `GET /api/v1/pilot/flood/{pilot_id}/feed.json`, protected for
+    now, with ADR-0052;
+  - then the districts feed first (never empty), and incidents on a flooding day.
+- **Blocked by:**
+  - a **public HTTPS host** (the Ubuntu deployment, never run yet);
+  - the maintainers' answers on the **6-hour cache** and **empty lists**;
+  - sending the drafts.
+
+**W3. DDPM planner reports** (designed)
+- **Has:** the district Word document (ADR-0033); replay; grounded answers.
+- **Next:**
+  - the fact bundle shared by every output;
+  - the live shift report;
+  - a province pre-season roll-up;
+  - an event (after-action) summary from the archive.
+- **Blocked by:** DDPM sample reports (D1) and who the Bangkok live report is for (D2).
+
+**W4. River forecasts (GEOGLOWS)** (Phase A built; display only)
+- **Next:**
+  - hydrologist-confirmed reaches and the districts each affects (D3);
+  - a daily reach summary, which is the easiest first Global Risk contribution, since it is daily
+    and never empty (D4);
+  - HAND (Phase B) is still blocked on local hydrology data.
+- **Rule:** any "high" threshold is a scientific-method change, so it needs an ADR and scientific
+  approval.
+
+**W5. Research archive for data scientists** (built today)
+- **Next:**
+  - add GEOGLOWS runs and camera-check labels once they run;
+  - one external backup (it is a single copy on a laptop);
+  - move to the Ubuntu host;
+  - an optional GeoParquet copy;
+  - read-only access for ADPC data scientists.
+- **Watch:** the worker archives before retention every hour. `python -m grpcli.flood_pilot
+  archive` does it by hand.
+
+**W6. Insurance and partners** (future; nothing to build)
+- **Already secured:** the archive and pinned rule versions.
+- **Still needed:**
+  - a GRP-side audit trail (Global Risk receipts keep no fetched rows);
+  - licences for commercial use: OSM share-alike, DDPM permission, GEOGLOWS to confirm;
+  - a separate partner channel.
+- **Limits:** crowd reports are never a payout trigger, and no report states a loss.
+
+#### Open decisions (owner)
+
+| ID | Decision | Unblocks |
+| --- | --- | --- |
+| D1 | Get one DDPM situation report and one pre-season plan as samples | W3 report formats |
+| D2 | Who the Bangkok live report is for: DDPM central, BMA or both | W1/W3 wording and access |
+| D3 | Who confirms GEOGLOWS reaches and their districts (ADPC or RID hydrologist) | W4 |
+| D4 | First Global Risk contribution: the GEOGLOWS daily summary, then Bangkok districts? | W2/W4 |
+| D5 | Look for a Floodboard-like source outside Bangkok, or stay Bangkok-only | W1 scale |
+| Host | Run the Ubuntu deployment and choose a permanent domain | W2, W5 |
+| Send | Floodboard credit note, maintainer questions, BMA addition (all drafted, none sent) | W1, W2 |
+| Model | Camera-check model (the gateway is OpenAI-style today) | W1 |
+| Backup | Where the archive's external backup goes | W5 |
+
+#### Decided today
+
+- Feed: incidents plus districts; the route stays protected until a host exists; the Ubuntu host;
+  the name `bangkok_flood_incidents_live`.
+- Whole Bangkok.
+- Archive: start now; local, then Ubuntu; strip report text and delete the old text; stable
+  officer pseudonyms.
 
 ### 3 October (latest): bmatraffic pictures inside the page (ADR-0051)
 
