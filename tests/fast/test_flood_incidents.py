@@ -27,6 +27,15 @@ PARAMS = Params(bands=CONFIG.freshness_minutes)
 # A square area around Pracha Chuen Road in Bang Sue.
 AREA = [{"type": "Polygon", "coordinates": [[[100.53, 13.83], [100.56, 13.83], [100.56, 13.85],
                                                [100.53, 13.85], [100.53, 13.83]]]}]
+# The same square cut into two made-up districts at longitude 100.542.
+HALVES = [
+    ("WEST", {"type": "Polygon", "coordinates": [[[100.53, 13.83], [100.542, 13.83],
+                                                  [100.542, 13.85], [100.53, 13.85],
+                                                  [100.53, 13.83]]]}),
+    ("EAST", {"type": "Polygon", "coordinates": [[[100.542, 13.83], [100.56, 13.83],
+                                                  [100.56, 13.85], [100.542, 13.85],
+                                                  [100.542, 13.83]]]}),
+]
 X0, Y0 = 100.5400, 13.8400
 STEP = 0.0005  # about 55 m
 
@@ -161,6 +170,7 @@ def snapshots(session, monkeypatch):
 
     state = {"roads": []}
     monkeypatch.setattr(store, "demo_outlines", lambda _config: AREA)
+    monkeypatch.setattr(store, "demo_areas", lambda _config: HALVES)
     monkeypatch.setattr(store, "current_roads",
                         lambda _s, _c, _at: {"features": state["roads"]})
     monkeypatch.setattr(store, "recent_reports", lambda _s, _c, _at, _h: {"features": []})
@@ -241,3 +251,24 @@ def test_an_older_snapshot_never_rewrites_history(session, snapshots) -> None:
     assert snapshots(NOW - timedelta(minutes=30), []) is None
     [incident] = _open(session)
     assert incident.status == "active"
+
+
+# --- District codes (ADR-0056) --------------------------------------------------------------
+
+
+def test_district_codes_list_every_district_a_geometry_reaches() -> None:
+    from core.flood_evidence.geo import district_codes
+
+    inside = road("a" * 16)["geometry"]                 # 100.5400 to 100.5404
+    across = road("b" * 16, dx=0.0018)["geometry"]      # 100.5418 to 100.5422
+    assert district_codes(inside, HALVES) == ["WEST"]
+    assert district_codes(across, HALVES) == ["EAST", "WEST"]
+
+
+def test_incidents_store_their_district_codes_once_in_the_worker(session, snapshots) -> None:
+    snapshots(NOW, [road("a" * 16), road("b" * 16, dx=STEP), road("c" * 16, dx=2 * STEP),
+                    road("d" * 16, dx=3 * STEP), road("e" * 16, dx=4 * STEP)])
+    [incident] = _open(session)
+    assert incident.summary["district_codes"] == ["EAST", "WEST"]
+    snapshots(NOW + timedelta(minutes=10), [road("a" * 16)])
+    assert session.get(FloodIncident, incident.id).summary["district_codes"] == ["WEST"]

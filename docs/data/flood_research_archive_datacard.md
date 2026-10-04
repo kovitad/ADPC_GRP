@@ -17,7 +17,7 @@ duckdb.sql("select * from read_json_auto('research/flood/bangkok/v1/road_state/*
 | `road_state` | new state of a Floodboard road segment | `valid_from`/`valid_to` (as of export); `district_codes`; Floodboard's verdict and confidence are its estimates, not GRP's |
 | `road_geometry` | segment geometry seen that day | join on `geometry_hash`; names in Thai and English |
 | `report` | new state of a public report | `report_key` is a salted hash; no text, link or provider ID |
-| `incident` | incident active that day | its state at export time; `district_codes_approx` |
+| `incident` | incident active that day | its state at export time; `district_codes` from its roads (`district_codes_basis` = `roads`), or a box approximation for incidents before ADR-0056 |
 | `incident_event` | incident change (created, merged, split, receding, closed...) | detail as recorded |
 | `incident_run` | incident pass over a roads snapshot | active count, run time |
 | `facility_exposure` | change of a school, hospital or clinic's state | OSM facilities (ODbL) |

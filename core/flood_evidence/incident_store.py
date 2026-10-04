@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.exposure import latest_exposure
-from core.flood_evidence.geo import boxes_touch, expand
+from core.flood_evidence.geo import boxes_touch, district_codes, expand
 from core.flood_evidence.incidents import (
     RULE_VERSION,
     Params,
@@ -58,11 +58,18 @@ def params_for(config: PilotConfig) -> Params:
     return Params(bands=config.freshness_minutes)
 
 
-def demo_outlines(config: PilotConfig) -> list[dict[str, Any]]:
+def demo_areas(config: PilotConfig) -> list[tuple[str, dict[str, Any]]]:
+    """(district code, outline) for each district in the demo area."""
+
     codes = set(config.demo_corridor.get("areas") or [])
     if config.base_id != "bangkok" or not codes:
         return []
-    return [a["outline"] for a in bangkok_outlines() if a["admin_code"] in codes]
+    return [(a["admin_code"], a["outline"]) for a in bangkok_outlines()
+            if a["admin_code"] in codes]
+
+
+def demo_outlines(config: PilotConfig) -> list[dict[str, Any]]:
+    return [outline for _, outline in demo_areas(config)]
 
 
 def _event(session: Session, incident: FloodIncident, at: datetime, kind: str, **detail) -> None:
@@ -106,8 +113,12 @@ def update_incidents(session: Session, config: PilotConfig, fetch: FloodSourceFe
     reports = recent_reports(session, config, at, REPORT_WINDOW_HOURS)["features"]
     exposures = latest_exposure(session, config, at)["assets"]
     found = build_incidents(roads, reports, outlines, at, params) if outlines else []
+    areas = demo_areas(config)
     for item in found:
         item.update(facility_flags(item, exposures))
+        # Computed once here, in the worker, so the Planner, the feed and the archive never
+        # do spatial work in a request (ADR-0056).
+        item["district_codes"] = district_codes(item["geometry"], areas)
 
     open_incidents = list(
         session.scalars(

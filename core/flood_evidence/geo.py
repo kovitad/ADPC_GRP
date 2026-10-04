@@ -96,6 +96,27 @@ def inside_outline(lon: float, lat: float, outline: dict[str, Any]) -> bool:
     )
 
 
+def outline_box(outline: dict[str, Any]) -> tuple[float, float, float, float]:
+    """The bounding box of a Polygon or MultiPolygon outline (outer rings)."""
+
+    polygons = outline["coordinates"] if outline["type"] == "MultiPolygon" else [
+        outline["coordinates"]
+    ]
+    points = [p for rings in polygons for p in rings[0]]
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def district_codes(
+    geometry: dict[str, Any], areas: list[tuple[str, dict[str, Any]]]
+) -> list[str]:
+    """Codes of every area that any vertex of the geometry falls in, checked box-first."""
+
+    box = bbox(geometry)
+    return sorted(code for code, outline in areas
+                  if boxes_touch(box, outline_box(outline)) and touches_outline(geometry, outline))
+
+
 def touches_outline(geometry: dict[str, Any], outline: dict[str, Any]) -> bool:
     """True when any vertex of the geometry lies inside the outline."""
 

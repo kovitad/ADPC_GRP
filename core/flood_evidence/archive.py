@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from core.flood_evidence.assets import asset_registry
 from core.flood_evidence.config import PilotConfig
-from core.flood_evidence.geo import bbox, boxes_touch, touches_outline
+from core.flood_evidence.geo import district_codes
 from core.flood_evidence.ingest import utc
 from core.flood_evidence.models import (
     FloodAssetExposure,
@@ -92,25 +92,13 @@ def pseudonym(salt: bytes, value: str, length: int = 16) -> str:
     return hmac.new(salt, value.encode("utf-8"), hashlib.sha256).hexdigest()[:length]
 
 
-def _districts(geometry: dict[str, Any], areas: list[tuple[str, tuple, dict]]) -> list[str]:
-    box = bbox(geometry)
-    return sorted(code for code, abox, outline in areas
-                  if boxes_touch(box, abox) and touches_outline(geometry, outline))
+_districts = district_codes
 
 
-def _outline_box(outline: dict[str, Any]) -> tuple[float, float, float, float]:
-    polygons = outline["coordinates"] if outline["type"] == "MultiPolygon" else [
-        outline["coordinates"]]
-    points = [p for rings in polygons for p in rings[0]]
-    xs, ys = [p[0] for p in points], [p[1] for p in points]
-    return min(xs), min(ys), max(xs), max(ys)
-
-
-def _areas(config: PilotConfig) -> list[tuple[str, tuple, dict]]:
+def _areas(config: PilotConfig) -> list[tuple[str, dict]]:
     if config.base_id != "bangkok":
         return []
-    return [(a["admin_code"], _outline_box(a["outline"]), a["outline"])
-            for a in bangkok_outlines()]
+    return [(a["admin_code"], a["outline"]) for a in bangkok_outlines()]
 
 
 def _road_rows(rows: list[FloodObservation], areas) -> tuple[list[dict], list[dict]]:
@@ -162,17 +150,20 @@ def _report_rows(rows: list[FloodObservation], salt: bytes, areas) -> list[dict]
 
 def _incident_row(incident: FloodIncident, areas) -> dict:
     summary = dict(incident.summary or {})
-    west, south, east, north = incident.bbox
-    # Approximate: the districts that the box corners or its centre fall in.
-    box = {"type": "MultiLineString", "coordinates": [
-        [[west, south], [east, south], [east, north], [west, north]],
-        [[(west + east) / 2, (south + north) / 2]]]}
+    codes, basis = summary.get("district_codes"), "roads"
+    if codes is None:
+        # Incidents processed before ADR-0056 have no stored codes: approximate from the box.
+        west, south, east, north = incident.bbox
+        box = {"type": "MultiLineString", "coordinates": [
+            [[west, south], [east, south], [east, north], [west, north]],
+            [[(west + east) / 2, (south + north) / 2]]]}
+        codes, basis = _districts(box, areas), "box_approx"
     return {
         "incident_id": str(incident.id), "status_at_export": incident.status,
         "opened_at": _iso(incident.opened_at), "last_active_at": _iso(incident.last_active_at),
         "last_snapshot_at": _iso(incident.last_snapshot_at),
         "closed_at": _iso(incident.closed_at), "bbox": list(incident.bbox),
-        "district_codes_approx": _districts(box, areas),
+        "district_codes": codes, "district_codes_basis": basis,
         "road_keys": list(incident.road_keys),
         **{k: summary.get(k) for k in INCIDENT_FIELDS},
         "rule_version": incident.rule_version,
