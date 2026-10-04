@@ -131,6 +131,8 @@ RP20/RP50 rasters and methods exist.
 - **Fix, same day:** every camera showed the same picture, because bmatraffic sends the session's
   last-opened camera. Now there is one session per watched camera (idle sessions are dropped
   after 30 seconds, at most 16). 1362 and 1108 checked live.
+- **Checked by the owner (4 October):** the in-page bmatraffic pictures look good in a
+  signed-in browser.
 - **BMA request:** now says what the demo does and asks permission before wider use (Gate B).
 - **Tests:** 1,089 passed, 2 skipped; Ruff clean.
 
