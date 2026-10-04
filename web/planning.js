@@ -2764,7 +2764,7 @@
     return params;
   };
 
-  const downloadSummary = async (button) => {
+  const downloadSummary = async (button, lang = "en") => {
     if (!state.selected) {
       addMessage("assistant", "Choose a district on the map first, then download its summary.", {
         record: false,
@@ -2773,7 +2773,7 @@
     }
     const label = button.textContent;
     button.disabled = true;
-    button.textContent = "Preparing…";
+    button.textContent = lang === "th" ? "กำลังจัดทำ…" : "Preparing…";
     try {
       const picture = await drawSummaryMap({ basemap: true }).catch(() => null);
       await GRP.download("/api/v1/planning/summary.docx", {
@@ -2784,8 +2784,9 @@
           assessment_id: state.assessmentId || null,
           map_png: picture ? picture.dataUrl : null,
           map_has_basemap: Boolean(picture && picture.basemap),
+          lang,
         },
-        fallbackName: "grp-flood-summary.docx",
+        fallbackName: lang === "th" ? "grp-flood-summary-th.docx" : "grp-flood-summary.docx",
       });
     } catch (error) {
       addMessage("assistant", error.message, { label: error.code, error: true, record: false });
@@ -3391,7 +3392,11 @@
     const note = document.createElement("small");
     if (matches(state.selected)) {
       note.textContent = `Added to the ${state.selected.name} summary: Global Risk's counts of schools, hospitals, buildings and roads in its flood hazard layer, with this brief and its sources.`;
-      box.append(note, chipButton("Download summary (.docx)", (button) => downloadSummary(button)));
+      box.append(
+        note,
+        chipButton("Download summary (.docx)", (button) => downloadSummary(button)),
+        chipButton("ดาวน์โหลดสรุป (ไทย)", (button) => downloadSummary(button, "th")),
+      );
     } else {
       const place = payload.evidence.area.sig_place || payload.evidence.area.requested;
       const other = state.boundaries.find(matches);
@@ -4537,6 +4542,8 @@
       clearButton.addEventListener("click", () => startOver(clearButton));
       const summaryButton = $("[data-summary-download]");
       summaryButton.addEventListener("click", () => downloadSummary(summaryButton));
+      const summaryButtonTh = $("[data-summary-download-th]");
+      summaryButtonTh.addEventListener("click", () => downloadSummary(summaryButtonTh, "th"));
       await restoreState({ skipAssessment: Boolean(requestedAssessmentId) });
       await syncTailFromServer();
       resumeLookups();

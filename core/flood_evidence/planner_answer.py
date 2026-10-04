@@ -92,6 +92,8 @@ def live_facts(session: Session, hub_code: str, admin_code: str, admin_level: st
         "district_name_th": name_th,
         "rolled_up_from": str(admin_code) if admin_level == "subdistrict" else None,
         "facts": _without_officer_judgements(bundle["facts"]),
+        # Fact label to the incident or facility it describes (for cameras and reports).
+        "labels": {label: info.get("ref") for label, info in bundle["labels"].items()},
         "as_of": now.isoformat(),
     }
 

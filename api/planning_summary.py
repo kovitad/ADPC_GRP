@@ -14,7 +14,7 @@ import io
 import re
 import struct
 from datetime import UTC, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 from uuid import UUID
 
@@ -35,6 +35,7 @@ from api.planning_access import planner_membership
 from api.sessions import CurrentPrincipal
 from core.assessment_models import AssessmentFeature, Boundary, Feature
 from core.contribution_models import APPROVED, SigContribution
+from core.flood_evidence.summary_live import live_section
 from core.planning_memory_models import PlanningChatMessage
 from core.summary_docx import STATUS_LABELS, render_summary
 
@@ -59,6 +60,8 @@ class SummaryRequest(BaseModel):
     # A PNG the browser drew from the page's own layers, as base64 or a data: URL.
     map_png: str | None = Field(default=None, max_length=8_500_000)
     map_has_basemap: bool = False
+    # The document's language; texts from data and Global Risk stay as written (ADR-0056).
+    lang: Literal["en", "th"] = "en"
 
 
 def _map_picture(value: str | None) -> bytes | None:
@@ -352,6 +355,12 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
                         "Village register", str(source.get("version_id", ""))[:8]])
     sources.append(["boundary", f"{boundary.name} ({boundary.admin_code})", boundary.source,
                     boundary.edition])
+    # ADR-0056: live reported flooding for Bangkok, never part of the assessment above.
+    live = live_section(session, hub.hub_code, boundary.admin_code, boundary.admin_level)
+    if live.get("available"):
+        sources.append(["live reported flooding (not part of the assessment)",
+                        "Floodboard roads and reports, grouped by GRP", "Floodboard, CC BY 4.0",
+                        live["as_of"]])
 
     limits = list(result["limits"] if result else LIMITS)
     if result:
@@ -379,15 +388,17 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
         },
         "supporting": supporting,
         "global_risk": _global_risk(session, principal, hub.hub_id, boundary),
+        "live": live,
         "limits": limits,
         "sources": sources,
     }
 
 
-def _filename(area: dict[str, Any], extension: str) -> tuple[str, str]:
+def _filename(area: dict[str, Any], extension: str, lang: str = "en") -> tuple[str, str]:
     stem = re.sub(r"[^A-Za-z0-9]+", "-", str(area.get("name") or "district")).strip("-").lower()
     day = datetime.now(BANGKOK).strftime("%Y-%m-%d")
-    ascii_name = f"grp-flood-summary-{stem or 'district'}-{day}.{extension}"
+    suffix = "-th" if lang == "th" else ""
+    ascii_name = f"grp-flood-summary-{stem or 'district'}-{day}{suffix}.{extension}"
     return ascii_name, (
         f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(ascii_name)}"
     )
@@ -404,18 +415,24 @@ def summary_docx(
 ) -> Response:
     picture = _map_picture(payload.map_png)
     facts = gather(session, principal, payload)
-    facts["map"] = {
-        "png": picture,
-        "caption": (
+    if payload.lang == "th":
+        caption = (
+            f"รูปที่ 1 {facts['area'].get('name_th') or facts['area'].get('name', '')} "
+            f"({facts['centres']['scenario']}) ขอบเขตพื้นที่และศูนย์พักพิงบนภาพแสดงความลึกน้ำ"
+            "อย่างหยาบ (ประมาณ 1.9 กม. ต่อพิกเซล สถานะของแต่ละศูนย์มาจากข้อมูลความละเอียดเต็ม)"
+            + (" แผนที่ฐาน © ผู้ร่วมพัฒนา OpenStreetMap" if payload.map_has_basemap else "")
+        )
+    else:
+        caption = (
             f"{_map_title(facts)} District outline and evacuation centres over the flood-depth "
             "display preview (about 1.9 km per pixel; each centre's status comes from the "
             "full-resolution layer)."
             + (" Base map © OpenStreetMap contributors." if payload.map_has_basemap else "")
-        ),
-    }
-    _, disposition = _filename(facts["area"], "docx")
+        )
+    facts["map"] = {"png": picture, "caption": caption}
+    _, disposition = _filename(facts["area"], "docx", payload.lang)
     return Response(
-        render_summary(facts),
+        render_summary(facts, payload.lang),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": disposition, "Cache-Control": "no-store"},
     )
@@ -458,7 +475,8 @@ def summary_centres_csv(
     for row in centres["rows"]:
         writer.writerow([_cell(v) for v in (
             row["name"], row.get("subdistrict"), row.get("village"), row.get("capacity"),
-            row.get("supporting_unit"), STATUS_LABELS.get(row["status"], row["status"]),
+            row.get("supporting_unit"),
+            STATUS_LABELS.get(row["status"], {}).get("en", row["status"]),
             "" if row.get("depth_m") is None else round(row["depth_m"], 2),
             *[(row["indicators"] or {}).get(key) for key in titles],
         )])

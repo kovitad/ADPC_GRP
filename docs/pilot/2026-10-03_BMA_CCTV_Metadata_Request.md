@@ -29,6 +29,11 @@
 > such as a snapshot address that does not need a session, an HTTPS address, or a limit on how
 > often GRP should ask?
 
+> **Update, 4 October 2026 (later): BMA's reply.** The Product Owner reports that BMA said the
+> camera pictures are public data that anyone may use. GRP now includes up to four credited
+> camera pictures in the Planner's district summary (ADR-0056). Please keep BMA's reply, or ask
+> for a one-line written confirmation, on file.
+
 > **Update, 4 October 2026: an automatic water check (planned, not built).** The pilot now
 > covers the whole of Bangkok. The Product Owner would like a simple automatic check on camera
 > pictures near reported flooding: one word, **water**, **partial water** or **dry**. Its rules:

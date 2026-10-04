@@ -72,7 +72,33 @@ Decision D2 (officer checks for Planners) is still open.
    - 8 centres on 4 October 2026, in districts 1003 (3), 1022, 1023, 1028, 1035 and 1044, which
      makes 1,075 facilities in all. A centre is "not assessed" until the next roads snapshot
      after deployment.
-5. **Rules for the later steps** (from the plan):
+5. **Live section in the district summary, in Thai or English** (4 October 2026, the Product
+   Owner's request).
+   - `core/flood_evidence/summary_live.py` builds section 6 "Live reported flooding (not part of
+     this assessment)", placed after the Global Risk evidence. It holds:
+     - the snapshot time, with a warning if it is over 2 hours old;
+     - counts by confidence word and what changed in the last hour;
+     - the incidents, the facilities and DDPM centres with flooding reported nearby, and rain
+       where tracked;
+     - the nearest camera to each listed incident;
+     - the Floodboard credit, and the D8 text in English and Thai.
+   - It uses `live_facts`, the same facts as the live answers, with officer fields removed.
+     Outside Bangkok it is one plain line.
+   - **Camera pictures.** Up to 4 pictures come from bmatraffic cameras through the relay. Each
+     is credited "BMA traffic camera (bmatraffic.com)" with its time. GRP keeps no copy; the
+     picture lives only in the downloaded document.
+     - The owner chose pictures in every summary, not only the local demo.
+     - The owner reported on 4 October 2026 that **BMA confirmed the camera pictures are public
+       data anyone may use**. A written confirmation should be kept on file.
+     - This widens ADR-0051's "local demo only" scope for the summary. A camera that does not
+       answer is listed without a picture.
+   - **Language.** `POST /api/v1/planning/summary.docx` takes `lang` (`en` or `th`). Every fixed
+     text in `core/summary_docx.py` is translated with the same wording rules: never "safe"
+     (ปลอดภัย is used only in the "does not certify that any place is safe" line). Texts from data
+     sources and Global Risk stay as written, and the Thai document says so. The page has a
+     "ดาวน์โหลดสรุป (ไทย)" button.
+   - The assessment section, its result and its receipt are unchanged.
+6. **Rules for the later steps** (from the plan):
    - live data never enters a stored assessment or its receipt;
    - the map layer is "Reported flooding on roads (live, not a flood map)";
    - a sub-district shows its parent district's live facts, and says so;
