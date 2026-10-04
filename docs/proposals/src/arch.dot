@@ -1,0 +1,39 @@
+digraph G {
+  graph [rankdir=TB, fontname="Segoe UI", fontsize=12, nodesep=0.25, ranksep=0.45, bgcolor="white", pad=0.3];
+  node [shape=box, style="rounded,filled", fontname="Segoe UI", fontsize=11, color="#4b5563", penwidth=1.2];
+  edge [color="#6b7280", arrowsize=0.7, fontname="Segoe UI"];
+
+  subgraph cluster_src { label="1. Sources (each with licence and lineage)"; style="rounded"; color="#9ca3af"; fontcolor="#374151";
+    fb [label="Floodboard\nroads + reports\n(CC BY 4.0)", fillcolor="#dbeafe"];
+    longdo [label="Longdo events + rain\n(context only)", fillcolor="#e0e7ff"];
+    cam [label="Cameras\nBMA / bmatraffic / iTIC\n(view only)", fillcolor="#e0e7ff"];
+    gg [label="GEOGLOWS\n7-day river flow", fillcolor="#dcfce7"];
+    ddpm [label="DDPM baseline\nshelters, villages,\nRP100, boundaries", fillcolor="#fef3c7"];
+    osm [label="OSM facilities\n(ODbL)", fillcolor="#fef3c7"];
+    officer [label="Officer checks\n(human evidence)", fillcolor="#fce7f3"];
+  }
+
+  subgraph cluster_core { label="2. GRP worker: evidence engine (no GIS in web requests)"; style="rounded"; color="#9ca3af"; fontcolor="#374151";
+    ingest [label="Ingest\nraw bytes + SHA-256\nobservation model", fillcolor="#f3f4f6"];
+    inc [label="Incidents\nidentity, confidence word,\nfreshness, district codes", fillcolor="#f3f4f6"];
+    exp [label="Exposure\nfacilities + DDPM centres\n'reported nearby'", fillcolor="#f3f4f6"];
+    fact [label="Fact bundle\n(area, window, audience)\ncomputed, labelled", fillcolor="#fde68a", penwidth=2];
+  }
+
+  subgraph cluster_out { label="3. Outputs"; style="rounded"; color="#9ca3af"; fontcolor="#374151";
+    planner [label="Planner map + answers\n(gated AI, no warnings)", fillcolor="#d1fae5"];
+    reports [label="DDPM reports\npre-season / days ahead /\nshift / after-action", fillcolor="#d1fae5"];
+    feed [label="Live feed.json\nto Global Risk", fillcolor="#d1fae5"];
+    archive [label="Research archive\nday by day, no personal data", fillcolor="#d1fae5"];
+    partner [label="Partner export\n(insurance, future)", fillcolor="#f3f4f6", style="rounded,dashed"];
+  }
+
+  gr [label="Global Risk platform\nfeeds_query, risk briefs,\nreceipts (MCP)", fillcolor="#ede9fe", penwidth=2];
+  ds [label="Data scientists\nmodels", fillcolor="#ede9fe"];
+
+  fb -> ingest; longdo -> ingest; gg -> ingest; cam -> exp [style=dashed, label="  camera check\n  (planned)", fontsize=9];
+  ingest -> inc -> exp -> fact;
+  ddpm -> exp; osm -> exp; officer -> fact [style=dashed];
+  fact -> planner; fact -> reports; fact -> feed; inc -> archive; exp -> archive; archive -> partner [style=dashed];
+  feed -> gr; archive -> ds; gr -> planner [style=dashed, label="  regional layers,\n  briefs", fontsize=9];
+}

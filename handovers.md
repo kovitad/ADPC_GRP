@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 3 October 2026 (Bangkok flood pilot slices 1-7, ADR-0038 to 0044, demo area Bang Sue/Chatuchak/Bang Kapi/Lat Krabang, corridor Bang Sue and Chatuchak, branch `pilot/river-watch-and-bangkok-flood`, not pushed; see Section 0). Before that: 2 October 2026 (River Watch pilot tab, ADR-0036). Previously: 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 4 October 2026. Whole Bangkok (ADR-0053); daily research archive (ADR-0055); live flood evidence in the Planner, steps 1-4 (ADR-0056); Global Risk live-feed plan revised against its source code; DDPM reports design; proposal for the dev team in `docs/proposals/`. Branch `pilot/river-watch-and-bangkok-flood`, not pushed. **Next agent: read Section 0, "4 October (latest): roadmap input for the dev team", first.** Before that: 3 October 2026 (Bangkok flood pilot slices 1-7, ADR-0038 to 0051).
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -244,6 +244,62 @@ it, so do it before W2 submission)
 - Whole Bangkok.
 - Archive: start now; local, then Ubuntu; strip report text and delete the old text; stable
   officer pseudonyms.
+- D7: rain may appear in Planner answers, labelled as context. D8: the fixed "no warnings" text.
+
+#### Why this work exists (the case, in short)
+
+The full case is in the proposal for the dev team,
+`docs/proposals/GRP_Live_Flood_Intelligence_Proposal_2026-10-04.docx`.
+
+- **Problem.** GRP answers pre-season questions (RP100 scenario, shelters, population). It had no
+  picture of flooding now and no days-ahead outlook. Bangkok flood information is spread across
+  many systems. The spec v0.3 calls this "lack of a shared, current, evidence-linked
+  interpretation of what the data means for a decision". DDPM planners, and later insurers, need
+  evidence → incident → consequence → decision, with history to learn from.
+- **Live data.**
+  - Floodboard is the only usable open live source (CC BY 4.0). BMA's catalogue has no water-level
+    data and no licence.
+  - GRP turns it into incidents with confidence words, facility exposure, a "what changed" view,
+    grounded answers and replay.
+  - **It describes flooding now and never issues a warning (D8).**
+- **GEOGLOWS.**
+  - A free, global, daily 7-day river-flow forecast. It is the only days-ahead source we hold, for
+    riverine provinces (Chao Phraya, Nonthaburi/Bang Bua Thong).
+  - It is not street flooding, it has no "high" threshold (upstream return periods fail), and
+    its reaches are unconfirmed.
+  - HAND depth (Phase B) needs local hydrology.
+- **Consolidation.** One fact bundle per (area, window, audience) feeds the Planner, DDPM
+  reports, the Global Risk feed and the archive, so numbers agree everywhere.
+- **History.** The daily research archive keeps state changes, labels and rule versions with no
+  personal data, so models and insurance-grade event histories can be built later.
+
+#### Developer detail (where things are)
+
+| Area | Files and entry points | Notes |
+| --- | --- | --- |
+| Pilot config | `core/data/flood_pilot_bangkok.json` (`demo_corridor` = 50 districts, `rain_areas` = 4) | ADR-0053 |
+| Ingest and incidents | `core/flood_evidence/ingest.py`, `incident_store.py` (`update_incidents` stores `district_codes`), `incidents.py`, `geo.district_codes` | worker only; ADR-0041, ADR-0056 |
+| Facilities | `assets.py` (OSM), `ddpm_shelters.py` (`pilot_assets` = OSM plus the current DDPM shelter version, read from the DB), `exposure.py` | ADR-0040, ADR-0056 |
+| Facts and answers | `briefing.build_facts`, `answer.py` (gate), `planner_answer.py` (`NO_WARNINGS`, officer fields removed) | ADR-0043, ADR-0056 |
+| Planner | `GET /api/v1/maps/live-flood` (`api/maps.py` → `planner_layer.py`); `live_flood` mode in `api/planning.py`; `web/planning.js` (`syncLiveFlood`, `data-live-flood-toggle`) | live answers never cached |
+| Archive | `archive.py` (`export_pending`, run by the worker before retention); `python -m grpcli.flood_pilot archive`; storage `research/flood/bangkok/v1/`; salt `private/flood-archive-salt` | ADR-0055; data card `docs/data/flood_research_archive_datacard.md` |
+| Backup capture | `grpcli/floodboard_capture.py` (cleans `reports.csv`; `--clean-existing`); restart it after a reboot | PID changes on restart |
+| Global Risk feed | plan `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`; manifests `docs/pilot/global_risk_manifests/`; endpoint **not built** (ADR-0052 reserved) | 6-hour cache and empty-list findings |
+| Restart | `scripts/docker-desktop.ps1` only (keeps `SERVIR_AUTH_CLIENT_ID`); a rebuild took 10-15 minutes on 4 October | never a raw `compose up` |
+
+Verified on 4 October 2026:
+- 145 of 145 active incidents carried district codes (06:47 UTC run).
+- The live layer: Lat Krabang 21 incidents and 112 roads; sub-district 103005 rolls up to
+  Chatuchak; 3415 is refused.
+- The live answer for Lat Krabang (computed path).
+- 8 DDPM centres found.
+- First archive day: 2.9 MB.
+- Tests: 1,086 pass, 2 skip.
+
+Not yet verified:
+- an AI-worded live answer in a signed-in browser;
+- DDPM centre exposure rows (they start at the first snapshot after the step 4 rebuild);
+- the Planner layer seen in a browser.
 
 ### 3 October (latest): bmatraffic pictures inside the page (ADR-0051)
 
