@@ -30,37 +30,40 @@ archive that the insurance section asked for.
 no deletion. That breaks the rule ADR-0038 and ADR-0045 set for the main pipeline. Section 6
 fixes it.
 
-## 3. What to archive
+## 3. What to archive: only what a model needs
 
-Two tiers, with different access.
+The owner's rule (4 October 2026): **keep the data day by day from go-live as the source for
+later models, but keep only what matters for a model.** Raw files are not kept forever.
 
-### Tier R: research tier (kept indefinitely, for ADPC data scientists)
+### Kept indefinitely, one file per table per UTC day
 
-Analysis-ready, no personal data, one file per table per UTC day.
-
-| Table | One row per | Main fields | For models |
+| Table | One row per | Main fields | Why a model needs it |
 | --- | --- | --- | --- |
-| `road_state` | road segment per roads snapshot | segment key, geometry hash, district, depth, closed and cleared flags, Floodboard verdict and confidence, source families, `reported_at`, `retrieved_at` | the main signal; a time series per segment |
-| `road_geometry` | distinct segment geometry (once) | geometry hash, line geometry, road name and class | joins without repeating geometry |
+| `road_state` | **change** of a road segment's state (not every snapshot) | segment key, district, depth, closed and cleared flags, Floodboard confidence, source families, `valid_from`, `valid_to` | the main signal; the full time series is rebuilt from changes |
+| `road_geometry` | distinct segment geometry, once | geometry hash, line, road name and class | joins without repeating geometry |
 | `report` | report observation | salted hash of the provider ID, time, point, source family, depth, cleared; **no text, URL or name** | point evidence and its timing |
-| `incident` and `incident_event` | incident, and lifecycle change | footprint road keys, box, confidence, reasons, **rule version**, events | event-level targets: start, duration, merges |
-| `facility_exposure` | facility per snapshot | asset ID, exposure and access state, nearest distance, rule version | the impact layer |
-| `weather` | district or incident per radar observation | rain now and the 30-minute forecast levels | a predictor (Longdo terms: internal research only) |
+| `incident` and `incident_event` | incident, and lifecycle change | footprint road keys, box, district codes, confidence, reasons, **rule version**, events | event targets: start, duration, size, merges |
+| `facility_exposure` | **change** of a facility's state | asset ID, exposure and access state, nearest distance, rule version, `valid_from`, `valid_to` | the impact layer |
+| `label` | human or machine check | target, label (`flooding_seen`, `dry_seen`, `cannot_tell`; later `water`, `partial_water`, `dry`), method (`officer`, `camera_check`, `sensor`), time, pseudonymous checker | **the ground truth** |
+| `weather` | district or incident per radar observation | rain now and the 30-minute forecast levels | a predictor (Longdo: internal research only) |
 | `river_forecast` | GEOGLOWS run per reach | the summary object and raw-bytes SHA-256 | a predictor for riverine areas |
-| `label` | human or machine check | target (incident or facility), label (`flooding_seen`, `dry_seen`, `cannot_tell`, later `water`, `partial_water`, `dry`), method (`officer`, `camera_check`, `sensor`), time, **pseudonymous** checker ID | **the ground truth** |
-| `context` | file version | OSM capture time, boundary edition, camera registry version, pilot config hash | reproducibility |
+| `context` | version change | OSM capture time, boundary edition, camera registry version, pilot config hash | reproducibility |
 
-Every file carries `rule_version` where a rule produced the value, and `source_version` or SHA-256
-where a source did.
+**State changes, not snapshots.** Most segments keep the same state for hours. Storing a row only
+when something changes, with `valid_from` and `valid_to`, keeps the full history at a fraction
+of the size. `flood_observation` already works this way.
 
-### Tier A: audit tier (restricted, for rebuilding and checking)
+### Not kept beyond today's retention
 
-- **Raw roads exports, gzipped, kept indefinitely.** Road properties hold no personal data. At
-  about 2 MB per snapshot, gzip should bring it to roughly 250 KB, about 20 MB a day or 7 GB a
-  year. That figure is an estimate to measure in step 1.
-- **Raw reports exports are not kept beyond 14 days.** They hold text and links. The research
-  tier keeps their facts.
-- Manifests with SHA-256, licence and retrieval headers, for every file.
+- **Raw Floodboard exports** (roads and reports): deleted after 14 days as now (ADR-0045). The
+  research tables keep their facts, and each day's manifest keeps the SHA-256 of every raw file
+  used, so the source can be identified.
+- **Report text, links, provider IDs, names and photos:** never kept.
+- **Per-snapshot facility rows:** replaced by state changes.
+- **Replays:** never archived.
+
+Size: to be measured in step 1. The state-change tables should be a small fraction of the 88 MB
+the raw capture used in its first day.
 
 ## 4. Format and place
 
@@ -75,7 +78,6 @@ where a source did.
     datacard.md                       what each table means, caveats, licences, label rules
     <table>/date=2026-10-04/part-000.jsonl.gz
     <table>/date=2026-10-04/manifest.json   row count, SHA-256, rule versions, sources
-  audit/flood/bangkok/roads/date=2026-10-04/<retrieved_at>.geojson.gz
   ```
 
 - **Who writes it:** a worker job, once a day for the previous UTC day. It runs **before**
@@ -121,7 +123,7 @@ deletion needs the owner's yes (D-A3).
      versions present; row counts match the database.
 2. **Backfill** from 3 October: export every day still held, before 10 October, when facility
    states start to go.
-3. **Raw roads to the audit tier**, and the size estimate checked against real gzip.
+3. **Measure the daily size** and record it in the data card.
 4. **Fix the backup capture** (section 6).
 5. **GEOGLOWS runs and camera labels**, once those features run on the stack.
 6. **Later:** a GeoParquet conversion, a bucket off the laptop, and a read-only account for data
