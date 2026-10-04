@@ -208,12 +208,25 @@ Facts that shape the roadmap:
   - a separate partner channel.
 - **Limits:** crowd reports are never a payout trigger, and no report states a loss.
 
+**W7. Live flood evidence in the Planner, Bangkok** (planned; nothing outside the code blocks
+it, so do it before W2 submission)
+- **Plan:** `docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`.
+- **Steps:**
+  1. district codes on incidents, in the worker;
+  2. the live layer "Reported flooding on roads (live, not a flood map)";
+  3. live facts in Planner answers, with `snapshot_at` in the cache key and fixed "no warnings"
+     wording;
+  4. DDPM shelters in the exposure run (Bangkok has 8);
+  5. the feed endpoint on the same fact builder.
+- **Rules:** live data never enters an assessment; sub-districts roll up to their district; no
+  warnings. ADR-0056.
+
 #### Open decisions (owner)
 
 | ID | Decision | Unblocks |
 | --- | --- | --- |
 | D1 | Get one DDPM situation report and one pre-season plan as samples | W3 report formats |
-| D2 | Who the Bangkok live report is for: DDPM central, BMA or both | W1/W3 wording and access |
+| D2 | Who the Bangkok live report is for (DDPM central, BMA or both), and whether Planners see officer checks | W1/W3/W7 wording and access |
 | D3 | Who confirms GEOGLOWS reaches and their districts (ADPC or RID hydrologist) | W4 |
 | D4 | First Global Risk contribution: the GEOGLOWS daily summary, then Bangkok districts? | W2/W4 |
 | D5 | Look for a Floodboard-like source outside Bangkok, or stay Bangkok-only | W1 scale |
@@ -221,6 +234,8 @@ Facts that shape the roadmap:
 | Send | Floodboard credit note, maintainer questions, BMA addition (all drafted, none sent) | W1, W2 |
 | Model | Camera-check model (the gateway is OpenAI-style today) | W1 |
 | Backup | Where the archive's external backup goes | W5 |
+| D7 | Rain context and River Watch for Planners (recommend rain yes, River Watch after D3) | W7 |
+| D8 | Approve the fixed "official warnings" wording, Thai and English, and name the channels | W7 |
 
 #### Decided today
 
