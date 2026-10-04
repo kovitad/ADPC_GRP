@@ -1554,9 +1554,11 @@
   let liveSummary = null;
   let liveSelection = null;
   let liveFitted = false;
-  // One canvas for every point layer: a second canvas covers the first and swallows its clicks,
-  // so live points stopped opening cards once a district's centres were drawn.
-  const liveRenderer = centerRenderer;
+  // Live points are drawn as SVG in the live pane, above the district shapes. A canvas catches
+  // every click over the whole map, and the filled district shapes covered any canvas below
+  // them, so camera points could not be clicked. An SVG surface passes clicks on empty space
+  // through to the district underneath.
+  const liveRenderer = window.L.svg({ pane: "grpLiveFlood", padding: 0.4 });
 
   const bangkokClock = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-GB", {
     timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit",

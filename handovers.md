@@ -336,7 +336,9 @@ point it details out, careful about UX".
   - a cached page could break start-up;
   - version tags are now checked by a test.
   - live points did not open cards once a district was selected, because the centres' canvas
-    covered the live canvas; all point layers now share one canvas (`01f4e3d`).
+    covered the live canvas (`01f4e3d`). That was not enough: the selected district's filled
+    shape also covered the canvas, so live points are now SVG in the live pane, above the district
+    shapes, and clicks on empty space still reach the district.
 
 #### BUILT: the live pilot covers Nonthaburi (ADR-0057, 4 October 2026)
 
