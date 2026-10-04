@@ -26,7 +26,7 @@ from core.flood_evidence.config import DATA, pilot_config
 from core.flood_evidence.geo import inside_outline
 
 OVERPASS = "https://overpass-api.de/api/interpreter"
-CHUNK = 10  # districts per request
+CHUNK = 3  # districts per request; larger groups timed out (HTTP 504) on 4 October 2026
 USER_AGENT = "GRP-flood-pilot-capture/0.1 (ADPC SERVIR pilot)"
 AMENITIES = ("school", "hospital", "clinic")
 
@@ -48,16 +48,16 @@ def capture(pilot_id: str, overpass: str = OVERPASS) -> Path:
     areas = pilot_areas(config)
     # One box per district: the districts need not touch, and one big box would fetch the gaps.
     # Asked in small groups, one after another: 56 boxes in one request timed out (HTTP 504).
-    wanted = "|".join(AMENITIES)
     elements: dict[tuple[str, int], dict] = {}
     queries = []
     stamp = None
     for start in range(0, len(areas), CHUNK):
+        # Exact tag matches, one per amenity: much faster for Overpass than a pattern match.
         boxes = "".join(
-            f'nwr["amenity"~"^({wanted})$"]({",".join(map(str, _bounds([a["outline"]])))});'
-            for a in areas[start:start + CHUNK]
+            f'nwr["amenity"="{amenity}"]({",".join(map(str, _bounds([a["outline"]])))});'
+            for a in areas[start:start + CHUNK] for amenity in AMENITIES
         )
-        query = f"[out:json][timeout:120];({boxes});out center tags;"
+        query = f"[out:json][timeout:90];({boxes});out center tags;"
         queries.append(query)
         request = urllib.request.Request(
             overpass,

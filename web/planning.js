@@ -1562,11 +1562,13 @@
       return { facilities: true, cameras: true };
     }
   };
+  const liveSub = (name) => $(`[data-live-sub="${name}"]`);
+  const liveSubOn = (name) => Boolean(liveSub(name) && liveSub(name).checked);
   const saveLivePrefs = () => {
     try {
       window.localStorage.setItem(LIVE_PREFS, JSON.stringify({
-        facilities: $('[data-live-sub="facilities"]').checked,
-        cameras: $('[data-live-sub="cameras"]').checked,
+        facilities: liveSubOn("facilities"),
+        cameras: liveSubOn("cameras"),
       }));
     } catch (_error) {
       // Not remembered in this browser; the switches still work.
@@ -2036,6 +2038,7 @@
   // The "Live now" list: every item reachable without precise clicking, and with a keyboard.
   const renderLiveList = () => {
     const list = $("[data-live-list]");
+    if (!list) return;
     list.replaceChildren();
     if (!livePayload || !livePayload.available) {
       list.hidden = true;
@@ -2074,8 +2077,8 @@
       colour: LIVE_COLOURS[incident.confidence],
       onClick: () => openIncident(incident.incident_id),
     })));
-    const showFacilities = $('[data-live-sub="facilities"]').checked;
-    const showCameras = $('[data-live-sub="cameras"]').checked;
+    const showFacilities = liveSubOn("facilities");
+    const showCameras = liveSubOn("cameras");
     if (showFacilities) {
       section(`Facilities near reported flooding (${(livePayload.facilities || []).length})`,
         (livePayload.facilities || []).map((f) => ({
@@ -2095,23 +2098,25 @@
 
   const renderLiveHeader = () => {
     const when = $("[data-live-when]");
+    if (!when) return;
     const minutes = minutesSince(livePayload && livePayload.snapshot_retrieved_at);
     when.textContent = livePayload && livePayload.available
       ? `as of ${bangkokClock(livePayload.snapshot_retrieved_at)}${minutes > LIVE_STALE_MINUTES ? ` (${ageText(minutes)} ago)` : ""}`
       : "";
     when.classList.toggle("is-stale", Boolean(minutes > LIVE_STALE_MINUTES));
-    $('[data-live-count="facilities"]').textContent = livePayload && livePayload.available
-      ? `(${(livePayload.facilities || []).length})` : "";
-    $('[data-live-count="cameras"]').textContent = livePayload && livePayload.available
-      ? `(${(livePayload.cameras || []).length})` : "";
+    const counts = { facilities: livePayload && livePayload.facilities, cameras: livePayload && livePayload.cameras };
+    Object.entries(counts).forEach(([name, items]) => {
+      const node = $(`[data-live-count="${name}"]`);
+      if (node) node.textContent = livePayload && livePayload.available ? `(${(items || []).length})` : "";
+    });
   };
 
   const applyLiveSublayers = () => {
     const on = $("[data-live-flood-toggle]").checked && livePayload && livePayload.available;
     document.querySelectorAll("[data-live-sub]").forEach((box) => { box.disabled = !$("[data-live-flood-toggle]").checked; });
     const show = (layer, wanted) => (on && wanted ? layer.addTo(map) : layer.remove());
-    show(liveFacilityLayer, $('[data-live-sub="facilities"]').checked);
-    show(liveCameraLayer, $('[data-live-sub="cameras"]').checked);
+    show(liveFacilityLayer, liveSubOn("facilities"));
+    show(liveCameraLayer, liveSubOn("cameras"));
     renderLiveList();
   };
 
@@ -2157,6 +2162,7 @@
     // ADR-0057: the pilot's districts (Bangkok and Nonthaburi), from the map layers response.
     const inBangkok = Boolean(boundary
       && (state.liveAreas || []).includes(String(boundary.admin_code || "").slice(0, 4)));
+    if (!$("[data-live-flood]") || !$("[data-live-flood-toggle]")) return;
     $("[data-live-flood]").hidden = !inBangkok;
     const on = inBangkok && $("[data-live-flood-toggle]").checked;
     if (!on) {
@@ -2181,10 +2187,10 @@
 
   (() => {
     const prefs = readLivePrefs();
-    $('[data-live-sub="facilities"]').checked = prefs.facilities;
-    $('[data-live-sub="cameras"]').checked = prefs.cameras;
+    if (liveSub("facilities")) liveSub("facilities").checked = prefs.facilities;
+    if (liveSub("cameras")) liveSub("cameras").checked = prefs.cameras;
   })();
-  $("[data-live-flood-toggle]").addEventListener("change", syncLiveFlood);
+  $("[data-live-flood-toggle]")?.addEventListener("change", syncLiveFlood);
   document.querySelectorAll("[data-live-sub]").forEach((box) => box.addEventListener("change", () => {
     saveLivePrefs();
     applyLiveSublayers();
