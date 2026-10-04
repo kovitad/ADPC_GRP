@@ -73,7 +73,7 @@
     span.textContent = text;
     return span;
   };
-  const FACILITY_LETTER = { hospital: "H", clinic: "C", school: "S" };
+  const FACILITY_LETTER = { hospital: "H", clinic: "C", school: "S", evacuation_centre: "E" };
   const facilityName = (a) => (PilotText.lang() === "en" && a.name_en) || a.name || a.name_en
     || say("fac.unnamed", { type: say(`fac.type.${a.asset_type}`) });
   const cameraName = (c) => c.name[PilotText.lang()] || c.name.en;

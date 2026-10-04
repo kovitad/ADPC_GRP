@@ -2,9 +2,9 @@
 
 ## Status
 
-Steps 1-3 accepted and built on 4 October 2026 at the Product Owner's request ("go ahead with
-step 1/2/3"). The owner decided D7 (rain may appear, labelled as context) and D8 (the fixed
-no-warnings wording) on 4 October 2026. Step 4 is planned in
+Steps 1-4 accepted and built on 4 October 2026 at the Product Owner's request ("go ahead with
+step 1/2/3/4"). The owner decided D7 (rain may appear, labelled as context) and D8 (the fixed
+no-warnings wording) on 4 October 2026. The plan is
 [`docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`](../pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md).
 Decision D2 (officer checks for Planners) is still open.
 
@@ -59,7 +59,20 @@ Decision D2 (officer checks for Planners) is still open.
      district.
    - Known limit: incidents in the "check first" list keep the pilot's order, which ranks
      incidents an officer saw as dry first. The check itself is not shown.
-4. **Rules for the later steps** (from the plan):
+4. **DDPM evacuation centres in the facility check** (step 4).
+   - `core/flood_evidence/ddpm_shelters.py` adds the current platform-baseline shelter version
+     (`evacuation_centers`, `is_current`, no Hub) for the demo districts. They are read from the
+     database at check time and never copied into the repository (ADR-0022).
+   - They are typed `evacuation_centre`, with IDs `ddpm:<feature id>` and a source naming the
+     data library version.
+   - `pilot_assets` (OSM plus DDPM) replaces the OSM-only registry in exposure, the briefing,
+     facility reviews and the archive.
+   - The same rules apply (ADR-0040): "flooding reported nearby", never "flooded", and access is
+     never assumed. Answers label a shelter's source as DDPM.
+   - 8 centres on 4 October 2026, in districts 1003 (3), 1022, 1023, 1028, 1035 and 1044, which
+     makes 1,075 facilities in all. A centre is "not assessed" until the next roads snapshot
+     after deployment.
+5. **Rules for the later steps** (from the plan):
    - live data never enters a stored assessment or its receipt;
    - the map layer is "Reported flooding on roads (live, not a flood map)";
    - a sub-district shows its parent district's live facts, and says so;

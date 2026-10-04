@@ -29,8 +29,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from core.flood_evidence.assets import asset_registry
 from core.flood_evidence.config import PilotConfig
+from core.flood_evidence.ddpm_shelters import pilot_assets
 from core.flood_evidence.geo import district_codes
 from core.flood_evidence.ingest import utc
 from core.flood_evidence.models import (
@@ -174,7 +174,7 @@ def _exposure_changes(session: Session, config: PilotConfig, start: datetime,
                       end: datetime) -> list[dict]:
     """Facility rows only where the state changed from the facility's previous row."""
 
-    assets = {a.asset_id: a for a in asset_registry(config.base_id)[0]}
+    assets = {a.asset_id: a for a in pilot_assets(session, config)[0]}
     previous: dict[str, tuple] = {}
     before = session.execute(
         select(FloodAssetExposure).where(
@@ -269,7 +269,7 @@ def build_day(session: Session, config: PilotConfig, day: date, salt: bytes) -> 
         ).order_by(FloodWeather.observed_base_time, FloodWeather.scope_kind,
                    FloodWeather.scope_id)
     )
-    _, asset_source = asset_registry(config.base_id)
+    _, asset_source = pilot_assets(session, config)
     return {
         "road_state": road_state,
         "road_geometry": road_geometry,

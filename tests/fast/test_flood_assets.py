@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-import core.flood_evidence.exposure as exposure_module
+import core.flood_evidence.ddpm_shelters as shelters_module
 from core.db import Base
 from core.flood_evidence.assets import (
     ACCESS_UNDER_REVIEW,
@@ -138,7 +138,7 @@ def test_the_worker_stores_exposure_with_each_snapshot(session, tmp_path, monkey
                    and f["properties"]["hw"] != "zone")
     lon, lat = flooded["geometry"]["coordinates"][0][0]
     registry = parse_assets({"assets": [_asset(lat=lat, lon=lon), _asset("osm:node/2", 13.95)]})
-    monkeypatch.setattr(exposure_module, "asset_registry", lambda _pilot: (registry, {}))
+    monkeypatch.setattr(shelters_module, "asset_registry", lambda _pilot: (registry, {}))
     at = datetime.fromtimestamp(flooded["properties"]["updated"] / 1000, UTC)
     source = CONFIG.source("floodboard_roads")
     assert latest_exposure(session, CONFIG, at)["snapshot_retrieved_at"] is None

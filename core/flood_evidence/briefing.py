@@ -21,7 +21,6 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from core.flood_evidence.assets import asset_registry
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.geo import inside_outline
@@ -199,7 +198,9 @@ def get_situation_changes(
 
     before = _exposure_at(session, config, effective)
     after = _exposure_at(session, config, now)
-    assets = {a.asset_id: a for a in asset_registry(config.base_id)[0]
+    from core.flood_evidence.ddpm_shelters import pilot_assets
+
+    assets = {a.asset_id: a for a in pilot_assets(session, config)[0]
               if codes is None or a.district_code in codes}
 
     def exposed(rows: dict[str, Any], asset_id: str) -> bool:
@@ -352,7 +353,8 @@ def build_facts(
             "flooding_reported_within_m": asset["nearest_distance_m"],
             "exposure": asset["exposure_state"],
             "access": asset["access_state"],
-            "source": "OpenStreetMap",
+            "source": "DDPM evacuation centre (GRP data library)"
+            if asset["asset_type"] == "evacuation_centre" else "OpenStreetMap",
             "newly_near_flooding": asset["asset_id"] in changes["facilities"].get(
                 "newly_near_flooding", []),
         })
@@ -387,7 +389,8 @@ def build_facts(
                           "population", "road network (access cannot be confirmed by GRP)",
                           "river forecast (River Watch is separate and is not street flooding)"],
         "road_verdicts_are": "Floodboard's estimate, not a BMA rule",
-        "facilities_are": "OpenStreetMap, not an official list",
+        "facilities_are": "schools, hospitals and clinics from OpenStreetMap (not an official "
+                          "list), plus DDPM evacuation centres from the GRP data library",
         "confidence_is": "a pilot rule with reasons, not a probability",
         **({"replay": True, "simulated_time_bangkok": _clock(now.isoformat()),
             "replay_uses": "today's facility list, cameras and rules, not those of the time"}

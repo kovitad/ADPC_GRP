@@ -19,7 +19,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.access_models import AppUser
-from core.flood_evidence.assets import asset_registry
 from core.flood_evidence.cameras import VIEWER_MODES, camera_registry
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.ingest import utc
@@ -105,7 +104,9 @@ def review_facility(
 ) -> FloodReview:
     if action not in FACILITY_ACTIONS:
         raise ReviewRejected("unknown_action", "Unknown access action")
-    assets, _ = asset_registry(config.base_id)
+    from core.flood_evidence.ddpm_shelters import pilot_assets
+
+    assets, _ = pilot_assets(session, config)
     if not any(a.asset_id == asset_id for a in assets):
         raise LookupError(asset_id)
     if action == "withdraw":

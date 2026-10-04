@@ -26,6 +26,8 @@ from core.flood_evidence.freshness import counts_as_current
 from core.flood_evidence.geo import point_to_geometry_m
 
 ASSET_TYPES = ("hospital", "clinic", "school")
+# DDPM shelters come from the GRP data library, not the OSM file (ADR-0056, step 4).
+EVACUATION_CENTRE = "evacuation_centre"
 POTENTIALLY_EXPOSED = "potentially_exposed"
 NO_REPORT_NEARBY = "no_report_nearby"
 ACCESS_UNDER_REVIEW = "access_under_review"
