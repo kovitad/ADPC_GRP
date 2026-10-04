@@ -208,7 +208,7 @@ Facts that shape the roadmap:
   - a separate partner channel.
 - **Limits:** crowd reports are never a payout trigger, and no report states a loss.
 
-**W7. Live flood evidence in the Planner, Bangkok** (planned; nothing outside the code blocks
+**W7. Live flood evidence in the Planner, Bangkok** (step 1 built 4 October, `5f18f81`: incidents store `district_codes` in the worker; steps 2-5 planned; nothing outside the code blocks
 it, so do it before W2 submission)
 - **Plan:** `docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`.
 - **Steps:**
