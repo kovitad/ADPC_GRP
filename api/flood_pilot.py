@@ -35,7 +35,7 @@ from core.flood_evidence.answer import (
     gate,
     instructions_for,
 )
-from core.flood_evidence.areas import pilot_areas
+from core.flood_evidence.areas import pilot_areas, pilot_subdistricts
 from core.flood_evidence.briefing import build_facts, get_situation_changes
 from core.flood_evidence.camera_relay import PROVIDER as RELAY_PROVIDER
 from core.flood_evidence.camera_relay import (
@@ -307,7 +307,11 @@ def read_reports(
 )
 def read_areas(config: FloodPilot) -> dict[str, Any]:
     areas = pilot_areas(config)
-    return {"areas": sorted(areas, key=lambda a: a["name"])}
+    subdistricts = pilot_subdistricts(config)
+    return {
+        "areas": sorted(areas, key=lambda a: a["name"]),
+        "subdistricts": sorted(subdistricts, key=lambda a: (a["parent_code"], a["name"])),
+    }
 
 
 @router.get(

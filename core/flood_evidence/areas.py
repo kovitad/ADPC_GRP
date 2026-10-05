@@ -1,8 +1,9 @@
 """The flood pilot's districts and their outlines (ADR-0057).
 
 The pilot began in Bangkok, whose outlines live in the River Watch file. Since 4 October 2026 it
-also covers Nonthaburi. ``core/data/flood_pilot_<id>_areas.json`` holds every pilot district's
-outline. It is captured once from the GRP boundary table (``python -m grpcli.flood_pilot areas``),
+also covers Nonthaburi. ``core/data/flood_pilot_<id>_areas.json`` holds every pilot district and
+sub-district outline. It is captured once from the GRP boundary table
+(``python -m grpcli.flood_pilot areas``),
 like the Bangkok file before it, so neither the worker nor a web request reads boundaries on the
 fly. Without the file, the Bangkok outlines are used, which keeps old setups working.
 """
@@ -44,6 +45,28 @@ def pilot_areas(config: PilotConfig) -> list[dict[str, Any]]:
 
     codes = set(config.demo_corridor.get("areas") or [])
     return [a for a in all_areas(config.base_id) if a["admin_code"] in codes]
+
+
+@lru_cache
+def _captured_subdistricts(base_id: str) -> tuple[dict[str, Any], ...]:
+    path = DATA / f"flood_pilot_{base_id}_areas.json"
+    if not path.exists():
+        return ()
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return tuple(raw.get("subdistricts") or ())
+
+
+def all_subdistricts(base_id: str = "bangkok") -> list[dict[str, Any]]:
+    """Every captured sub-district; old captures safely return none."""
+
+    return [dict(area) for area in _captured_subdistricts(base_id)]
+
+
+def pilot_subdistricts(config: PilotConfig) -> list[dict[str, Any]]:
+    """Captured sub-districts whose parent district is in the pilot."""
+
+    codes = set(config.demo_corridor.get("areas") or [])
+    return [a for a in all_subdistricts(config.base_id) if a["parent_code"] in codes]
 
 
 def in_pilot(config: PilotConfig, admin_code: str | None) -> bool:

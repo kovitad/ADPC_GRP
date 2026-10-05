@@ -96,8 +96,8 @@ def archive_now(pilot_id: str = "bangkok") -> None:
 
 
 def capture_areas(pilot_id: str = "bangkok") -> Path:
-    """Write every pilot district's outline from the GRP boundary table (ADR-0057). Run again after
-    the boundary edition or the pilot's area list changes."""
+    """Write pilot district and sub-district outlines from the GRP boundary table (ADR-0057).
+    Run again after the boundary edition or the pilot's area list changes."""
 
     from datetime import UTC
 
@@ -114,6 +114,12 @@ def capture_areas(pilot_id: str = "bangkok") -> Path:
             "from boundary where admin_level = 'district' and is_supported "
             "and admin_code = any(:codes) order by admin_code, edition desc"
         ), {"codes": codes}).all()
+        subdistrict_rows = session.execute(text(
+            "select distinct on (admin_code) admin_code, name, name_th, province_name, "
+            "province_name_th, edition, ST_AsGeoJSON(geom_simplified_postgis, 6) "
+            "from boundary where admin_level = 'subdistrict' and is_supported "
+            "and left(admin_code, 4) = any(:codes) order by admin_code, edition desc"
+        ), {"codes": codes}).all()
     found = {r[0] for r in rows}
     missing = [c for c in codes if c not in found]
     if missing:
@@ -122,14 +128,22 @@ def capture_areas(pilot_id: str = "bangkok") -> Path:
               "name_th": name_th, "province": (province or "").title(),
               "province_th": province_th, "outline": json.loads(geometry)}
              for code, name, name_th, province, province_th, _edition, geometry in rows]
+    subdistricts = [
+        {"admin_code": code, "parent_code": code[:4],
+         "name": name.title() if name.isupper() else name, "name_th": name_th,
+         "province": (province or "").title(), "province_th": province_th,
+         "outline": json.loads(geometry)}
+        for code, name, name_th, province, province_th, _edition, geometry in subdistrict_rows
+    ]
     payload = {
         "_source": {
-            "table": "GRP boundary (supported districts, simplified geometry)",
-            "editions": sorted({r[5] for r in rows}),
+            "table": "GRP boundary (supported districts and sub-districts, simplified geometry)",
+            "editions": sorted({r[5] for r in [*rows, *subdistrict_rows]}),
             "captured_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "areas": codes,
         },
         "areas": areas,
+        "subdistricts": subdistricts,
     }
     out = DATA / f"flood_pilot_{pilot_id}_areas.json"
     out.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",

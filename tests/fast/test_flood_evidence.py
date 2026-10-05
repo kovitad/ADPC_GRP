@@ -316,7 +316,7 @@ def test_unknown_pilot_has_no_config() -> None:
 
 
 def test_demo_area_is_bangkok_and_nonthaburi_and_rain_stays_on_four() -> None:
-    from core.flood_evidence.areas import pilot_areas
+    from core.flood_evidence.areas import pilot_areas, pilot_subdistricts
     from core.river_watch import bangkok_outlines
 
     names = {a["admin_code"]: a["name"] for a in bangkok_outlines()}
@@ -326,6 +326,11 @@ def test_demo_area_is_bangkok_and_nonthaburi_and_rain_stays_on_four() -> None:
     captured = {a["admin_code"]: a for a in pilot_areas(CONFIG)}
     assert sorted(captured) == sorted(CONFIG.demo_corridor["areas"])
     assert captured["1204"]["name"] == "Bang Bua Thong" and captured["1204"]["outline"]
+    subdistricts = pilot_subdistricts(CONFIG)
+    assert len(subdistricts) == 232
+    assert all(a["parent_code"] in CONFIG.demo_corridor["areas"] for a in subdistricts)
+    assert {a["parent_code"] for a in subdistricts} == set(CONFIG.demo_corridor["areas"])
+    assert all(a["outline"]["type"] in {"Polygon", "MultiPolygon"} for a in subdistricts)
     assert [names[code] for code in CONFIG.rain_areas] == [
         "Bang Sue", "Chatuchak", "Bang Kapi", "Lat Krabang"
     ]

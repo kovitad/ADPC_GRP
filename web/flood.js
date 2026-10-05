@@ -23,7 +23,8 @@
   const OLD = "#8a959b";
   const OPACITY = { current: 0.95, recent: 0.9, aging: 0.7, stale: 0.45, expired: 0.55, future: 0.5 };
   const state = {
-    config: null, areas: [], area: "corridor", vehicle: "sedan", all: false,
+    config: null, areas: [], subdistricts: [], area: "corridor", subdistrict: null,
+    vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
     assets: null, facility: null, incidents: null, incident: null, allIncidents: false,
     canWrite: false, changes: null, window: 60, weather: null,
@@ -124,8 +125,10 @@
   const setUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete("area");
+    url.searchParams.delete("subdistrict");
     url.searchParams.delete("road");
     if (state.area !== "corridor") url.searchParams.set("area", state.area);
+    if (state.subdistrict) url.searchParams.set("subdistrict", state.subdistrict);
     if (state.selected) url.searchParams.set("road", state.selected.properties.id);
     url.searchParams.delete("facility");
     url.searchParams.delete("incident");
@@ -137,6 +140,7 @@
   // "all", one district code, or "corridor": the owner's demo corridor from the pilot config.
   const corridorCodes = () => (state.config && state.config.demo_corridor ? state.config.demo_corridor.areas || [] : []);
   const currentAreas = () => {
+    if (state.subdistrict) return state.subdistricts.filter((a) => a.admin_code === state.subdistrict);
     if (state.area === "corridor") return state.areas.filter((a) => corridorCodes().includes(a.admin_code));
     return state.areas.filter((a) => a.admin_code === state.area);
   };
@@ -151,7 +155,8 @@
     (a) => inArea({ type: "Point", coordinates: [a.lon, a.lat] }),
   ) : []);
   const visibleIncidents = () => (state.incidents ? state.incidents.incidents.filter(
-    (i) => inArea({ type: "Point", coordinates: i.center }),
+    (i) => state.subdistrict ? (i.subdistrict_codes || []).includes(state.subdistrict)
+      : inArea({ type: "Point", coordinates: i.center }),
   ) : []);
   const incidentName = (incident) => {
     const names = [];
@@ -1397,6 +1402,27 @@
     }
   };
 
+  const nameOf = (a) => (PilotText.lang() === "th" ? a.name_th : a.name) || a.name;
+
+  const fillSubdistricts = () => {
+    const field = $("[data-subdistrict-field]");
+    const select = $("[data-subdistrict]");
+    const choices = state.subdistricts.filter((a) => a.parent_code === state.area)
+      .sort((a, b) => nameOf(a).localeCompare(nameOf(b), PilotText.locale()));
+    field.hidden = !choices.length;
+    select.replaceChildren();
+    const whole = el("option", "", say("fl.subdistrict.all"));
+    whole.value = "";
+    select.append(whole);
+    choices.forEach((a) => {
+      const option = el("option", "", nameOf(a));
+      option.value = a.admin_code;
+      select.append(option);
+    });
+    if (!choices.some((a) => a.admin_code === state.subdistrict)) state.subdistrict = null;
+    select.value = state.subdistrict || "";
+  };
+
   const fillAreas = () => {
     const select = $("[data-area]");
     select.replaceChildren();
@@ -1409,7 +1435,6 @@
       option.value = "corridor";
       select.append(option);
     }
-    const nameOf = (a) => (PilotText.lang() === "th" ? a.name_th : a.name);
     [...state.areas]
       .sort((a, b) => nameOf(a).localeCompare(nameOf(b), PilotText.locale()))
       .forEach((a) => {
@@ -1418,6 +1443,7 @@
         select.append(option);
       });
     select.value = state.area;
+    fillSubdistricts();
   };
 
   $("[data-ch-window]").addEventListener("change", (event) => {
@@ -1426,7 +1452,16 @@
   });
   $("[data-area]").addEventListener("change", (event) => {
     state.area = event.target.value;
+    state.subdistrict = null;
+    fillSubdistricts();
     loadChanges();
+    state.selected = null;
+    setUrl();
+    $("[data-evidence]").replaceChildren(el("p", "fl-evidence__empty", say("ev.empty")));
+    drawAll();
+  });
+  $("[data-subdistrict]").addEventListener("change", (event) => {
+    state.subdistrict = event.target.value || null;
     state.selected = null;
     setUrl();
     $("[data-evidence]").replaceChildren(el("p", "fl-evidence__empty", say("ev.empty")));
@@ -1643,9 +1678,15 @@
       state.config = config;
       state.cameras = cameras;
       state.areas = areas.areas;
+      state.subdistricts = areas.subdistricts || [];
       const asked = params.get("area");
+      const askedSubdistrict = params.get("subdistrict");
       if (asked === "all" || state.areas.some((a) => a.admin_code === asked)) state.area = asked;
       if (state.area === "corridor" && !corridorCodes().length) state.area = "all";
+      if (state.subdistricts.some((a) => a.admin_code === askedSubdistrict)) {
+        state.subdistrict = askedSubdistrict;
+        state.area = state.subdistricts.find((a) => a.admin_code === askedSubdistrict).parent_code;
+      }
       fillAreas();
       if (REPLAY) {
         await startReplay();
