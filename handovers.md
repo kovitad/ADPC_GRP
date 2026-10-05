@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "5 October (later, latest)", then "5 October" and "4 October (evening)", then "4 October (morning): roadmap input for the dev team".**
+**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "5 October (evening, latest)", then "5 October (later)", then "5 October" and "4 October (evening)", then "4 October (morning): roadmap input for the dev team".**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,27 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-4 October 2026)
 
-### 5 October (later, latest): menu, live-feed contributions, air quality (ADR-0061)
+### 5 October (evening, latest): Planner map icon system (ADR-0062)
+
+- **What:** the owner's icon pack (`docs/enhancement/GRP_Map_Icon_UX_Pack_v1.0`) on the Planner
+  map:
+  - shape is the feature, colour is the source, and a ring and badge are the assessment status;
+  - every live point is a keyboard-focusable pin with a tooltip and an accessible name;
+  - one shared cluster group shows the dominant or a neutral symbol, and points on one spot
+    spread out (spiderfy);
+  - legend rows are grouped, with the map's symbol, a short name, the source, the count and an
+    "i" button for source, date and limits;
+  - the status legend uses the same symbols.
+- **Kept:** the owner's 25 September "N/A" wording instead of "Unable to assess".
+- **Not yet:**
+  - the flood pilot page markers;
+  - symbols for volunteer centres and early-warning resources;
+  - a signed-in check.
+- **Also running:** the PM2.5 test address (`scripts/feed-test-address.ps1`), started for the
+  owner's Global Risk test. Close it and run `.\scripts\docker-desktop.ps1` to switch the public
+  routes off afterwards.
+
+### 5 October (later): menu, live-feed contributions, air quality (ADR-0061)
 
 - **Global Risk test.** The flood districts feed was submitted through a temporary tunnel with
   the owner's yes. The deployment **auto-approves**, so it went live for everyone and cannot be

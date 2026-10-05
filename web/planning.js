@@ -136,6 +136,111 @@
   let floodOverlay = null;
   let floodPicture = null;
 
+
+  // ---------- map symbols (docs/enhancement/GRP_Map_Icon_UX_Pack_v1.0, ADR-0062) ----------
+  // Shape says what a point is, colour says where it comes from, and a separate ring and badge
+  // say its assessment status. Colour is never the only clue: every marker has its own glyph, a
+  // tooltip and an accessible name.
+  const ICON_BASE = "/assets/map-icons/";
+  const STATUS_SYMBOL = {
+    potentially_exposed: { icon: "status-exposed.svg", css: "status-exposed", label: "Potentially exposed" },
+    not_exposed_under_scenario: { icon: "status-not-exposed.svg", css: "status-not-exposed", label: "Not exposed under the selected scenario" },
+    unable_to_assess: { icon: "status-unable.svg", css: "status-unable", label: "N/A — no data" },
+  };
+  const iconImg = (file, className) => {
+    const img = document.createElement("img");
+    img.src = ICON_BASE + file;
+    img.alt = "";
+    img.className = className;
+    img.draggable = false;
+    return img;
+  };
+  // A pin (or a square for line-like features) with an optional status ring and badge.
+  const pinIcon = (file, { status = null, muted = false, near = false, picture = false } = {}) => {
+    const box = document.createElement("span");
+    const statusSymbol = STATUS_SYMBOL[status];
+    box.className = ["grp-pin", statusSymbol ? statusSymbol.css : "", muted ? "is-muted" : "",
+      near ? "is-near-flood" : "", picture ? "has-picture" : ""].filter(Boolean).join(" ");
+    box.append(iconImg(file, "grp-pin__icon"));
+    if (statusSymbol) box.append(iconImg(statusSymbol.icon, "grp-pin__badge"));
+    return window.L.divIcon({
+      html: box, className: "grp-map-marker", iconSize: [34, 40], iconAnchor: [17, 40],
+      tooltipAnchor: [0, -38],
+    });
+  };
+  const grpMarker = (latlng, file, options = {}) => {
+    const marker = window.L.marker(latlng, {
+      icon: pinIcon(file, options), keyboard: true, riseOnHover: true,
+    });
+    marker.grpSymbol = file;
+    return marker;
+  };
+  // One cluster group for all live points. A cluster shows its count and the dominant symbol
+  // (three quarters or more of its points); a mixed cluster shows a neutral symbol. At high zoom
+  // points stand alone, and points on the same spot spread out (spiderfy) when clicked.
+  const DOMINANT_SHARE = 0.75;
+  const clusterIcon = (cluster) => {
+    const children = cluster.getAllChildMarkers();
+    const tally = {};
+    children.forEach((marker) => { tally[marker.grpSymbol] = (tally[marker.grpSymbol] || 0) + 1; });
+    const [top, topCount] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0] || [null, 0];
+    const dominant = top && topCount / children.length >= DOMINANT_SHARE ? top : null;
+    const box = document.createElement("span");
+    box.className = `grp-cluster${dominant ? "" : " is-mixed"}`;
+    box.setAttribute("role", "img");
+    const names = [...new Set(children.map((m) => m.grpKind))].join(", ");
+    box.setAttribute("aria-label", `${children.length} points: ${names}`);
+    if (dominant) {
+      box.append(iconImg(dominant, "grp-cluster__icon"));
+    } else {
+      const mixed = document.createElement("span");
+      mixed.className = "grp-cluster__mixed";
+      mixed.setAttribute("aria-hidden", "true");
+      box.append(mixed);
+    }
+    const count = document.createElement("b");
+    count.textContent = children.length.toLocaleString("en-GB");
+    box.append(count);
+    return window.L.divIcon({ html: box, className: "grp-map-marker grp-map-cluster", iconSize: [46, 46] });
+  };
+  const liveCluster = window.L.markerClusterGroup
+    ? window.L.markerClusterGroup({
+      maxClusterRadius: 48, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false, chunkedLoading: true, iconCreateFunction: clusterIcon,
+    })
+    : window.L.layerGroup();
+  // A switch's points, shown through the shared cluster group. It answers the same calls the
+  // switch code makes of a Leaflet layer: addTo, remove and eachLayer.
+  const clusteredLayer = () => {
+    const markers = [];
+    return {
+      markers,
+      addLayer(marker) { markers.push(marker); return this; },
+      addTo(target) {
+        if (!target.hasLayer(liveCluster)) liveCluster.addTo(target);
+        if (liveCluster.addLayers) liveCluster.addLayers(markers);
+        else markers.forEach((marker) => liveCluster.addLayer(marker));
+        return this;
+      },
+      remove() {
+        if (liveCluster.removeLayers) liveCluster.removeLayers(markers);
+        else markers.forEach((marker) => liveCluster.removeLayer(marker));
+        return this;
+      },
+      eachLayer(fn) { markers.forEach(fn); },
+    };
+  };
+  const timeText = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", {
+    timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  }) : null);
+  const tooltipText = (...parts) => parts.filter(Boolean).join(" · ");
+  let selectedMarker = null;
+  const selectMarker = (layer) => {
+    selectedMarker?.getElement()?.classList.remove("is-selected");
+    selectedMarker = layer && layer.getElement ? layer : null;
+    selectedMarker?.getElement()?.classList.add("is-selected");
+  };
+
   // ---------- the map dock: Layers, Details and Run in one panel ----------
   // docs/pilot/2026-10-04_Planner_Map_Panels_UX_Design.md: nothing floats on the map except a
   // hover name. Every card opens in the Details tab, one at a time, and the dock folds away.
@@ -204,6 +309,7 @@
     const current = detailsCurrent;
     detailsCurrent = null;
     selectionRing.remove();
+    selectMarker(null);
     detailsNav.replaceChildren();
     detailsBody.replaceChildren();
     detailsTab.disabled = true;
@@ -243,13 +349,19 @@
   // A layer whose click opens a card in Details. Points stacked on one spot get a pick list.
   const openItem = (layer, { back = null, latlng = null } = {}) => {
     const item = layer.grpItem;
+    const isMarker = layer instanceof window.L.Marker;
     showDetails({
       node: item.build(),
-      latlng: latlng || (layer.getLatLng ? layer.getLatLng() : null),
+      // A marker shows its own selected state; the ring is for roads and spiderfied points.
+      latlng: isMarker ? null : (latlng || (layer.getLatLng ? layer.getLatLng() : null)),
       onOpen: item.onOpen,
       onClose: item.onClose,
       back,
     });
+    if (isMarker) {
+      selectMarker(layer);
+      keepClearOfDock(layer.getLatLng());
+    }
   };
 
   const showPickList = (layers, latlng) => {
@@ -298,9 +410,21 @@
 
   const bindDetails = (layer, item) => {
     layer.grpItem = item;
+    layer.grpKind = item.kind;
     layer.on("click", (event) => onItemClick(event, layer));
-    if (item.label && canHover()) {
-      layer.bindTooltip(item.label, { direction: "top", offset: [0, -6], className: "pw-hover-name" });
+    const text = item.tooltip || item.label;
+    // Markers get a tooltip on hover and on keyboard focus; lines on hover only.
+    if (text && (canHover() || layer instanceof window.L.Marker)) {
+      layer.bindTooltip(text, { direction: "top", offset: [0, -6], className: "pw-hover-name" });
+    }
+    if (layer instanceof window.L.Marker) {
+      layer.on("add", () => {
+        const element = layer.getElement();
+        if (!element) return;
+        element.setAttribute("role", "button");
+        element.setAttribute("aria-label", text || item.kind);
+        if (selectedMarker === layer) element.classList.add("is-selected");
+      });
     }
     return layer;
   };
@@ -1492,17 +1616,14 @@
     centerMarkers.clear();
     centers.forEach((center) => {
       const assessed = center.status !== "not_assessed";
-      const marker = window.L.circleMarker([center.lat, center.lon], {
-        pane: "grpPoints",
-        radius: assessed ? 8 : 5,
-        color: assessed ? "#fff" : "#374151",
-        weight: assessed ? 2 : 1,
-        fillColor: assessed ? STATUS_COLOR[center.status] : "#fff",
-        fillOpacity: 0.95,
+      const marker = grpMarker([center.lat, center.lon], "evacuation-center.svg", {
+        status: center.status,
       });
       bindDetails(marker, {
         kind: "Evacuation centre",
         label: center.name,
+        tooltip: tooltipText("Evacuation centre", center.name,
+          assessed ? (STATUS_SYMBOL[center.status] || { label: center.status }).label : "Not assessed yet"),
         colour: assessed ? STATUS_COLOR[center.status] : "#374151",
         build: () => plainCard(popup(center.name, statusDetail(center))),
         onOpen: () => activateCenter(center.feature_id, { moveMap: false, open: false }),
@@ -1569,16 +1690,17 @@
     collection.features.forEach((feature) => {
       const [lon, lat] = feature.geometry.coordinates;
       const properties = feature.properties;
-      bindDetails(window.L.circleMarker([lat, lon], {
-        pane: "grpPoints",
-        radius: source.role === "village_locations" ? 3 : 5,
-        color: "#fff",
-        weight: 1,
-        fillColor: supportingColour(source.role),
-        fillOpacity: 0.9,
-      }), {
+      const point = source.role === "village_locations"
+        ? grpMarker([lat, lon], "village.svg")
+        : window.L.circleMarker([lat, lon], {
+          pane: "grpPoints", radius: 5, color: "#fff", weight: 1,
+          fillColor: supportingColour(source.role), fillOpacity: 0.9,
+        });
+      bindDetails(point, {
         kind: source.title || "Point",
         label: properties.name,
+        tooltip: tooltipText(source.role === "village_locations" ? "Village" : source.title,
+          properties.name, source.title),
         colour: supportingColour(source.role),
         build: () => plainCard(popup(properties.name, [source.title_th || source.title])),
       }).addTo(group);
@@ -1789,22 +1911,43 @@
     clinic: { label: "Clinic", colour: "#9333ea" },
     school: { label: "School", colour: "#2563eb" },
   };
-  // Switch key -> label, the source it loads from, and its swatch.
+  // Switch key -> short label, data source, legend group, symbol and information-panel text
+  // (ADR-0062). Labels stay short; who provides it, how and its limits go in the "i" panel.
+  const LIVE_GROUPS = [
+    ["obs", "Flood observations"],
+    ["fac", "Facilities and communities"],
+    ["cam", "Cameras"],
+    ["bnd", "Boundaries"],
+  ];
   const LIVE_SWITCHES = [
-    { key: "roads", label: "Roads with flooding reported (Floodboard)", source: "roads", swatch: "line", colour: "#ea580c" },
-    { key: "rep_traffy", label: "Reports: Traffy Fondue", source: "reports", colour: "#0891b2" },
-    { key: "rep_crowd", label: "Reports: public, via Floodboard", source: "reports", colour: "#db2777" },
-    { key: "rep_bma", label: "Reports: BMA sensors", source: "reports", colour: "#1d4ed8" },
-    { key: "rep_longdo", label: "Reports: Longdo, iTIC, Highways", source: "reports", colour: "#65a30d" },
-    { key: "rep_other", label: "Reports: news and clusters (not counted)", source: "reports", colour: "#9ca3af" },
-    { key: "fac_osm", label: "Schools, hospitals and clinics (OSM)", source: "facilities", colour: "#2563eb" },
-    { key: "fac_ddpm", label: "DDPM evacuation centres", source: "facilities", colour: "#0f766e" },
-    { key: "cam_traffic", label: "Cameras: BMA Traffic", source: "cameras", colour: "#111827" },
-    { key: "cam_bma", label: "Cameras: BMA flood cameras (via BMA's relay)", source: "cameras", colour: "#4b5563" },
-    { key: "cam_longdo", label: "Cameras: iTIC and Longdo", source: "cameras", colour: "#374151" },
-    { key: "cam_pakkret", label: "Cameras: Pak Kret municipality", source: "cameras", colour: "#1f2937" },
-    { key: "cam_other", label: "Cameras: others", source: "cameras", colour: "#6b7280" },
-    { key: "outline", label: "District outlines", source: "outlines", swatch: "outline", colour: "#334155" },
+    { key: "roads", group: "obs", label: "Roads with flooding reported", provider: "Floodboard", source: "roads", swatch: "line", colour: "#E85D04", icon: "roads-flooded.svg",
+      info: "Road segments Floodboard rates as flooded, grouped into incidents by GRP. Colour on the map is the incident's confidence. Floodboard (floodboard.org), CC BY 4.0." },
+    { key: "rep_traffy", group: "obs", label: "Traffy Fondue reports", provider: "Traffy Fondue, via Floodboard", source: "reports", colour: "#078EA8", icon: "report-traffy.svg",
+      info: "Citizen reports filed through Traffy Fondue and relayed by Floodboard. Text and names are not kept. One report is not independent confirmation." },
+    { key: "rep_crowd", group: "obs", label: "Public flood reports", provider: "Floodboard", source: "reports", colour: "#D62976", icon: "report-public.svg",
+      info: "Reports from the public on Floodboard. Text and names are not kept." },
+    { key: "rep_bma", group: "obs", label: "BMA sensors", provider: "BMA, via Floodboard", source: "reports", colour: "#2563D9", icon: "sensor-bma.svg",
+      info: "BMA water-level sensor readings relayed by Floodboard. A reading of 0 cm is evidence of no water at that point." },
+    { key: "rep_longdo", group: "obs", label: "Agency reports", provider: "Longdo, iTIC, Dept. of Highways", source: "reports", colour: "#4F9400", icon: "report-agency.svg",
+      info: "Events from Longdo Traffic: Department of Highways, iTIC staff and Longdo users. Their numbers are not used in the Global Risk feed." },
+    { key: "rep_other", group: "obs", label: "News and clusters", provider: "Not counted in assessment", source: "reports", colour: "#8A96A3", icon: "report-news.svg", muted: true,
+      info: "News items and clustered context. Shown for context only and not counted as evidence in any incident or assessment." },
+    { key: "fac_osm", group: "fac", label: "Schools, hospitals and clinics", provider: "OpenStreetMap", source: "facilities", colour: "#1D67D2", icon: "critical-facility.svg",
+      info: "Schools, hospitals and clinics from OpenStreetMap (ODbL). An orange halo means flooding is reported on a road nearby, not that the building is flooded; access is not confirmed." },
+    { key: "fac_ddpm", group: "fac", label: "Evacuation centres", provider: "DDPM", source: "facilities", colour: "#087E78", icon: "evacuation-center.svg",
+      info: "DDPM evacuation centres from the GRP data library. Records whose location does not match their district, and synthetic records, are left out." },
+    { key: "cam_traffic", group: "cam", label: "BMA Traffic cameras", provider: "bmatraffic.com", source: "cameras", colour: "#172331", icon: "traffic-camera.svg",
+      info: "BMA traffic cameras. A green dot means GRP can show a live picture; pictures refresh only while a card is open. An empty road in a picture is not proof that it is dry." },
+    { key: "cam_bma", group: "cam", label: "BMA flood cameras", provider: "BMA flood site", source: "cameras", colour: "#4E5D6C", icon: "flood-camera.svg",
+      info: "BMA flood-monitoring cameras. Pictures come through BMA's own relay and open on the official viewer." },
+    { key: "cam_longdo", group: "cam", label: "iTIC and Longdo cameras", provider: "iTIC, Longdo", source: "cameras", colour: "#172331", icon: "traffic-camera.svg",
+      info: "Traffic cameras listed by iTIC and Longdo. Pictures open on the official viewer." },
+    { key: "cam_pakkret", group: "cam", label: "Pak Kret cameras", provider: "Pak Kret municipality", source: "cameras", colour: "#172331", icon: "traffic-camera.svg",
+      info: "Pak Kret municipality's public CCTV. Pictures are shown on screen only and never put in reports until the municipality replies." },
+    { key: "cam_other", group: "cam", label: "Other cameras", provider: "Various", source: "cameras", colour: "#172331", icon: "traffic-camera.svg",
+      info: "Other listed cameras." },
+    { key: "outline", group: "bnd", label: "District outlines", provider: "GRP boundaries", source: "outlines", swatch: "outline", colour: "#28415E", icon: "district-boundary.svg",
+      info: "District outlines of the pilot area (Bangkok and Nonthaburi, 56 districts)." },
   ];
   const LIVE_STALE_MINUTES = 120;
   const LIVE_CAMERA_RADIUS_M = 400;
@@ -1821,7 +1964,6 @@
   // every click over the whole map, and the filled district shapes covered any canvas below
   // them, so camera points could not be clicked. An SVG surface passes clicks on empty space
   // through to the district underneath.
-  const liveRenderer = window.L.svg({ pane: "grpLiveFlood", padding: 0.4 });
 
   const bangkokClock = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-GB", {
     timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit",
@@ -2186,52 +2328,54 @@
       return group;
     }
     if (spec.source === "reports") {
-      const group = window.L.layerGroup();
+      const group = clusteredLayer();
       liveData.reports.reports.features.filter((f) => f.properties.group === key).forEach((f) => {
         const [lon, lat] = f.geometry.coordinates;
-        const marker = window.L.circleMarker([lat, lon], {
-          renderer: liveRenderer, radius: 4, color: "#fff", weight: 1, fillColor: spec.colour,
-          fillOpacity: f.properties.cleared ? 0.35 : 0.9,
+        const p = f.properties;
+        const marker = grpMarker([lat, lon], spec.icon, { muted: spec.muted || p.cleared });
+        bindDetails(marker, {
+          kind: spec.label.replace(/s$/, ""), label: p.underlying_source || spec.label,
+          colour: spec.colour, build: () => reportCard(p),
+          tooltip: tooltipText(spec.label.replace(/s$/, ""), p.cleared ? "says cleared" : null,
+            spec.provider, timeText(p.observed_at), spec.muted ? "Not counted in assessment" : null),
         });
-        bindDetails(marker, { kind: "Report", label: f.properties.underlying_source || spec.label,
-          colour: spec.colour, build: () => reportCard(f.properties) });
-        marker.addTo(group);
+        group.addLayer(marker);
       });
       return group;
     }
     if (spec.source === "facilities") {
-      const group = window.L.layerGroup();
+      const group = clusteredLayer();
       const wanted = key === "fac_ddpm"
         ? (f) => f.asset_type === "evacuation_centre"
         : (f) => f.asset_type !== "evacuation_centre";
+      const glyph = { school: "school.svg", hospital: "hospital.svg", clinic: "hospital.svg",
+        evacuation_centre: "evacuation-center.svg" };
       liveData.facilities.facilities.filter(wanted).forEach((f) => {
         const exposed = f.exposure_state === "potentially_exposed";
-        const kind = LIVE_FACILITY[f.asset_type] || { colour: "#6b7280" };
-        const marker = window.L.circleMarker([f.lat, f.lon], {
-          renderer: liveRenderer,
-          radius: exposed ? 7 : (f.asset_type === "evacuation_centre" ? 5 : 3.5),
-          color: exposed ? "#f97316" : "#fff", weight: exposed ? 3 : 1,
-          fillColor: kind.colour, fillOpacity: 0.9,
-        });
+        const kind = LIVE_FACILITY[f.asset_type] || { label: "Facility", colour: "#6b7280" };
+        const marker = grpMarker([f.lat, f.lon], glyph[f.asset_type] || spec.icon, { near: exposed });
         marker.liveIncidentIds = f.incident_ids;
-        bindDetails(marker, { kind: (LIVE_FACILITY[f.asset_type] || { label: "Facility" }).label,
-          label: f.name || "Unnamed", colour: kind.colour, build: () => facilityCard(f) });
-        marker.addTo(group);
+        bindDetails(marker, {
+          kind: kind.label, label: f.name || "Unnamed", colour: kind.colour,
+          build: () => facilityCard(f),
+          tooltip: tooltipText(kind.label, f.name || "unnamed", f.source,
+            exposed ? `flooding reported ${f.nearest_distance_m ?? "nearby"}${f.nearest_distance_m != null ? " m away" : ""}` : "no flooding reported nearby"),
+        });
+        group.addLayer(marker);
       });
       return group;
     }
     if (spec.source === "cameras") {
-      const group = window.L.layerGroup();
+      const group = clusteredLayer();
       liveData.cameras.cameras.filter((c) => c.group === key).forEach((c) => {
-        const marker = window.L.circleMarker([c.lat, c.lon], {
-          renderer: liveRenderer, radius: 4, color: c.picture_url ? "#10b981" : "#fff",
-          weight: c.picture_url ? 2 : 1, fillColor: spec.colour, fillOpacity: 0.9,
-        });
+        const marker = grpMarker([c.lat, c.lon], spec.icon, { picture: Boolean(c.picture_url) });
         marker.liveCameraId = c.camera_id;
         let open = null;
         bindDetails(marker, {
           kind: "Camera",
           label: localName(c.name) || "Camera",
+          tooltip: tooltipText(spec.label.replace(/s$/, ""), localName(c.name) || "unnamed", spec.provider,
+            c.picture_url ? "live picture in GRP" : "official viewer"),
           colour: spec.colour,
           build: () => {
             if (open && open.picture) open.picture.stop();
@@ -2241,7 +2385,7 @@
           onOpen: () => open && open.picture && open.picture.start(),
           onClose: () => open && open.picture && open.picture.stop(),
         });
-        marker.addTo(group);
+        group.addLayer(marker);
       });
       return group;
     }
@@ -2311,12 +2455,10 @@
     });
     const nearIds = new Set(incidentId ? camerasNear(incidentId).map((c) => c.camera.camera_id) : []);
     ["fac_osm", "fac_ddpm"].forEach((key) => liveLayers[key]?.eachLayer((marker) => {
-      marker.setStyle({ opacity: !incidentId || marker.liveIncidentIds.includes(incidentId) ? 1 : 0.2,
-        fillOpacity: !incidentId || marker.liveIncidentIds.includes(incidentId) ? 0.9 : 0.15 });
+      marker.setOpacity(!incidentId || marker.liveIncidentIds.includes(incidentId) ? 1 : 0.25);
     }));
     LIVE_SWITCHES.filter((s) => s.source === "cameras").forEach((s) => liveLayers[s.key]?.eachLayer((marker) => {
-      marker.setStyle({ opacity: !incidentId || nearIds.has(marker.liveCameraId) ? 1 : 0.2,
-        fillOpacity: !incidentId || nearIds.has(marker.liveCameraId) ? 0.9 : 0.15 });
+      marker.setOpacity(!incidentId || nearIds.has(marker.liveCameraId) ? 1 : 0.25);
     }));
   };
 
@@ -2412,50 +2554,96 @@
     holder.append(button);
   };
 
+  // The "i" button: who provides a layer, how fresh it is, and what it cannot tell you.
+  const showLayerInfo = (spec, count) => {
+    showDetails({ node: liveCard({
+      title: spec.label,
+      badge: { text: spec.provider, colour: spec.colour },
+      meaning: spec.info,
+      facts: [
+        ["Records", count.toLocaleString("en-GB")],
+        ...(spec.source === "outlines" ? [] : [["Data", liveAsOf()]]),
+      ],
+      notThis: spec.muted ? "Not counted in any assessment" : "Reported information, not a flood map or a warning",
+      source: spec.provider,
+      stale: liveStaleLine(),
+    }) });
+  };
+
+  // Legend rows grouped as the map icon pack asks: checkbox, the map's own symbol (or a line
+  // sample for roads and outlines), a short name with its source below, the count, and "i".
   const renderLiveSwitches = () => {
     const box = $("[data-live-switches]");
     if (!box) return;
     box.replaceChildren();
     const counts = (liveSummary && liveSummary.counts) || {};
-    LIVE_SWITCHES.forEach((spec) => {
-      const count = counts[spec.key] || 0;
-      if (spec.key === "cam_other" && !count) return;
-      const label = document.createElement("label");
-      label.className = "pw-toggle pw-live-switch";
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.dataset.liveSwitch = spec.key;
-      input.checked = liveOn.has(spec.key);
-      input.addEventListener("change", () => setLiveSwitch(spec.key, input.checked));
-      const swatch = document.createElement("i");
-      swatch.className = `pw-live-swatch pw-live-swatch--${spec.swatch || "dot"}`;
-      swatch.style.setProperty("--c", spec.colour);
-      const text = document.createElement("span");
-      text.textContent = spec.label;
-      const number = document.createElement("span");
-      number.className = "pw-live-switch__count";
-      number.textContent = count.toLocaleString("en-GB");
-      label.append(input, swatch, text, number);
-      box.append(label);
-      if (spec.key === "roads") {
-        const legend = document.createElement("div");
-        legend.className = "pw-legend pw-live-roadlegend";
-        [["conflicting", "Conflicting"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]].forEach(([k, t]) => {
-          const item = document.createElement("span");
-          const line = document.createElement("i");
-          line.className = "pw-line";
-          line.style.setProperty("--c", LIVE_COLOURS[k]);
-          item.append(line, document.createTextNode(`${t} confidence`));
-          legend.append(item);
-        });
-        const old = document.createElement("span");
-        const oldLine = document.createElement("i");
-        oldLine.className = "pw-line pw-line--dashed";
-        oldLine.style.setProperty("--c", "#9ca3af");
-        old.append(oldLine, document.createTextNode("Older or cleared report"));
-        legend.append(old);
-        box.append(legend);
-      }
+    LIVE_GROUPS.forEach(([group, heading]) => {
+      const specs = LIVE_SWITCHES.filter((spec) => spec.group === group
+        && !(spec.key === "cam_other" && !counts[spec.key]));
+      if (!specs.length) return;
+      const title = document.createElement("div");
+      title.className = "pw-live-group__title";
+      title.textContent = heading;
+      box.append(title);
+      specs.forEach((spec) => {
+        const count = counts[spec.key] || 0;
+        const row = document.createElement("div");
+        row.className = `pw-live-row${spec.muted ? " is-muted" : ""}`;
+        const label = document.createElement("label");
+        label.className = "pw-live-switch";
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.dataset.liveSwitch = spec.key;
+        input.checked = liveOn.has(spec.key);
+        input.addEventListener("change", () => setLiveSwitch(spec.key, input.checked));
+        let symbol;
+        if (spec.swatch) {
+          symbol = document.createElement("i");
+          symbol.className = `pw-live-sample pw-live-sample--${spec.swatch}`;
+          symbol.style.setProperty("--c", spec.colour);
+        } else {
+          symbol = iconImg(spec.icon, "pw-live-symbol");
+        }
+        symbol.setAttribute("aria-hidden", "true");
+        const text = document.createElement("span");
+        text.className = "pw-live-switch__text";
+        const name = document.createElement("span");
+        name.textContent = spec.label;
+        const provider = document.createElement("small");
+        provider.textContent = spec.provider;
+        text.append(name, provider);
+        const number = document.createElement("span");
+        number.className = "pw-live-switch__count";
+        number.textContent = count.toLocaleString("en-GB");
+        label.append(input, symbol, text, number);
+        const info = document.createElement("button");
+        info.type = "button";
+        info.className = "pw-live-info";
+        info.textContent = "i";
+        info.setAttribute("aria-label", `About ${spec.label}: source, date and limits`);
+        info.addEventListener("click", () => showLayerInfo(spec, count));
+        row.append(label, info);
+        box.append(row);
+        if (spec.key === "roads") {
+          const legend = document.createElement("div");
+          legend.className = "pw-legend pw-live-roadlegend";
+          [["conflicting", "Conflicting"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]].forEach(([k, t]) => {
+            const item = document.createElement("span");
+            const line = document.createElement("i");
+            line.className = "pw-line";
+            line.style.setProperty("--c", LIVE_COLOURS[k]);
+            item.append(line, document.createTextNode(`${t} confidence`));
+            legend.append(item);
+          });
+          const old = document.createElement("span");
+          const oldLine = document.createElement("i");
+          oldLine.className = "pw-line pw-line--dashed";
+          oldLine.style.setProperty("--c", "#9ca3af");
+          old.append(oldLine, document.createTextNode("Older or cleared report"));
+          legend.append(old);
+          box.append(legend);
+        }
+      });
     });
   };
 

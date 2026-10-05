@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 56" role="img" aria-label="Evacuation center">
+  <title>Evacuation center</title>
+  <defs><filter id="s" x="-30%" y="-20%" width="160%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#172331" flood-opacity=".30"/></filter></defs>
+  <path filter="url(#s)" d="M24 2C12.4 2 4 10.6 4 22.2 4 37 24 54 24 54s20-17 20-31.8C44 10.6 35.6 2 24 2Z" fill="#087E78" stroke="#FFFFFF" stroke-width="3"/>
+  <g color="#FFFFFF" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m10 26 14-12 14 12M14 24v15h20V24"/><circle cx="22" cy="28" r="2.5"/><path d="M22 31v6M18 34h8M31 31h7M35 27l4 4-4 4"/></g>
+</svg>

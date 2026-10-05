@@ -1556,3 +1556,63 @@ a.pw-chip-button { display: inline-block; }
   .pw-map .pw-place-chip, .pw-map:has(.pw-dock__panel:not([hidden])) .pw-place-chip { left: 50%; max-width: calc(100% - 24px); }
   .pw-map:has(.pw-dock__panel:not([hidden])) .pw-place-chip { display: none; }
 }
+
+/* ---------- map symbols (GRP Map Icon UX Pack v1.0, ADR-0062) ---------- */
+/* Shape = feature type, colour = source, ring + badge = assessment status. */
+.grp-map-marker { background: none; border: 0; }
+.grp-pin { position: relative; display: block; width: 34px; height: 40px; transition: transform 0.12s ease-out; transform-origin: 50% 100%; }
+.grp-pin__icon { display: block; width: 34px; height: 40px; pointer-events: none; }
+.grp-pin__badge { position: absolute; right: -6px; top: -4px; width: 17px; height: 17px; pointer-events: none; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 30%)); }
+/* Status rings sit around the pin head and stay readable in grayscale (solid, solid, dashed). */
+.grp-pin.status-exposed::before,
+.grp-pin.status-not-exposed::before,
+.grp-pin.status-unable::before { content: ""; position: absolute; left: -3px; top: -3px; width: 40px; height: 40px; border-radius: 50%; box-sizing: border-box; pointer-events: none; }
+.grp-pin.status-exposed::before { border: 3px solid #C43D36; }
+.grp-pin.status-not-exposed::before { border: 3px solid #2E7D32; }
+.grp-pin.status-unable::before { border: 3px dashed #7D8894; }
+/* Live context, not assessment: flooding reported nearby, a live picture available, muted reports. */
+.grp-pin.is-near-flood::after { content: ""; position: absolute; left: -4px; top: -4px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 0 3px #f97316, 0 0 0 6px rgb(249 115 22 / 25%); pointer-events: none; }
+.grp-pin.has-picture::after { content: ""; position: absolute; right: -2px; top: -2px; width: 11px; height: 11px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 2px #fff; pointer-events: none; }
+.grp-pin.is-muted { opacity: 0.55; filter: saturate(0.4); }
+/* Hover, keyboard focus and the selected point. */
+.leaflet-marker-icon.grp-map-marker:hover .grp-pin { transform: scale(1.1); }
+.leaflet-marker-icon.grp-map-marker:focus-visible { outline: none; }
+.leaflet-marker-icon.grp-map-marker:focus-visible .grp-pin { transform: scale(1.15); filter: drop-shadow(0 0 0 #2563eb) drop-shadow(0 0 3px #2563eb); }
+.leaflet-marker-icon.grp-map-marker.is-selected { z-index: 10000 !important; }
+.leaflet-marker-icon.grp-map-marker.is-selected .grp-pin { transform: scale(1.24); filter: drop-shadow(0 0 0 #2563eb) drop-shadow(0 0 4px #2563eb) drop-shadow(0 0 8px rgb(37 99 235 / 55%)); }
+/* Clusters: the layer's own symbol and the count. */
+.grp-cluster { position: relative; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 0 3px rgb(255 255 255 / 70%), 0 2px 8px rgb(16 40 36 / 35%); }
+.grp-cluster__icon { width: 26px; height: 30px; }
+.grp-cluster b { position: absolute; right: -6px; bottom: -4px; min-width: 20px; padding: 1px 5px; border-radius: 999px; background: #172331; color: #ffffff; font: 700 11px/16px system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px #fff; }
+.marker-cluster-anim .leaflet-marker-icon, .marker-cluster-anim .leaflet-marker-shadow { transition: transform 0.25s ease-out, opacity 0.25s ease-in; }
+
+/* Legend rows: checkbox, symbol or line sample, name and source, count, information button. */
+.pw-live-group__title { margin: 0.55rem 0 0.15rem; color: #52645f; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.pw-live-group__title:first-child { margin-top: 0.1rem; }
+.pw-live-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.3rem; }
+.pw-live-row.is-muted .pw-live-switch__text span { color: #6b7672; }
+.pw-live-switch { display: grid; grid-template-columns: auto 30px 1fr auto; align-items: center; gap: 0.45rem; padding: 0.15rem 0; font-weight: 500; font-size: 0.78rem; cursor: pointer; }
+.pw-live-symbol { width: 26px; height: 30px; justify-self: center; }
+.pw-live-sample { justify-self: center; display: inline-block; }
+.pw-live-sample--line { width: 26px; height: 0; border-top: 5px solid var(--c); border-radius: 3px; }
+.pw-live-sample--outline { width: 22px; height: 16px; border: 2px dashed var(--c); border-radius: 3px; }
+.pw-live-switch__text { display: grid; line-height: 1.2; min-width: 0; }
+.pw-live-switch__text small { color: #6b7672; font-size: 0.68rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pw-live-switch__count { color: #52645f; font-variant-numeric: tabular-nums; font-size: 0.76rem; }
+.pw-live-info { width: 22px; height: 22px; border: 1px solid #c7d2de; border-radius: 50%; background: #ffffff; color: #1f4e79; font: italic 700 0.72rem/1 Georgia, serif; cursor: pointer; }
+.pw-live-info:hover, .pw-live-info:focus-visible { background: #eef5fa; outline: 2px solid #2563eb; outline-offset: 1px; }
+.pw-live-roadlegend { margin: 0 0 0.25rem 3.6rem; }
+
+/* Assessment status legend: the same symbol and ring as on the map. */
+.pw-status-legend { gap: 0.35rem; }
+.pw-status-legend__title { color: #52645f; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.pw-status-legend > span:not(.pw-status-legend__title) { display: flex; align-items: center; gap: 0.6rem; }
+.grp-pin--legend { width: 26px; height: 30px; flex: none; transform: none; margin: 4px 4px 0 2px; }
+.grp-pin--legend .grp-pin__icon { width: 26px; height: 30px; }
+.grp-pin--legend .grp-pin__badge { width: 13px; height: 13px; right: -5px; top: -3px; }
+.grp-pin--legend.status-exposed::before, .grp-pin--legend.status-not-exposed::before, .grp-pin--legend.status-unable::before { width: 32px; height: 32px; left: -3px; top: -3px; }
+.grp-cluster.is-mixed { background: #f3f6f8; }
+.grp-cluster__mixed { position: relative; width: 24px; height: 24px; }
+.grp-cluster__mixed::before, .grp-cluster__mixed::after { content: ""; position: absolute; left: 2px; width: 20px; height: 9px; border: 2.5px solid #4E5D6C; border-radius: 3px; background: #fff; transform: skewX(-12deg); }
+.grp-cluster__mixed::before { top: 3px; }
+.grp-cluster__mixed::after { top: 11px; }
