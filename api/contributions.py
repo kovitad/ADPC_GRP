@@ -35,6 +35,7 @@ from api.settings import get_settings, planning_chat_available
 from api.sig_connection import sig_access_token
 from api.sig_evidence import tool_payload
 from api.sig_jobs import app_session
+from core import public_reads
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.contribution_models import (
     APPROVED,
@@ -50,7 +51,7 @@ from core.contribution_models import (
 )
 from core.contribution_rules import NAME_FIELD, check_manifest, check_point_file
 from core.feed_check import check_feed
-from core.live_feeds import platform_feeds
+from core.live_feeds import FEEDS, platform_feeds
 
 logger = logging.getLogger("grp.contributions")
 router = APIRouter(prefix="/contributions", tags=["contributions"])
@@ -472,6 +473,23 @@ async def create_contribution(
         if taken is not None:
             duplicate = {**taken, "field": name_key, "message": _name_taken_message(taken)}
             problems[name_key] = "Already sent to Global Risk. Contributions cannot be updated."
+    feed_test = None
+    if kind == "feed" and not problems:
+        # Global Risk fetches the feed itself and refuses a dead address or an empty list: test it
+        # now, on preview and again on send, so neither reaches Global Risk.
+        fetch = checked.manifest.get("fetch") or {}
+        feed_test = await asyncio.to_thread(
+            check_feed, fetch.get("url"), fetch.get("records_path"), fetch.get("fields") or {},
+            fetch.get("as_of_field"),
+        )
+        if not feed_test["ok"]:
+            problems["url"] = f"Global Risk could not use this feed: {feed_test['problem']}"
+        else:
+            checked.notes.append(
+                f"Tested now: Global Risk would read {feed_test['count']} records and return the "
+                f"last {feed_test['returned_by_default']} by default ({feed_test['order']})."
+            )
+            checked.notes.extend(feed_test.get("notes") or [])
     if payload.preview or problems:
         return {
             "sent": False,
@@ -558,13 +576,22 @@ def _on_global_risk_view(record: dict[str, Any], sent_here: dict[str, SigContrib
     summary="GRP's own live feeds a Hub can share with Global Risk, or why not yet",
     openapi_extra={"x-grp-access": "protected"},
 )
-def list_platform_feeds(principal: SignedInMember, hub_code: str | None = None) -> dict:
+def list_platform_feeds(
+    principal: SignedInMember, session: DatabaseSession, hub_code: str | None = None
+) -> dict:
     _available()
-    planner_membership(principal, hub_code)
+    hub = planner_membership(principal, hub_code)
     settings = get_settings()
-    return {"feeds": platform_feeds(settings.grp_public_feed_base_url,
-                                    {"flood_feed_public": settings.flood_feed_public,
-                                     "air_quality_feed_public": settings.air_quality_feed_public})}
+    sent = {}
+    for feed in FEEDS:
+        taken = taken_name(session, "feed", feed.dataset, hub.hub_id)
+        if taken is not None:
+            sent[feed.dataset] = {"source": taken["source"], "state": taken.get("state"),
+                                  "contribution_id": taken.get("contribution_id")}
+    switches = {"flood_feed_public": settings.flood_feed_public,
+                "air_quality_feed_public": settings.air_quality_feed_public}
+    return {"reads_since": public_reads.STARTED, "feeds": platform_feeds(
+        settings.grp_public_feed_base_url, switches, public_reads.snapshot(), sent)}
 
 
 @router.post(

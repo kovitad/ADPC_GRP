@@ -54,7 +54,7 @@ TAKEN_STATES = frozenset({SUBMITTING, CHECKING, STAGED, APPROVED})
 # Kinds whose name is a layer or dataset that is never overwritten. Weights are left out on
 # purpose: submitting weights again for the same hazard is Global Risk's documented way to adjust
 # them. Documents are archived by title and may share one.
-NAMESPACES = {"vector": "layer", "raster": "layer", "table": "dataset"}
+NAMESPACES = {"vector": "layer", "raster": "layer", "table": "dataset", "feed": "dataset"}
 # Evidence older than this may describe a layer Global Risk has since removed.
 SEEN_WINDOW = timedelta(days=30)
 # At most this many layers can be chosen for one Planning question.

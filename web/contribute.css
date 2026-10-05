@@ -109,3 +109,5 @@
 .cb-feed-result dd { margin: 0; font-weight: 600; }
 .cb-feed-result p { margin: 0; }
 .cb-feed-result pre { max-height: 260px; overflow: auto; padding: 0.6rem; border-radius: 8px; background: #ffffff; font-size: 0.74rem; }
+.cb-feed__sent { color: #1f4e79 !important; font-weight: 600; }
+.cb-feed__read { color: #6b7672 !important; font-size: 0.76rem !important; }

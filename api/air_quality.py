@@ -19,6 +19,7 @@ from api.errors import GrpError, not_found
 from api.permissions import SignedInMember
 from api.rate_limits import limiter
 from api.settings import get_settings
+from core import public_reads
 from core.air_quality import AirQualityUnavailable, build_feed, fetch_latest
 from core.flood_evidence.feed import serialise
 
@@ -73,4 +74,5 @@ async def read_public_air_quality(request: Request) -> Response:
         raise not_found()
     caller = request.client.host if request.client else "unknown"
     limiter.check("public_air_quality_per_caller_per_minute", caller, 30, 60)
+    public_reads.record("air_quality:sea")
     return _response(await _feed_or_error(), request, "public, max-age=300")

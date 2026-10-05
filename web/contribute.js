@@ -256,6 +256,20 @@
       const summary = document.createElement("p");
       summary.textContent = feed.summary;
       card.append(title, name, summary);
+      if (feed.sent) {
+        const sent = document.createElement("p");
+        sent.className = "cb-feed__sent";
+        sent.textContent = feed.sent.source === "this_hub"
+          ? `Already sent by this Hub${feed.sent.state ? ` (${(STATUS[feed.sent.state] || [feed.sent.state])[0]})` : ""}. Global Risk keeps names for good, so it cannot be sent again.`
+          : "This name was already sent to Global Risk by GRP. It cannot be sent again.";
+        card.append(sent);
+      }
+      const read = document.createElement("p");
+      read.className = "cb-feed__read";
+      read.textContent = feed.last_read
+        ? `Read from outside ${feed.last_read.count} time${feed.last_read.count === 1 ? "" : "s"}, last at ${GRP.formatTime(feed.last_read.last)}.`
+        : `Not read from outside since GRP started${state.readsSince ? ` (${GRP.formatTime(state.readsSince)})` : ""}.`;
+      card.append(read);
       if (feed.reason) {
         const why = document.createElement("p");
         why.className = "cb-feed__reason";
@@ -265,7 +279,7 @@
       const use = document.createElement("button");
       use.type = "button";
       use.className = "button button--secondary";
-      use.textContent = feed.available ? "Use this feed" : "Fill the form anyway";
+      use.textContent = feed.sent ? "Fill the form to compare" : feed.available ? "Use this feed" : "Fill the form anyway";
       use.addEventListener("click", () => {
         state.values = flattenFeed(feed.manifest);
         state.feedTab = "other";
@@ -284,6 +298,7 @@
     try {
       const result = await GRP.request(`/api/v1/contributions/platform-feeds?hub_code=${encodeURIComponent(state.hubCode)}`);
       state.platformFeeds = result.feeds || [];
+      state.readsSince = result.reads_since || null;
     } catch (error) {
       state.platformFeeds = [];
       showBanner(error.message, "bad");
@@ -441,7 +456,9 @@
       });
       $("[data-confirm]").hidden = true;
       state.checked = null;
-      showBanner("Sent. Global Risk is downloading and checking the file; this can take a few minutes. You can leave this page: the top bar will tell you when it lands.", "info");
+      showBanner(state.kind === "feed"
+        ? "Sent. Global Risk is fetching the feed once to check it; this usually takes under a minute. You can leave this page: the top bar will tell you when it lands."
+        : "Sent. Global Risk is downloading and checking the file; this can take a few minutes. You can leave this page: the top bar will tell you when it lands.", "info");
       await loadList();
     } catch (error) {
       showBanner(error.message, "bad");
@@ -566,7 +583,8 @@
         fix.textContent = "Fix and send again";
         fix.addEventListener("click", () => {
           state.kind = row.kind;
-          state.values = { ...row.manifest };
+          state.values = row.kind === "feed" ? flattenFeed(row.manifest || {}) : { ...row.manifest };
+          if (row.kind === "feed") state.feedTab = "other";
           document.querySelectorAll("[data-kinds] input").forEach((input) => {
             input.checked = input.value === row.kind;
           });
@@ -576,7 +594,16 @@
         });
         actions.append(fix);
       }
-      if (row.status === "approved" && row.kind !== "weights") {
+      if (row.status === "approved" && row.kind === "feed") {
+        const how = document.createElement("p");
+        how.className = "cb-item__how";
+        how.append("Ask Global Risk through its MCP tools: ");
+        const code = document.createElement("code");
+        code.textContent = `feeds_query("${row.name}")`;
+        how.append(code, ", or any risk question whose hazard the feed declares.");
+        item.append(how);
+      }
+      if (row.status === "approved" && !["weights", "feed"].includes(row.kind)) {
         const use = document.createElement("a");
         use.className = "button button--primary button--compact";
         use.href = `/planning.html?ask=${encodeURIComponent(tryQuestion(row))}`;

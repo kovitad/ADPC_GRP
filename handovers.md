@@ -146,6 +146,17 @@ RP20/RP50 rasters and methods exist.
     `/api/v1/public/aq/sea/feed.json` (404 unless `AIR_QUALITY_FEED_PUBLIC`);
   - on 5 October 2026, Global Risk's own reader returned Nonthaburi 94.7 and Bangkok 83.1 µg/m³
     as the worst.
+- **Live feed contributions finished:**
+  - a feed is tested the way Global Risk reads it, on preview and again on send, so a dead
+    address or an empty list never reaches Global Risk;
+  - feed names share the dataset namespace with tables;
+  - each "From this platform" card says whether GRP already sent it, and when its public route
+    was last read from outside (in memory, since the API started);
+  - "Fix and send again" works for feeds;
+  - an approved feed shows `feeds_query("<name>")`.
+
+  The districts feed sent through the MCP on 5 October is not in GRP's own records, so its card
+  will not say "already sent". Global Risk's gate still refuses the name.
 - **Next:**
   1. a permanent public host (Lightsail with a static IP), then share the flood districts and
      PM2.5 feeds from Share data;

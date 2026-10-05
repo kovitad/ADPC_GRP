@@ -26,6 +26,7 @@ from api.permissions import SignedInMember
 from api.rate_limits import limiter, rate_limited
 from api.sessions import CurrentPrincipal
 from api.settings import get_settings
+from core import public_reads
 from core.access_models import AuditEvent, AuditResult
 from core.flood_evidence.answer import (
     PROMPT_VERSION,
@@ -224,6 +225,7 @@ def read_public_flood_feed(pilot_id: str, session: DatabaseSession, request: Req
         raise not_found()
     caller = request.client.host if request.client else "unknown"
     limiter.check("public_flood_feed_per_caller_per_minute", caller, 30, 60)
+    public_reads.record(f"flood:{config.pilot_id}")
     return _feed_response(session, config, request, "public, max-age=60")
 
 

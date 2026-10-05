@@ -25,6 +25,7 @@ class PlatformFeed:
     label: str
     summary: str
     switch: str  # the setting that serves its public route
+    read_key: str  # core.public_reads key of its public route
     note: str | None = None
 
 
@@ -34,6 +35,7 @@ FEEDS = (
         "Bangkok and Nonthaburi flood by district",
         "All 56 districts, most concerning last; never empty. Share this one first.",
         "flood_feed_public",
+        "flood:bangkok",
     ),
     PlatformFeed(
         "bangkok_flood_incidents_live",
@@ -41,6 +43,7 @@ FEEDS = (
         "One record per open incident. Global Risk refuses an empty list, so send it on a day "
         "with flooding.",
         "flood_feed_public",
+        "flood:bangkok",
         note="empty_on_dry_days",
     ),
     PlatformFeed(
@@ -49,6 +52,7 @@ FEEDS = (
         "351 provinces in 11 countries at the latest 3-hour forecast step, worst last, with an "
         "indicative US EPA category. Republished from SERVIR-SEA's public feed.",
         "air_quality_feed_public",
+        "air_quality:sea",
     ),
 )
 
@@ -58,8 +62,14 @@ def _template(dataset: str) -> dict[str, Any]:
     return json.loads((MANIFESTS / f"{dataset}.json").read_text(encoding="utf-8"))
 
 
-def platform_feeds(public_base: str | None, switches: dict[str, bool]) -> list[dict[str, Any]]:
-    """Every shareable GRP feed, with its filled manifest or the reason it cannot be sent."""
+def platform_feeds(public_base: str | None, switches: dict[str, bool],
+                   reads: dict[str, dict] | None = None,
+                   sent: dict[str, dict] | None = None) -> list[dict[str, Any]]:
+    """Every shareable GRP feed, with its filled manifest or the reason it cannot be sent.
+
+    ``reads`` (from ``core.public_reads``) says when its public route was last read from outside;
+    ``sent`` says whether GRP already sent its name to Global Risk.
+    """
 
     base = (public_base or "").rstrip("/")
     out = []
@@ -80,5 +90,7 @@ def platform_feeds(public_base: str | None, switches: dict[str, bool]) -> list[d
             "dataset": feed.dataset, "label": feed.label, "summary": feed.summary,
             "note": feed.note, "available": reason is None, "reason": reason,
             "manifest": manifest,
+            "last_read": (reads or {}).get(feed.read_key),
+            "sent": (sent or {}).get(feed.dataset),
         })
     return out
