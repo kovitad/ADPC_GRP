@@ -190,12 +190,25 @@ RP20/RP50 rasters and methods exist.
    - the flood page pins;
    - the Assessments and Data preview maps.
 
+#### Search and selected area (added late on 5 October)
+
+- **Search a point of interest** (for example "Big C Wong Sawang"):
+  - the map flies to street level and drops a red, named pin;
+  - the district the point sits in is found from the district shapes and selected;
+  - a "Near …" card lists live items within 1 km, nearest first, with "Show live data here".
+- **The selected district or sub-district is now obvious:** a white-cased navy outline, the rest
+  of the map lightly dimmed, and its name in readable case.
+- **Search spelling is still OpenStreetMap's.** "big c wongsawang" finds nothing, while "Big C
+  Wong Sawang" or the Thai name works. Forgiving Thai search needs a **Longdo Map** key (the rain
+  key is refused for search).
+
 #### Next to build
 
-1. Symbols for volunteer centres and early-warning resources (none in the icon pack yet).
-2. An air-quality page, which turns on the Live ▾ entry. Then a Planner PM2.5 layer and a line in
+1. Longdo Map search on the server, once the owner has a Longdo Map key.
+2. Symbols for volunteer centres and early-warning resources (none in the icon pack yet).
+3. An air-quality page, which turns on the Live ▾ entry. Then a Planner PM2.5 layer and a line in
    the district summary.
-3. The earlier queue, still open:
+4. The earlier queue, still open:
    - retry the Nonthaburi OSM capture;
    - the camera check;
    - W3 DDPM reports.

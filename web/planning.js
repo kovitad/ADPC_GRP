@@ -125,6 +125,11 @@
   // Centres and supporting points sit above the district shapes, so a filled district never
   // swallows their clicks. SVG passes clicks on empty space through to the district.
   map.createPane("grpPoints").style.zIndex = "420";
+  // The selected area (search UX, 5 Oct 2026): a light mask outside it, and its outline on top.
+  map.createPane("grpSelectionMask").style.zIndex = "385";
+  map.getPane("grpSelectionMask").style.pointerEvents = "none";
+  map.createPane("grpSelectionLine").style.zIndex = "415";
+  map.getPane("grpSelectionLine").style.pointerEvents = "none";
   let sensitivityMask = null;
   const centerMarkers = new Map();
   let centerFilter = "all";
@@ -1087,6 +1092,28 @@
     if (detailsBody.contains(box)) box.replaceChildren(...parsed.body.childNodes);
   };
 
+  // The selected district or sub-district, made obvious: a white-cased navy outline, the rest of
+  // the map lightly dimmed (unless the sensitivity view already dims it), and its name.
+  let selectedAreaLayer = null;
+  // Boundary names arrive in capitals ("BANG SUE"); people read "Bang Sue".
+  const readableName = (name) => (name && name === name.toUpperCase()
+    ? name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_m, gap, letter) => gap + letter.toUpperCase())
+    : name || "");
+  const areaLabel = (boundary) => {
+    const level = boundary.admin_level === "subdistrict" ? "sub-district" : "district";
+    const parent = boundary.admin_level === "subdistrict" && state.parentDistrictName
+      ? `, ${readableName(state.parentDistrictName)}` : "";
+    return `${readableName(boundary.name)} ${level}${parent}`;
+  };
+  const showSelectedArea = (boundary) => {
+    selectedAreaLayer?.remove();
+    selectedAreaLayer = null;
+    if (!boundary || !boundary.geometry) return;
+    selectedAreaLayer = window.GRPMap.selectedArea(boundary.geometry, areaLabel(boundary), {
+      dim: !sensitivityShown(), panes: { mask: "grpSelectionMask", line: "grpSelectionLine" },
+    }).addTo(map);
+  };
+
   const selectBoundary = (
     boundary,
     { announce = false, explicit = announce, preserveAssessment = false } = {},
@@ -1742,6 +1769,8 @@
 
   const syncSensitivityView = () => {
     const shown = sensitivityShown();
+    // The selected-area mask steps aside when the sensitivity view does its own dimming.
+    if (state.selected) showSelectedArea(state.selected);
     $("[data-sensitivity-legend]").hidden = !shown;
     if (sensitivityMask) {
       sensitivityMask.remove();
@@ -2420,6 +2449,106 @@
     return rows;
   };
 
+  // The live layer follows a search: what is reported within 1 km of the searched place.
+  const NEARBY_M = 1000;
+  const NEARBY_SWITCHES = ["roads", "rep_traffy", "rep_crowd", "rep_bma", "fac_osm", "fac_ddpm", "cam_traffic", "cam_bma"];
+  const showNearby = (name, lat, lon) => {
+    const rows = [];
+    const away = (pLat, pLon) => Math.round(metres(lon, lat, pLon, pLat));
+    if (liveData.roads) {
+      const best = {};
+      liveData.roads.roads.features.forEach((f) => {
+        const id = f.properties.incident_id;
+        if (!id) return;
+        const coords = f.geometry.type === "MultiLineString" ? f.geometry.coordinates.flat() : f.geometry.coordinates;
+        const d = Math.min(...coords.map(([x, y]) => away(y, x)));
+        if (d <= NEARBY_M && (best[id] === undefined || d < best[id])) best[id] = d;
+      });
+      Object.entries(best).forEach(([id, d]) => {
+        const incident = incidentById(id);
+        if (!incident) return;
+        rows.push({ d, icon: "roads-flooded.svg", kind: "Flooded road",
+          label: `${(LIVE_CONFIDENCE[incident.confidence] || "").replace(" confidence", "")} confidence`,
+          open: (back) => openIncident(id, { back }) });
+      });
+    }
+    if (liveData.reports) {
+      liveData.reports.reports.features.forEach((f) => {
+        const [x, y] = f.geometry.coordinates;
+        const d = away(y, x);
+        const spec = LIVE_SWITCHES.find((s) => s.key === f.properties.group);
+        if (d <= NEARBY_M && spec) rows.push({ d, icon: spec.icon, kind: spec.label.replace(/s$/, ""), label: timeText(f.properties.observed_at) || "",
+          open: (back) => showDetails({ node: reportCard(f.properties), latlng: [y, x], back }) });
+      });
+    }
+    if (liveData.facilities) {
+      liveData.facilities.facilities.forEach((f) => {
+        const d = away(f.lat, f.lon);
+        const glyph = { school: "school.svg", hospital: "hospital.svg", clinic: "hospital.svg", evacuation_centre: "evacuation-center.svg" }[f.asset_type] || "critical-facility.svg";
+        if (d <= NEARBY_M) rows.push({ d, icon: glyph, kind: (LIVE_FACILITY[f.asset_type] || { label: "Facility" }).label, label: f.name || "unnamed",
+          open: (back) => showDetails({ node: facilityCard(f), latlng: [f.lat, f.lon], back }) });
+      });
+    }
+    if (liveData.cameras) {
+      liveData.cameras.cameras.forEach((c) => {
+        const d = away(c.lat, c.lon);
+        const spec = LIVE_SWITCHES.find((s) => s.key === c.group);
+        if (d <= NEARBY_M) rows.push({ d, icon: spec ? spec.icon : "traffic-camera.svg", kind: "Camera", label: localName(c.name) || "unnamed",
+          open: (back) => {
+            const open = cameraCard(c);
+            showDetails({ node: open.node, latlng: [c.lat, c.lon], back,
+              onOpen: () => open.picture && open.picture.start(), onClose: () => open.picture && open.picture.stop() });
+          } });
+      });
+    }
+    rows.sort((a, b) => a.d - b.d);
+    const box = document.createElement("div");
+    box.className = "pw-nearby";
+    const head = document.createElement("p");
+    head.className = "pw-nearby__head";
+    head.textContent = `Near ${name}`;
+    const note = document.createElement("p");
+    note.className = "pw-nearby__note";
+    const missing = NEARBY_SWITCHES.filter((key) => !liveOn.has(key));
+    note.textContent = rows.length
+      ? `${rows.length} live item${rows.length === 1 ? "" : "s"} within 1 km. Reported information, not a flood map.`
+      : "Nothing reported within 1 km in the live layers that are on. No report is not proof that it is dry.";
+    box.append(head, note);
+    if (missing.length && (state.liveAreas || []).length) {
+      const turnOn = document.createElement("button");
+      turnOn.type = "button";
+      turnOn.className = "pw-live-card__button";
+      turnOn.textContent = "Show live data here";
+      turnOn.addEventListener("click", async () => {
+        turnOn.disabled = true;
+        turnOn.textContent = "Loading live data…";
+        await Promise.all(missing.map((key) => setLiveSwitch(key, true)));
+        showNearby(name, lat, lon);
+      });
+      box.append(turnOn);
+    }
+    const back = { label: `Back to near ${name}`, onClick: () => showNearby(name, lat, lon) };
+    rows.slice(0, 12).forEach((row) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "pw-nearby__row";
+      const icon = iconImg(row.icon, "pw-nearby__icon");
+      const text = document.createElement("span");
+      const kind = document.createElement("small");
+      kind.textContent = row.kind;
+      const label = document.createElement("span");
+      label.textContent = row.label;
+      text.append(kind, label);
+      const dist = document.createElement("span");
+      dist.className = "pw-nearby__distance";
+      dist.textContent = `${row.d.toLocaleString("en-GB")} m`;
+      item.append(icon, text, dist);
+      item.addEventListener("click", () => row.open(back));
+      box.append(item);
+    });
+    showDetails({ node: box });
+  };
+
   // The "Live now" list opens in Details, reachable with a keyboard.
   const showLiveNow = () => {
     const rows = liveNowRows();
@@ -2609,6 +2738,8 @@
     state.areaLevel = nextLevel;
     state.boundaries = payload.boundaries;
     state.selected = null;
+    state.parentDistrictName = nextLevel === "subdistrict" && priorDistrict ? priorDistrict.name : null;
+    showSelectedArea(null);
     syncLiveFlood();
     // Nothing is selected at the new level, so the People tab must go back to its prompt rather
     // than keep the previous level's figures on screen (backlog U1).
@@ -5046,33 +5177,54 @@
     return matches.length === 1 ? matches[0] : null;
   };
 
+  // A shop, hospital, school or building, rather than an area: shown like a map app's result.
+  const ADMIN_TYPES = new Set(["administrative", "city", "town", "village", "suburb", "quarter",
+    "neighbourhood", "county", "state", "province", "district", "subdistrict", "hamlet", "postcode"]);
+  const isPointOfInterest = (place) => !currentPlaceIsArea(place);
+  const currentPlaceIsArea = (place) => ["boundary", "place"].includes(place.category)
+    && ADMIN_TYPES.has(place.type);
+  const boundaryContaining = (lat, lon) => state.boundaries.find((boundary) =>
+    window.GRPMap.contains(boundary.geometry, lat, lon)) || null;
+
   const pickPlace = (place, { currentLocation = false } = {}) => {
     placeLayer.clearLayers();
     const lat = Number(place.lat);
     const lon = Number(place.lon);
-    const shape = place.geojson && place.geojson.type !== "Point"
+    const poi = !currentLocation && isPointOfInterest(place);
+    const poiName = poi ? (place.name || place.display_name.split(",")[0]).trim() : null;
+    const shape = !poi && place.geojson && place.geojson.type !== "Point"
       ? window.L.geoJSON(place.geojson, { style: { color: "#2563eb", weight: 2, fillOpacity: 0.05, dashArray: "6 4" } })
       : null;
-    if (shape) {
+    // Select the district the place sits in first; selecting clears the place layer.
+    const name = externalPlaceName(place);
+    const localBoundary = boundaryContaining(lat, lon) || localBoundaryForPlace(name);
+    if (localBoundary) selectBoundary(localBoundary, { explicit: true });
+    if (poi) {
+      window.GRPMap.searchPin(lat, lon, poiName).addTo(placeLayer);
+      map.flyTo([lat, lon], 16, { duration: 0.6 });
+    } else if (shape) {
       shape.addTo(placeLayer);
       map.flyToBounds(shape.getBounds(), { padding: [60, 60], duration: 0.6 });
     } else {
       map.flyTo([lat, lon], 12, { duration: 0.6 });
     }
-    window.L.circleMarker([lat, lon], { radius: 6, color: "#2563eb", fillColor: "#2563eb", fillOpacity: 1 }).addTo(placeLayer);
-    const name = externalPlaceName(place);
-    state.currentPlace = name || null;
+    if (!poi) {
+      window.L.circleMarker([lat, lon], { radius: 6, color: "#2563eb", fillColor: "#2563eb", fillOpacity: 1 }).addTo(placeLayer);
+    }
+    const districtName = localBoundary ? readableName(localBoundary.name) : name;
+    state.currentPlace = name || (localBoundary ? localBoundary.name : null);
     const chip = $("[data-place-chip]");
     chip.replaceChildren();
-    if (!name) {
+    if (poi) showNearby(poiName, lat, lon);
+    if (!state.currentPlace) {
       chip.textContent = "This map location is for orientation only. Choose a Thailand district before requesting Global Risk evidence.";
       chip.hidden = false;
       return;
     }
-    const localBoundary = localBoundaryForPlace(name);
-    if (localBoundary) selectBoundary(localBoundary, { explicit: true });
     chip.append(document.createTextNode(
-      `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
+      poi
+        ? `${poiName} is in ${districtName}${localBoundary ? " district, now selected" : ""}. `
+        : `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
     ));
     if (storedSigAnswer(name)) {
       chip.append(chipButton("Show the Global Risk evidence I already have", () =>

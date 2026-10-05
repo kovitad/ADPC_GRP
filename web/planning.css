@@ -1582,3 +1582,15 @@ a.pw-chip-button { display: inline-block; }
 .grp-pin--legend .grp-pin__icon { width: 26px; height: 30px; }
 .grp-pin--legend .grp-pin__badge { width: 13px; height: 13px; right: -5px; top: -3px; }
 .grp-pin--legend.status-exposed::before, .grp-pin--legend.status-not-exposed::before, .grp-pin--legend.status-unable::before { width: 32px; height: 32px; left: -3px; top: -3px; }
+
+/* Near a searched place: the live items within 1 km, nearest first. */
+.pw-nearby { display: grid; gap: 0.35rem; }
+.pw-nearby__head { margin: 0; font-size: 0.98rem; font-weight: 700; color: #1f2937; }
+.pw-nearby__note { margin: 0 0 0.3rem; color: #4b5563; font-size: 0.8rem; }
+.pw-nearby > .pw-live-card__button { justify-self: start; margin-bottom: 0.3rem; }
+.pw-nearby__row { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 0.55rem; width: 100%; padding: 0.4rem 0.5rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font: inherit; text-align: left; cursor: pointer; }
+.pw-nearby__row:hover, .pw-nearby__row:focus-visible { background: #f3f7fb; border-color: #c7d2de; outline: none; }
+.pw-nearby__icon { width: 22px; height: 26px; }
+.pw-nearby__row small { display: block; color: #6b7280; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.pw-nearby__row span span { font-size: 0.82rem; font-weight: 600; color: #1f2937; }
+.pw-nearby__distance { color: #52645f; font-size: 0.76rem; font-variant-numeric: tabular-nums; }

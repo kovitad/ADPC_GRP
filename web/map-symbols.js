@@ -164,8 +164,66 @@ window.GRPMap = (() => {
     fillOpacity: selected ? 0.08 : 0.03,
   });
 
+  // A searched place, like a map app's result pin: red, with its name always shown.
+  const searchPin = (lat, lon, name) => {
+    const pin = document.createElement("span");
+    pin.className = "grp-search-pin";
+    pin.setAttribute("role", "img");
+    pin.setAttribute("aria-label", `Searched place: ${name}`);
+    const label = document.createElement("span");
+    label.textContent = name;
+    return window.L.marker([lat, lon], {
+      icon: window.L.divIcon({ html: pin, className: "grp-map-marker", iconSize: [28, 38], iconAnchor: [14, 38], tooltipAnchor: [0, -36] }),
+      keyboard: true, zIndexOffset: 900, title: name,
+    }).bindTooltip(label, { permanent: true, direction: "top", className: "grp-search-label" });
+  };
+
+  // The selected area, made obvious: a white casing under a solid navy outline, everything outside
+  // dimmed, and the area's name at its centre. `panes` names a pane for the mask and the lines.
+  const selectedArea = (geometry, label, { dim = true, panes = {} } = {}) => {
+    const group = window.L.featureGroup();
+    const polygons = geometry.type === "Polygon" ? [geometry.coordinates]
+      : geometry.type === "MultiPolygon" ? geometry.coordinates : [];
+    const rings = polygons.map((polygon) => (polygon[0] || []).map(([lon, lat]) => [lat, lon]))
+      .filter((ring) => ring.length > 2);
+    if (!rings.length) return group;
+    if (dim) {
+      const world = [[-89, -179.9], [-89, 179.9], [89, 179.9], [89, -179.9]];
+      window.L.polygon([world, ...rings], {
+        pane: panes.mask, stroke: false, fillColor: "#0f172a", fillOpacity: 0.16, interactive: false,
+      }).addTo(group);
+    }
+    const line = { pane: panes.line, interactive: false, fill: false };
+    window.L.geoJSON(geometry, { ...line, style: { color: "#ffffff", weight: 8, opacity: 0.9, fill: false } }).addTo(group);
+    const outline = window.L.geoJSON(geometry, { ...line, style: { color: BOUNDARY, weight: 3.5, opacity: 1, fill: false } }).addTo(group);
+    if (label) {
+      const text = document.createElement("span");
+      text.textContent = label;
+      window.L.tooltip({ permanent: true, direction: "center", className: "grp-area-label", interactive: false })
+        .setLatLng(outline.getBounds().getCenter()).setContent(text).addTo(group);
+    }
+    return group;
+  };
+
+  // Is a point inside a GeoJSON Polygon or MultiPolygon? (ray casting; holes respected)
+  const contains = (geometry, lat, lon) => {
+    const polygons = geometry && geometry.type === "Polygon" ? [geometry.coordinates]
+      : geometry && geometry.type === "MultiPolygon" ? geometry.coordinates : [];
+    const inRing = (ring) => {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    };
+    return polygons.some((polygon) => polygon.length && inRing(polygon[0])
+      && !polygon.slice(1).some(inRing));
+  };
+
   return {
     ICON_BASE, STATUS_SYMBOL, BOUNDARY, iconImg, pinIcon, grpMarker, clusterIcon, clusterGroup,
-    clusteredLayer, youAreHere, baseLayer, boundaryStyle,
+    clusteredLayer, youAreHere, baseLayer, boundaryStyle, searchPin, selectedArea, contains,
   };
 })();
