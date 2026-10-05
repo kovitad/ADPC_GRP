@@ -7,8 +7,8 @@
   context and no website key may be reused.
 - **Before that:** sub-district scope was completed across Planning, Assessments and Live
   (ADR-0063), including worker placement, filtered cards and parent-district context.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin through `a616af8`
-  (ThaiWater/HII research and access gate). There are no remaining tracked changes.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin. ThaiWater/HII
+  research and its access gate are pushed; there are no remaining tracked changes.
 - **Next agent:** read Section 0, "6 October: ThaiWater/HII research complete", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
