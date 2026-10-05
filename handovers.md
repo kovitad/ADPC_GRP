@@ -157,6 +157,15 @@ RP20/RP50 rasters and methods exist.
 
   The districts feed sent through the MCP on 5 October is not in GRP's own records, so its card
   will not say "already sent". Global Risk's gate still refuses the name.
+- **Test mode for the PM2.5 feed** (`ce16cca`):
+  - the PM2.5 card in Share data has "Test it on Global Risk now";
+  - `scripts/feed-test-address.ps1` switches the public routes on, starts the relay (which now
+    also serves `/air-quality/feed.json`) and a quick tunnel, then prints the address;
+  - a tunnel address is accepted only in test mode, under a `_test<n>` name.
+
+  On 5 October the test address answered from outside: 351 provinces, sorted, with Nonthaburi and
+  Bangkok the worst. The test feed stays on Global Risk after the tunnel closes; add its name to
+  the maintainer note.
 - **Next:**
   1. a permanent public host (Lightsail with a static IP), then share the flood districts and
      PM2.5 feeds from Share data;
