@@ -109,10 +109,7 @@
 
   // ---------- map ----------
   const map = window.L.map("risk-map", { zoomControl: true }).setView([13.4, 101.0], 6);
-  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  }).addTo(map);
+  window.GRPMap.baseLayer().addTo(map);
   const districtLayer = window.L.featureGroup().addTo(map);
   const centersLayer = window.L.featureGroup().addTo(map);
   const supportingMapLayers = new Map();
@@ -137,99 +134,11 @@
   let floodPicture = null;
 
 
-  // ---------- map symbols (docs/enhancement/GRP_Map_Icon_UX_Pack_v1.0, ADR-0062) ----------
-  // Shape says what a point is, colour says where it comes from, and a separate ring and badge
-  // say its assessment status. Colour is never the only clue: every marker has its own glyph, a
-  // tooltip and an accessible name.
-  const ICON_BASE = "/assets/map-icons/";
-  const STATUS_SYMBOL = {
-    potentially_exposed: { icon: "status-exposed.svg", css: "status-exposed", label: "Potentially exposed" },
-    not_exposed_under_scenario: { icon: "status-not-exposed.svg", css: "status-not-exposed", label: "Not exposed under the selected scenario" },
-    unable_to_assess: { icon: "status-unable.svg", css: "status-unable", label: "N/A — no data" },
-  };
-  const iconImg = (file, className) => {
-    const img = document.createElement("img");
-    img.src = ICON_BASE + file;
-    img.alt = "";
-    img.className = className;
-    img.draggable = false;
-    return img;
-  };
-  // A pin (or a square for line-like features) with an optional status ring and badge.
-  const pinIcon = (file, { status = null, muted = false, near = false, picture = false } = {}) => {
-    const box = document.createElement("span");
-    const statusSymbol = STATUS_SYMBOL[status];
-    box.className = ["grp-pin", statusSymbol ? statusSymbol.css : "", muted ? "is-muted" : "",
-      near ? "is-near-flood" : "", picture ? "has-picture" : ""].filter(Boolean).join(" ");
-    box.append(iconImg(file, "grp-pin__icon"));
-    if (statusSymbol) box.append(iconImg(statusSymbol.icon, "grp-pin__badge"));
-    return window.L.divIcon({
-      html: box, className: "grp-map-marker", iconSize: [34, 40], iconAnchor: [17, 40],
-      tooltipAnchor: [0, -38],
-    });
-  };
-  const grpMarker = (latlng, file, options = {}) => {
-    const marker = window.L.marker(latlng, {
-      icon: pinIcon(file, options), keyboard: true, riseOnHover: true,
-    });
-    marker.grpSymbol = file;
-    return marker;
-  };
-  // One cluster group for all live points. A cluster shows its count and the dominant symbol
-  // (three quarters or more of its points); a mixed cluster shows a neutral symbol. At high zoom
-  // points stand alone, and points on the same spot spread out (spiderfy) when clicked.
-  const DOMINANT_SHARE = 0.75;
-  const clusterIcon = (cluster) => {
-    const children = cluster.getAllChildMarkers();
-    const tally = {};
-    children.forEach((marker) => { tally[marker.grpSymbol] = (tally[marker.grpSymbol] || 0) + 1; });
-    const [top, topCount] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0] || [null, 0];
-    const dominant = top && topCount / children.length >= DOMINANT_SHARE ? top : null;
-    const box = document.createElement("span");
-    box.className = `grp-cluster${dominant ? "" : " is-mixed"}`;
-    box.setAttribute("role", "img");
-    const names = [...new Set(children.map((m) => m.grpKind))].join(", ");
-    box.setAttribute("aria-label", `${children.length} points: ${names}`);
-    if (dominant) {
-      box.append(iconImg(dominant, "grp-cluster__icon"));
-    } else {
-      const mixed = document.createElement("span");
-      mixed.className = "grp-cluster__mixed";
-      mixed.setAttribute("aria-hidden", "true");
-      box.append(mixed);
-    }
-    const count = document.createElement("b");
-    count.textContent = children.length.toLocaleString("en-GB");
-    box.append(count);
-    return window.L.divIcon({ html: box, className: "grp-map-marker grp-map-cluster", iconSize: [46, 46] });
-  };
-  const liveCluster = window.L.markerClusterGroup
-    ? window.L.markerClusterGroup({
-      maxClusterRadius: 48, disableClusteringAtZoom: 17, spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false, chunkedLoading: true, iconCreateFunction: clusterIcon,
-    })
-    : window.L.layerGroup();
-  // A switch's points, shown through the shared cluster group. It answers the same calls the
-  // switch code makes of a Leaflet layer: addTo, remove and eachLayer.
-  const clusteredLayer = () => {
-    const markers = [];
-    return {
-      markers,
-      addLayer(marker) { markers.push(marker); return this; },
-      addTo(target) {
-        if (!target.hasLayer(liveCluster)) liveCluster.addTo(target);
-        if (liveCluster.addLayers) liveCluster.addLayers(markers);
-        else markers.forEach((marker) => liveCluster.addLayer(marker));
-        return this;
-      },
-      remove() {
-        if (liveCluster.removeLayers) liveCluster.removeLayers(markers);
-        else markers.forEach((marker) => liveCluster.removeLayer(marker));
-        return this;
-      },
-      eachLayer(fn) { markers.forEach(fn); },
-    };
-  };
+  // ---------- map symbols: shared with every map page (web/map-symbols.js, ADR-0062) ----------
+  const { STATUS_SYMBOL, iconImg, grpMarker, clusterGroup } = window.GRPMap;
+  // One cluster group for all live points; each switch adds and removes only its own.
+  const liveCluster = clusterGroup();
+  const clusteredLayer = () => window.GRPMap.clusteredLayer(liveCluster);
   const timeText = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", {
     timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
   }) : null);
@@ -969,13 +878,7 @@
   };
 
   // ---------- layers ----------
-  const boundaryStyle = (selected) => ({
-    color: "#1b678f",
-    weight: selected ? 3 : 2,
-    dashArray: selected ? null : "4 4",
-    fillColor: "#8db33f",
-    fillOpacity: selected ? 0.16 : 0.05,
-  });
+  const boundaryStyle = (selected) => window.GRPMap.boundaryStyle(selected);
 
   const drawDistricts = () => {
     districtLayer.clearLayers();
@@ -5268,6 +5171,17 @@
     }
   });
 
+  // The browser's position as a pulsing dot with its accuracy circle; it stays until the next
+  // "Use my location" or a page reload. Coordinates never leave the browser except for the
+  // district lookup the button already does.
+  let youAreHereLayer = null;
+  const showYouAreHere = (lat, lon, accuracy) => {
+    youAreHereLayer?.remove();
+    const metres = Number.isFinite(accuracy) ? Math.round(accuracy) : null;
+    youAreHereLayer = window.GRPMap.youAreHere(lat, lon, accuracy,
+      metres ? `You are here (within about ${metres.toLocaleString("en-GB")} m)` : "You are here").addTo(map);
+  };
+
   const useCurrentLocation = async () => {
     const button = $("[data-use-location]");
     if (!navigator.geolocation) {
@@ -5282,7 +5196,8 @@
         reject,
         { enableHighAccuracy: false, maximumAge: 300000, timeout: 10000 },
       ));
-      const { latitude, longitude } = position.coords;
+      const { latitude, longitude, accuracy } = position.coords;
+      showYouAreHere(latitude, longitude, accuracy);
       const { place, outsideThailand } = await reverseDistrict(latitude, longitude);
       if (outsideThailand) throw new Error("CURRENT_LOCATION_NOT_THAILAND");
       if (!place) throw new Error("CURRENT_LOCATION_NO_DISTRICT");

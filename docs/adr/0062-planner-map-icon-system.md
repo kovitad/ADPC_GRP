@@ -1,4 +1,4 @@
-# ADR-0062: the Planner map uses the GRP map icon system
+# ADR-0062: every GRP map uses the GRP map icon system
 
 ## Status
 
@@ -69,3 +69,42 @@ on the Planner map. It amends ADR-0058 (legend rows) and ADR-0060 (markers and s
   - volunteer centres and early-warning resources have no symbol in the pack, so they stay dots;
   - a satellite basemap check, because the Planner has no satellite layer.
 - **Not yet checked** by a signed-in planner.
+
+## Amendment, 5 October 2026: one standard on every map page
+
+At the owner's request ("standardise map layers and icons everywhere we show OSM"):
+
+1. **One library.** `web/map-symbols.js` (`window.GRPMap`) and `web/map-symbols.css` hold:
+   - the pins, status rings and badges, and live-context states (flooding nearby, access to
+     check, live picture, offline, test entry, muted);
+   - the cluster group with dominant and neutral symbols;
+   - the standard OpenStreetMap base layer and attribution (`baseLayer`);
+   - the pack's navy dashed boundary style (`boundaryStyle`);
+   - the "you are here" marker.
+
+   Every map page loads it.
+2. **Pages:**
+   - **Planning:** uses the library;
+     - "Use my location" now shows a pulsing blue dot at the browser's position, with an
+       accuracy circle and an accessible name such as "You are here (within about 120 m)";
+     - the district outline is the pack's navy.
+   - **Flood pilot** (`flood.html`):
+     - reports, facilities and cameras are pins in one cluster group, with tooltips;
+     - older reports and news are muted;
+     - facilities show an orange halo for flooding nearby and a red one for access to check;
+     - offline cameras get a red dot, and test entries are greyed;
+     - the layer list shows the map's symbols (line samples for roads and the outline), and
+       the legend shows the same pins.
+   - **Assessments:** results are evacuation-centre pins with the status ring and badge, and the
+     map key uses the same symbols.
+   - **Data preview:** shelters are evacuation-centre pins.
+     - The flood value at the point shows as the standard ring: flooded pixel = potentially
+       exposed, 0 m = not exposed, no value or outside the tiles = N/A. This is a preview, not
+       an assessment.
+     - A district-name mismatch adds a red halo.
+   - **Data inspector** and **River Watch:** the standard base map and boundary style.
+3. **Still dots, on purpose:**
+   - the data inspector's quality points, because they are any dataset type and can number in
+     the thousands, and the pack has no generic point symbol;
+   - River Watch's searched point;
+   - the flood page's replay test reports, which keep their dashed test marker.

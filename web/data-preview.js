@@ -28,10 +28,10 @@
 
   // Shelter colours by what the flood file says at its location. No green: nothing here is safe.
   const FLOOD_STYLE = {
-    on_flood_pixel: { colour: "#08519c", label: "on a flooded pixel" },
-    zero_depth: { colour: "#6b7c86", label: "on a 0 m pixel" },
-    no_value: { colour: "#963ca0", label: "on a no-value pixel (meaning undecided)" },
-    outside_tiles: { colour: "#3a3b3d", label: "outside every flood tile" },
+    on_flood_pixel: { colour: "#08519c", label: "on a flooded pixel", status: "potentially_exposed" },
+    zero_depth: { colour: "#6b7c86", label: "on a 0 m pixel", status: "not_exposed_under_scenario" },
+    no_value: { colour: "#963ca0", label: "on a no-value pixel (meaning undecided)", status: "unable_to_assess" },
+    outside_tiles: { colour: "#3a3b3d", label: "outside every flood tile", status: "unable_to_assess" },
   };
   const ELSEWHERE = { colour: "#c2410c", label: "names this district but lies outside it" };
   const GRADE_LABELS = { blocker: "Blocker", problem: "Problem", known: "Known already" };
@@ -240,15 +240,12 @@
     }
     if (!map) {
       map = L.map(mapBox);
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 18,
-      }).addTo(map);
+      window.GRPMap.baseLayer().addTo(map);
       layers = L.layerGroup().addTo(map);
     }
     layers.clearLayers();
     const outline = L.geoJSON(report.outline, {
-      style: { color: "#0d2534", weight: 2, fill: false },
+      style: { ...window.GRPMap.boundaryStyle(true), fill: false },
       interactive: false,
     }).addTo(layers);
     const flood = report.flood || {};
@@ -263,26 +260,19 @@
       `<strong>${escapeHtml(s.name)}</strong><br>${escapeHtml(status)}` +
       (s.depth_m !== null && s.depth_m !== undefined ? ` · ${s.depth_m} m` : "") +
       `<br>Names: ${escapeHtml(s.named_district || "—")}, ${escapeHtml(s.named_province || "—")}`;
+    // ADR-0062: shelters use the evacuation-centre symbol. The flood value at the point shows as
+    // the standard ring (a preview, not an assessment); a district-name mismatch adds a red halo.
     (report.shelters || []).forEach((s) => {
       const style = FLOOD_STYLE[s.flood] || FLOOD_STYLE.outside_tiles;
-      L.circleMarker([s.lat, s.lon], {
-        radius: 6,
-        color: s.names_this_district ? "#ffffff" : "#d62828",
-        dashArray: s.names_this_district ? null : "3 3",
-        weight: s.names_this_district ? 1.5 : 3,
-        fillColor: style.colour,
-        fillOpacity: 0.95,
+      window.GRPMap.grpMarker([s.lat, s.lon], "evacuation-center.svg", {
+        status: style.status, review: !s.names_this_district, kind: "Shelter", label: `${s.name}: ${style.label}`,
       })
         .bindTooltip(tooltip(s, style.label))
         .addTo(layers);
     });
     (report.shelters_elsewhere || []).forEach((s) => {
-      L.circleMarker([s.lat, s.lon], {
-        radius: 6,
-        color: "#ffffff",
-        weight: 1.5,
-        fillColor: ELSEWHERE.colour,
-        fillOpacity: 0.95,
+      window.GRPMap.grpMarker([s.lat, s.lon], "evacuation-center.svg", {
+        review: true, muted: true, kind: "Shelter", label: `${s.name}: ${ELSEWHERE.label}`,
       })
         .bindTooltip(tooltip(s, ELSEWHERE.label))
         .addTo(layers);

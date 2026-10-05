@@ -116,10 +116,7 @@
   const ensureMap = (mapBox) => {
     if (where.map) return;
     where.map = window.L.map(mapBox, { scrollWheelZoom: false });
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
-      attribution: "© OpenStreetMap contributors",
-    }).addTo(where.map);
+    window.GRPMap.baseLayer("River forecasts: GEOGLOWS").addTo(where.map);
   };
 
   const renderWhere = () => {
@@ -154,7 +151,7 @@
 
     if (state.mode === "bkk") {
       group.addLayer(window.L.geoJSON(state.district.outline, {
-        style: { color: "#0d2534", weight: 2, dashArray: "6 5", fill: true, fillOpacity: 0.04 },
+        style: window.GRPMap.boundaryStyle(false),
         interactive: false,
       }));
       state.district.reaches.forEach((r) => {

@@ -47,6 +47,18 @@
   const reportGroup = (f) => `rep_${Object.keys(REPORT_GROUPS)
     .find((g) => REPORT_GROUPS[g].includes(f.properties.underlying_source)) || "other"}`;
   const CAMERA_GROUPS = { BMA_TRAFFIC: "cam_traffic", BMA_DDS: "cam_bma", ITIC_LONGDO: "cam_longdo" };
+  // The shared map icon system (web/map-symbols.js, ADR-0062): shape is the feature, colour the
+  // source. Roads and the outline stay lines and show a line sample in the layer list.
+  const SYMBOL = {
+    rep_traffy: "report-traffy.svg", rep_crowd: "report-public.svg", rep_bma: "sensor-bma.svg",
+    rep_doh: "report-agency.svg", rep_longdo: "report-agency.svg", rep_other: "report-news.svg",
+    facilities: "critical-facility.svg", cam_traffic: "traffic-camera.svg", cam_bma: "flood-camera.svg",
+    cam_longdo: "traffic-camera.svg", cam_other: "traffic-camera.svg",
+  };
+  const FACILITY_SYMBOL = { school: "school.svg", hospital: "hospital.svg", clinic: "hospital.svg",
+    evacuation_centre: "evacuation-center.svg" };
+  // Reports, facilities and cameras share one cluster group; each switch adds only its own.
+  const pointCluster = window.GRPMap.clusterGroup();
   const LAYER_KEY = "grp.flood.hiddenLayers";
   const hiddenLayers = (() => {
     try {
@@ -73,7 +85,6 @@
     span.textContent = text;
     return span;
   };
-  const FACILITY_LETTER = { hospital: "H", clinic: "C", school: "S", evacuation_centre: "E" };
   const facilityName = (a) => (PilotText.lang() === "en" && a.name_en) || a.name || a.name_en
     || say("fac.unnamed", { type: say(`fac.type.${a.asset_type}`) });
   const cameraName = (c) => c.name[PilotText.lang()] || c.name.en;
@@ -171,15 +182,16 @@
     if (map) return;
     const view = state.config.map;
     map = window.L.map($("[data-map]"), { scrollWheelZoom: true }).setView(view.center, view.zoom);
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "© OpenStreetMap contributors · Flood data © Floodboard, CC BY 4.0",
-    }).addTo(map);
+    window.GRPMap.baseLayer("Flood data © Floodboard, CC BY 4.0").addTo(map);
   };
 
   const drawMap = () => {
     ensureMap();
-    [...Object.values(toggleLayers), reportLayer, selectedLayer].forEach((layer) => layer && map.removeLayer(layer));
+    [...Object.values(toggleLayers), reportLayer, selectedLayer].forEach((layer) => {
+      if (!layer) return;
+      if (layer.markers) layer.remove(); else map.removeLayer(layer);
+    });
+    pointCluster.clearLayers();
     toggleLayers = {};
     layerCounts = {};
     selectedLayer = null;
@@ -189,7 +201,7 @@
           type: "FeatureCollection",
           features: currentAreas().map((a) => ({ type: "Feature", geometry: a.outline, properties: {} })),
         }, {
-          style: { color: "#0d2534", weight: 2, dashArray: "6 5", fill: true, fillOpacity: 0.03 },
+          style: window.GRPMap.boundaryStyle(false),
           interactive: false,
         })
       : null;
@@ -205,15 +217,18 @@
     const reportGroups = {};
     reports.filter((f) => !synthetic(f)).forEach((f) => {
       const key = reportGroup(f);
-      (reportGroups[key] = reportGroups[key] || []).push(
-        window.L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
-          radius: 2.5, color: "#7950f2", weight: 0, fillColor: "#7950f2",
-          fillOpacity: NOW_BANDS.has(f.properties.freshness) ? 0.55 : 0.25, interactive: false,
-        }));
+      const p = f.properties;
+      const label = [say(`lay.${key}`), sourceName(p.underlying_source || ""),
+        p.observed_at ? clock(p.observed_at) : null].filter(Boolean).join(" · ");
+      const marker = window.GRPMap.grpMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], SYMBOL[key], {
+        kind: say(`lay.${key}`), label, muted: key === "rep_other" || !NOW_BANDS.has(p.freshness),
+      });
+      marker.bindTooltip(textOf(label), { direction: "top" });
+      (reportGroups[key] = reportGroups[key] || window.GRPMap.clusteredLayer(pointCluster)).addLayer(marker);
     });
-    Object.entries(reportGroups).forEach(([key, markers]) => {
-      toggleLayers[key] = window.L.featureGroup(markers);
-      layerCounts[key] = markers.length;
+    Object.entries(reportGroups).forEach(([key, layer]) => {
+      toggleLayers[key] = layer;
+      layerCounts[key] = layer.markers.length;
     });
     roadLayer = window.L.geoJSON({ type: "FeatureCollection", features: visibleRoads() }, {
       style: styleFor,
@@ -224,47 +239,40 @@
         layer.on("click", () => showEvidence(feature));
       },
     });
-    facilityLayer = window.L.layerGroup(
-      visibleFacilities().map((a) => {
-        const tone = ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state) ? "review"
-          : a.exposure_state === "potentially_exposed" ? "exposed" : "none";
-        const marker = window.L.marker([a.lat, a.lon], {
-          // The icon holds only this file's own letter; names go in the tooltip as text.
-          icon: window.L.divIcon({
-            className: `fl-fac fl-fac--${tone}`,
-            html: FACILITY_LETTER[a.asset_type] || "?",
-            iconSize: [20, 20],
-          }),
-        });
-        marker.bindTooltip(textOf(facilityName(a)), { sticky: true });
-        marker.on("click", () => showFacility(a));
-        return marker;
-      }),
-    );
+    facilityLayer = window.GRPMap.clusteredLayer(pointCluster);
+    visibleFacilities().forEach((a) => {
+      const tone = ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state) ? "review"
+        : a.exposure_state === "potentially_exposed" ? "exposed" : "none";
+      const label = [say(`fac.type.${a.asset_type}`), facilityName(a), say(`leg.fac.${tone}`)].join(" · ");
+      const marker = window.GRPMap.grpMarker([a.lat, a.lon], FACILITY_SYMBOL[a.asset_type] || SYMBOL.facilities, {
+        kind: say(`fac.type.${a.asset_type}`), label, near: tone === "exposed", review: tone === "review",
+      });
+      // Names go in the tooltip as text only.
+      marker.bindTooltip(textOf(label), { direction: "top" });
+      marker.on("click", () => showFacility(a));
+      facilityLayer.addLayer(marker);
+    });
     const cameraGroups = {};
     (state.cameras ? state.cameras.cameras : [])
       .filter((c) => inArea({ type: "Point", coordinates: [c.lon, c.lat] }))
       .forEach((c) => {
         const key = CAMERA_GROUPS[c.provider] || "cam_other";
-        (cameraGroups[key] = cameraGroups[key] || []).push((() => {
-          const colour = c.status === "online" ? "#1e6b33" : c.status === "offline" ? "#a61e1e" : "#4a555b";
-          const marker = window.L.circleMarker([c.lat, c.lon], {
-            radius: 7, color: colour, weight: 2.5, dashArray: c.placeholder ? "3 3" : null,
-            fillColor: colour, fillOpacity: c.placeholder ? 0 : 0.6,
-          });
-          marker.bindTooltip(textOf(cameraName(c)), { sticky: true });
-          marker.on("click", () => showCamera(c));
-          return marker;
-        })());
+        const label = [say(`lay.${key}`), cameraName(c)].join(" · ");
+        const marker = window.GRPMap.grpMarker([c.lat, c.lon], SYMBOL[key], {
+          kind: say(`lay.${key}`), label, offline: c.status === "offline", placeholder: c.placeholder,
+        });
+        marker.bindTooltip(textOf(label), { direction: "top" });
+        marker.on("click", () => showCamera(c));
+        (cameraGroups[key] = cameraGroups[key] || window.GRPMap.clusteredLayer(pointCluster)).addLayer(marker);
       });
-    Object.entries(cameraGroups).forEach(([key, markers]) => {
-      toggleLayers[key] = window.L.layerGroup(markers);
-      layerCounts[key] = markers.length;
+    Object.entries(cameraGroups).forEach(([key, layer]) => {
+      toggleLayers[key] = layer;
+      layerCounts[key] = layer.markers.length;
     });
     toggleLayers.roads = roadLayer;
     layerCounts.roads = visibleRoads().length;
     toggleLayers.facilities = facilityLayer;
-    layerCounts.facilities = visibleFacilities().length;
+    layerCounts.facilities = facilityLayer.markers.length;
     if (outlineLayer) {
       toggleLayers.outline = outlineLayer;
       layerCounts.outline = currentAreas().length;
@@ -280,11 +288,11 @@
       const layer = toggleLayers[key];
       if (!layer) return;
       const show = !hiddenLayers.has(key);
-      if (show && !map.hasLayer(layer)) {
+      const shown = layer.markers ? layer.shown : map.hasLayer(layer);
+      if (show && !shown) {
         layer.addTo(map);
-        if (key.startsWith("rep_")) layer.bringToBack();
-      } else if (!show && map.hasLayer(layer)) {
-        map.removeLayer(layer);
+      } else if (!show && shown) {
+        if (layer.markers) layer.remove(); else map.removeLayer(layer);
       }
     });
     if (selectedLayer) selectedLayer.bringToFront();
@@ -308,7 +316,15 @@
         }
         applyLayers();
       });
-      label.append(input, el("span", "", `${say(`lay.${key}`)} · ${number(layerCounts[key] || 0)}`));
+      let symbol;
+      if (SYMBOL[key]) {
+        symbol = window.GRPMap.iconImg(SYMBOL[key], "fl-layers__symbol");
+      } else {
+        symbol = el("i", `fl-layers__sample fl-layers__sample--${key}`);
+      }
+      symbol.setAttribute("aria-hidden", "true");
+      label.append(input, symbol, el("span", "fl-layers__name", say(`lay.${key}`)),
+        el("span", "fl-layers__count", number(layerCounts[key] || 0)));
       box.append(label);
     });
   };
@@ -329,11 +345,21 @@
     Object.entries(COLOURS).forEach(([key, colour]) => item({ background: colour }, say(`leg.${key}`)));
     item({ background: OLD }, say("leg.old"));
     item({ background: "repeating-linear-gradient(90deg,#e8590c 0 3px,transparent 3px 8px)" }, say("leg.derived"));
-    item({ background: "#7950f2", borderRadius: "50%", width: "0.6rem", height: "0.6rem" }, say("leg.report"));
-    item({ border: "2px dashed #4a555b", borderRadius: "50%", width: "0.7rem", height: "0.7rem" }, say("leg.camera"));
-    item({ background: "#e8590c", borderRadius: "4px", width: "0.8rem", height: "0.8rem" }, say("leg.fac.exposed"));
-    item({ background: "#c92a2a", borderRadius: "4px", width: "0.8rem", height: "0.8rem" }, say("leg.fac.review"));
-    item({ background: "#ffffff", border: "1px solid #6c7a80", borderRadius: "4px", width: "0.8rem", height: "0.8rem" }, say("leg.fac.none"));
+    const symbolItem = (file, states, text) => {
+      const li = document.createElement("li");
+      const pin = document.createElement("span");
+      pin.className = ["grp-pin", "grp-pin--legend", ...states].join(" ");
+      pin.append(window.GRPMap.iconImg(file, "grp-pin__icon"));
+      const label = document.createElement("span");
+      label.textContent = text;
+      li.append(pin, label);
+      legend.append(li);
+    };
+    symbolItem("report-public.svg", [], say("leg.report"));
+    symbolItem("traffic-camera.svg", [], say("leg.camera"));
+    symbolItem("school.svg", ["is-near-flood"], say("leg.fac.exposed"));
+    symbolItem("hospital.svg", ["is-access-review"], say("leg.fac.review"));
+    symbolItem("evacuation-center.svg", [], say("leg.fac.none"));
   };
 
   // --- Cards and coverage --------------------------------------------------------------------

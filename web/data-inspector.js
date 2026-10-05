@@ -303,10 +303,7 @@
     mapLegend.hidden = false;
     if (!map) {
       map = L.map(mapBox, { scrollWheelZoom: false });
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 18,
-      }).addTo(map);
+      window.GRPMap.baseLayer().addTo(map);
       markers = L.layerGroup().addTo(map);
     }
     markers.clearLayers();

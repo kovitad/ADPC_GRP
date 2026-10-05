@@ -127,8 +127,10 @@ RP20/RP50 rasters and methods exist.
     "i" button for source, date and limits;
   - the status legend uses the same symbols.
 - **Kept:** the owner's 25 September "N/A" wording instead of "Unable to assess".
+- **Every map page now uses the same library** (`web/map-symbols.js` and `.css`): Planning, the
+  flood pilot, Assessments, Data preview, Data inspector and River Watch. It sets the base map,
+  the boundary style and the pins. Planning also has "you are here" after "Use my location".
 - **Not yet:**
-  - the flood pilot page markers;
   - symbols for volunteer centres and early-warning resources;
   - a signed-in check.
 - **Also running:** the PM2.5 test address (`scripts/feed-test-address.ps1`), started for the

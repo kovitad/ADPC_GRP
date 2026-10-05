@@ -128,10 +128,7 @@
   const ensureMap = () => {
     if (map) return;
     map = window.L.map("result-map").setView([15.05, 100.07], 11);
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    window.GRPMap.baseLayer().addTo(map);
     layers = window.L.layerGroup().addTo(map);
   };
 
@@ -494,7 +491,7 @@
     let bounds = null;
     if (boundary) {
       const outline = window.L.geoJSON(boundary.geometry, {
-        style: { color: "#1b678f", weight: 2, fillColor: "#8db33f", fillOpacity: 0.08 },
+        style: window.GRPMap.boundaryStyle(true),
       }).addTo(layers);
       bounds = outline.getBounds();
     }
@@ -506,15 +503,14 @@
       GRP.cell(row, meaning);
       GRP.cell(row, c.flood_depth_m === null ? "–" : `${c.flood_depth_m} m`);
       table.append(row);
-      window.L.circleMarker([c.lat, c.lon], {
-        radius: 8, color: "#fff", weight: 2, fillColor: STATUS_COLOR[c.status], fillOpacity: 0.95,
+      // ADR-0062: the evacuation-centre symbol, with the result as a ring and badge.
+      const label = `Evacuation centre · ${c.name} · ${STATUS_TEXT[c.status]}`;
+      const tip = document.createElement("span");
+      tip.textContent = label;
+      window.GRPMap.grpMarker([c.lat, c.lon], "evacuation-center.svg", {
+        status: c.status, kind: "Evacuation centre", label,
       })
-        .bindPopup(`<strong></strong><br><span></span>`)
-        .on("popupopen", (event) => {
-          const node = event.popup.getElement();
-          node.querySelector("strong").textContent = c.name;
-          node.querySelector("span").textContent = STATUS_TEXT[c.status];
-        })
+        .bindTooltip(tip, { direction: "top" })
         .addTo(layers);
     });
     if (bounds) map.fitBounds(bounds, { padding: [20, 20] });
