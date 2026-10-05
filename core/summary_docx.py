@@ -1,4 +1,4 @@
-"""The planner's district summary as a Word document (ADR-0033), in English or Thai.
+"""The planner's selected-area summary as a Word document (ADR-0033), in English or Thai.
 
 Pure rendering: every fact arrives already gathered and screened by ``api/planning_summary.py``.
 The wording follows what the Planning panel says and the rules behind it: "not exposed under
@@ -129,6 +129,11 @@ T: dict[str, dict[str, str]] = {
                     "Ask about this district in Planning to add it.",
               "th": "ยังไม่มีหลักฐานจาก Global Risk สำหรับพื้นที่นี้ในช่วง 30 วันที่ผ่านมา ถามเกี่ยวกับ"
                     "พื้นที่นี้ในหน้า Planning เพื่อเพิ่มข้อมูล"},
+    "gr_district_scope": {
+        "en": "Global Risk evidence is for {district} district (it has no sub-district evidence).",
+        "th": "หลักฐานจาก Global Risk ครอบคลุมทั้งเขต/อำเภอ{district} "
+              "(Global Risk ไม่มีหลักฐานระดับแขวง/ตำบล)",
+    },
     "gr_line": {"en": "{place} · evidence pack {pack} · gathered {when} · {status}",
                 "th": "{place} · ชุดหลักฐาน {pack} · รวบรวมเมื่อ {when} · {status}"},
     "question": {"en": "Question: {q}", "th": "คำถาม: {q}"},
@@ -442,10 +447,15 @@ def _number(value: Any, lang: str = "en") -> str:
 
 
 def _area_name(area: dict[str, Any], lang: str = "en") -> str:
-    level = t("district" if area.get("admin_level") == "district" else "subdistrict", lang)
+    is_subdistrict = area.get("admin_level") == "subdistrict"
+    level = t("subdistrict" if is_subdistrict else "district", lang)
     if lang == "th" and area.get("name_th"):
-        return f"{level}{area['name_th']} ({area.get('name', '')})"
+        name = f"{level}{area['name_th']} ({area.get('name', '')})"
+        parent = area.get("district_name_th") or area.get("district_name")
+        return f"{name}, เขต/อำเภอ{parent}" if is_subdistrict and parent else name
     name = f"{area.get('name', '')} {level}".strip()
+    if is_subdistrict and area.get("district_name"):
+        name += f", {area['district_name']}"
     if area.get("name_th"):
         name += f" ({area['name_th']})"
     return name
@@ -732,6 +742,9 @@ def render_summary(facts: dict[str, Any], lang: str = "en") -> bytes:
 
     # 5. Global Risk evidence
     document.add_heading(t("s5", lang), level=1)
+    if area.get("admin_level") == "subdistrict" and area.get("district_name"):
+        district = (area.get("district_name_th") if lang == "th" else None) or area["district_name"]
+        _warn(document, t("gr_district_scope", lang, district=district))
     evidence = facts.get("global_risk")
     if not evidence:
         _note(document, t("no_gr", lang))

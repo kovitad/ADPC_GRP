@@ -1,8 +1,8 @@
-"""Download everything the Planning page knows about one district, as .docx or .csv (ADR-0033).
+"""Download everything Planning knows about one selected area, as .docx or .csv (ADR-0033).
 
 Every fact is read here from GRP's own records, through the same functions the page uses, so the
-document says what the panel says. The browser supplies only the district, the assessment and a
-map picture it drew; the picture is checked to be a modest PNG and is otherwise just an image.
+document says what the panel says. The browser supplies only the area, the assessment and a map
+picture it drew; the picture is checked to be a modest PNG and is otherwise just an image.
 """
 
 from __future__ import annotations
@@ -95,13 +95,13 @@ def _centres(
     session, principal: CurrentPrincipal, hub_code: str, boundary: Boundary,
     assessment_id: UUID | None, layers: dict[str, Any],
 ) -> dict[str, Any]:
-    """The assessment's rows when it belongs to this district; otherwise the source list."""
+    """The assessment's rows when it belongs to this area; otherwise the source list."""
 
     result = None
     if assessment_id is not None:
         result = assessment_result(assessment_id, principal, session)
         if (result.get("area_detail") or {}).get("admin_code") != boundary.admin_code:
-            result = None  # another district's result never enters this one's document
+            result = None  # another area's result never enters this one's document
     rows: list[dict[str, Any]] = []
     if result is not None:
         pairs = session.execute(
@@ -414,7 +414,7 @@ def _filename(area: dict[str, Any], extension: str, lang: str = "en") -> tuple[s
 
 @router.post(
     "/summary.docx",
-    summary="The district's planning summary as a Word document",
+    summary="The selected area's planning summary as a Word document",
     openapi_extra={"x-grp-access": "protected"},
     response_class=Response,
 )
@@ -432,9 +432,9 @@ def summary_docx(
         )
     else:
         caption = (
-            f"{_map_title(facts)} District outline and evacuation centres over the flood-depth "
-            "display preview (about 1.9 km per pixel; each centre's status comes from the "
-            "full-resolution layer)."
+            f"{_map_title(facts)} Selected area outline and evacuation centres over the "
+            "flood-depth display preview (about 1.9 km per pixel; each centre's status comes "
+            "from the full-resolution layer)."
             + (" Base map © OpenStreetMap contributors." if payload.map_has_basemap else "")
         )
     facts["map"] = {"png": picture, "caption": caption}
@@ -459,7 +459,7 @@ def _cell(value: Any) -> Any:
 
 @router.get(
     "/summary/centres.csv",
-    summary="The district's evacuation-centre table as CSV",
+    summary="The selected area's evacuation-centre table as CSV",
     openapi_extra={"x-grp-access": "protected"},
     response_class=Response,
 )

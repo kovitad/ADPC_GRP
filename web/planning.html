@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="/map-symbols.css?v=20261005d" />
     <script src="/map-symbols.js?v=20261005d"></script>
     <script src="/grp-common.js?v=20261005a" defer></script>
-    <script src="/planning.js?v=20261005d" defer></script>
+    <script src="/planning.js?v=20261005e" defer></script>
   </head>
   <body class="pw-body" data-view="chat">
     <header data-grp-topbar></header>
@@ -44,7 +44,7 @@
               class="button button--secondary button--compact"
               type="button"
               data-summary-download
-              title="Everything GRP knows about the selected district as a Word document: map, centres, people, Global Risk evidence, gaps and sources"
+              title="Everything GRP knows about the selected area as a Word document: map, centres, people, Global Risk evidence, gaps and sources"
             >Download summary</button>
             <button
               class="button button--secondary button--compact"
@@ -238,7 +238,7 @@
           <div class="pw-run__body">
             <section class="pw-run__area">
               <span>Analysis area</span>
-              <strong data-run-area>Select a district on the map</strong>
+              <strong data-run-area>Select a district or sub-district on the map</strong>
             </section>
             <label class="pw-run__field">
               <span>Flood scenario</span>
@@ -259,7 +259,7 @@
             <button class="pw-run__submit" type="button" data-run-submit disabled>
               Determine evacuation-centre exposure
             </button>
-            <p class="pw-run__status" data-run-status>Select a district to begin.</p>
+            <p class="pw-run__status" data-run-status>Select a district or sub-district to begin.</p>
             <section class="pw-run__trace" data-run-trace-section hidden>
               <div class="pw-run__trace-head">
                 <h3>Run and integration trace</h3>
@@ -383,8 +383,8 @@
             <div data-ev-panel="centres" hidden>
               <div class="pw-centres__head">
                 <div>
-                  <h3>Evacuation centres in this district</h3>
-                  <p data-centre-intro>Select a district to list its available centre records.</p>
+                  <h3>Evacuation centres in this area</h3>
+                  <p data-centre-intro>Select a district or sub-district to list its available centre records.</p>
                 </div>
                 <label class="pw-centre-search">
                   <span class="sr-only">Search evacuation centres</span>
@@ -404,8 +404,8 @@
             </div>
             <div data-ev-panel="vulnerable" hidden>
               <div class="pw-people" data-vulnerable-content>
-                <h3>Vulnerable people</h3>
-                <p>No approved population evidence is loaded for this district yet.</p>
+                <h3>People in this area</h3>
+                <p>No approved population evidence is loaded for this area yet.</p>
               </div>
             </div>
             <div data-ev-panel="evidence" hidden>

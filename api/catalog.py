@@ -435,6 +435,17 @@ def area_profile(
         "province_name_th": boundary.province_name_th,
         "country_name": boundary.country_name,
     }
+    if boundary.admin_level == "subdistrict":
+        parent = session.scalar(
+            select(Boundary).where(
+                Boundary.is_supported,
+                Boundary.admin_level == "district",
+                Boundary.admin_code == boundary.admin_code[:4],
+            )
+        )
+        if parent is not None:
+            area["district_name"] = parent.name
+            area["district_name_th"] = parent.name_th
     hazard_version = session.scalar(
         select(DatasetVersion)
         .join(Dataset, Dataset.id == DatasetVersion.dataset_id)

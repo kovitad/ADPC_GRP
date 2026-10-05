@@ -1240,6 +1240,9 @@
       ? `, ${readableName(state.selectedDistrict.name)}` : "";
     return `${readableName(boundary.name)} ${level}${parent}`;
   };
+  const selectedAreaType = () => state.selected?.admin_level === "subdistrict"
+    ? "sub-district" : "district";
+  const selectedAreaName = () => state.selected ? areaLabel(state.selected) : "selected area";
   const showSelectedArea = (boundary) => {
     selectedAreaLayer?.remove();
     selectedAreaLayer = null;
@@ -1619,7 +1622,7 @@
       : "";
     $("[data-centre-list-count]").textContent = state.centerRows.length
       ? `Showing ${visible.length.toLocaleString()} of ${state.centerRows.length.toLocaleString()} centre records.`
-      : "No centre records are available for this district.";
+      : `No centre records are available for this ${selectedAreaType()}.`;
     const list = $("[data-centre-list]");
     list.replaceChildren(...visible.map((center) => {
       const row = document.createElement("button");
@@ -1655,9 +1658,9 @@
       ? "Select a row to locate the same centre on the map. Repeated names are kept as separate source records."
       // 256 of 929 districts (44 of Bangkok's 50) have no records in the delivery: a gap in the
       // data, the same in every version, so switching versions does not help.
-      : "The shelter data has no evacuation centres in this district. This is a gap in the data "
-        + "(about a quarter of districts, most of Bangkok), not a finding that it has none, and "
-        + "every version holds the same list.";
+      : `The shelter data has no evacuation centres in this ${selectedAreaType()}. This is a gap `
+        + "in the delivered data, not a finding that it has none; changing versions does not "
+        + "change the selected area's boundary.";
     $("[data-centre-source]").textContent = source || "";
     renderCenterList();
     loadCentreIndicators(rows);
@@ -1708,7 +1711,7 @@
     const revision = ++centerLoadRevision;
     if (!state.centersVersion || !state.selected) {
       drawCenterMarkers([]);
-      setCenterRows([], "Select a supported district to load its managed source records.");
+      setCenterRows([], "Select a supported district or sub-district to load its managed source records.");
       return;
     }
     const url = new URL(state.centersVersion.features_url, window.location.origin);
@@ -2913,8 +2916,8 @@
 
   const syncRunPanel = () => {
     $("[data-run-area]").textContent = state.selected
-      ? `${state.selected.name}${state.selected.province_name ? ` · ${state.selected.province_name}` : ""}`
-      : "Select a district on the map";
+      ? `${selectedAreaName()}${state.selected.province_name ? ` · ${state.selected.province_name}` : ""}`
+      : "Select a district or sub-district on the map";
 
     const selectedHazardId = runHazard.value || $("[data-flood-scenario]").value;
     runHazard.replaceChildren();
@@ -2972,7 +2975,7 @@
     if (!state.runBusy) {
       $("[data-run-status]").textContent = ready
         ? "Ready. The exact versions above will be saved with the result."
-        : "Select a supported district and available inputs to begin.";
+        : "Select a supported district or sub-district and available inputs to begin.";
     }
   };
 
@@ -3432,7 +3435,7 @@
     const box = $("[data-vulnerable-content]");
     box.replaceChildren();
     const heading = document.createElement("h3");
-    heading.textContent = "Vulnerable people";
+    heading.textContent = "People in this area";
     box.append(heading);
 
     const profile = state.areaProfile;
@@ -3507,6 +3510,15 @@
       ));
     }
 
+    // Global Risk has district evidence only. Say so even before a lookup, so a sub-district's
+    // local figures can never be mistaken for the wider external totals.
+    if (state.selected?.admin_level === "subdistrict") {
+      const district = state.selectedDistrict ? readableName(state.selectedDistrict.name) : "the parent";
+      box.append(peopleNote(
+        `Global Risk evidence is for ${district} district (it has no sub-district evidence).`,
+      ));
+    }
+
     // SIG's own population is shown beside GRP's, never instead of it.
     const sigValues = Object.entries(state.sigPopulation || {})
       .filter(([, value]) => typeof value === "number");
@@ -3571,7 +3583,7 @@
     briefSection.querySelector("h3").textContent = "Important limitation";
     currentEvidence = null;
     openEvidencePayload = null;
-    $("[data-ev-eyebrow]").textContent = "Available district source data";
+    $("[data-ev-eyebrow]").textContent = `Available ${selectedAreaType()} source data`;
     $("[data-ev-title]").textContent = collection.boundary.name;
     $("[data-ev-counts]").textContent =
       `${collection.total.toLocaleString()} evacuation-centre record(s) · not assessed`;
@@ -3580,7 +3592,8 @@
     $("[data-summary-status]").textContent = "Source records — no assessment run";
     $("[data-summary-title]").textContent = "Available evacuation-centre locations";
     $("[data-summary-lead]").textContent =
-      "The complete district-scoped source list is on the Centres tab and uses the same records as the map markers. No flood status, capacity, route or safety conclusion has been added.";
+      `The complete ${selectedAreaType()}-scoped source list is on the Centres tab and uses the `
+      + "same records as the map markers. No flood status, route or safety conclusion has been added.";
     $("[data-summary-movement-title]").textContent = "What a planner can do now";
     $("[data-summary-movement]").replaceChildren(summaryNotice(
       "Review named centre records",
@@ -3591,7 +3604,7 @@
     $("[data-summary-coverage-intro]").textContent =
       "Only managed source facts are shown before an assessment.";
     renderCoverage([
-      { label: "District boundary", status: "available", detail: collection.boundary.name },
+      { label: `${selectedAreaType() === "sub-district" ? "Sub-district" : "District"} boundary`, status: "available", detail: collection.boundary.name },
       { label: "Evacuation-centre locations", status: "available", detail: `${collection.total} source record(s)` },
       ...localCoverage(),
       { label: "Flood status by centre", status: "missing", detail: "Run an assessment to classify these same records" },
@@ -3605,7 +3618,9 @@
     renderGaps([
       "Centre capacity and essential services are not included in this source.",
       "Route accessibility and travel safety have not been assessed.",
-      "District population evidence, when available from Global Risk, is not tied to individual centres.",
+      state.selected?.admin_level === "subdistrict"
+        ? `Global Risk evidence is for ${readableName(state.selectedDistrict?.name || "the parent")} district; it has no sub-district evidence.`
+        : "District population evidence, when available from Global Risk, is not tied to individual centres.",
     ]);
     ensureAreaProfile(state.selected);
     renderVulnerablePeople();
@@ -4002,7 +4017,7 @@
 
   const downloadSummary = async (button, lang = "en") => {
     if (!state.selected) {
-      addMessage("assistant", "Choose a district on the map first, then download its summary.", {
+      addMessage("assistant", "Choose a district or sub-district on the map first, then download its summary.", {
         record: false,
       });
       return;

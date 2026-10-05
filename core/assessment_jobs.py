@@ -48,7 +48,7 @@ ASSESSMENT_RUN_STEPS = (
     (10, "request_recorded", "Request recorded"),
     (20, "inputs_resolved", "Exact data versions selected"),
     (30, "worker_started", "Background worker started"),
-    (40, "district_centres_loaded", "District shelter records loaded"),
+    (40, "district_centres_loaded", "Area shelter records loaded"),
     (50, "flood_overlay_completed", "Flood exposure calculated"),
     (60, "result_saved", "Locked result saved"),
 )
@@ -435,14 +435,14 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
             assessment.id,
             "district_centres_loaded",
             "completed",
-            f"Loaded {len(centers):,} source shelter records; applying the selected district.",
+            f"Loaded {len(centers):,} source shelter records; applying the selected area boundary.",
         )
         _mark_run_step(
             session,
             assessment.id,
             "flood_overlay_completed",
             "running",
-            "Testing district shelter points against the pinned flood-depth layer.",
+            "Testing shelter points in the selected area against the pinned flood-depth layer.",
         )
         session.commit()
         if pinned_hazard_files:
@@ -470,7 +470,7 @@ def process_job(session: Session, storage: LocalStorage, assessment_id: UUID) ->
         assessment.id,
         "flood_overlay_completed",
         "completed",
-        f"Calculated exposure for {len(in_scope):,} shelter records inside the district.",
+        f"Calculated exposure for {len(in_scope):,} shelter records inside the selected area.",
     )
     _mark_run_step(
         session,
