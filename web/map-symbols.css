@@ -55,15 +55,10 @@
 
 
 
-.grp-cluster.is-mixed { background: #f3f6f8; }
 
-.grp-cluster__mixed { position: relative; width: 24px; height: 24px; }
 
-.grp-cluster__mixed::before, .grp-cluster__mixed::after { content: ""; position: absolute; left: 2px; width: 20px; height: 9px; border: 2.5px solid #4E5D6C; border-radius: 3px; background: #fff; transform: skewX(-12deg); }
 
-.grp-cluster__mixed::before { top: 3px; }
 
-.grp-cluster__mixed::after { top: 11px; }
 
 
 /* Live context on pins (not assessment results). */
@@ -85,3 +80,8 @@
 .grp-pin--legend.is-near-flood::after, .grp-pin--legend.is-access-review::after { left: -3px; top: -3px; width: 28px; height: 28px; }
 .map-key--symbols { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; }
 .map-key--symbols > span { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* Mixed cluster: its two most common symbols, overlapped. */
+.grp-cluster.is-mixed .grp-cluster__icon { position: absolute; width: 22px; height: 26px; }
+.grp-cluster__icon--back { left: 6px; top: 7px; opacity: 0.85; }
+.grp-cluster__icon--front { left: 17px; top: 12px; }

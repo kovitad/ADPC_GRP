@@ -55,27 +55,37 @@ window.GRPMap = (() => {
     return marker;
   };
 
-  // A cluster shows its count and the dominant symbol (three quarters or more of its points); a
-  // mixed cluster shows a neutral symbol.
+  // A cluster shows its count and the dominant symbol (three quarters or more of its points). A
+  // mixed cluster shows its two most common symbols overlapped, so it never needs decoding (an
+  // abstract "neutral" glyph read as a folder, 5 Oct 2026). Hover or focus lists what is inside.
   const DOMINANT_SHARE = 0.75;
   const clusterIcon = (cluster) => {
     const children = cluster.getAllChildMarkers();
     const tally = {};
-    children.forEach((marker) => { tally[marker.grpSymbol] = (tally[marker.grpSymbol] || 0) + 1; });
-    const [top, topCount] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0] || [null, 0];
+    const kinds = {};
+    children.forEach((marker) => {
+      tally[marker.grpSymbol] = (tally[marker.grpSymbol] || 0) + 1;
+      const kind = marker.grpKind || "points";
+      kinds[kind] = (kinds[kind] || 0) + 1;
+    });
+    const ranked = Object.entries(tally).sort((a, b) => b[1] - a[1]);
+    const [top, topCount] = ranked[0] || [null, 0];
     const dominant = top && topCount / children.length >= DOMINANT_SHARE ? top : null;
     const box = document.createElement("span");
     box.className = `grp-cluster${dominant ? "" : " is-mixed"}`;
     box.setAttribute("role", "img");
-    const names = [...new Set(children.map((m) => m.grpKind).filter(Boolean))].join(", ");
-    box.setAttribute("aria-label", `${children.length} points${names ? `: ${names}` : ""}`);
+    const inside = Object.entries(kinds).sort((a, b) => b[1] - a[1])
+      .map(([kind, n]) => `${n.toLocaleString("en-GB")} ${n > 1 && !/s$/i.test(kind) ? `${kind}s` : kind}`)
+      .join(", ");
+    const summary = `${children.length.toLocaleString("en-GB")} points: ${inside}`;
+    box.setAttribute("aria-label", summary);
+    box.title = summary;
     if (dominant) {
       box.append(iconImg(dominant, "grp-cluster__icon"));
     } else {
-      const mixed = document.createElement("span");
-      mixed.className = "grp-cluster__mixed";
-      mixed.setAttribute("aria-hidden", "true");
-      box.append(mixed);
+      ranked.slice(0, 2).forEach(([file], index) => {
+        box.append(iconImg(file, `grp-cluster__icon grp-cluster__icon--${index ? "back" : "front"}`));
+      });
     }
     const count = document.createElement("b");
     count.textContent = children.length.toLocaleString("en-GB");
