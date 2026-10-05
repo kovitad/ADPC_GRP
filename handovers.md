@@ -202,6 +202,23 @@ RP20/RP50 rasters and methods exist.
   Wong Sawang" or the Thai name works. Forgiving Thai search needs a **Longdo Map** key (the rain
   key is refused for search).
 
+#### Sub-district level (planned and decided late on 5 October)
+
+- **Plan:** `docs/pilot/2026-10-05_Subdistrict_Level_Plan.md`.
+- **The data is there:** 7,436 sub-districts with shapes (180 in Bangkok, 52 in Nonthaburi), and
+  sub-district population and exposure for 7,255 areas (none for Bangkok). Assessments already
+  run on sub-districts.
+- **Gaps:**
+  - Planning hides the level switch and dead-ends at sub-district level;
+  - search does not find sub-districts in other districts;
+  - the live layer rolls a sub-district up to its district;
+  - the live page has districts only.
+- **Decided:**
+  - a click selects the sub-district and its district;
+  - the default scope is the sub-district;
+  - live counts what is inside, with the district total;
+  - the order is Planning, then Live, then Assessments.
+
 #### Next to build
 
 1. Longdo Map search on the server, once the owner has a Longdo Map key.
