@@ -5,8 +5,10 @@ is stored by the worker, so roads and facilities need no spatial work here. Came
 district's incident roads are matched in the request, as the pilot's incident page already does
 (at most about 20 incidents times 1,413 cameras).
 
-A sub-district shows its parent district and says so. Officer checks and officer-confirmed access
-are not included (decision D2 is open). Nothing here touches an assessment.
+A sub-district contains only incidents whose worker-stored sub-district codes include it, and
+facility/camera points inside its outline; the parent-district totals are returned alongside.
+Officer checks and officer-confirmed access are not included (decision D2 is open). Nothing here
+touches an assessment.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from core.flood_evidence.camera_relay import RELAYED_PROVIDERS, frame_url
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import pilot_config
 from core.flood_evidence.exposure import latest_exposure
+from core.flood_evidence.geo import inside_outline
 from core.flood_evidence.incident_store import list_incidents
 from core.flood_evidence.situation import current_roads
 
@@ -34,7 +37,7 @@ NOTE = ("Roads with flooding reported by BMA, Traffy Fondue and the public, grou
         "Not part of any assessment.")
 INCIDENT_FIELDS = ("incident_id", "status", "confidence", "reasons", "source_families",
                    "max_depth_cm", "newest_evidence_at", "freshness", "center",
-                   "district_codes", "closed_roads")
+                   "district_codes", "subdistrict_codes", "closed_roads")
 CAMERA_RADIUS_M = 400
 MAX_CAMERAS = 40
 FACILITY_CREDITS = {"evacuation_centre": "DDPM (GRP data library)"}
@@ -44,9 +47,18 @@ def _unavailable(reason: str, note: str) -> dict[str, Any]:
     return {"available": False, "reason": reason, "note": note, "title": LAYER_TITLE}
 
 
-def live_layer(session: Session, hub_code: str, admin_code: str, admin_level: str,
-               now: datetime | None = None, relay: bool = False) -> dict[str, Any]:
-    """The incidents and their roads in the area's district, from the latest stored run."""
+def live_layer(
+    session: Session,
+    hub_code: str,
+    admin_code: str,
+    admin_level: str,
+    now: datetime | None = None,
+    relay: bool = False,
+    *,
+    area_name: str | None = None,
+    area_outline: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Live items in the selected area, with parent-district totals for a sub-district."""
 
     config = pilot_config(PILOT_ID)
     code = str(admin_code or "")
@@ -64,38 +76,82 @@ def live_layer(session: Session, hub_code: str, admin_code: str, admin_level: st
     now = now or datetime.now(UTC)
     listed = list_incidents(session, config, now)
     placed = [i for i in listed["incidents"] if i.get("district_codes") is not None]
-    here = [i for i in placed if district in i["district_codes"]]
-    incidents = [{**{k: i.get(k) for k in INCIDENT_FIELDS},
-                  "road_count": len(i.get("road_keys") or []),
-                  "report_count": len(i.get("report_keys") or [])} for i in here]
-    by_road = {key: i for i in here for key in i.get("road_keys") or []}
+    district_incidents = [i for i in placed if district in i["district_codes"]]
+    is_subdistrict = admin_level == "subdistrict"
+    if is_subdistrict:
+        here = [i for i in district_incidents
+                if code in (i.get("subdistrict_codes") or [])]
+    else:
+        here = district_incidents
+
+    def public_incidents(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [{**{k: item.get(k) for k in INCIDENT_FIELDS},
+                 "road_count": len(item.get("road_keys") or []),
+                 "report_count": len(item.get("report_keys") or [])} for item in items]
+
     roads = current_roads(session, config, now, include_all=True)
-    features = []
-    for feature in roads["features"]:
-        p = feature["properties"]
-        incident = by_road.get(p["id"])
-        if incident is None:
-            continue
-        features.append({"type": "Feature", "geometry": feature["geometry"], "properties": {
-            "id": p["id"], "name": p.get("name"), "name_en": p.get("name_en"),
-            "depth_cm": p.get("depth_cm"), "closed_all": p.get("closed_all"),
-            "freshness": p.get("freshness"), "reported_at": p.get("reported_at"),
-            "incident_id": incident["incident_id"], "confidence": incident["confidence"],
-            "status": incident["status"],
-        }})
+
+    def road_features(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        by_road = {key: item for item in items for key in item.get("road_keys") or []}
+        features = []
+        for feature in roads["features"]:
+            p = feature["properties"]
+            incident = by_road.get(p["id"])
+            if incident is None:
+                continue
+            features.append({"type": "Feature", "geometry": feature["geometry"], "properties": {
+                "id": p["id"], "name": p.get("name"), "name_en": p.get("name_en"),
+                "depth_cm": p.get("depth_cm"), "closed_all": p.get("closed_all"),
+                "freshness": p.get("freshness"), "reported_at": p.get("reported_at"),
+                "incident_id": incident["incident_id"], "confidence": incident["confidence"],
+                "status": incident["status"],
+            }})
+        return features
+
+    district_features = road_features(district_incidents)
+    features = road_features(here)
+    district_facilities = _facilities(session, config, now, district, district_incidents)
     facilities = _facilities(session, config, now, district, here)
+    district_cameras = _cameras(config, now, district_incidents, district_features, relay)
     cameras = _cameras(config, now, here, features, relay)
+    if is_subdistrict:
+        if area_outline is None:
+            return _unavailable("area_outline_missing",
+                                "The sub-district outline is not available for live filtering.")
+        facilities = [item for item in facilities
+                      if item["incident_ids"]
+                      and inside_outline(item["lon"], item["lat"], area_outline)]
+        cameras = [item for item in cameras
+                   if inside_outline(item["lon"], item["lat"], area_outline)]
+    incidents = public_incidents(here)
     gaps = []
     unplaced = len(listed["incidents"]) - len(placed)
     if unplaced:
         gaps.append(f"{unplaced} other open incident(s) were last updated before districts were "
                     "recorded, so they cannot be placed; they get one if flooding is reported "
                     "there again, or close within two hours.")
+    if is_subdistrict:
+        no_subdistrict = sum(1 for item in district_incidents
+                             if item.get("subdistrict_codes") is None)
+        if no_subdistrict:
+            gaps.append(f"{no_subdistrict} incident(s) in the district predate sub-district "
+                        "placement and are excluded from this sub-district count.")
     name_en, name_th = names[district]
     return {
         "available": True, "title": LAYER_TITLE, "note": NOTE, "credit": CREDIT,
         "district_code": district, "district_name": name_en, "district_name_th": name_th,
-        "rolled_up_from": code if admin_level == "subdistrict" else None,
+        "rolled_up_from": None,
+        "scope": {
+            "admin_code": code,
+            "admin_level": admin_level,
+            "name": area_name or (name_en if not is_subdistrict else code),
+        },
+        "district_totals": {
+            "incidents": len(district_incidents),
+            "roads": len(district_features),
+            "facilities": len(district_facilities),
+            "cameras": len(district_cameras),
+        },
         "snapshot_retrieved_at": roads.get("snapshot_retrieved_at"),
         "last_processed_at": listed.get("last_processed_at"),
         "rule_version": listed.get("rule_version"),
@@ -130,6 +186,7 @@ def _facilities(session: Session, config: Any, now: datetime, district: str,
             "name_en": asset.get("name_en") or "",
             "lat": asset["lat"], "lon": asset["lon"],
             "nearest_distance_m": asset.get("nearest_distance_m"),
+            "exposure_state": asset.get("exposure_state"),
             "access_state": access, "frontage": frontage,
             "incident_ids": sorted({incident_of[k] for k in asset.get("road_keys") or []
                                     if k in incident_of}),

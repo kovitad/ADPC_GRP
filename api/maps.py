@@ -425,14 +425,21 @@ def live_flood(
     boundary_id: UUID,
     hub_code: str | None = Query(default=None, max_length=64),
 ) -> dict[str, object]:
-    """ADR-0056 step 2: stored incidents for the area's district, never part of an assessment."""
+    """Stored live items inside the area, never part of an assessment."""
 
     hub = planner_membership(principal, hub_code)
     boundary = session.get(Boundary, boundary_id)
     if boundary is None or not boundary.is_supported:
         raise not_found()
-    return live_layer(session, hub.hub_code, boundary.admin_code, boundary.admin_level,
-                      relay=get_settings().bmatraffic_relay_enabled)
+    return live_layer(
+        session,
+        hub.hub_code,
+        boundary.admin_code,
+        boundary.admin_level,
+        relay=get_settings().bmatraffic_relay_enabled,
+        area_name=boundary.name,
+        area_outline=boundary.geom,
+    )
 
 
 @router.get(

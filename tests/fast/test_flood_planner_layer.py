@@ -29,11 +29,13 @@ def _road(key: str) -> dict:
 @pytest.fixture(autouse=True)
 def stored(monkeypatch):
     incidents = [
-        _incident("in-chatuchak", ["1030"], ["a" * 16],
+        _incident("in-chatuchak", ["1030"], ["a" * 16], subdistrict_codes=["103005"],
                   verification="officer_saw_dry", officer={"name": "someone"}),
-        _incident("on-border", ["1029", "1030"], ["b" * 16]),
-        _incident("in-lat-krabang", ["1011"], ["c" * 16]),
+        _incident("on-border", ["1029", "1030"], ["b" * 16],
+                  subdistrict_codes=["102901", "103001"]),
+        _incident("in-lat-krabang", ["1011"], ["c" * 16], subdistrict_codes=["101101"]),
         _incident("not-placed-yet", None, ["d" * 16]),
+        _incident("district-only", ["1030"], ["e" * 16], subdistrict_codes=None),
     ]
     monkeypatch.setattr(layer, "list_incidents", lambda _s, _c, _now: {
         "incidents": incidents, "last_processed_at": NOW.isoformat(),
@@ -52,7 +54,7 @@ def stored(monkeypatch):
     monkeypatch.setattr(layer, "camera_registry", lambda _pilot: ())
     monkeypatch.setattr(layer, "nearby_cameras", lambda _reg, _geom, _now, _radius: [
         _camera("bmatraffic:1362", "BMA_TRAFFIC", "1362", 120),
-        _camera("itic:9", "ITIC", "9", 50),
+        _camera("itic:9", "ITIC", "9", 50, lat=14.2),
     ])
 
 
@@ -65,9 +67,9 @@ def _asset(asset_id, asset_type, district, keys, distance, *, access="access_unk
             "officer": {"name": "someone"} if access == "access_disrupted_confirmed" else None}
 
 
-def _camera(camera_id, provider, number, distance) -> dict:
+def _camera(camera_id, provider, number, distance, *, lat=13.82) -> dict:
     return {"camera_id": camera_id, "provider": provider, "provider_camera_id": number,
-            "name": {"en": f"Camera {number}", "th": f"กล้อง {number}"}, "lat": 13.82,
+            "name": {"en": f"Camera {number}", "th": f"กล้อง {number}"}, "lat": lat,
             "lon": 100.55, "status": "online", "viewer_url": "https://example.test/view",
             "placeholder": False, "source_label": provider, "distance_m": distance}
 
@@ -75,15 +77,37 @@ def _camera(camera_id, provider, number, distance) -> dict:
 def test_a_district_gets_its_incidents_including_those_across_its_border() -> None:
     result = layer.live_layer(None, "adpc", "1030", "district", NOW)
     assert result["available"] and result["district_name"] == "Chatuchak"
-    assert [i["incident_id"] for i in result["incidents"]] == ["in-chatuchak", "on-border"]
-    assert {f["properties"]["id"] for f in result["roads"]["features"]} == {"a" * 16, "b" * 16}
+    assert [i["incident_id"] for i in result["incidents"]] == [
+        "in-chatuchak", "on-border", "district-only",
+    ]
+    assert {f["properties"]["id"] for f in result["roads"]["features"]} == {
+        "a" * 16, "b" * 16, "e" * 16,
+    }
     assert result["rolled_up_from"] is None
     assert "not a flood map" in result["title"]["en"]
 
 
-def test_a_sub_district_shows_its_parent_district_and_says_so() -> None:
-    result = layer.live_layer(None, "adpc", "103005", "subdistrict", NOW)
-    assert result["district_code"] == "1030" and result["rolled_up_from"] == "103005"
+def test_a_sub_district_gets_only_its_live_items_with_the_district_total() -> None:
+    outline = {"type": "Polygon", "coordinates": [[[100.5, 13.7], [100.6, 13.7],
+                                                         [100.6, 13.9], [100.5, 13.9],
+                                                         [100.5, 13.7]]]}
+    result = layer.live_layer(
+        None, "adpc", "103005", "subdistrict", NOW,
+        area_name="LAT YAO", area_outline=outline,
+    )
+
+    assert result["district_code"] == "1030" and result["rolled_up_from"] is None
+    assert result["scope"] == {
+        "admin_code": "103005", "admin_level": "subdistrict", "name": "LAT YAO",
+    }
+    assert [item["incident_id"] for item in result["incidents"]] == ["in-chatuchak"]
+    assert {item["properties"]["id"] for item in result["roads"]["features"]} == {"a" * 16}
+    assert [item["asset_id"] for item in result["facilities"]] == ["ddpm:1"]
+    assert [item["camera_id"] for item in result["cameras"]] == ["bmatraffic:1362"]
+    assert result["district_totals"]["incidents"] == 3
+    assert result["district_totals"]["roads"] == 3
+    assert result["district_totals"]["cameras"] == 2
+    assert any("predate sub-district placement" in gap for gap in result["gaps"])
 
 
 def test_officer_checks_never_reach_the_planner_layer() -> None:
@@ -145,7 +169,7 @@ def test_cameras_are_shared_across_incidents_and_only_relay_cameras_get_a_pictur
     first, second = with_relay["cameras"]
     assert first["camera_id"] == "bmatraffic:1362"
     assert first["picture_url"].endswith("/cameras/bmatraffic%3A1362/frame.jpg")
-    assert sorted(first["incident_ids"]) == ["in-chatuchak", "on-border"]
+    assert sorted(first["incident_ids"]) == ["district-only", "in-chatuchak", "on-border"]
     assert second["picture_url"] is None
     without = layer.live_layer(None, "adpc", "1030", "district", NOW, relay=False)
     assert all(c["picture_url"] is None for c in without["cameras"])

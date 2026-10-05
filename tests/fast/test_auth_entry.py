@@ -227,6 +227,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Candidate means lower mapped flood exposure" in page
     assert "Deterministic evidence summary · not publishable" in script
     assert "Key findings from Global Risk evidence" in script
+    assert "/api/v1/maps/live-flood?${params}" in script
+    assert "district_totals.incidents" in script
+    assert "more incident${elsewhere === 1" in script
     assert "Existing evidence may be restored from this browser tab" in script
     # The connection banner offers the one action that helps, and warns before expiry.
     assert "Sign in again" in script

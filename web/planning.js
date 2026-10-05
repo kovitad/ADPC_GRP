@@ -2035,6 +2035,8 @@
   const liveLoading = {};       // source name -> promise
   const liveLayers = {};        // switch key -> Leaflet layer
   let liveSummary = null;
+  let liveScope = null;        // Selected district/sub-district, with district totals alongside.
+  let liveScopeRevision = 0;
   let liveSelection = null;
   let liveFitted = false;
   // Live points are drawn as SVG in the live pane, above the district shapes. A canvas catches
@@ -2167,6 +2169,15 @@
   };
   const facilitiesNear = (incidentId) => ((liveData.facilities && liveData.facilities.facilities) || [])
     .filter((f) => f.incident_ids.includes(incidentId));
+  const itemIsInLiveScope = (kind, id) => {
+    if (!liveScope || !state.selected) return false;
+    const items = kind === "incident" ? liveScope.incidents : liveScope.facilities;
+    const key = kind === "incident" ? "incident_id" : "asset_id";
+    return (items || []).some((item) => item[key] === id);
+  };
+  const liveScopeLabel = () => liveScope && liveScope.scope
+    ? `${readableName(liveScope.scope.name)} ${liveScope.scope.admin_level === "subdistrict" ? "sub-district" : "district"}`
+    : null;
 
   const focusItems = (points) => {
     if (!points.length) return;
@@ -2218,6 +2229,8 @@
       },
       meaning,
       facts: [
+        ...(itemIsInLiveScope("incident", incident.incident_id) && liveScopeLabel()
+          ? [["Area", liveScopeLabel()]] : []),
         ["Deepest reported", incident.max_depth_cm != null ? `${incident.max_depth_cm} cm` : "no depth reported"],
         ["Reports", `${incident.report_count} · last ${bangkokClock(incident.newest_evidence_at)}`],
         ["Roads", `${incident.road_count} segment${incident.road_count === 1 ? "" : "s"}${incident.closed_roads ? ` · ${incident.closed_roads} closed` : ""}`],
@@ -2285,6 +2298,10 @@
           : "Flooding reported on a road nearby.")
         : "No flooding reported nearby now. No report is not proof that it is dry.",
       extra: accessLine,
+      facts: [
+        ...(itemIsInLiveScope("facility", facility.asset_id) && liveScopeLabel()
+          ? [["Area", liveScopeLabel()]] : []),
+      ],
       buttons,
       notThis: exposed ? "Reported nearby, not flooded" : "Not part of the assessment",
       source: `${facility.source} · ${liveAsOf()}`,
@@ -2554,7 +2571,18 @@
     const note = $("[data-live-flood-note]");
     if (!note) return;
     const parts = [];
-    if (liveData.roads) {
+    if (liveScope && state.selected) {
+      const active = liveScope.incidents.filter((item) => item.status === "active").length;
+      const districtTotal = liveScope.district_totals.incidents;
+      const elsewhere = Math.max(0, districtTotal - liveScope.incidents.length);
+      parts.push(active
+        ? `${active} active incident${active === 1 ? "" : "s"} in ${liveScopeLabel()}.`
+        : `No active incident reported in ${liveScopeLabel()} now. No report is not proof that it is dry.`);
+      if (liveScope.scope.admin_level === "subdistrict") {
+        parts.push(`${elsewhere} more incident${elsewhere === 1 ? "" : "s"} elsewhere in `
+          + `${readableName(liveScope.district_name)} district (${districtTotal} district total).`);
+      }
+    } else if (liveData.roads) {
       const active = incidents().filter((i) => i.status === "active").length;
       parts.push(active
         ? `${active} active incident${active === 1 ? "" : "s"} across Bangkok and Nonthaburi.`
@@ -2570,7 +2598,8 @@
   const liveNowRows = () => {
     const rows = [];
     if (liveOn.has("roads") && liveData.roads) {
-      incidents().filter((i) => i.status === "active").slice(0, 12).forEach((incident) => {
+      const listedIncidents = liveScope ? liveScope.incidents : incidents();
+      listedIncidents.filter((i) => i.status === "active").slice(0, 12).forEach((incident) => {
         const road = incidentLines(incident.incident_id).find((f) => f.properties.name_en || f.properties.name);
         rows.push({
           label: `${road ? road.properties.name_en || road.properties.name : "Unnamed roads"} · ${(LIVE_CONFIDENCE[incident.confidence] || "").replace(" confidence", "").toLowerCase()}`,
@@ -2580,7 +2609,8 @@
       });
     }
     if ((liveOn.has("fac_osm") || liveOn.has("fac_ddpm")) && liveData.facilities) {
-      liveData.facilities.facilities.filter((f) => f.exposure_state === "potentially_exposed").slice(0, 10).forEach((f) => {
+      const listedFacilities = liveScope ? liveScope.facilities : liveData.facilities.facilities;
+      listedFacilities.filter((f) => f.exposure_state === "potentially_exposed").slice(0, 10).forEach((f) => {
         rows.push({
           label: `${(LIVE_FACILITY[f.asset_type] || { label: f.asset_type }).label}: ${f.name || "unnamed"} · ${f.nearest_distance_m ?? "?"} m`,
           colour: "#f97316",
@@ -2842,13 +2872,36 @@
     renderLiveNote();
   };
 
-  // Shown whenever the person's Hub is in the pilot; independent of the selected district.
+  const loadLiveScope = async () => {
+    const revision = ++liveScopeRevision;
+    if (!state.selected || !(state.liveAreas || []).length) {
+      liveScope = null;
+      renderLiveNote();
+      renderLiveList();
+      return;
+    }
+    const params = new URLSearchParams({ boundary_id: state.selected.id });
+    if (state.hubCode) params.set("hub_code", state.hubCode);
+    try {
+      const payload = await GRP.request(`/api/v1/maps/live-flood?${params}`);
+      if (revision !== liveScopeRevision || state.selected?.id !== params.get("boundary_id")) return;
+      liveScope = payload.available ? payload : null;
+    } catch (_error) {
+      if (revision === liveScopeRevision) liveScope = null;
+    }
+    renderLiveNote();
+    renderLiveList();
+  };
+
+  // Shown whenever the person's Hub is in the pilot. Its switches still cover the full pilot,
+  // while the note, cards and Live now list follow the selected area.
   let liveStarted = false;
   function syncLiveFlood() {
     const group = $("[data-live-flood]");
     if (!group) return;
     const enabled = (state.liveAreas || []).length > 0;
     group.hidden = !enabled;
+    loadLiveScope();
     if (!enabled || liveStarted) return;
     liveStarted = true;
     loadLiveSummary().then(() => {

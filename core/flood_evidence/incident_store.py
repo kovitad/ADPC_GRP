@@ -22,9 +22,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from core.assessment_models import Boundary
 from core.flood_evidence.areas import pilot_areas
 from core.flood_evidence.config import PilotConfig
 from core.flood_evidence.exposure import latest_exposure
@@ -72,6 +73,24 @@ def demo_outlines(config: PilotConfig) -> list[dict[str, Any]]:
     return [outline for _, outline in demo_areas(config)]
 
 
+def demo_subdistrict_areas(
+    session: Session, config: PilotConfig
+) -> list[tuple[str, dict[str, Any]]]:
+    """Supported sub-district outlines inside the pilot, read only by the worker."""
+
+    codes = set(config.demo_corridor.get("areas") or [])
+    if config.base_id != "bangkok" or not codes:
+        return []
+    rows = session.scalars(
+        select(Boundary).where(
+            Boundary.is_supported,
+            Boundary.admin_level == "subdistrict",
+            or_(*(Boundary.admin_code.like(f"{code}%") for code in sorted(codes))),
+        )
+    ).all()
+    return [(row.admin_code, row.geom) for row in rows]
+
+
 def _event(session: Session, incident: FloodIncident, at: datetime, kind: str, **detail) -> None:
     session.add(FloodIncidentEvent(pilot_id=incident.pilot_id, incident_id=incident.id, at=at,
                                    kind=kind, detail=detail))
@@ -114,11 +133,13 @@ def update_incidents(session: Session, config: PilotConfig, fetch: FloodSourceFe
     exposures = latest_exposure(session, config, at)["assets"]
     found = build_incidents(roads, reports, outlines, at, params) if outlines else []
     areas = demo_areas(config)
+    subdistricts = demo_subdistrict_areas(session, config)
     for item in found:
         item.update(facility_flags(item, exposures))
         # Computed once here, in the worker, so the Planner, the feed and the archive never
         # do spatial work in a request (ADR-0056).
         item["district_codes"] = district_codes(item["geometry"], areas)
+        item["subdistrict_codes"] = district_codes(item["geometry"], subdistricts)
 
     open_incidents = list(
         session.scalars(

@@ -171,6 +171,7 @@ def snapshots(session, monkeypatch):
     state = {"roads": []}
     monkeypatch.setattr(store, "demo_outlines", lambda _config: AREA)
     monkeypatch.setattr(store, "demo_areas", lambda _config: HALVES)
+    monkeypatch.setattr(store, "demo_subdistrict_areas", lambda _session, _config: HALVES)
     monkeypatch.setattr(store, "current_roads",
                         lambda _s, _c, _at: {"features": state["roads"]})
     monkeypatch.setattr(store, "recent_reports", lambda _s, _c, _at, _h: {"features": []})
@@ -270,5 +271,8 @@ def test_incidents_store_their_district_codes_once_in_the_worker(session, snapsh
                     road("d" * 16, dx=3 * STEP), road("e" * 16, dx=4 * STEP)])
     [incident] = _open(session)
     assert incident.summary["district_codes"] == ["EAST", "WEST"]
+    assert incident.summary["subdistrict_codes"] == ["EAST", "WEST"]
     snapshots(NOW + timedelta(minutes=10), [road("a" * 16)])
-    assert session.get(FloodIncident, incident.id).summary["district_codes"] == ["WEST"]
+    stored = session.get(FloodIncident, incident.id).summary
+    assert stored["district_codes"] == ["WEST"]
+    assert stored["subdistrict_codes"] == ["WEST"]
