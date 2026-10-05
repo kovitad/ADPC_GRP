@@ -27,7 +27,8 @@ def test_a_feed_is_checked_flat_and_sent_nested() -> None:
     assert manifest["adapter"] == "generic_json" and manifest["pack"] == "risk"
     assert manifest["fetch"] == {"url": FLAT["url"], "records_path": "provinces",
                                  "as_of_field": "as_of",
-                                 "fields": {"province": "name", "pm25": "values.0", "as_of": "time"}}
+                                 "fields": {"province": "name", "pm25": "values.0",
+                                            "as_of": "time"}}
     assert manifest["hazards"] == ["air_quality", "pm25"]
     assert "url" not in manifest and "records_path" not in manifest
     # The checked manifest comes back on send, nested; it must pass unchanged.
@@ -85,7 +86,8 @@ def test_the_check_fetches_through_the_pinned_public_address(monkeypatch) -> Non
     result = fc.check_feed("http://feeds.example.org/pm25.json", "provinces",
                            {"province": "name", "as_of": "time"}, "as_of", client=client)
     assert result["ok"] and result["count"] == 1
-    assert seen["url"].startswith("http://93.184.216.34/") and seen["host_header"] == "feeds.example.org"
+    assert seen["url"].startswith("http://93.184.216.34/")
+    assert seen["host_header"] == "feeds.example.org"
 
 
 def test_a_name_that_resolves_privately_is_refused(monkeypatch) -> None:
@@ -98,7 +100,8 @@ def test_a_name_that_resolves_privately_is_refused(monkeypatch) -> None:
 def test_platform_feeds_wait_for_a_permanent_public_address() -> None:
     none = platform_feeds(None, {"flood_feed_public": True})
     assert [f["available"] for f in none] == [False, False]
-    assert "permanent public address" in none[0]["reason"] and none[0]["manifest"]["fetch"]["url"] is None
+    assert "permanent public address" in none[0]["reason"]
+    assert none[0]["manifest"]["fetch"]["url"] is None
 
     off = platform_feeds("https://grp.example.org", {"flood_feed_public": False})
     assert "switched off" in off[0]["reason"]
