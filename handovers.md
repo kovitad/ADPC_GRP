@@ -7,7 +7,7 @@
   cards and Check first list, with parent-district totals alongside.
 - **Before that:** 5 October, with live feeds, grouped navigation, PM2.5 and the shared map icon
   standard (ADR-0052 and ADR-0061–0062).
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, with **26 commits not pushed** since `26b1580`.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`, with **27 commits not pushed** since `26b1580`.
 - **Next agent:** read Section 0, "6 October: sub-district rollout complete", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
@@ -121,7 +121,7 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-5 October 2026)
+## 0. Start here (sessions of 24 September-6 October 2026)
 
 ### 6 October: sub-district rollout complete (latest; read this first)
 
@@ -130,8 +130,8 @@ RP20/RP50 rasters and methods exist.
   The decision is recorded in ADR-0063.
 - Commits, oldest first: `4655969`/`101cf2e` (area API and tests), `a73f007` (Planning
   picker), `a380c09` (Planning scope), `e48d682` (Planner live scope), `7362878`
-  (Assessments), `8051223`
-  (Live picker/filter), then the final browser-check/record commit.
+  (Assessments), `8051223` (Live picker/filter), then `e0de28b` (browser checks, ADR and
+  handover).
 - Browser-checked signed in on the desktop stack at 1,440 px and 390 px:
   - Planning selects Khlong Sam Prawet with Bangkok › Lat Krabang context and switches between
     whole district and this sub-district;
@@ -147,6 +147,11 @@ RP20/RP50 rasters and methods exist.
   `core/flood_evidence/areas.py` and the captured area JSON were copied into the API container and
   that container was restarted. **Run `scripts/docker-desktop.ps1` again when package networking
   is healthy** so the image itself contains the final commits. `web/` remains bind-mounted live.
+- After the API-container restart, the owner briefly saw the sign-in-unavailable screen. It was
+  transient. The SERVIR client ID is set, OIDC discovery resolves from the container,
+  `/api/v1/auth/login` returns the AuthKit authorization redirect, and a clean headless browser
+  reached the SERVIR **Sign in** page. Retry the login route directly if an old `?auth=unavailable`
+  URL is still open; do not replace or print the stored client configuration.
 - Both public feed switches report `false`. The unrelated untracked owner deliverables were left
   untouched. Commits remain local and unpushed.
 
