@@ -257,7 +257,11 @@ def test_assessments_and_planning_share_compatible_result_context() -> None:
     assert 'data-incompatible' in assessment_page
     assert re.search(r"/assessments\.js\?v=\d{8}[a-z]", assessment_page)
     assert "Boolean(dataset.synthetic) === Boolean(boundary.synthetic)" in assessment_script
-    assert "Real district: synthetic test inputs are excluded." in assessment_script
+    assert "synthetic test inputs are excluded." in assessment_script
+    assert "data-area-breadcrumb" in assessment_page
+    assert "data-result-breadcrumb" in assessment_page
+    assert "parentDistrictOutline" in assessment_script
+    assert "parent district context" in assessment_page
     assert "/planning.html?assessment_id=" in assessment_script
     assert 'get("assessment_id")' in planning_script
     assert "/assessments.html?assessment_id=" in planning_script

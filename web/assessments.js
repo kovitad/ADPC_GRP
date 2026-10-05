@@ -54,6 +54,25 @@
   };
 
   const selectedArea = () => boundaries.find((item) => item.id === selectedAreaId()) || null;
+  const readableName = (name) => (name && name === name.toUpperCase()
+    ? name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_m, gap, letter) => gap + letter.toUpperCase())
+    : name || "");
+  const areaKind = (area) => area?.admin_level === "subdistrict" ? "sub-district" : "district";
+
+  const renderPickerBreadcrumb = () => {
+    const holder = $("[data-area-breadcrumb]");
+    const district = boundaries.find((item) => item.id === $("[data-boundary]").value);
+    const area = selectedArea();
+    if (!holder || !district) {
+      if (holder) holder.textContent = "";
+      return;
+    }
+    holder.textContent = [
+      readableName(district.province_name),
+      `${readableName(district.name)} district`,
+      area?.admin_level === "subdistrict" ? `${readableName(area.name)} sub-district` : null,
+    ].filter(Boolean).join(" › ");
+  };
 
   // A past result can be for an area outside the province currently loaded in the picker, so its
   // outline is fetched on demand rather than assumed to be in memory (backlog U2).
@@ -80,12 +99,30 @@
     return found;
   };
 
+  const parentDistrictOutline = async (detail) => {
+    if (!detail || detail.admin_level !== "subdistrict") return null;
+    const code = String(detail.admin_code).slice(0, 4);
+    const known = boundaries.find((item) => item.admin_level === "district"
+      && item.admin_code === code && item.geometry);
+    if (known) return known;
+    const params = new URLSearchParams({
+      hub_code: hubCode, level: "district", province_code: code.slice(0, 2),
+    });
+    try {
+      const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
+      return payload.boundaries.find((item) => item.admin_code === code) || null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
   const showCompatibleDatasets = () => {
     const boundary = selectedArea();
     const hazard = $("[data-hazard]");
     const centers = $("[data-centers]");
     hazard.replaceChildren();
     centers.replaceChildren();
+    renderPickerBreadcrumb();
     if (!boundary) return;
     const compatible = datasets.filter(
       (dataset) => Boolean(dataset.synthetic) === Boolean(boundary.synthetic),
@@ -121,7 +158,7 @@
     $("[data-compatibility-note]").textContent = ready
       ? boundary.synthetic
         ? "Synthetic test area: only synthetic test inputs are available."
-        : "Real district: synthetic test inputs are excluded."
+        : `Real ${areaKind(boundary)}: synthetic test inputs are excluded.`
       : "No compatible flood and evacuation-centre data is available for this area.";
   };
 
@@ -245,7 +282,7 @@
         || searchIndex.find((item) => item.name.toLowerCase().includes(wanted));
       if (!match) {
         $("[data-compatibility-note]").textContent =
-          `No supported district matches "${searchBox.value.trim()}".`;
+          `No supported district or sub-district matches "${searchBox.value.trim()}".`;
         return;
       }
       provinceSelect.value = match.admin_code.slice(0, 2);
@@ -328,7 +365,7 @@
 
     const resultCell = GRP.cell(row, resultText(a));
     if (resultText(a) === "No centres in the data") {
-      resultCell.title = "The shelter data has no evacuation centres in this district. It is a gap "
+      resultCell.title = "The shelter data has no evacuation centres in this area. It is a gap "
         + "in the data, the same in every version, not a finding that there are none.";
     } else if (resultText(a) === "N/A") {
       const s = a.summary || {};
@@ -488,7 +525,23 @@
     ensureMap();
     layers.clearLayers();
     const boundary = await areaOutline(result.area_detail);
+    const parent = await parentDistrictOutline(result.area_detail);
+    const resultCrumb = $("[data-result-breadcrumb]");
+    resultCrumb.textContent = [
+      readableName(result.area_detail.province_name),
+      parent ? `${readableName(parent.name)} district` : null,
+      `${readableName(result.area_detail.name)} ${areaKind(result.area_detail)}`,
+    ].filter((item, index, all) => item && all.indexOf(item) === index).join(" › ");
+    $("[data-result-title]").textContent = result.area_detail.admin_level === "subdistrict" && parent
+      ? `${readableName(result.area_detail.name)} sub-district, ${readableName(parent.name)}`
+      : `${readableName(result.area_detail.name)} ${areaKind(result.area_detail)}`;
     let bounds = null;
+    $("[data-parent-outline-key]").hidden = !parent;
+    if (parent) {
+      window.L.geoJSON(parent.geometry, {
+        style: { ...window.GRPMap.boundaryStyle(false), fill: false, dashArray: "6 5" },
+      }).addTo(layers);
+    }
     if (boundary) {
       const outline = window.L.geoJSON(boundary.geometry, {
         style: window.GRPMap.boundaryStyle(true),

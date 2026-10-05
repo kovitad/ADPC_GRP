@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="/map-symbols.css?v=20261005d" />
     <script src="/map-symbols.js?v=20261005d"></script>
     <script src="/grp-common.js?v=20261005a" defer></script>
-    <script src="/assessments.js?v=20261005a" defer></script>
+    <script src="/assessments.js?v=20261005b" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -69,6 +69,7 @@
             Run assessment
           </button>
         </form>
+        <nav class="assignment-status" data-area-breadcrumb aria-label="Selected assessment area"></nav>
         <p class="assignment-status" data-compatibility-note></p>
         <p class="assignment-status" data-submit-status aria-live="polite"></p>
       </section>
@@ -88,11 +89,13 @@
             <span class="status-pill" data-state-pill>…</span>
           </div>
         </div>
+        <nav class="assignment-status" data-result-breadcrumb aria-label="Assessment area"></nav>
         <p class="admin-card__intro" data-result-meta></p>
         <div class="metric-row" data-totals></div>
         <div class="trust-row" data-trust></div>
         <div class="result-map" id="result-map" aria-label="Map of the area and centers"></div>
         <div class="map-key map-key--symbols" aria-hidden="true">
+          <span data-parent-outline-key hidden>Dashed line: parent district context</span>
           <span><span class="grp-pin grp-pin--legend status-exposed"><img class="grp-pin__icon" src="/assets/map-icons/evacuation-center.svg" alt="" /><img class="grp-pin__badge" src="/assets/map-icons/status-exposed.svg" alt="" /></span> Potentially exposed under this scenario</span>
           <span><span class="grp-pin grp-pin--legend status-not-exposed"><img class="grp-pin__icon" src="/assets/map-icons/evacuation-center.svg" alt="" /><img class="grp-pin__badge" src="/assets/map-icons/status-not-exposed.svg" alt="" /></span> Not exposed under this scenario</span>
           <span><span class="grp-pin grp-pin--legend status-unable"><img class="grp-pin__icon" src="/assets/map-icons/evacuation-center.svg" alt="" /><img class="grp-pin__badge" src="/assets/map-icons/status-unable.svg" alt="" /></span> N/A — no data</span>
