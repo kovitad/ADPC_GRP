@@ -563,7 +563,8 @@ def list_platform_feeds(principal: SignedInMember, hub_code: str | None = None) 
     planner_membership(principal, hub_code)
     settings = get_settings()
     return {"feeds": platform_feeds(settings.grp_public_feed_base_url,
-                                    {"flood_feed_public": settings.flood_feed_public})}
+                                    {"flood_feed_public": settings.flood_feed_public,
+                                     "air_quality_feed_public": settings.air_quality_feed_public})}
 
 
 @router.post(

@@ -56,6 +56,10 @@ services:
       # with FLOOD_FEED_PUBLIC=true; the API port stays on 127.0.0.1, and only grpcli.feed_relay
       # is put behind a tunnel.
       FLOOD_FEED_PUBLIC: "${FLOOD_FEED_PUBLIC:-false}"
+      # ADR-0061: the anonymous PM2.5 feed (republished from SERVIR-SEA AQ Tracker). Off by default.
+      AIR_QUALITY_FEED_PUBLIC: "${AIR_QUALITY_FEED_PUBLIC:-false}"
+      # The permanent public address feeds are shared from (Share data). Unset: none yet.
+      GRP_PUBLIC_FEED_BASE_URL: "${GRP_PUBLIC_FEED_BASE_URL:-}"
       # Draft methods run only here, for the SYNTHETIC test case (never on servers).
       ALLOW_DRAFT_METHODS: "true"
       # Local testing clicks through pages quickly; servers keep the Section 13.1 limit of 60.

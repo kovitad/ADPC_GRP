@@ -1,0 +1,112 @@
+{
+ "dataset": "pm25_forecast_latest",
+ "description": "PM2.5 forecast (GEOS-CF, bias-corrected) per area, at the 3-hourly step closest to now in the newest run. A model forecast, not a station observation.",
+ "source": "SERVIR Southeast Asia / ADPC, from NASA GEOS-CF",
+ "units": "µg/m³",
+ "adm_lvl": "province",
+ "init_date": "2026-10-04",
+ "forecast_time": "2026-10-05T04:30:00Z",
+ "count": 10,
+ "data": [
+  {
+   "area_id": 228,
+   "area_name": "Nonthaburi",
+   "country": "Thailand",
+   "lat": 13.9226,
+   "lon": 100.3943,
+   "pm25_avg": 94.73,
+   "pm25_min": 58.8,
+   "pm25_max": 149.67
+  },
+  {
+   "area_id": 221,
+   "area_name": "Bangkok Metropolis",
+   "country": "Thailand",
+   "lat": 13.7719,
+   "lon": 100.6246,
+   "pm25_avg": 83.14,
+   "pm25_min": 8.76,
+   "pm25_max": 153.27
+  },
+  {
+   "area_id": 229,
+   "area_name": "Pathum Thani",
+   "country": "Thailand",
+   "lat": 14.0641,
+   "lon": 100.6833,
+   "pm25_avg": 65.32,
+   "pm25_min": 12.69,
+   "pm25_max": 125.35
+  },
+  {
+   "area_id": 251,
+   "area_name": "Samut Prakan",
+   "country": "Thailand",
+   "lat": 13.5964,
+   "lon": 100.7105,
+   "pm25_avg": 43.1,
+   "pm25_min": 8.7,
+   "pm25_max": 123.83
+  },
+  {
+   "area_id": 239,
+   "area_name": "Phra Nakhon Si Ayutthaya",
+   "country": "Thailand",
+   "lat": 14.3441,
+   "lon": 100.5282,
+   "pm25_avg": 42.76,
+   "pm25_min": 17.46,
+   "pm25_max": 87.66
+  },
+  {
+   "area_id": 210,
+   "area_name": "Ang Thong",
+   "country": "Thailand",
+   "lat": 14.6215,
+   "lon": 100.3502,
+   "pm25_avg": 36.89,
+   "pm25_min": 29.91,
+   "pm25_max": 42.89
+  },
+  {
+   "area_id": 158,
+   "area_name": "Mountain Province",
+   "country": "Philippines",
+   "lat": 17.1005,
+   "lon": 121.1325,
+   "pm25_avg": 2.53,
+   "pm25_min": 0.0,
+   "pm25_max": 7.03
+  },
+  {
+   "area_id": 149,
+   "area_name": "Lanao del Sur",
+   "country": "Philippines",
+   "lat": 7.809,
+   "lon": 124.3339,
+   "pm25_avg": 2.35,
+   "pm25_min": 0.0,
+   "pm25_max": 8.39
+  },
+  {
+   "area_id": 73,
+   "area_name": "Xiangkhouang",
+   "country": "Laos",
+   "lat": 19.4657,
+   "lon": 103.5194,
+   "pm25_avg": 1.99,
+   "pm25_min": 0.0,
+   "pm25_max": 8.78
+  },
+  {
+   "area_id": 999999,
+   "area_name": "Test no-data province",
+   "country": "Laos",
+   "lat": 19.4657,
+   "lon": 103.5194,
+   "pm25_avg": 0,
+   "pm25_min": 0,
+   "pm25_max": 0
+  }
+ ]
+}

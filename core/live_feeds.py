@@ -43,6 +43,13 @@ FEEDS = (
         "flood_feed_public",
         note="empty_on_dry_days",
     ),
+    PlatformFeed(
+        "sea_pm25_province_forecast",
+        "Southeast Asia PM2.5 by province (AQ Tracker)",
+        "351 provinces in 11 countries at the latest 3-hour forecast step, worst last, with an "
+        "indicative US EPA category. Republished from SERVIR-SEA's public feed.",
+        "air_quality_feed_public",
+    ),
 )
 
 

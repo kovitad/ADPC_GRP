@@ -1,6 +1,12 @@
 # Navigation menu, "Contribute a live feed", and the ADPC air-quality feed
 
-Status: proposed on 5 October 2026, waiting for the owner's answers at the end.
+Status: decided on 5 October 2026 (grouped top menu; the owner gets the AQ key and permission;
+close the tunnel).
+
+- **A is built** (`51e64f0`).
+- **B is built** (`6f7c586`).
+- **C changed:** AQ Tracker has a public feed that needs no key, so GRP republishes it now,
+  switched off (ADR-0061).
 
 The owner asked for three things:
 

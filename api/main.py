@@ -8,6 +8,7 @@ from api import (
     access,
     admin,
     ai,
+    air_quality,
     assessments,
     audit,
     auth,
@@ -63,6 +64,8 @@ for module in (
 ):
     app.include_router(module.router, prefix="/api/v1")
 app.include_router(flood_pilot.public_router, prefix="/api/v1")
+app.include_router(air_quality.router, prefix="/api/v1")
+app.include_router(air_quality.public_router, prefix="/api/v1")
 
 
 @app.get("/admin", include_in_schema=False)

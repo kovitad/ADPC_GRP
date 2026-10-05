@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "5 October (latest)", then "4 October (evening)", then "4 October (morning): roadmap input for the dev team".**
+**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "5 October (later, latest)", then "5 October" and "4 October (evening)", then "4 October (morning): roadmap input for the dev team".**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,46 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-4 October 2026)
 
-### 5 October (latest): the live feed for Global Risk (ADR-0052)
+### 5 October (later, latest): menu, live-feed contributions, air quality (ADR-0061)
+
+- **Global Risk test.** The flood districts feed was submitted through a temporary tunnel with
+  the owner's yes. The deployment **auto-approves**, so it went live for everyone and cannot be
+  withdrawn:
+  - contribution `47b51ee65c4659f9`;
+  - receipt `25e8f83c33fa518f`.
+
+  The tunnel is now closed and the public switch is off.
+  `docs/pilot/2026-10-05_Global_Risk_Maintainer_Note_Feed_Repoint.md` is a draft asking the
+  maintainers to remove or re-point the feed; the owner sends it.
+- **Top menu** (`51e64f0`):
+  - Planning;
+  - Assessments;
+  - Live ▾, built from a pilot registry in `web/grp-common.js`;
+  - Share data ▾;
+  - Admin ▾;
+  - the person's own menu (My access, Sign out);
+  - ☰ on narrow screens.
+- **Share data → Live feed** (`6f7c586`):
+  - "From this platform" lists GRP's feeds, or says why one cannot be sent (no
+    `GRP_PUBLIC_FEED_BASE_URL`, or the route is switched off);
+  - "From another source" takes any JSON feed, and "Test the feed" reads it like Global Risk,
+    through a pinned public address;
+  - temporary tunnel, private and credentialed URLs are refused.
+- **Air quality** (ADR-0061). AQ Tracker has a **public feed with no key**. GRP republishes it
+  with the time on every row, worst last, and an indicative US EPA category:
+  - routes: `GET /api/v1/air-quality/sea/latest` (protected) and
+    `/api/v1/public/aq/sea/feed.json` (404 unless `AIR_QUALITY_FEED_PUBLIC`);
+  - on 5 October 2026, Global Risk's own reader returned Nonthaburi 94.7 and Bangkok 83.1 µg/m³
+    as the worst.
+- **Next:**
+  1. a permanent public host (Lightsail with a static IP), then share the flood districts and
+     PM2.5 feeds from Share data;
+  2. ask the AQ Tracker team to confirm redistribution and the credit line, and to add a per-row
+     time and a lowest-first sort, so Global Risk could read them directly;
+  3. an air-quality page, then flip the Live menu entry from "soon";
+  4. send the maintainer note.
+
+### 5 October: the live feed for Global Risk (ADR-0052)
 
 - **Stack:** Docker Desktop had stopped at about 22:58 UTC on 4 October. It was restarted on
   5 October and rebuilt with `scripts/docker-desktop.ps1`, so the copied fixes are now in the

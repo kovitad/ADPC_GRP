@@ -305,6 +305,8 @@ MATRIX_OPERATION_IDS = {
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
 KNOWN_UNCOVERED = {
+    # ADR-0061: tests/fast/test_air_quality_feed.py covers it without calling AQ Tracker.
+    "read_air_quality_api_v1_air_quality_sea_latest_get",
     # AI gateway permission cases live in fast tests.
     "ai_test_call_api_v1_ai_test_call_post",
     # Golden assessment tests cover Hub submission.

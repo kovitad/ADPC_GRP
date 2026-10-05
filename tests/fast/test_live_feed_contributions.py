@@ -99,7 +99,7 @@ def test_a_name_that_resolves_privately_is_refused(monkeypatch) -> None:
 
 def test_platform_feeds_wait_for_a_permanent_public_address() -> None:
     none = platform_feeds(None, {"flood_feed_public": True})
-    assert [f["available"] for f in none] == [False, False]
+    assert not any(f["available"] for f in none)
     assert "permanent public address" in none[0]["reason"]
     assert none[0]["manifest"]["fetch"]["url"] is None
 

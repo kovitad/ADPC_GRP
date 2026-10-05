@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     bmatraffic_relay_enabled: bool = False
     # ADR-0052: the anonymous live flood feed for Global Risk. Off unless a public host serves it.
     flood_feed_public: bool = False
+    # ADR-0061: the anonymous PM2.5 feed for Global Risk. Off unless a public host serves it.
+    air_quality_feed_public: bool = False
     # The permanent public address GRP's feeds are shared from (Share data). Unset: none yet.
     grp_public_feed_base_url: str | None = None
     ai_provider: str | None = None
