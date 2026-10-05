@@ -5389,8 +5389,8 @@
       searchResults.append(group);
       local.slice(0, 5).forEach((boundary) =>
         searchResults.append(searchItem(
-          boundary.name,
-          `${boundary.province_name ? `${boundary.province_name} · ` : ""}${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`,
+          readableName(boundary.name),
+          `${boundary.province_name ? `${readableName(boundary.province_name)} · ` : ""}${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`,
           () => selectBoundary(boundary, { announce: true }),
         )),
       );

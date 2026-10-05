@@ -314,7 +314,9 @@
 
 .pw-search {
   position: absolute;
-  z-index: 900;
+  /* Above Leaflet's zoom buttons (1000) and "Use my location", so the results list is never
+     covered; below the Global Risk evidence panel (1100). */
+  z-index: 1050;
   top: 14px;
   left: 14px;
   width: min(380px, calc(100% - 150px));
@@ -1594,3 +1596,6 @@ a.pw-chip-button { display: inline-block; }
 .pw-nearby__row small { display: block; color: #6b7280; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 .pw-nearby__row span span { font-size: 0.82rem; font-weight: 600; color: #1f2937; }
 .pw-nearby__distance { color: #52645f; font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+
+/* Search results: a scrolling list that never runs off the map. */
+.pw-search__results { max-height: min(60vh, 420px); overflow-y: auto; box-shadow: 0 12px 28px rgb(16 40 36 / 22%); }
