@@ -49,6 +49,8 @@ from core.contribution_models import (
     SigContribution,
 )
 from core.contribution_rules import NAME_FIELD, check_manifest, check_point_file
+from core.feed_check import check_feed
+from core.live_feeds import platform_feeds
 
 logger = logging.getLogger("grp.contributions")
 router = APIRouter(prefix="/contributions", tags=["contributions"])
@@ -80,6 +82,14 @@ RECORD_STATES = {
     "failed": FAILED,
     "declined": DECLINED,
 }
+
+
+class FeedCheckRequest(BaseModel):
+    hub_code: str = Field(min_length=1, max_length=64)
+    url: str = Field(min_length=1, max_length=2000)
+    records_path: str = Field(min_length=1, max_length=200)
+    fields: dict[str, str] = Field(min_length=1, max_length=60)
+    as_of_field: str | None = Field(default=None, max_length=80)
 
 
 class ContributionRequest(BaseModel):
@@ -541,6 +551,34 @@ def _on_global_risk_view(record: dict[str, Any], sent_here: dict[str, SigContrib
         "created_at": record.get("created_at"),
         "updated_at": record.get("updated_at"),
     }
+
+
+@router.get(
+    "/platform-feeds",
+    summary="GRP's own live feeds a Hub can share with Global Risk, or why not yet",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def list_platform_feeds(principal: SignedInMember, hub_code: str | None = None) -> dict:
+    _available()
+    planner_membership(principal, hub_code)
+    settings = get_settings()
+    return {"feeds": platform_feeds(settings.grp_public_feed_base_url,
+                                    {"flood_feed_public": settings.flood_feed_public})}
+
+
+@router.post(
+    "/feed-check",
+    summary="Fetch a live JSON feed once and read it the way Global Risk will",
+    openapi_extra={"x-grp-access": "protected"},
+)
+async def check_live_feed(payload: FeedCheckRequest, principal: SignedInMember) -> dict:
+    _available()
+    planner_membership(principal, payload.hub_code)
+    # The server fetches on the person's behalf: a few checks a minute, public addresses only.
+    limiter.check("feed_checks_per_person_per_minute", str(principal.user_id), 6, 60)
+    return await asyncio.to_thread(
+        check_feed, payload.url, payload.records_path, payload.fields, payload.as_of_field
+    )
 
 
 @router.get(

@@ -107,6 +107,9 @@ MATRIX = {
     "list_contributions": (401, 404, 404, 404, 404),
     "check_contribution": (401, 404, 404, 404, 404),
     "on_global_risk": (401, 404, 404, 404, 404),
+    # ADR-0052: live-feed contributions follow the same dev-only rule.
+    "platform_feeds": (401, 404, 404, 404, 404),
+    "feed_check": (401, 404, 404, 404, 404),
     # ADR-0033: the district summary downloads need a planning role; an unknown district is not
     # found, and a Platform Admin with no planning membership is refused first.
     "summary_docx": (401, 404, 404, 404, 403),
@@ -232,6 +235,8 @@ MATRIX_OPERATION_IDS = {
     "list_contributions": "list_contributions_api_v1_contributions_get",
     "check_contribution": "create_contribution_api_v1_contributions_post",
     "on_global_risk": "on_global_risk_api_v1_contributions_on_global_risk_get",
+    "platform_feeds": "list_platform_feeds_api_v1_contributions_platform_feeds_get",
+    "feed_check": "check_live_feed_api_v1_contributions_feed_check_post",
     "read_contribution": "read_contribution_api_v1_contributions__contribution_id__get",
     "refresh_contribution": (
         "refresh_contribution_api_v1_contributions__contribution_id__refresh_post"
@@ -596,6 +601,10 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         ),
         "read_contribution": ("GET", f"/api/v1/contributions/{user_id}", None),
         "on_global_risk": ("GET", "/api/v1/contributions/on-global-risk", None),
+        "platform_feeds": ("GET", "/api/v1/contributions/platform-feeds", None),
+        "feed_check": ("POST", "/api/v1/contributions/feed-check",
+                       {"hub_code": "adpc", "url": "https://example.org/x.json",
+                        "records_path": "a", "fields": {"b": "c"}}),
         "refresh_contribution": ("POST", f"/api/v1/contributions/{user_id}/refresh", None),
         "global_risk_layers": ("GET", "/api/v1/planning/global-risk-layers", None),
         "river_watch_reaches": ("GET", "/api/v1/pilot/river-watch/reaches", None),

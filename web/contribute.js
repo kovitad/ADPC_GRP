@@ -72,6 +72,22 @@
         ["usage_notes"],
       ],
     },
+    feed: {
+      label: "Live feed",
+      help: "A JSON feed Global Risk fetches itself and serves through feeds_query and its risk answers, such as GRP's Bangkok flood feed or an agency's live API. Global Risk keeps a copy for up to six hours.",
+      fields: [
+        ["dataset", { label: "Feed name", help: "snake_case; it becomes the feed's name on Global Risk, e.g. bangkok_flood_districts_live.", placeholder: "bangkok_flood_districts_live" }],
+        ["title"], ["description"], ["source"], ["validation"],
+        ["cadence", { label: "How often it changes", help: "In words, e.g. every 10 minutes.", placeholder: "every 10 minutes" }],
+        ["url", { label: "Feed address", help: "An http or https address anyone can open, that will stay up. Not a temporary tunnel.", placeholder: "https://grp.example.org/api/v1/public/flood/bangkok/feed.json" }],
+        ["records_path", { label: "Record list", help: "Where the list of records is, as a dot path, e.g. districts or data.rows.", placeholder: "districts" }],
+        ["fields", { label: "Fields to keep", type: "map", help: "Output name to the path inside each record. A list position is a number, e.g. values.0.", placeholder: "{\"district\": \"district_name_en\", \"active\": \"active_incidents\", \"as_of\": \"as_of\"}" }],
+        ["as_of_field", { label: "Date field", optional: true, help: "One of the output names above that holds each record's time, so Global Risk returns the newest records.", placeholder: "as_of" }],
+        ["pack"],
+        ["hazards", { label: "Hazards", type: "list", optional: true, help: "Comma separated. A risk answer cites the feed only for these hazards.", placeholder: "flood, flashflood" }],
+        ["countries"], ["license"], ["usage_notes"],
+      ],
+    },
     weights: {
       label: "Risk weights",
       help: "Changes how the flood risk level is computed from vulnerability layers. It affects the risk levels every Global Risk user sees, for every place.",
@@ -94,7 +110,8 @@
     failed: ["Not sent", "is-bad"],
   };
 
-  const state = { hubCode: null, kind: "vector", values: {}, checked: null, rows: [], timer: null, servir: false };
+  const startKind = window.location.hash === "#live-feed" ? "feed" : "vector";
+  const state = { hubCode: null, kind: startKind, values: {}, checked: null, rows: [], timer: null, servir: false, feedTab: "platform", platformFeeds: null };
 
   const kindButtons = () => {
     const box = $("[data-kinds]");
@@ -123,6 +140,11 @@
   const renderFields = (problems) => {
     const spec = KINDS[state.kind];
     $("[data-kind-help]").textContent = spec.help;
+    const isFeed = state.kind === "feed";
+    $("[data-feed]").hidden = !isFeed;
+    $("[data-feed-test]").hidden = !isFeed;
+    if (!isFeed) $("[data-feed-result]").hidden = true;
+    if (isFeed) renderFeedSource();
     const box = $("[data-fields]");
     box.replaceChildren();
     spec.fields.map(fieldSpec).forEach((field) => {
@@ -201,6 +223,131 @@
     return manifest;
   };
 
+  // ADR-0052: a live feed from this GRP (filled from its registry) or from another source.
+  const flattenFeed = (manifest) => {
+    const { fetch = {}, adapter: _adapter, ...rest } = manifest;
+    return { ...rest, url: fetch.url || "", records_path: fetch.records_path, fields: fetch.fields, as_of_field: fetch.as_of_field };
+  };
+
+  const renderFeedSource = () => {
+    document.querySelectorAll("[data-feed-tab]").forEach((tab) => {
+      tab.setAttribute("aria-selected", String(tab.dataset.feedTab === state.feedTab));
+    });
+    $("[data-feed-other]").hidden = state.feedTab !== "other";
+    const box = $("[data-feed-platform]");
+    box.hidden = state.feedTab !== "platform";
+    if (state.feedTab !== "platform") return;
+    box.replaceChildren();
+    if (!state.platformFeeds) {
+      box.textContent = "Loading this GRP's feeds…";
+      return;
+    }
+    if (!state.platformFeeds.length) {
+      box.textContent = "This GRP has no feeds to share.";
+      return;
+    }
+    state.platformFeeds.forEach((feed) => {
+      const card = document.createElement("div");
+      card.className = `cb-feed__card${feed.available ? "" : " is-unavailable"}`;
+      const title = document.createElement("strong");
+      title.textContent = feed.label;
+      const name = document.createElement("code");
+      name.textContent = feed.dataset;
+      const summary = document.createElement("p");
+      summary.textContent = feed.summary;
+      card.append(title, name, summary);
+      if (feed.reason) {
+        const why = document.createElement("p");
+        why.className = "cb-feed__reason";
+        why.textContent = `Not ready to send: ${feed.reason}`;
+        card.append(why);
+      }
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "button button--secondary";
+      use.textContent = feed.available ? "Use this feed" : "Fill the form anyway";
+      use.addEventListener("click", () => {
+        state.values = flattenFeed(feed.manifest);
+        state.feedTab = "other";
+        renderFields({});
+        showBanner(feed.available
+          ? "The form is filled from this GRP's feed. Test it, then check and send."
+          : "The form is filled, but this feed cannot be sent until the reason shown is fixed.", feed.available ? "info" : "bad");
+      });
+      card.append(use);
+      box.append(card);
+    });
+  };
+
+  const loadPlatformFeeds = async () => {
+    if (!state.hubCode) return;
+    try {
+      const result = await GRP.request(`/api/v1/contributions/platform-feeds?hub_code=${encodeURIComponent(state.hubCode)}`);
+      state.platformFeeds = result.feeds || [];
+    } catch (error) {
+      state.platformFeeds = [];
+      showBanner(error.message, "bad");
+    }
+    if (state.kind === "feed") renderFeedSource();
+  };
+
+  const showFeedResult = (result) => {
+    const box = $("[data-feed-result]");
+    box.replaceChildren();
+    box.hidden = false;
+    box.className = `cb-feed-result ${result.ok ? "is-ok" : "is-bad"}`;
+    const head = document.createElement("strong");
+    head.textContent = result.ok
+      ? `Global Risk would read ${result.count} records and return the last ${result.returned_by_default} by default.`
+      : `Global Risk could not use this feed: ${result.problem}`;
+    box.append(head);
+    if (!result.ok) return;
+    const facts = document.createElement("dl");
+    facts.append(detail("Order", result.order));
+    if (result.as_of) facts.append(detail("Newest record", result.as_of));
+    box.append(facts);
+    (result.notes || []).forEach((note) => {
+      const p = document.createElement("p");
+      p.textContent = note;
+      box.append(p);
+    });
+    const sample = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "The records a default query returns";
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(result.last, null, 2);
+    sample.append(summary, pre);
+    box.append(sample);
+  };
+
+  const testFeed = async () => {
+    const manifest = manifestFromForm();
+    let fields = manifest.fields;
+    if (typeof fields === "string") {
+      showFeedResult({ ok: false, problem: "Fields to keep must be a mapping, for example {\"name\": \"name\"}." });
+      return;
+    }
+    if (!manifest.url || !manifest.records_path || !fields) {
+      showFeedResult({ ok: false, problem: "Give the feed address, the record list and the fields to keep first." });
+      return;
+    }
+    const button = $("[data-feed-test]");
+    button.disabled = true;
+    button.textContent = "Testing…";
+    try {
+      fields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v)]));
+      showFeedResult(await GRP.request("/api/v1/contributions/feed-check", {
+        method: "POST",
+        body: { hub_code: state.hubCode, url: manifest.url, records_path: manifest.records_path, fields, as_of_field: manifest.as_of_field || null },
+      }));
+    } catch (error) {
+      showFeedResult({ ok: false, problem: error.message });
+    } finally {
+      button.disabled = false;
+      button.textContent = "Test the feed";
+    }
+  };
+
   const showBanner = (text, kind = "info") => {
     const banner = $("[data-banner]");
     banner.textContent = text;
@@ -252,7 +399,9 @@
     }));
     $("[data-manifest]").textContent = JSON.stringify(result.manifest, null, 2);
     // Worded to stay true whether Global Risk auto-approves (as on 30 Sep 2026) or reviews first.
-    $("[data-warning]").textContent = state.kind === "weights"
+    $("[data-warning]").textContent = state.kind === "feed"
+      ? "Global Risk approves contributions at once on this server: the feed will be live for every Global Risk user, and only a Global Risk reviewer can remove it. It fetches the address again on later reads, so the address must stay up."
+      : state.kind === "weights"
       ? "This changes the flood risk levels every Global Risk user sees, everywhere. Global Risk may apply it as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer."
       : "Global Risk may publish this to every Global Risk user as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer.";
     $("[data-agree-text]").textContent = state.kind === "weights"
@@ -549,6 +698,14 @@
     $("[data-send]").disabled = !event.currentTarget.checked;
   });
   $("[data-send]").addEventListener("click", () => send());
+  $("[data-feed-test]").addEventListener("click", () => testFeed());
+  document.querySelectorAll("[data-feed-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      collect();
+      state.feedTab = tab.dataset.feedTab;
+      renderFeedSource();
+    });
+  });
   $("[data-edit]").addEventListener("click", () => {
     $("[data-confirm]").hidden = true;
   });
@@ -568,6 +725,7 @@
         return;
       }
       state.hubCode = membership.hub_code;
+      loadPlatformFeeds();
       $("[data-hub-name]").textContent = membership.hub_name;
       await Promise.all([checkServir(), loadList()]);
       if (state.servir) {

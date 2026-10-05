@@ -7,9 +7,9 @@
     <meta name="theme-color" content="#0b453d" />
     <title>Share data | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="/styles.css?v=20261005a" />
-    <link rel="stylesheet" href="/contribute.css?v=20261001a" />
+    <link rel="stylesheet" href="/contribute.css?v=20261005a" />
     <script src="/grp-common.js?v=20261005a" defer></script>
-    <script src="/contribute.js?v=20261001a" defer></script>
+    <script src="/contribute.js?v=20261005a" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -38,12 +38,33 @@
         </fieldset>
         <p class="cb-kind-help" data-kind-help></p>
 
+        <!-- ADR-0052: a live feed comes from this GRP or from another source. -->
+        <section class="cb-feed" data-feed hidden id="live-feed" aria-label="Live feed source">
+          <p class="cb-feed__alert">
+            Global Risk publishes a live feed to every Global Risk user as soon as it arrives, and
+            an approved feed cannot be withdrawn. Send only an address that will stay up.
+          </p>
+          <div class="cb-feed__tabs" role="tablist">
+            <button type="button" role="tab" data-feed-tab="platform" aria-selected="true">From this platform</button>
+            <button type="button" role="tab" data-feed-tab="other" aria-selected="false">From another source</button>
+          </div>
+          <div class="cb-feed__platform" data-feed-platform></div>
+          <p class="cb-feed__help" data-feed-other hidden>
+            Give the address of a JSON feed anyone can open, where its record list is, and which
+            record values to keep. A source that needs an API key cannot be given here, because
+            Global Risk fetches it anonymously: add it to GRP first, then share it from this
+            platform.
+          </p>
+        </section>
+
         <form class="cb-form" data-form novalidate>
           <div class="cb-fields" data-fields></div>
           <div class="cb-actions">
             <button class="button button--primary" type="submit" data-check>Check</button>
+            <button class="button button--secondary" type="button" data-feed-test hidden>Test the feed</button>
             <button class="button button--secondary" type="button" data-reset>Clear</button>
           </div>
+          <section class="cb-feed-result" data-feed-result hidden aria-live="polite"></section>
         </form>
 
         <section class="cb-confirm" data-confirm hidden aria-labelledby="cb-confirm-heading">
