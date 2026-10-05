@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, literal_column, or_, select
 
 from api.dependencies import DatabaseSession
 from api.errors import not_found
@@ -62,6 +62,145 @@ def boundaries(
             }
             for row in rows
         ]
+    }
+
+
+# ---------- areas by name or by point: district and sub-district together ----------
+AREA_LEVELS = ("district", "subdistrict")
+# Words people type around a name: "เขตจตุจักร", "แขวงลาดยาว", "Chatuchak District", "Tambon ...".
+AREA_WORDS = ("subdistrict", "sub-district", "district", "khwaeng", "khet", "tambon", "amphoe",
+              "แขวง", "เขต", "ตำบล", "อำเภอ", "ต.", "อ.")
+
+
+def _area_view(row: Boundary, parent: Boundary | None = None, geometry: bool = False) -> dict:
+    view = {
+        "id": str(row.id),
+        "name": row.name,
+        "name_th": row.name_th,
+        "admin_code": row.admin_code,
+        "admin_level": row.admin_level,
+        "province_name": row.province_name,
+        "province_name_th": row.province_name_th,
+        "country_name": row.country_name,
+        "synthetic": "synthetic" in row.source.casefold(),
+    }
+    if row.admin_level == "subdistrict":
+        view["district"] = None if parent is None else {
+            "id": str(parent.id), "name": parent.name, "name_th": parent.name_th,
+            "admin_code": parent.admin_code,
+        }
+    if geometry:
+        view["geometry"] = row.geom
+    return view
+
+
+def _parents(session, rows: list[Boundary]) -> dict[str, Boundary]:
+    codes = {row.admin_code[:4] for row in rows if row.admin_level == "subdistrict"}
+    if not codes:
+        return {}
+    districts = session.scalars(select(Boundary).where(
+        Boundary.is_supported, Boundary.admin_level == "district", Boundary.admin_code.in_(codes)))
+    return {row.admin_code: row for row in districts}
+
+
+def _search_term(q: str) -> str:
+    term = " ".join(q.split()).casefold()
+    for word in AREA_WORDS:
+        term = term.replace(word, " ")
+    return " ".join(term.split())
+
+
+@router.get(
+    "/areas/search",
+    summary="Districts and sub-districts by Thai or English name",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def search_areas(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    q: str = Query(min_length=2, max_length=80),
+    hub_code: str | None = Query(default=None, max_length=64),
+    limit: int = Query(default=12, ge=1, le=30),
+) -> dict[str, object]:
+    """Every supported district and sub-district whose name contains the words typed.
+
+    Exact names come first, then names that start with the words, then the rest; districts come
+    before sub-districts of the same rank. Sub-districts say which district they are in.
+    """
+
+    planner_membership(principal, hub_code)
+    term = _search_term(q)
+    if len(term) < 2:
+        return {"areas": []}
+    squeezed = term.replace(" ", "")
+    rows = session.scalars(
+        select(Boundary).where(
+            Boundary.is_supported,
+            Boundary.admin_level.in_(AREA_LEVELS),
+            or_(
+                func.lower(Boundary.name).contains(term),
+                func.lower(func.coalesce(Boundary.name_th, "")).contains(term),
+                func.replace(func.lower(Boundary.name), " ", "").contains(squeezed),
+            ),
+        ).limit(300)
+    ).all()
+
+    def rank(row: Boundary) -> tuple:
+        names = [row.name.casefold(), (row.name_th or "").casefold()]
+        flat = [name.replace(" ", "") for name in names]
+        exact = term in names or squeezed in flat
+        prefix = (any(name.startswith(term) for name in names)
+                  or any(f.startswith(squeezed) for f in flat))
+        return (0 if exact else 1 if prefix else 2, AREA_LEVELS.index(row.admin_level), row.name)
+
+    rows = sorted(rows, key=rank)[:limit]
+    parents = _parents(session, rows)
+    return {"areas": [_area_view(row, parents.get(row.admin_code[:4])) for row in rows]}
+
+
+@router.get(
+    "/areas/at",
+    summary="The district and sub-district that contain a point",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def area_at(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    lat: float = Query(ge=-90, le=90),
+    lon: float = Query(ge=-180, le=180),
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """One click on the map selects the sub-district under it and its district together.
+
+    PostGIS answers with its spatial index; a database without it (the tests' SQLite) is read
+    with Shapely. Either both are found, one of them, or neither: never a guess.
+    """
+
+    planner_membership(principal, hub_code)
+    base = select(Boundary).where(Boundary.is_supported, Boundary.admin_level.in_(AREA_LEVELS))
+    if session.get_bind().dialect.name == "postgresql":
+        point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+        # geom_postgis is maintained by the migrations and indexed; the model keeps GeoJSON.
+        covers = func.ST_Covers(literal_column("boundary.geom_postgis"), point)
+        rows = session.scalars(base.where(covers)).all()
+    else:
+        from shapely.geometry import Point, shape
+
+        here = Point(lon, lat)
+        rows = [row for row in session.scalars(base).all()
+                if row.geom and shape(row.geom).covers(here)]
+    # A real area wins over the synthetic test district if both cover the point.
+    rows.sort(key=lambda row: "synthetic" in row.source.casefold())
+    district = next((row for row in rows if row.admin_level == "district"), None)
+    subdistrict = next((row for row in rows if row.admin_level == "subdistrict"
+                        and (district is None or row.admin_code.startswith(district.admin_code))),
+                       None)
+    if district is None and subdistrict is not None:
+        district = _parents(session, [subdistrict]).get(subdistrict.admin_code[:4])
+    return {
+        "district": None if district is None else _area_view(district, geometry=True),
+        "subdistrict": (None if subdistrict is None
+                        else _area_view(subdistrict, district, geometry=True)),
     }
 
 

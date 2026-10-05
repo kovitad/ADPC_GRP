@@ -119,6 +119,9 @@ MATRIX = {
     # ADR-0034: the Planning layer picker follows the planning conversation: every planning role
     # reads its own Hub's list, a Platform Admin with no planning membership has none.
     "global_risk_layers": (401, 200, 200, 200, 403),
+    # Sub-district plan: area search and lookup by point follow the planning catalogue rules.
+    "areas_search": (401, 200, 200, 200, 403),
+    "areas_at": (401, 200, 200, 200, 403),
     # ADR-0036: the River Watch pilot is for Admins. An unknown reach is not found, after the
     # caller is authorized, so no matrix case reaches GEOGLOWS.
     "river_watch_reaches": (401, 403, 200, 200, 200),
@@ -235,6 +238,8 @@ MATRIX_OPERATION_IDS = {
     "list_contributions": "list_contributions_api_v1_contributions_get",
     "check_contribution": "create_contribution_api_v1_contributions_post",
     "on_global_risk": "on_global_risk_api_v1_contributions_on_global_risk_get",
+    "areas_search": "search_areas_api_v1_catalog_areas_search_get",
+    "areas_at": "area_at_api_v1_catalog_areas_at_get",
     "platform_feeds": "list_platform_feeds_api_v1_contributions_platform_feeds_get",
     "feed_check": "check_live_feed_api_v1_contributions_feed_check_post",
     "read_contribution": "read_contribution_api_v1_contributions__contribution_id__get",
@@ -603,6 +608,8 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         ),
         "read_contribution": ("GET", f"/api/v1/contributions/{user_id}", None),
         "on_global_risk": ("GET", "/api/v1/contributions/on-global-risk", None),
+        "areas_search": ("GET", "/api/v1/catalog/areas/search?q=bang", None),
+        "areas_at": ("GET", "/api/v1/catalog/areas/at?lat=13.8&lon=100.5", None),
         "platform_feeds": ("GET", "/api/v1/contributions/platform-feeds", None),
         "feed_check": ("POST", "/api/v1/contributions/feed-check",
                        {"hub_code": "adpc", "url": "https://example.org/x.json",
