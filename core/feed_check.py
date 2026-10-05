@@ -52,7 +52,8 @@ def _public_address(host: str) -> str:
     return addresses[0]
 
 
-def fetch_json(url: str, client: httpx.Client | None = None) -> Any:
+def fetch_json(url: str, client: httpx.Client | None = None,
+               allow_temporary: bool = False) -> Any:
     """The parsed JSON at ``url``, fetched under the same rules as Global Risk."""
 
     own = client is None
@@ -60,7 +61,7 @@ def fetch_json(url: str, client: httpx.Client | None = None) -> Any:
     try:
         current = url
         for _ in range(MAX_REDIRECTS + 1):
-            problem = feed_url_problem(current)
+            problem = feed_url_problem(current, allow_temporary=allow_temporary)
             if problem:
                 raise FeedCheckError(problem)
             parts = urlparse(current)
@@ -152,11 +153,13 @@ def read_like_global_risk(document: Any, records_path: str, fields: dict[str, st
 
 
 def check_feed(url: str, records_path: str, fields: dict[str, str],
-               as_of_field: str | None = None, client: httpx.Client | None = None) -> dict:
+               as_of_field: str | None = None, client: httpx.Client | None = None,
+               allow_temporary: bool = False) -> dict:
     """Fetch and read a feed. Never raises: a failure is ``ok: false`` with the reason."""
 
     try:
-        result = read_like_global_risk(fetch_json(url, client), records_path, fields, as_of_field)
+        document = fetch_json(url, client, allow_temporary=allow_temporary)
+        result = read_like_global_risk(document, records_path, fields, as_of_field)
     except FeedCheckError as error:
         return {"ok": False, "problem": str(error)}
     notes = []

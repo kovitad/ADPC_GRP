@@ -114,3 +114,15 @@ def test_platform_feeds_wait_for_a_permanent_public_address() -> None:
 
     tunnel = platform_feeds("https://x.trycloudflare.com", {"flood_feed_public": True})
     assert not tunnel[0]["available"] and "temporary" in tunnel[0]["reason"]
+
+
+def test_a_tunnel_address_is_allowed_only_for_a_test_name() -> None:
+    tunnel = {**FLAT, "url": "https://areas-barry-beyond-res.trycloudflare.com/air-quality/feed.json"}
+    assert "temporary" in check_manifest("feed", tunnel).problems["url"]
+    real_name = check_manifest("feed", tunnel, test=True).problems
+    assert "url" not in real_name and "_test" in real_name["dataset"]
+    assert check_manifest("feed", {**tunnel, "dataset": "sea_pm25_province_test1"},
+                          test=True).problems == {}
+    # Test mode never opens private or local addresses.
+    local = {**tunnel, "dataset": "x_test1", "url": "http://127.0.0.1:8090/air-quality/feed.json"}
+    assert "private" in check_manifest("feed", local, test=True).problems["url"]

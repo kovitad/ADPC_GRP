@@ -111,3 +111,8 @@
 .cb-feed-result pre { max-height: 260px; overflow: auto; padding: 0.6rem; border-radius: 8px; background: #ffffff; font-size: 0.74rem; }
 .cb-feed__sent { color: #1f4e79 !important; font-weight: 600; }
 .cb-feed__read { color: #6b7672 !important; font-size: 0.76rem !important; }
+.cb-feed__test { margin-top: 0.4rem; padding: 0.5rem 0.65rem; border: 1px dashed #c7d2de; border-radius: 10px; background: #f8fafc; }
+.cb-feed__test summary { cursor: pointer; color: #1f4e79; font-size: 0.82rem; font-weight: 700; }
+.cb-feed__test ol { margin: 0.5rem 0; padding-left: 1.1rem; color: #4b5753; font-size: 0.78rem; line-height: 1.45; }
+.cb-feed__test .cb-field { display: grid; gap: 0.2rem; margin: 0.35rem 0; }
+.cb-feed__test input { padding: 0.4rem 0.5rem; border: 1px solid #cbd8d6; border-radius: 6px; font: inherit; font-size: 0.8rem; }

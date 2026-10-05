@@ -27,6 +27,8 @@ class PlatformFeed:
     switch: str  # the setting that serves its public route
     read_key: str  # core.public_reads key of its public route
     note: str | None = None
+    # Its path on grpcli.feed_relay, for a test through a temporary tunnel (None: no test yet).
+    test_path: str | None = None
 
 
 FEEDS = (
@@ -53,6 +55,7 @@ FEEDS = (
         "indicative US EPA category. Republished from SERVIR-SEA's public feed.",
         "air_quality_feed_public",
         "air_quality:sea",
+        test_path="/air-quality/feed.json",
     ),
 )
 
@@ -92,5 +95,6 @@ def platform_feeds(public_base: str | None, switches: dict[str, bool],
             "manifest": manifest,
             "last_read": (reads or {}).get(feed.read_key),
             "sent": (sent or {}).get(feed.dataset),
+            "test_path": feed.test_path,
         })
     return out

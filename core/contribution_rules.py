@@ -61,6 +61,9 @@ RASTER_PREFIXES = ("hazard_", "risk_", "vulnerability_", "population_")
 TEMPORARY_HOSTS = ("trycloudflare.com", "ngrok.io", "ngrok-free.app", "ngrok.app", "loca.lt",
                    "localhost.run", "serveo.net", "localtunnel.me")
 FEED_FETCH_KEYS = ("url", "records_path", "as_of_field", "fields")
+# Owner's choice (5 Oct 2026): a test may go through a temporary tunnel, but only under a test
+# name, so the real name stays free. The test feed is left behind when the tunnel closes.
+TEST_FEED_NAME = re.compile(r"^[a-z][a-z0-9_]*_test\d+$")
 SNAKE = re.compile(r"^[a-z][a-z0-9_]{1,79}$")
 # Global Risk's gate (30 Sep 2026): "layer must be snake_case: lowercase letters, digits,
 # underscores, 3-40 chars". A longer name is declined after the whole submit round trip.
@@ -117,8 +120,11 @@ def _as_mapping(value: Any) -> dict | None:
     return None
 
 
-def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
-    """Clean the manifest and name every problem GRP can see before sending it."""
+def check_manifest(kind: str, manifest: dict[str, Any], test: bool = False) -> Checked:
+    """Clean the manifest and name every problem GRP can see before sending it.
+
+    ``test`` is a live-feed test: a temporary tunnel address is allowed, under a test name only.
+    """
 
     if kind not in KINDS:
         return Checked({}, {"kind": f"Choose one of: {', '.join(KINDS)}."})
@@ -147,7 +153,7 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
         problems["csv_text"] = "Paste the CSV or give a link to it."
 
     if kind == "feed" and "url" in cleaned:
-        problem = feed_url_problem(str(cleaned["url"]))
+        problem = feed_url_problem(str(cleaned["url"]), allow_temporary=test)
         if problem:
             problems["url"] = problem
     elif "url" in cleaned:
@@ -233,6 +239,11 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
                 cleaned["weights"] = numbers
 
     if kind == "feed":
+        if test and "dataset" in cleaned and not TEST_FEED_NAME.fullmatch(str(cleaned["dataset"])):
+            problems["dataset"] = (
+                "A test feed's name ends with _test and a number, e.g. "
+                "sea_pm25_province_forecast_test1, so the real name stays free."
+            )
         if "dataset" in cleaned and not SNAKE.fullmatch(str(cleaned["dataset"])):
             problems["dataset"] = (
                 "Lower-case letters, digits and underscores, starting with a letter."
@@ -255,7 +266,7 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
     return checked
 
 
-def feed_url_problem(url: str) -> str | None:
+def feed_url_problem(url: str, allow_temporary: bool = False) -> str | None:
     """Why Global Risk could not, or should not, fetch this feed URL. None when it looks fine."""
 
     import ipaddress
@@ -273,7 +284,7 @@ def feed_url_problem(url: str) -> str | None:
             return "Global Risk cannot reach a private address. Use a public one."
     except ValueError:
         pass
-    if host.endswith(TEMPORARY_HOSTS):
+    if host.endswith(TEMPORARY_HOSTS) and not allow_temporary:
         return ("This is a temporary tunnel address. An approved feed cannot be withdrawn, so use "
                 "an address that will stay up.")
     return None

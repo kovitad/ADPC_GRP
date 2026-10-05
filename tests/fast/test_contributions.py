@@ -683,7 +683,7 @@ FEED = {
 def _feed_test(monkeypatch, result: dict) -> list:
     asked = []
 
-    def fake(url, records_path, fields, as_of_field):
+    def fake(url, records_path, fields, as_of_field, *_rest):
         asked.append(url)
         return result
 

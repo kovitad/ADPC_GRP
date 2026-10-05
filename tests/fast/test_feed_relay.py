@@ -73,3 +73,12 @@ def test_a_switched_off_feed_is_not_found(relay) -> None:
     Upstream.status = 404
     status, _headers, body = _get(f"{relay}/feed.json")
     assert status == 404 and body == b"feed unavailable"
+
+
+def test_the_air_quality_path_reads_its_own_route() -> None:
+    from grpcli.feed_relay import routes_for
+
+    routes = routes_for("http://127.0.0.1:8000")
+    assert routes["/air-quality/feed.json"] == "http://127.0.0.1:8000/api/v1/public/aq/sea/feed.json"
+    assert routes["/feed.json"].endswith("/api/v1/public/flood/bangkok/feed.json")
+    assert set(routes) == {"/feed.json", "/bangkok/feed.json", "/air-quality/feed.json"}

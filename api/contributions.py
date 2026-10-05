@@ -91,6 +91,8 @@ class FeedCheckRequest(BaseModel):
     records_path: str = Field(min_length=1, max_length=200)
     fields: dict[str, str] = Field(min_length=1, max_length=60)
     as_of_field: str | None = Field(default=None, max_length=80)
+    # A live-feed test through a temporary tunnel (owner's choice, 5 Oct 2026).
+    test: bool = False
 
 
 class ContributionRequest(BaseModel):
@@ -99,6 +101,8 @@ class ContributionRequest(BaseModel):
     manifest: dict[str, Any]
     # True: check and show the exact manifest, send nothing. False: the person has confirmed.
     preview: bool = True
+    # A live-feed test: a temporary tunnel address is allowed, under a _test<n> name only.
+    test: bool = False
 
 
 def _available() -> None:
@@ -463,7 +467,7 @@ async def create_contribution(
     _available()
     hub = planner_membership(principal, payload.hub_code)
     kind = payload.kind.strip().lower()
-    checked = check_manifest(kind, payload.manifest)
+    checked = check_manifest(kind, payload.manifest, test=payload.test and kind == "feed")
     problems = dict(checked.problems)
     duplicate = None
     name_key = NAME_FIELD.get(kind)
@@ -480,7 +484,7 @@ async def create_contribution(
         fetch = checked.manifest.get("fetch") or {}
         feed_test = await asyncio.to_thread(
             check_feed, fetch.get("url"), fetch.get("records_path"), fetch.get("fields") or {},
-            fetch.get("as_of_field"),
+            fetch.get("as_of_field"), None, payload.test,
         )
         if not feed_test["ok"]:
             problems["url"] = f"Global Risk could not use this feed: {feed_test['problem']}"
@@ -605,7 +609,8 @@ async def check_live_feed(payload: FeedCheckRequest, principal: SignedInMember) 
     # The server fetches on the person's behalf: a few checks a minute, public addresses only.
     limiter.check("feed_checks_per_person_per_minute", str(principal.user_id), 6, 60)
     return await asyncio.to_thread(
-        check_feed, payload.url, payload.records_path, payload.fields, payload.as_of_field
+        check_feed, payload.url, payload.records_path, payload.fields, payload.as_of_field,
+        None, payload.test,
     )
 
 

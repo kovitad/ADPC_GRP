@@ -111,7 +111,7 @@
   };
 
   const startKind = window.location.hash === "#live-feed" ? "feed" : "vector";
-  const state = { hubCode: null, kind: startKind, values: {}, checked: null, rows: [], timer: null, servir: false, feedTab: "platform", platformFeeds: null };
+  const state = { hubCode: null, kind: startKind, values: {}, checked: null, rows: [], timer: null, servir: false, feedTab: "platform", platformFeeds: null, test: false };
 
   const kindButtons = () => {
     const box = $("[data-kinds]");
@@ -280,7 +280,23 @@
       use.type = "button";
       use.className = "button button--secondary";
       use.textContent = feed.sent ? "Fill the form to compare" : feed.available ? "Use this feed" : "Fill the form anyway";
+      if (feed.available && !feed.sent) {
+        const send = document.createElement("button");
+        send.type = "button";
+        send.className = "button button--primary";
+        send.textContent = "Send to Global Risk";
+        send.addEventListener("click", () => {
+          state.test = false;
+          state.values = flattenFeed(feed.manifest);
+          state.feedTab = "other";
+          renderFields({});
+          check().catch((error) => showBanner(error.message, "bad"));
+        });
+        card.append(send);
+      }
+      if (feed.test_path) card.append(testPanel(feed));
       use.addEventListener("click", () => {
+        state.test = false;
         state.values = flattenFeed(feed.manifest);
         state.feedTab = "other";
         renderFields({});
@@ -291,6 +307,71 @@
       card.append(use);
       box.append(card);
     });
+  };
+
+  // Owner's choice (5 Oct 2026): test a platform feed on Global Risk through a temporary tunnel,
+  // under a test name, before a permanent address exists. The test feed stays behind on Global
+  // Risk after the tunnel closes.
+  const testPanel = (feed) => {
+    const box = document.createElement("details");
+    box.className = "cb-feed__test";
+    const summary = document.createElement("summary");
+    summary.textContent = "Test it on Global Risk now";
+    const steps = document.createElement("ol");
+    [
+      "Start the test address on this computer: in a terminal, run .\\scripts\\feed-test-address.ps1 (it switches the feed on, starts the relay and a tunnel, and prints an address ending in trycloudflare.com).",
+      "Paste that address below, check the test name, and press Review.",
+      "Read the review, tick the box and send. Then ask Global Risk with feeds_query and the test name.",
+    ].forEach((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      steps.append(li);
+    });
+    const warn = document.createElement("p");
+    warn.className = "cb-feed__reason";
+    warn.textContent = "The test feed stays on Global Risk for everyone after the tunnel closes, pointing at a dead address, until a Global Risk maintainer removes it. Use a test name so the real name stays free.";
+    const addressLabel = document.createElement("label");
+    addressLabel.className = "cb-field";
+    const addressName = document.createElement("span");
+    addressName.className = "cb-field__name";
+    addressName.textContent = "Test address";
+    const address = document.createElement("input");
+    address.type = "url";
+    address.placeholder = "https://something.trycloudflare.com";
+    addressLabel.append(addressName, address);
+    const nameLabel = document.createElement("label");
+    nameLabel.className = "cb-field";
+    const nameName = document.createElement("span");
+    nameName.className = "cb-field__name";
+    nameName.textContent = "Test name";
+    const name = document.createElement("input");
+    name.type = "text";
+    name.value = `${feed.dataset}_test1`;
+    nameLabel.append(nameName, name);
+    const review = document.createElement("button");
+    review.type = "button";
+    review.className = "button button--primary";
+    review.textContent = "Review the test";
+    review.addEventListener("click", () => {
+      const base = address.value.trim().replace(/\/+$/, "");
+      if (!/^https?:\/\//.test(base)) {
+        showBanner("Paste the test address the script printed, starting with https://.", "bad");
+        return;
+      }
+      const manifest = JSON.parse(JSON.stringify(feed.manifest));
+      manifest.dataset = name.value.trim();
+      manifest.title = `TEST: ${manifest.title}`;
+      manifest.usage_notes = `TEST FEED on a temporary address; it will stop answering. ${manifest.usage_notes || ""}`.slice(0, 500);
+      manifest.fetch.url = `${base}${feed.test_path}`;
+      state.test = true;
+      state.values = flattenFeed(manifest);
+      state.feedTab = "other";
+      renderFields({});
+      showBanner("Test mode: a temporary address under a test name. Check the review below, then send.", "info");
+      check().catch((error) => showBanner(error.message, "bad"));
+    });
+    box.append(summary, steps, warn, addressLabel, nameLabel, review);
+    return box;
   };
 
   const loadPlatformFeeds = async () => {
@@ -353,7 +434,7 @@
       fields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v)]));
       showFeedResult(await GRP.request("/api/v1/contributions/feed-check", {
         method: "POST",
-        body: { hub_code: state.hubCode, url: manifest.url, records_path: manifest.records_path, fields, as_of_field: manifest.as_of_field || null },
+        body: { hub_code: state.hubCode, url: manifest.url, records_path: manifest.records_path, fields, as_of_field: manifest.as_of_field || null, test: state.test },
       }));
     } catch (error) {
       showFeedResult({ ok: false, problem: error.message });
@@ -392,7 +473,7 @@
     $("[data-confirm]").hidden = true;
     const result = await GRP.request("/api/v1/contributions", {
       method: "POST",
-      body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true },
+      body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true, test: state.test },
     });
     renderFields(result.problems || {});
     if (result.duplicate) {
@@ -435,7 +516,7 @@
     try {
       const result = await GRP.request("/api/v1/contributions", {
         method: "POST",
-        body: { hub_code: state.hubCode, kind: state.kind, manifest: state.checked.manifest, preview: false },
+        body: { hub_code: state.hubCode, kind: state.kind, manifest: state.checked.manifest, preview: false, test: state.test },
       });
       if (!result.sent) {
         renderFields(result.problems || {});
@@ -718,6 +799,7 @@
   });
   $("[data-reset]").addEventListener("click", () => {
     state.values = {};
+    state.test = false;
     $("[data-confirm]").hidden = true;
     renderFields({});
   });

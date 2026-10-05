@@ -1,9 +1,12 @@
 """Serve only the public live flood feed, so a tunnel can expose it and nothing else (ADR-0052).
 
 The GRP API stays on 127.0.0.1:8000 with sign-in, Admin and every other route. This relay listens
-on its own port and answers exactly one path, ``/feed.json``, by reading the API's anonymous feed
-route (switched on with ``FLOOD_FEED_PUBLIC=true``). Everything else is 404. Put the tunnel in
-front of this port, never in front of the API.
+on its own port and answers exactly these paths, by reading the API's anonymous feed routes:
+
+- ``/feed.json`` and ``/bangkok/feed.json``: the flood feed (``FLOOD_FEED_PUBLIC=true``);
+- ``/air-quality/feed.json``: Southeast Asia PM2.5 (``AIR_QUALITY_FEED_PUBLIC=true``, ADR-0061).
+
+Everything else is 404. Put the tunnel in front of this port, never in front of the API.
 
     python -m grpcli.feed_relay --port 8090
 """
@@ -15,17 +18,26 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-PATHS = ("/feed.json", "/bangkok/feed.json")
 PASS_HEADERS = ("ETag", "Cache-Control", "Content-Type")
 
 
-def make_handler(upstream: str) -> type[BaseHTTPRequestHandler]:
+def routes_for(api: str, pilot: str = "bangkok") -> dict[str, str]:
+    flood = f"{api}/api/v1/public/flood/{pilot}/feed.json"
+    return {"/feed.json": flood, f"/{pilot}/feed.json": flood,
+            "/air-quality/feed.json": f"{api}/api/v1/public/aq/sea/feed.json"}
+
+
+def make_handler(upstreams: str | dict[str, str]) -> type[BaseHTTPRequestHandler]:
+    if isinstance(upstreams, str):
+        upstreams = {"/feed.json": upstreams, "/bangkok/feed.json": upstreams}
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "grp-feed-relay"
         sys_version = ""
 
         def _answer(self, with_body: bool) -> None:
-            if self.path.split("?", 1)[0] not in PATHS:
+            upstream = upstreams.get(self.path.split("?", 1)[0])
+            if upstream is None:
                 self._plain(404, b"not found", with_body)
                 return
             request = urllib.request.Request(upstream, headers={"Accept": "application/json"})
@@ -85,9 +97,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--api", default="http://127.0.0.1:8000")
     parser.add_argument("--pilot", default="bangkok")
     args = parser.parse_args(argv)
-    upstream = f"{args.api}/api/v1/public/flood/{args.pilot}/feed.json"
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(upstream))
-    print(f"Serving {upstream} as http://{args.host}:{args.port}/feed.json (Ctrl+C to stop)")
+    routes = routes_for(args.api, args.pilot)
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(routes))
+    for path, upstream in routes.items():
+        print(f"http://{args.host}:{args.port}{path} -> {upstream}")
+    print("Serving only these paths (Ctrl+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
