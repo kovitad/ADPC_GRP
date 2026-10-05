@@ -1,7 +1,7 @@
 # Live flood feed on Global Risk: the tunnel test and the MCP calls
 
-Status: built on 5 October 2026 up to the tunnel (ADR-0052). The steps that publish or submit
-need the owner's yes at the time.
+Status: **run on 5 October 2026 with the owner's yes. The feed was auto-approved and is live** (see
+"What happened").
 
 ## Why a tunnel
 
@@ -80,3 +80,24 @@ It is submitted after the districts feed.
   (maintainer question 4).
 - **Laptop uptime.** If the laptop, Docker or the tunnel stops, the next fetch fails and Global
   Risk serves the cached copy marked stale, or declines.
+
+## What happened (5 October 2026)
+
+- **The tunnel** `https://areas-barry-beyond-res.trycloudflare.com/feed.json` served only the
+  feed; `/api/v1/me` through the tunnel answered 404.
+- **`contribute_submit`** returned contribution `47b51ee65c4659f9`, but **auto-approved**:
+  "this deployment lands contributions without review" (`GRP_AUTO_APPROVE` on). The feed was
+  live for every caller at once, and `conf/feeds/bangkok_flood_districts_live.yml` was written
+  with the temporary tunnel URL. The plan had assumed staging with review.
+- **`feeds_query`** returned the 12 most concerning districts, sorted by `as_of`, not from cache.
+  Lat Krabang (11 active, high) and Prawet (6 active, high) were last.
+- **`assemble_pack(pack="risk", place="Bangkok", hazard="flood")`** cited the live feed as [4],
+  "pulled at pack time", beside the JRC 100-year flood exposure for 173 hospitals and 684
+  schools.
+- **`publish_answer`** passed. Receipt `25e8f83c33fa518f`:
+  <https://servirplatform.sig-gis.com/api/resolve/receipt/25e8f83c33fa518f>.
+- **Withdraw was refused:** "approved, not pending". Only a Global Risk maintainer can retire
+  the feed or re-point it at a permanent host. The name `bangkok_flood_districts_live` is now
+  taken.
+- **Lesson:** before submitting to this deployment, check whether it auto-approves. Submit only
+  a URL that will stay up.
