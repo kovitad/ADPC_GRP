@@ -258,6 +258,9 @@ def check_manifest(kind: str, manifest: dict[str, Any], test: bool = False) -> C
                 "Use one of the output field names above, so records sort by it."
             )
         cleaned.setdefault("pack", "risk")
+        # Global Risk requires residency for every feed (declined without it, 5 Oct 2026). A feed
+        # it fetches at query time is always an external call-out.
+        cleaned.setdefault("residency", "external call-out")
         checked.manifest = {
             **{k: v for k, v in cleaned.items() if k not in FEED_FETCH_KEYS},
             "adapter": "generic_json",

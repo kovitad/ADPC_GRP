@@ -25,6 +25,8 @@ def test_a_feed_is_checked_flat_and_sent_nested() -> None:
     assert checked.problems == {}
     manifest = checked.manifest
     assert manifest["adapter"] == "generic_json" and manifest["pack"] == "risk"
+    # Global Risk declines a feed without residency (5 Oct 2026).
+    assert manifest["residency"] == "external call-out"
     assert manifest["fetch"] == {"url": FLAT["url"], "records_path": "provinces",
                                  "as_of_field": "as_of",
                                  "fields": {"province": "name", "pm25": "values.0",
