@@ -7,8 +7,8 @@
   placement. It produces no API layer, confidence change, watch or warning yet.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. No key is configured locally, so no TWA call was made and the switch remains false.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin through `03aa63b`
-  (ThaiWater Stage 0 shadow capture).
+- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin. ThaiWater Stage 0
+  is implemented in `03aa63b`; its detailed continuation handover is committed immediately after.
 - **Next agent:** read Section 0, "6 October: ThaiWater Stage 0 shadow capture", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
