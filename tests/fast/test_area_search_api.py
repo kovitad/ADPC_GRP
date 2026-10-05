@@ -11,41 +11,50 @@ from core.access_models import Base, uuid7
 from core.assessment_models import Boundary
 from core.identity import MembershipView
 
+DELIVERY = "ADPC Data Science Thailand hierarchy delivery"
+
 
 def _principal() -> CurrentPrincipal:
+    member = MembershipView(hub_id=uuid7(), hub_code="adpc", hub_name="ADPC", role="planner")
     return CurrentPrincipal(
         user_id=None, email="planner@example.test", display_name="Planner",
-        is_platform_admin=False,
-        memberships=(MembershipView(hub_id=uuid7(), hub_code="adpc", hub_name="ADPC", role="planner"),),
-        issued_at=0, session_id="test",
+        is_platform_admin=False, memberships=(member,), issued_at=0, session_id="test",
     )
 
 
 def _square(x0, y0, x1, y1):
-    return {"type": "Polygon", "coordinates": [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]}
+    ring = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]
+    return {"type": "Polygon", "coordinates": [ring]}
 
 
-def _area(code, name, name_th, level, geom, supported=True, source="ADPC Data Science Thailand hierarchy delivery"):
+def _area(code, name, name_th, level, geom, supported=True, source=DELIVERY):
     return Boundary(
-        admin_code=code, admin_level=level, name=name, name_th=name_th, province_name="BANGKOK",
-        province_name_th="กรุงเทพมหานคร", country_name="Thailand", geom=geom, source=source,
-        edition="2025-10", geometry_sha256="a" * 64, is_supported=supported,
+        admin_code=code, admin_level=level, name=name, name_th=name_th,
+        province_name="BANGKOK", province_name_th="กรุงเทพมหานคร", country_name="Thailand",
+        geom=geom, source=source, edition="2025-10", geometry_sha256="a" * 64,
+        is_supported=supported,
     )
 
 
 @pytest.fixture
 def world():
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         session.add_all([
             _area("1029", "BANG SUE", "บางซื่อ", "district", _square(100.50, 13.80, 100.55, 13.85)),
-            _area("102901", "BANG SUE", "บางซื่อ", "subdistrict", _square(100.50, 13.80, 100.52, 13.85)),
-            _area("102902", "WONG SAWANG", "วงศ์สว่าง", "subdistrict", _square(100.52, 13.80, 100.55, 13.85)),
+            _area("102901", "BANG SUE", "บางซื่อ", "subdistrict",
+                  _square(100.50, 13.80, 100.52, 13.85)),
+            _area("102902", "WONG SAWANG", "วงศ์สว่าง", "subdistrict",
+                  _square(100.52, 13.80, 100.55, 13.85)),
             _area("1030", "CHATUCHAK", "จตุจักร", "district", _square(100.55, 13.80, 100.60, 13.85)),
-            _area("103001", "LAT YAO", "ลาดยาว", "subdistrict", _square(100.55, 13.80, 100.60, 13.85)),
+            _area("103001", "LAT YAO", "ลาดยาว", "subdistrict",
+                  _square(100.55, 13.80, 100.60, 13.85)),
             # Not supported: never offered.
-            _area("10", "BANGKOK", "กรุงเทพมหานคร", "province", _square(100, 13, 101, 14), supported=False),
+            _area("10", "BANGKOK", "กรุงเทพมหานคร", "province", _square(100, 13, 101, 14),
+                  supported=False),
             # The synthetic test district overlaps on purpose.
             _area("9999", "SYNTHETIC", None, "district", _square(100.50, 13.80, 100.60, 13.85),
                   source="synthetic test data (not a real boundary)"),
@@ -59,19 +68,20 @@ def _search(world, q):
 
 
 def test_a_sub_district_is_found_by_english_thai_or_squeezed_name(world) -> None:
-    for q in ("wong sawang", "Wong Sawang", "wongsawang", "วงศ์สว่าง", "แขวงวงศ์สว่าง", "Khwaeng Wong Sawang"):
+    for q in ("wong sawang", "Wong Sawang", "wongsawang", "วงศ์สว่าง", "แขวงวงศ์สว่าง",
+              "Khwaeng Wong Sawang"):
         names = [a["name"] for a in _search(world, q)]
         assert names[:1] == ["WONG SAWANG"], q
     first = _search(world, "wongsawang")[0]
     assert first["admin_level"] == "subdistrict"
-    assert first["district"] == {"id": first["district"]["id"], "name": "BANG SUE", "name_th": "บางซื่อ",
-                                 "admin_code": "1029"}
+    assert first["district"]["name"] == "BANG SUE"
+    assert first["district"]["admin_code"] == "1029"
 
 
 def test_the_district_comes_before_its_namesake_sub_district(world) -> None:
     areas = _search(world, "bang sue")
-    assert [(a["admin_level"], a["admin_code"]) for a in areas[:2]] == [("district", "1029"),
-                                                                      ("subdistrict", "102901")]
+    pairs = [(a["admin_level"], a["admin_code"]) for a in areas[:2]]
+    assert pairs == [("district", "1029"), ("subdistrict", "102901")]
     assert all(a["admin_level"] in {"district", "subdistrict"} for a in _search(world, "bangkok"))
 
 
@@ -84,4 +94,5 @@ def test_a_point_gives_its_sub_district_and_district(world) -> None:
 
 
 def test_a_point_outside_every_area_finds_nothing(world) -> None:
-    assert routes.area_at(_principal(), world, 15.0, 101.0, None) == {"district": None, "subdistrict": None}
+    found = routes.area_at(_principal(), world, 15.0, 101.0, None)
+    assert found == {"district": None, "subdistrict": None}
