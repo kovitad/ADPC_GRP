@@ -62,6 +62,7 @@ for module in (
     flood_pilot,
 ):
     app.include_router(module.router, prefix="/api/v1")
+app.include_router(flood_pilot.public_router, prefix="/api/v1")
 
 
 @app.get("/admin", include_in_schema=False)

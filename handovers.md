@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "4 October (evening, latest)", first, then "4 October (morning): roadmap input for the dev team".**
+**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "5 October (latest)", then "4 October (evening)", then "4 October (morning): roadmap input for the dev team".**
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -115,7 +115,37 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-4 October 2026)
 
-### 4 October (evening, latest): Nonthaburi, the Planner map and GEOGLOWS in the summary
+### 5 October (latest): the live feed for Global Risk (ADR-0052)
+
+- **Stack:** Docker Desktop had stopped at about 22:58 UTC on 4 October. It was restarted on
+  5 October and rebuilt with `scripts/docker-desktop.ps1`, so the copied fixes are now in the
+  images. 4.4 GB of memory was free.
+- **Built:**
+  - `core/flood_evidence/feed.py`;
+  - the protected route `GET /api/v1/pilot/flood/{pilot_id}/feed.json`;
+  - the public route `GET /api/v1/public/flood/{pilot_id}/feed.json`, which is 404 unless
+    `FLOOD_FEED_PUBLIC=true`;
+  - `grpcli/feed_relay.py`, which serves `/feed.json` only.
+
+  Tests: `test_flood_feed`, `test_feed_relay`, the permission matrix and the public-route test.
+- **Real data:** 65 incidents and 56 districts, 67 KB.
+- **Checked against Global Risk's own code** at `a8a43c2`: the validator passes both manifests,
+  and `generic_json` sorts by our timestamps. The manifests were fixed so `as_of` is mapped into
+  `fields`, and they now cover Bangkok and Nonthaburi.
+- **Next:** follow `docs/pilot/2026-10-05_Live_Feed_MCP_Test_Plan.md`. Each step needs the
+  owner's yes at the time:
+  1. install `cloudflared`;
+  2. switch the public feed on;
+  3. open the tunnel;
+  4. stage the districts feed;
+  5. run `feeds_query`, `assemble_pack(pack="risk", place="Bangkok", hazard="flood")` and
+     `publish_answer`;
+  6. withdraw.
+- **Hosting:** a permanent feed needs a static IP. Lightsail with 2 GB RAM and 60 GB disk fits
+  the whole stack (measured at rest: about 400 MB of memory, an 850 MB database and 5.9 GB of
+  stored files). 1 GB or less fits a feed-only host.
+
+### 4 October (evening): Nonthaburi, the Planner map and GEOGLOWS in the summary
 
 Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**: the owner runs
 `git push -u origin pilot/river-watch-and-bangkok-flood` (the agent's push was blocked).

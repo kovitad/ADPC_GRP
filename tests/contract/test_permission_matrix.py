@@ -137,6 +137,8 @@ MATRIX = {
     "flood_cameras": (401, 200, 200, 403, 200),
     "flood_assets": (401, 200, 200, 403, 200),
     "flood_incidents": (401, 200, 200, 403, 200),
+    # ADR-0052: the Global Risk feed follows the pilot rules; its anonymous copy is off by default.
+    "flood_feed": (401, 200, 200, 403, 200),
     # No incident is stored in the fixture, so allowed callers are told it is not found.
     "flood_incident": (401, 404, 404, 403, 404),
     # ADR-0042: recording an observation needs a pilot-Hub membership. A Platform Admin with no
@@ -249,6 +251,7 @@ MATRIX_OPERATION_IDS = {
     "flood_pilots": "list_flood_pilots_api_v1_pilot_flood_get",
     "flood_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
     "flood_situation": "read_situation_api_v1_pilot_flood__pilot_id__situation_get",
+    "flood_feed": "read_flood_feed_api_v1_pilot_flood__pilot_id__feed_json_get",
     "flood_roads": "read_roads_api_v1_pilot_flood__pilot_id__roads_get",
     "flood_reports": "read_reports_api_v1_pilot_flood__pilot_id__reports_get",
     "flood_areas": "read_areas_api_v1_pilot_flood__pilot_id__areas_get",
@@ -658,6 +661,7 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             "GET", "/api/v1/pilot/flood/bangkok/cameras/bmatraffic%3A1362/frame.jpg", None
         ),
         "flood_unknown_pilot": ("GET", "/api/v1/pilot/flood/no-such", None),
+        "flood_feed": ("GET", "/api/v1/pilot/flood/bangkok/feed.json", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)
@@ -790,3 +794,31 @@ def test_the_camera_relay_serves_only_bmatraffic_pictures_when_switched_on(
     cameras = client.get(base, headers=headers).json()["cameras"]
     kinds = {(c["provider"], (c["live"] or {}).get("kind")) for c in cameras}
     assert ("BMA_TRAFFIC", "frames") in kinds and ("BMA_TRAFFIC", None) not in kinds
+
+
+def test_the_public_flood_feed_is_closed_unless_switched_on(world, monkeypatch) -> None:
+    import api.flood_pilot as flood_module
+
+    limiter.reset()
+    client, headers = _client(world, "planner")
+    path = "/api/v1/public/flood/bangkok/feed.json"
+    assert client.get(path).status_code == 404
+    # The signed-in copy answers, with an ETag that gives 304 when nothing changed.
+    signed_in = client.get("/api/v1/pilot/flood/bangkok/feed.json", headers=headers)
+    assert signed_in.status_code == 200 and signed_in.headers["cache-control"].startswith("private")
+    again = client.get("/api/v1/pilot/flood/bangkok/feed.json",
+                       headers={**headers, "If-None-Match": signed_in.headers["etag"]})
+    assert again.status_code == 304
+    # A replay ID never resolves, even for a pilot member.
+    replay = client.get("/api/v1/pilot/flood/r00000000000/feed.json", headers=headers)
+    assert replay.status_code == 404
+
+    enabled = world["settings"].model_copy(update={"flood_feed_public": True})
+    monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
+    anonymous = client.get(path)
+    assert anonymous.status_code == 200
+    assert anonymous.headers["cache-control"] == "public, max-age=60"
+    body = anonymous.json()
+    assert len(body["districts"]) == 56 and body["records"] == []
+    assert client.get("/api/v1/public/flood/no-such/feed.json").status_code == 404
+    assert client.get("/api/v1/public/flood/r00000000000/feed.json").status_code == 404

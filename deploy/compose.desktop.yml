@@ -52,6 +52,10 @@ services:
       LONGDO_API_KEY_FILE: /run/grp-secrets/longdo_api_key
       # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only.
       BMATRAFFIC_RELAY_ENABLED: "true"
+      # ADR-0052: the anonymous live flood feed for Global Risk. Off unless the launcher is run
+      # with FLOOD_FEED_PUBLIC=true; the API port stays on 127.0.0.1, and only grpcli.feed_relay
+      # is put behind a tunnel.
+      FLOOD_FEED_PUBLIC: "${FLOOD_FEED_PUBLIC:-false}"
       # Draft methods run only here, for the SYNTHETIC test case (never on servers).
       ALLOW_DRAFT_METHODS: "true"
       # Local testing clicks through pages quickly; servers keep the Section 13.1 limit of 60.

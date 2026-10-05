@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only; off on
     # servers until BMA gives permission.
     bmatraffic_relay_enabled: bool = False
+    # ADR-0052: the anonymous live flood feed for Global Risk. Off unless a public host serves it.
+    flood_feed_public: bool = False
     ai_provider: str | None = None
     ai_model: str | None = None
     ai_base_url: str | None = None

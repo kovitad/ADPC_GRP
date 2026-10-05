@@ -1,8 +1,8 @@
 {
-  "_status": "DRAFT, 4 October 2026. Not submitted. Submit after the districts feed, on a day with flooding (an empty list is refused). Remove this _status line before submitting: unknown fields are refused.",
+  "_status": "DRAFT, 5 October 2026. Not submitted. Submit after the districts feed, on a day with flooding (an empty list is refused). Remove this _status line before submitting: unknown fields are refused. Checked against Global Risk's own validator and generic_json reader at a8a43c2.",
   "dataset": "bangkok_flood_incidents_live",
-  "title": "Bangkok flood incidents (live, whole city)",
-  "description": "Open flood incidents on Bangkok roads, grouped by the ADPC GRP Bangkok flood pilot from Floodboard road ratings and public reports (BMA, Traffy Fondue and crowd). One record per incident, with a confidence word and its reasons, the districts and roads it touches, and counts of schools, hospitals and clinics with flooding reported nearby. Estimates from crowd and agency reports: not a flood map, not water-level sensors and not verified on the ground. Covers all 50 Bangkok districts.",
+  "title": "Bangkok and Nonthaburi flood incidents (live)",
+  "description": "Open flood incidents on Bangkok roads, grouped by the ADPC GRP Bangkok flood pilot from Floodboard road ratings and public reports (BMA, Traffy Fondue and crowd). One record per incident, with a confidence word and its reasons, the districts and roads it touches, and counts of schools, hospitals and clinics with flooding reported nearby. Estimates from crowd and agency reports: not a flood map, not water-level sensors and not verified on the ground. Covers all 50 Bangkok districts and the 6 districts of Nonthaburi.",
   "source": "ADPC GRP Bangkok flood pilot (derived from Floodboard: BMA, Traffy Fondue and public reports; facilities from OpenStreetMap)",
   "validation": "unvalidated",
   "residency": "external call-out",
@@ -18,7 +18,9 @@
       "confidence": "confidence",
       "reasons": "confidence_reasons",
       "families": "source_families",
+      "evidence_class": "evidence_class",
       "districts": "district_names_en",
+      "district_codes": "district_codes",
       "roads": "road_names_en",
       "lat": "lat",
       "lon": "lon",
@@ -39,5 +41,5 @@
     "Thailand"
   ],
   "license": "CC BY 4.0 (derived from Floodboard, CC BY 4.0; facility counts from OpenStreetMap, ODbL)",
-  "usage_notes": "Bangkok only (50 districts). Confidence is a word with reasons, not a probability. 'Facilities nearby' means flooding reported near them, not that they are flooded. Check valid_until on each record: older is stale. Rain is not included. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
+  "usage_notes": "Bangkok and Nonthaburi only (56 districts). Confidence is a word with reasons, not a probability. 'Facilities nearby' means flooding reported near them, not that they are flooded. Check valid_until on each record: older is stale. Rain is not included. Credit: Floodboard (floodboard.org), CC BY 4.0; © OpenStreetMap contributors."
 }

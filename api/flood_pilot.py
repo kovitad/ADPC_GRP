@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from api.ai_gateway import run_ai_call
@@ -46,6 +46,7 @@ from core.flood_evidence.camera_relay import (
 from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
+from core.flood_evidence.feed import build_feed, serialise
 from core.flood_evidence.incident_store import (
     REPORT_WINDOW_HOURS,
     incident_detail,
@@ -80,6 +81,8 @@ from core.flood_evidence.snapshot_relay import shared_snapshot_relay
 from core.flood_evidence.weather import latest_weather
 
 router = APIRouter(prefix="/pilot/flood", tags=["pilot"])
+# ADR-0052: the anonymous copy of the live feed, served only when FLOOD_FEED_PUBLIC is on.
+public_router = APIRouter(prefix="/public/flood", tags=["pilot"])
 ROAD_ID = re.compile(r"^[0-9a-f]{16}$")
 DEFAULT_CAMERA_RADIUS_M = 400
 FRAMES_PER_PERSON_PER_MINUTE = 150
@@ -182,6 +185,46 @@ def _as_of(value: str | None, config: PilotConfig | None = None) -> datetime:
 
 
 AsOf = Annotated[str | None, Query(description="ISO 8601 time with zone; default now")]
+
+
+def _feed_response(session, config: PilotConfig, request: Request, cache: str) -> Response:
+    body, etag = serialise(build_feed(session, config))
+    headers = {"ETag": etag, "Cache-Control": cache}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=body, media_type="application/json", headers=headers)
+
+
+@router.get(
+    "/{pilot_id}/feed.json",
+    summary="The live flood feed for Global Risk: open incidents and every district (ADR-0052)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_flood_feed(
+    pilot_id: str, principal: SignedInMember, session: DatabaseSession, request: Request
+) -> Response:
+    # A live pilot only: a replay ID never resolves here.
+    config = pilot_config(pilot_id)
+    if config is None:
+        raise not_found()
+    if not may_open(principal, config):
+        raise access_not_authorized()
+    return _feed_response(session, config, request, "private, max-age=60")
+
+
+@public_router.get(
+    "/{pilot_id}/feed.json",
+    summary="The live flood feed, anonymous, for Global Risk to fetch (ADR-0052)",
+    openapi_extra={"x-grp-access": "public"},
+)
+def read_public_flood_feed(pilot_id: str, session: DatabaseSession, request: Request) -> Response:
+    # Fails closed: not found unless the deployment switches the public feed on.
+    config = pilot_config(pilot_id) if get_settings().flood_feed_public else None
+    if config is None:
+        raise not_found()
+    caller = request.client.host if request.client else "unknown"
+    limiter.check("public_flood_feed_per_caller_per_minute", caller, 30, 60)
+    return _feed_response(session, config, request, "public, max-age=60")
 
 
 @router.get(
