@@ -1,6 +1,15 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 4 October 2026 (evening). The live pilot now covers Bangkok and Nonthaburi (ADR-0057); the Planner has a per-source Live layer (ADR-0058) and one map dock instead of floating cards (ADR-0060); the district summary shows the GEOGLOWS river outlook (ADR-0059). Earlier the same day: whole Bangkok (ADR-0053), the daily research archive (ADR-0055), and live flood evidence in the Planner, steps 1-4 (ADR-0056). Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**. **Next agent: read Section 0, "5 October (evening, latest)", then "5 October (later)", then "5 October" and "4 October (evening)", then "4 October (morning): roadmap input for the dev team".**
+**Updated:** 5 October 2026 (end of day).
+- **Today:**
+  - the live flood feed for Global Risk (ADR-0052), and a first live test on Global Risk;
+  - a grouped top menu;
+  - live-feed contributions in Share data;
+  - the Southeast Asia PM2.5 feed (ADR-0061);
+  - one map icon and layer standard on every map page (ADR-0062).
+- **Before that:** 4 October, with Nonthaburi, the Planner Live layer and dock, and GEOGLOWS in the summary (ADR-0057 to 0060).
+- **Branch:** `pilot/river-watch-and-bangkok-flood`, with **15 commits not pushed** since `26b1580`.
+- **Next agent:** read Section 0, "5 October: end-of-day summary", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -113,16 +122,93 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-4 October 2026)
+## 0. Start here (sessions of 24 September-5 October 2026)
 
-### 5 October (evening, latest): Planner map icon system (ADR-0062)
+### 5 October: end-of-day summary (latest; read this first)
+
+#### State of the machine
+
+- **Docker Desktop stack:** up and rebuilt with `scripts/docker-desktop.ps1`, so the images
+  include today's code. `web/` is a live bind mount.
+- **Still running for the owner's Global Risk test:**
+  - `scripts/feed-test-address.ps1` (relay on port 8090, plus a Cloudflare quick tunnel);
+  - test address: `https://establishment-boot-jump-music.trycloudflare.com`;
+  - the public routes are switched **on** (`AIR_QUALITY_FEED_PUBLIC` and `FLOOD_FEED_PUBLIC`).
+
+  When the owner has finished testing: stop the script (Ctrl+C, or end its process), then run
+  `.\scripts\docker-desktop.ps1` without those variables to switch the routes off.
+- **Tests:** 1,206 pass and 2 skip; Ruff is clean. If a full run ever hangs, run with
+  `-p no:cacheprovider`. One hang on 5 October did not repeat that way.
+
+#### Commits on 5 October (oldest first, none pushed)
+
+| Commit | What | Record |
+| --- | --- | --- |
+| `9850bdf` | Live flood feed for Global Risk: protected route, public route behind a switch, feed-only relay | ADR-0052 |
+| `5958f80` | Record of the first Global Risk test: auto-approved, cannot be withdrawn | test plan |
+| `51e64f0` | Top bar grouped into Live, Share data, Admin and the person's menu | nav plan |
+| `6f7c586`, `c36871b` | Share data → Live feed: from this platform or another source, with Test the feed | ADR-0052 |
+| `91d8bb0` | Office lock files untracked and ignored | |
+| `692736e` | Southeast Asia PM2.5 republished from SERVIR-SEA's public feed | ADR-0061 |
+| `6c7a119` | Feeds tested before preview and send; cards show "already sent" and outside reads | ADR-0052 |
+| `ce16cca`, `a38097a` | PM2.5 test mode through a temporary address, under a `_test<n>` name | |
+| `12957ef` | `residency` sent with every feed (Global Risk declined the first PM2.5 test without it) | |
+| `ec35afa` | Planner map icon system | ADR-0062 |
+| `2167a2a` | One map standard on every map page (`web/map-symbols.js` and `.css`), plus "you are here" | ADR-0062 amendment |
+| `f526496` | Mixed clusters show their two main symbols, not a folder-like glyph | ADR-0062 |
+
+#### On Global Risk now (the deployment auto-approves; nothing can be withdrawn by us)
+
+- **`bangkok_flood_districts_live`** (contribution `47b51ee65c4659f9`). It points at a closed
+  tunnel, so it serves stale data, then declines.
+- **`sea_pm25_province_forecast_test1`.** The first attempt was declined (missing `residency`,
+  now fixed). Whether the owner re-sent it is not recorded here: check
+  `contribute_status()`. Once the test tunnel closes, it will also point at a dead address.
+- Both names go in the maintainer note
+  (`docs/pilot/2026-10-05_Global_Risk_Maintainer_Note_Feed_Repoint.md`). Add the PM2.5 test name
+  before sending.
+
+#### Owner actions
+
+1. **Push the branch:** `git push`.
+2. **Finish the PM2.5 test, then say so,** so the tunnel can be closed and the routes switched off.
+3. **Send the maintainer note,** with both feed names.
+4. **A permanent public host** (Lightsail, 2 GB RAM and 60 GB disk, static IP). Set
+   `GRP_PUBLIC_FEED_BASE_URL` there, and the platform feeds become sendable.
+5. **Ask the AQ Tracker team (SERVIR-SEA):**
+   - confirm we may republish their feed, and the credit line;
+   - add a per-row time and a lowest-first sort, so Global Risk can read their feed directly.
+6. **Decide two wording questions** from the icon pack:
+   - keep "N/A — no data" (the owner's 25 September choice, enforced by a test) or switch to
+     the pack's "Unable to assess";
+   - align the centre cards' "Lower mapped flood exposure" with the pack's "Not exposed under
+     the selected scenario".
+7. **Signed-in browser checks:**
+   - the grouped menu;
+   - Share data live feeds;
+   - the Planner icons, clusters and "you are here";
+   - the flood page pins;
+   - the Assessments and Data preview maps.
+
+#### Next to build
+
+1. Symbols for volunteer centres and early-warning resources (none in the icon pack yet).
+2. An air-quality page, which turns on the Live ▾ entry. Then a Planner PM2.5 layer and a line in
+   the district summary.
+3. The earlier queue, still open:
+   - retry the Nonthaburi OSM capture;
+   - the camera check;
+   - W3 DDPM reports.
+
+### 5 October (evening): Planner map icon system (ADR-0062)
 
 - **What:** the owner's icon pack (`docs/enhancement/GRP_Map_Icon_UX_Pack_v1.0`) on the Planner
   map:
   - shape is the feature, colour is the source, and a ring and badge are the assessment status;
   - every live point is a keyboard-focusable pin with a tooltip and an accessible name;
-  - one shared cluster group shows the dominant or a neutral symbol, and points on one spot
-    spread out (spiderfy);
+  - one shared cluster group shows the dominant symbol, or for a mixed cluster its two main
+    symbols overlapped (the first neutral glyph looked like a folder; fixed in `f526496`), and
+    points on one spot spread out (spiderfy);
   - legend rows are grouped, with the map's symbol, a short name, the source, the count and an
     "i" button for source, date and limits;
   - the status legend uses the same symbols.
@@ -186,7 +272,8 @@ RP20/RP50 rasters and methods exist.
   - a tunnel address is accepted only in test mode, under a `_test<n>` name.
 
   On 5 October the test address answered from outside: 351 provinces, sorted, with Nonthaburi and
-  Bangkok the worst. The test feed stays on Global Risk after the tunnel closes; add its name to
+  Bangkok the worst.
+  The first send was declined for a missing `residency`; fixed in `12957ef`. The test feed stays on Global Risk after the tunnel closes; add its name to
   the maintainer note.
 - **Next:**
   1. a permanent public host (Lightsail with a static IP), then share the flood districts and
