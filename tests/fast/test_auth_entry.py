@@ -110,13 +110,22 @@ def test_every_signed_in_page_uses_the_same_top_bar() -> None:
         assert "workspace-nav" not in page and "pw-nav" not in page, name
 
 
-def test_shared_menu_is_compact_and_wraps_on_small_screens() -> None:
+def test_shared_menu_groups_pages_and_folds_on_small_screens() -> None:
     styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+    common = (WEB_ROOT / "grp-common.js").read_text(encoding="utf-8")
 
+    # Planning, Assessments, Live, Share data and Admin, with My access in the person's menu.
+    for label in ('label: "Live"', 'label: "Share data"', 'label: "Admin"', '"My access"',
+                  '"Contribute a live feed"', '"River Watch (GEOGLOWS)"'):
+        assert label in common, label
+    # Menus open on click and close with Esc; pages can still show or hide each item.
+    assert 'aria-haspopup", "menu"' in common and '"Escape"' in common
+    for attr in ("data-admin-menu", "data-data-menu", "data-library-menu", "data-platform-menu",
+                 "data-pilot-menu"):
+        assert attr in common, attr
+    # Narrow screens: the groups become a list opened with the menu button.
     assert "@media (max-width: 900px)" in styles
-    assert "flex-wrap: wrap" in styles
-    assert "flex: 1 0 100%" in styles
-    assert "padding: 0.36rem 0.58rem" in styles
+    assert ".grp-topbar.is-menu-open .grp-topbar__nav { display: flex; }" in styles
 
 
 def test_data_inspector_supports_profiles_and_shareable_reports() -> None:

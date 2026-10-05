@@ -1635,74 +1635,121 @@ button.workspace-signout { border: 0; background: none; cursor: pointer; font-fa
   flex: 1;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.1rem;
+  gap: 0.15rem;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.grp-topbar__nav::-webkit-scrollbar { display: none; }
-.grp-topbar__nav a {
+/* Top-level links and menu buttons share one look. */
+.grp-topbar__link,
+.grp-menu__button {
   flex: none;
   padding: 0.36rem 0.58rem;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
   color: #4b4d50;
+  font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.grp-topbar__nav a[hidden] { display: none; }
-.grp-topbar__nav a:hover { color: var(--servir-blue-dark); background: #eef5fa; }
-.grp-topbar__nav a.is-active { color: #ffffff; background: var(--servir-blue); }
-.grp-topbar__nav a:focus-visible,
-.grp-topbar__signout:focus-visible { outline: 2px solid var(--servir-green); outline-offset: 2px; }
-.grp-topbar__user { display: flex; flex: none; align-items: center; gap: 0.8rem; }
-.grp-topbar__name {
-  max-width: 10rem;
-  overflow: hidden;
-  color: #58595b;
-  font-size: 0.84rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.grp-topbar__signout {
-  padding: 0.3rem 0.62rem;
-  border: 1px solid #cfd6d4;
-  border-radius: 999px;
+.grp-menu__button::after { content: " ▾"; color: #8a9396; font-size: 0.7rem; }
+.grp-topbar__link:hover,
+.grp-menu__button:hover,
+.grp-menu.is-open > .grp-menu__button { color: var(--servir-blue-dark); background: #eef5fa; }
+.grp-topbar__link.is-active,
+.grp-menu__button.is-active { color: #ffffff; background: var(--servir-blue); }
+.grp-menu__button.is-active::after { color: #dbe9f3; }
+.grp-topbar__link:focus-visible,
+.grp-menu__button:focus-visible,
+.grp-menu__panel a:focus-visible,
+.grp-menu__panel button:focus-visible { outline: 2px solid var(--servir-green); outline-offset: 2px; }
+.grp-topbar__link[hidden], .grp-menu[hidden], .grp-menu__panel [hidden] { display: none; }
+
+/* Drop-down panels. */
+.grp-menu { position: relative; }
+.grp-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1300;
+  display: none;
+  min-width: 15rem;
+  padding: 0.35rem;
+  border: 1px solid #e3e8e6;
+  border-radius: 12px;
   background: #ffffff;
-  color: #3a3b3d;
+  box-shadow: 0 12px 28px rgb(16 40 36 / 16%);
+}
+.grp-menu.is-open > .grp-menu__panel { display: grid; gap: 0.1rem; }
+.grp-menu__panel a,
+.grp-menu__panel button {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #33363a;
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
+  text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
-.grp-topbar__signout:hover { border-color: #8db33f; background: #f5f9ec; }
-@media (max-width: 1200px) {
-  .grp-topbar__product,
-  .grp-topbar__name { display: none; }
+.grp-menu__panel a:hover, .grp-menu__panel button:hover { background: #f1f6f9; }
+.grp-menu__panel a.is-active { color: var(--servir-blue-dark); background: #eaf3f9; }
+.grp-menu__note { color: #2f7a4a; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.grp-menu__note.is-soon { color: #8a9396; }
+.grp-menu__panel a.is-soon { color: #8a9396; cursor: default; }
+.grp-menu__panel a.is-soon:hover { background: transparent; }
+.grp-menu[data-menu="user"] .grp-menu__panel { right: 0; left: auto; min-width: 12rem; }
+
+.grp-topbar__user { display: flex; flex: none; align-items: center; gap: 0.6rem; }
+.grp-topbar__name { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; }
+.grp-topbar__burger {
+  display: none;
+  margin-left: auto;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #cfd6d4;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #3a3b3d;
+  font-size: 1.1rem;
+  cursor: pointer;
 }
+@media (max-width: 1200px) {
+  .grp-topbar__product { display: none; }
+}
+/* Phones and narrow windows: the menu becomes a list under the bar, opened with ☰. */
 @media (max-width: 900px) {
-  .grp-topbar {
-    flex-wrap: wrap;
-    gap: 0.35rem 0.6rem;
-    height: auto;
-    min-height: 56px;
-    padding: 0.45rem 0.65rem 0.5rem;
-  }
-  .grp-topbar__brand { order: 1; }
+  .grp-topbar { flex-wrap: wrap; height: auto; min-height: 56px; padding: 0.45rem 0.65rem; }
   .grp-topbar__logo { height: 22px; }
-  .grp-topbar__user { order: 2; margin-left: auto; }
+  .grp-topbar__burger { display: inline-grid; place-items: center; order: 2; }
+  .grp-topbar__user { order: 3; }
+  .grp-topbar__name { max-width: 7rem; }
   .grp-topbar__nav {
-    order: 3;
+    display: none;
+    order: 4;
     flex: 1 0 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    overflow: visible;
-    padding-top: 0.3rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.1rem;
+    padding: 0.4rem 0 0.3rem;
     border-top: 1px solid #edf1f0;
   }
-  .grp-topbar .grp-topbar__nav a { padding: 0.28rem 0.5rem; font-size: 0.73rem; }
+  .grp-topbar.is-menu-open .grp-topbar__nav { display: flex; }
+  .grp-topbar__nav .grp-menu__button { width: 100%; text-align: left; border-radius: 8px; }
+  .grp-topbar__nav .grp-topbar__link { border-radius: 8px; }
+  .grp-topbar__nav .grp-menu__panel { position: static; display: grid; min-width: 0; padding: 0 0 0.3rem 0.8rem; border: 0; box-shadow: none; }
+  .grp-topbar__nav .grp-menu__button::after { content: ""; }
 }
 
 /* Calmer page headings next to the shared top bar */
@@ -1828,9 +1875,10 @@ h4, h5, h6, strong { font-weight: var(--weight-semibold); }
 }
 .grp-topbar:empty { min-height: 56px; }
 .grp-topbar__product { font-weight: var(--weight-semibold); }
-.grp-topbar__nav a,
-.grp-topbar__signout { font-size: 0.78rem; font-weight: var(--weight-medium); }
-.grp-topbar__nav a.is-active { font-weight: var(--weight-semibold); }
+.grp-topbar__link,
+.grp-menu__button { font-size: 0.78rem; font-weight: var(--weight-medium); }
+.grp-topbar__link.is-active,
+.grp-menu__button.is-active { font-weight: var(--weight-semibold); }
 
 @media (max-width: 50rem) {
   .brand-story h1 { font-size: 1.55rem; }
