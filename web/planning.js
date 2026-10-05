@@ -61,6 +61,11 @@
     maxChosenLayers: 12,
     generatedQuestion: null,
     areaLevel: "district",
+    // Sub-district plan (5 Oct 2026): the district and sub-district chosen, and which of the two
+    // the numbers cover. state.selected is always the one in scope.
+    selectedDistrict: null,
+    selectedSubdistrict: null,
+    scope: "subdistrict",
     centersVersion: null,
     methods: [],
     centerRows: [],
@@ -893,14 +898,7 @@
       layer.bindTooltip(`${boundary.name}${boundary.synthetic ? " · synthetic" : ""}`, { sticky: true });
       layer.on("click", (event) => {
         window.L.DomEvent.stop(event);
-        // Clicking the selected district again closes an open card, or shows its profile.
-        if (state.selected && state.selected.id === boundary.id) {
-          if (detailsCurrent) closeDetails();
-          else showAreaProfile(boundary);
-          return;
-        }
-        selectBoundary(boundary, { announce: true });
-        showAreaProfile(boundary);
+        selectAtPoint(event.latlng, boundary);
       });
       districtLayer.addLayer(layer);
     });
@@ -1092,6 +1090,143 @@
     if (detailsBody.contains(box)) box.replaceChildren(...parsed.body.childNodes);
   };
 
+  // ---------- district and sub-district together (docs/pilot/2026-10-05_Subdistrict_Level_Plan.md) ----------
+  const subdistrictLists = new Map();   // district admin_code -> its sub-districts, with shapes
+  const subdistrictLayer = window.L.featureGroup();
+  const loadSubdistricts = async (district) => {
+    if (!district || district.admin_level !== "district") return [];
+    if (!subdistrictLists.has(district.admin_code)) {
+      const params = new URLSearchParams({ hub_code: state.hubCode, level: "subdistrict" });
+      params.set("parent_admin_code", district.admin_code);
+      subdistrictLists.set(district.admin_code, GRP.request(`/api/v1/catalog/boundaries?${params}`)
+        .then((payload) => payload.boundaries || [])
+        .catch(() => { subdistrictLists.delete(district.admin_code); return []; }));
+    }
+    return subdistrictLists.get(district.admin_code);
+  };
+  // The chosen district's sub-districts: thin lines, clickable, named from zoom 13.
+  const showSubdistricts = async (district) => {
+    const list = await loadSubdistricts(district);
+    if (state.selectedDistrict !== district) return;
+    subdistrictLayer.clearLayers();
+    list.forEach((sub) => {
+      const selected = state.selectedSubdistrict && state.selectedSubdistrict.id === sub.id;
+      const layer = window.L.geoJSON(sub.geometry, {
+        pane: "grpSelectionLine",
+        style: { color: window.GRPMap.BOUNDARY, weight: selected ? 0 : 1.2, dashArray: "3 4", opacity: 0.9,
+          fill: true, fillColor: window.GRPMap.BOUNDARY, fillOpacity: 0 },
+      });
+      const label = document.createElement("span");
+      label.textContent = readableName(sub.name);
+      layer.bindTooltip(label, { permanent: true, direction: "center", className: "pw-sub-label" });
+      layer.on("click", (event) => {
+        window.L.DomEvent.stop(event);
+        if (selected && detailsCurrent) { closeDetails(); return; }
+        selectArea({ district, subdistrict: sub }, { announce: !selected });
+      });
+      subdistrictLayer.addLayer(layer);
+    });
+    if (!map.hasLayer(subdistrictLayer)) subdistrictLayer.addTo(map);
+  };
+  // Sub-district names only when they can be read.
+  map.on("zoomend", () => map.getContainer().classList.toggle("pw-sub-labels-on", map.getZoom() >= 13));
+  map.getContainer().classList.toggle("pw-sub-labels-on", map.getZoom() >= 13);
+  map.getPane("grpSelectionLine").style.pointerEvents = "auto";
+
+  // Choose a district and, optionally, one of its sub-districts. `scope` says which the numbers
+  // cover; the default is the sub-district when there is one (owner's choice).
+  const selectArea = ({ district, subdistrict = null }, { scope = null, announce = true, fly = false } = {}) => {
+    if (!district) return;
+    state.selectedDistrict = district;
+    state.selectedSubdistrict = subdistrict;
+    const target = (scope || (subdistrict ? "subdistrict" : "district")) === "subdistrict" && subdistrict
+      ? subdistrict : district;
+    selectBoundary(target, { announce, explicit: true });
+    state.scope = target === subdistrict ? "subdistrict" : "district";
+    renderCrumbs();
+    if (fly && target.geometry) {
+      const bounds = window.L.geoJSON(target.geometry).getBounds();
+      if (bounds.isValid()) map.flyToBounds(bounds, { padding: [60, 60], duration: 0.6 });
+    }
+  };
+
+  const areaAtPoint = async (lat, lon) => {
+    try {
+      return await GRP.request(`/api/v1/catalog/areas/at?${new URLSearchParams({ hub_code: state.hubCode, lat, lon })}`);
+    } catch (_error) {
+      return { district: null, subdistrict: null };
+    }
+  };
+  // The loaded district object (it carries the outline the map draws), for an area from the API.
+  const knownDistrict = (area) => (area ? state.boundaries.find((item) => item.id === area.id
+    || (item.admin_level === "district" && item.admin_code === area.admin_code)) || area : null);
+
+  // One click: the sub-district under the pointer and its district.
+  const selectAtPoint = async (latlng, fallbackDistrict = null) => {
+    const found = await areaAtPoint(latlng.lat, latlng.lng);
+    const district = knownDistrict(found.district) || fallbackDistrict;
+    if (!district) return false;
+    let subdistrict = null;
+    if (found.subdistrict) {
+      const list = await loadSubdistricts(district);
+      subdistrict = list.find((item) => item.id === found.subdistrict.id) || found.subdistrict;
+    }
+    const same = state.selected && subdistrict && state.selected.id === subdistrict.id;
+    if (same && detailsCurrent) { closeDetails(); return true; }
+    selectArea({ district, subdistrict }, { announce: !same });
+    if (!same) showAreaProfile(state.selected);
+    return true;
+  };
+
+  // Province › District › Sub-district, and whether the numbers cover the district or the
+  // sub-district. Clicking the district crumb widens the scope to the district.
+  const renderCrumbs = () => {
+    const bar = $("[data-area-crumbs]");
+    if (!bar) return;
+    const district = state.selectedDistrict;
+    bar.replaceChildren();
+    bar.hidden = !district;
+    if (!district) return;
+    const sub = state.selectedSubdistrict;
+    const trail = document.createElement("ol");
+    trail.className = "pw-crumbs__trail";
+    const crumb = (text, current, onClick) => {
+      const li = document.createElement("li");
+      const node = document.createElement(onClick && !current ? "button" : "span");
+      node.textContent = text;
+      if (onClick && !current) {
+        node.type = "button";
+        node.addEventListener("click", onClick);
+      }
+      if (current) node.setAttribute("aria-current", "location");
+      li.append(node);
+      trail.append(li);
+    };
+    if (district.province_name) crumb(readableName(district.province_name), false, null);
+    crumb(`${readableName(district.name)} district`, state.scope === "district",
+      () => selectArea({ district, subdistrict: sub }, { scope: "district", announce: false }));
+    if (sub) crumb(readableName(sub.name), state.scope === "subdistrict",
+      () => selectArea({ district, subdistrict: sub }, { scope: "subdistrict", announce: false }));
+    bar.append(trail);
+    const scope = document.createElement("div");
+    scope.className = "pw-crumbs__scope";
+    scope.setAttribute("role", "group");
+    scope.setAttribute("aria-label", "What the numbers cover");
+    [["district", "Whole district"], ["subdistrict", "This sub-district"]].forEach(([key, text]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = text;
+      button.setAttribute("aria-pressed", String(state.scope === key));
+      button.disabled = key === "subdistrict" && !sub;
+      if (key === "subdistrict" && !sub) button.title = "Click a sub-district on the map first";
+      button.addEventListener("click", () => {
+        if (state.scope !== key) selectArea({ district, subdistrict: sub }, { scope: key, announce: false });
+      });
+      scope.append(button);
+    });
+    bar.append(scope);
+  };
+
   // The selected district or sub-district, made obvious: a white-cased navy outline, the rest of
   // the map lightly dimmed (unless the sensitivity view already dims it), and its name.
   let selectedAreaLayer = null;
@@ -1101,8 +1236,8 @@
     : name || "");
   const areaLabel = (boundary) => {
     const level = boundary.admin_level === "subdistrict" ? "sub-district" : "district";
-    const parent = boundary.admin_level === "subdistrict" && state.parentDistrictName
-      ? `, ${readableName(state.parentDistrictName)}` : "";
+    const parent = boundary.admin_level === "subdistrict" && state.selectedDistrict
+      ? `, ${readableName(state.selectedDistrict.name)}` : "";
     return `${readableName(boundary.name)} ${level}${parent}`;
   };
   const showSelectedArea = (boundary) => {
@@ -1163,7 +1298,20 @@
     }
     placeLayer.clearLayers();
     $("[data-place-chip]").hidden = true;
-    districtLayer.eachLayer((layer) => layer.setStyle(boundaryStyle(layer.boundaryId === boundary.id)));
+    if (boundary.admin_level === "subdistrict") {
+      state.selectedSubdistrict = boundary;
+      state.selectedDistrict = state.boundaries.find((item) => item.admin_level === "district"
+        && item.admin_code === String(boundary.admin_code).slice(0, 4)) || state.selectedDistrict;
+      state.scope = "subdistrict";
+    } else {
+      if (!state.selectedDistrict || state.selectedDistrict.id !== boundary.id) state.selectedSubdistrict = null;
+      state.selectedDistrict = boundary;
+      state.scope = "district";
+    }
+    const districtId = state.selectedDistrict ? state.selectedDistrict.id : boundary.id;
+    districtLayer.eachLayer((layer) => layer.setStyle(boundaryStyle(layer.boundaryId === districtId)));
+    showSubdistricts(state.selectedDistrict);
+    renderCrumbs();
     syncSensitivityView();
     syncLiveFlood();
     const layer = districtLayer.getLayers().find((item) => item.boundaryId === boundary.id);
@@ -1280,22 +1428,16 @@
     if (!detail || !detail.id) return null;
     const known = state.boundaries.find((item) => item.id === detail.id);
     if (known) return known;
-    const level = detail.admin_level === "subdistrict" ? "subdistrict" : "district";
-    const params = new URLSearchParams({ hub_code: state.hubCode, level });
-    if (level === "subdistrict") {
-      params.set("parent_admin_code", String(detail.admin_code).slice(0, 4));
+    if (detail.admin_level === "subdistrict") {
+      const district = state.boundaries.find((item) => item.admin_level === "district"
+        && item.admin_code === String(detail.admin_code).slice(0, 4));
+      const list = await loadSubdistricts(district);
+      return list.find((item) => item.id === detail.id) || null;
     }
     try {
+      const params = new URLSearchParams({ hub_code: state.hubCode, level: "district" });
       const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
-      const found = payload.boundaries.find((item) => item.id === detail.id);
-      if (!found) return null;
-      // Replace the visible list so the level selector, the map and the panel agree.
-      state.areaLevel = level;
-      state.boundaries = payload.boundaries;
-      const levelSelect = $("[data-area-level]");
-      if (levelSelect) levelSelect.value = level;
-      drawDistricts();
-      return found;
+      return payload.boundaries.find((item) => item.id === detail.id) || null;
     } catch (error) {
       return null;
     }
@@ -2723,40 +2865,6 @@
 
   // The map's layer panel. The chat's Global Risk layer picker is [data-layers] (ADR-0034).
   // The Layers and Run tabs are handled by the dock (see "the map dock" above).
-
-  $("[data-area-level]").addEventListener("change", async (event) => {
-    const nextLevel = event.currentTarget.value;
-    const priorDistrict = state.selected?.admin_level === "district" ? state.selected : null;
-    if (nextLevel === "subdistrict" && !priorDistrict) {
-      event.currentTarget.value = "district";
-      addMessage("assistant", "Select a district first, then choose Sub-district in Layers.", { error: true });
-      return;
-    }
-    const params = new URLSearchParams({ hub_code: state.hubCode, level: nextLevel });
-    if (priorDistrict) params.set("parent_admin_code", priorDistrict.admin_code);
-    const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
-    state.areaLevel = nextLevel;
-    state.boundaries = payload.boundaries;
-    state.selected = null;
-    state.parentDistrictName = nextLevel === "subdistrict" && priorDistrict ? priorDistrict.name : null;
-    showSelectedArea(null);
-    syncLiveFlood();
-    // Nothing is selected at the new level, so the People tab must go back to its prompt rather
-    // than keep the previous level's figures on screen (backlog U1).
-    state.areaProfile = null;
-    state.areaProfileId = null;
-    state.areaProfileState = "idle";
-    renderVulnerablePeople();
-    drawDistricts();
-    $("[data-boundary-layer-title]").textContent = nextLevel === "subdistrict"
-      ? `Sub-district boundaries in ${priorDistrict.name}`
-      : "District boundaries";
-    $("[data-search-input]").placeholder = `Search a ${nextLevel === "subdistrict" ? "sub-district" : "district"} in Thailand`;
-    if (districtLayer.getLayers().length) {
-      map.fitBounds(districtLayer.getBounds(), { padding: [40, 40] });
-    }
-    syncRunPanel();
-  });
 
   // ---------- configure and run ----------
   const runPanel = $("[data-run]");
@@ -4653,7 +4761,7 @@
             // Confirming the district is the explicit area choice; then answer the
             // original question for it so the evidence appears on the map at once.
             button.disabled = true;
-            pickPlace(candidate);
+            await pickPlace(candidate);
             const completed = await send(message, { echo: false, confirmedPlace: candidateName });
             button.textContent = completed ? `${candidateName} confirmed` : `Use ${candidateName} and answer`;
             if (!completed) button.disabled = false;
@@ -5186,10 +5294,11 @@
   const boundaryContaining = (lat, lon) => state.boundaries.find((boundary) =>
     window.GRPMap.contains(boundary.geometry, lat, lon)) || null;
 
-  const pickPlace = (place, { currentLocation = false } = {}) => {
+  const pickPlace = async (place, { currentLocation = false } = {}) => {
     placeLayer.clearLayers();
     const lat = Number(place.lat);
     const lon = Number(place.lon);
+    const found = await areaAtPoint(lat, lon);
     const poi = !currentLocation && isPointOfInterest(place);
     const poiName = poi ? (place.name || place.display_name.split(",")[0]).trim() : null;
     const shape = !poi && place.geojson && place.geojson.type !== "Point"
@@ -5197,8 +5306,16 @@
       : null;
     // Select the district the place sits in first; selecting clears the place layer.
     const name = externalPlaceName(place);
-    const localBoundary = boundaryContaining(lat, lon) || localBoundaryForPlace(name);
-    if (localBoundary) selectBoundary(localBoundary, { explicit: true });
+    const localBoundary = knownDistrict(found.district) || boundaryContaining(lat, lon)
+      || localBoundaryForPlace(name);
+    if (localBoundary) {
+      let subdistrict = null;
+      if (found.subdistrict) {
+        const list = await loadSubdistricts(localBoundary);
+        subdistrict = list.find((item) => item.id === found.subdistrict.id) || found.subdistrict;
+      }
+      selectArea({ district: localBoundary, subdistrict }, { announce: false });
+    }
     if (poi) {
       window.GRPMap.searchPin(lat, lon, poiName).addTo(placeLayer);
       map.flyTo([lat, lon], 16, { duration: 0.6 });
@@ -5211,7 +5328,10 @@
     if (!poi) {
       window.L.circleMarker([lat, lon], { radius: 6, color: "#2563eb", fillColor: "#2563eb", fillOpacity: 1 }).addTo(placeLayer);
     }
-    const districtName = localBoundary ? readableName(localBoundary.name) : name;
+    const districtName = localBoundary
+      ? (state.selectedSubdistrict ? `${readableName(state.selectedSubdistrict.name)} sub-district, ${readableName(localBoundary.name)}`
+        : readableName(localBoundary.name))
+      : name;
     state.currentPlace = name || (localBoundary ? localBoundary.name : null);
     const chip = $("[data-place-chip]");
     chip.replaceChildren();
@@ -5223,7 +5343,7 @@
     }
     chip.append(document.createTextNode(
       poi
-        ? `${poiName} is in ${districtName}${localBoundary ? " district, now selected" : ""}. `
+        ? `${poiName} is in ${districtName}${localBoundary ? (state.selectedSubdistrict ? ", now selected" : " district, now selected") : ""}. `
         : `${currentLocation ? `Your current district is ${name}.` : `${name} selected.`} Available map layers are shown. `
     ));
     if (storedSigAnswer(name)) {
@@ -5263,6 +5383,7 @@
 
   // Clicking bare map (not a supported area outline) offers that district for SIG evidence.
   const useMapPoint = async (lat, lon) => {
+    if (await selectAtPoint({ lat, lng: lon })) return;
     const chip = $("[data-place-chip]");
     chip.replaceChildren();
     chip.textContent = "Finding the district for that point…";
@@ -5380,22 +5501,42 @@
   const runSearch = async (query) => {
     const token = ++searchToken;
     searchResults.replaceChildren();
-    const lower = query.toLowerCase();
-    const local = state.boundaries.filter((b) => b.name.toLowerCase().includes(lower));
-    if (local.length) {
-      const group = document.createElement("div");
-      group.className = "pw-search__group";
-      group.textContent = "Thailand districts";
-      searchResults.append(group);
-      local.slice(0, 5).forEach((boundary) =>
-        searchResults.append(searchItem(
-          readableName(boundary.name),
-          `${boundary.province_name ? `${readableName(boundary.province_name)} · ` : ""}${boundary.admin_level}${boundary.synthetic ? " · synthetic test area" : ""}`,
-          () => selectBoundary(boundary, { announce: true }),
-        )),
-      );
-    }
     searchResults.hidden = false;
+    if (query.length < 2) return;
+    try {
+      const params = new URLSearchParams({ hub_code: state.hubCode, q: query, limit: 8 });
+      const { areas } = await GRP.request(`/api/v1/catalog/areas/search?${params}`);
+      if (token !== searchToken) return;
+      if (areas.length) {
+        const group = document.createElement("div");
+        group.className = "pw-search__group";
+        group.textContent = "Districts and sub-districts";
+        searchResults.append(group);
+        areas.forEach((area) => {
+          const sub = area.admin_level === "subdistrict";
+          const where = [sub && area.district ? `in ${readableName(area.district.name)}` : null,
+            readableName(area.province_name), area.synthetic ? "synthetic test area" : null].filter(Boolean).join(" · ");
+          searchResults.append(searchItem(
+            `${readableName(area.name)}${area.name_th ? ` · ${area.name_th}` : ""}`,
+            `${sub ? "Sub-district" : "District"} · ${where}`,
+            async () => {
+              const district = sub
+                ? knownDistrict(area.district)
+                : knownDistrict(area);
+              if (!district) return;
+              let subdistrict = null;
+              if (sub) {
+                const list = await loadSubdistricts(district);
+                subdistrict = list.find((item) => item.id === area.id) || null;
+              }
+              selectArea({ district, subdistrict }, { announce: true, fly: true });
+            },
+          ));
+        });
+      }
+    } catch (_error) {
+      // Area search is the server's; places below still work.
+    }
     if (query.length < 3) return;
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&addressdetails=1&limit=5&countrycodes=th&q=${encodeURIComponent(query)}`;

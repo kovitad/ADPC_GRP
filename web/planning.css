@@ -1599,3 +1599,23 @@ a.pw-chip-button { display: inline-block; }
 
 /* Search results: a scrolling list that never runs off the map. */
 .pw-search__results { max-height: min(60vh, 420px); overflow-y: auto; box-shadow: 0 12px 28px rgb(16 40 36 / 22%); }
+
+/* Selected area: province › district › sub-district, and what the numbers cover (sub-district plan). */
+.pw-crumbs { position: absolute; z-index: 940; top: 106px; left: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; max-width: min(560px, calc(100% - 120px)); padding: 0.35rem 0.4rem 0.35rem 0.75rem; border-radius: 12px; background: rgb(255 255 255 / 96%); box-shadow: 0 4px 14px rgb(16 40 36 / 16%); font-size: 0.8rem; }
+.pw-crumbs[hidden] { display: none; }
+.pw-crumbs__trail { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem; margin: 0; padding: 0; list-style: none; }
+.pw-crumbs__trail li + li::before { content: "›"; margin-right: 0.2rem; color: #8a9396; }
+.pw-crumbs__trail button { padding: 0.1rem 0.3rem; border: 0; border-radius: 6px; background: none; color: #1f4e79; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.pw-crumbs__trail [aria-current] { color: #172331; font-weight: 700; }
+.pw-crumbs__trail span:not([aria-current]) { color: #52645f; }
+.pw-crumbs__scope { display: inline-flex; padding: 2px; border-radius: 999px; background: #eef3f2; }
+.pw-crumbs__scope button { padding: 0.25rem 0.65rem; border: 0; border-radius: 999px; background: transparent; color: #44504d; font: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
+.pw-crumbs__scope button[aria-pressed="true"] { background: #ffffff; color: #0b453d; box-shadow: 0 1px 4px rgb(16 40 36 / 14%); }
+.pw-crumbs__scope button:disabled { opacity: 0.45; cursor: default; }
+.pw-map .leaflet-control-zoom { margin-top: 150px; }
+/* Sub-district names: shown from zoom 13 so they can be read. */
+.pw-sub-label { padding: 1px 6px; border: 0; border-radius: 6px; background: rgb(255 255 255 / 85%); color: #28415E; font-size: 0.7rem; font-weight: 600; box-shadow: none; }
+.pw-sub-label::before { display: none; }
+.leaflet-container:not(.pw-sub-labels-on) .pw-sub-label { display: none; }
+.pw-level-note { margin: 0 0 0.3rem; }
+@media (max-width: 860px) { .pw-crumbs { top: 104px; max-width: calc(100% - 90px); } }
