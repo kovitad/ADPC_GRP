@@ -1,14 +1,15 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 6 October 2026.
-- **Today:** sub-district scope is complete across Planning, Assessments and Live (ADR-0063).
-  Planning content and summaries follow the selected scope; live incidents are placed by the
-  worker; Assessments show parent context; and Live has a district/sub-district picker, filtered
-  cards and Check first list, with parent-district totals alongside.
-- **Before that:** 5 October, with live feeds, grouped navigation, PM2.5 and the shared map icon
-  standard (ADR-0052 and ADR-0061–0062).
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, with **27 commits not pushed** since `26b1580`.
-- **Next agent:** read Section 0, "6 October: sub-district rollout complete", first.
+- **Today:** ThaiWater/HII source research is complete. ADR-0064 keeps live TWA ingestion blocked
+  until HII issues GRP server credentials and confirms terms, licence, quota, retention and
+  redistribution. A no-credential open-catalogue validation spike may proceed; rain remains
+  context and no website key may be reused.
+- **Before that:** sub-district scope was completed across Planning, Assessments and Live
+  (ADR-0063), including worker placement, filtered cards and parent-district context.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`; the sub-district series is pushed through
+  `3a2767f`. The ThaiWater research documents are the only current tracked changes.
+- **Next agent:** read Section 0, "6 October: ThaiWater/HII research complete", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -123,7 +124,36 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
-### 6 October: sub-district rollout complete (latest; read this first)
+### 6 October: ThaiWater/HII research complete (latest; read this first)
+
+- Research and phased plan:
+  [`docs/pilot/2026-10-05_ThaiWater_HII_Integration_Research_and_Plan.md`](docs/pilot/2026-10-05_ThaiWater_HII_Integration_Research_and_Plan.md).
+  Integration gate: ADR-0064.
+- The current TWA application has a public Swagger UI and technically relevant rainfall,
+  river/canal level, discharge, gate/weir, Bangkok road-flood/flow, flood-product and CCTV
+  contracts. Data calls without credentials return 401. The browser application's embedded
+  `x-api-key` was not copied, recorded or reused.
+- No supported external-use process, API data licence, attribution, quota, rate-limit behavior,
+  retention right or redistribution right was found. Live polling is therefore **no-go** until HII
+  gives written terms and a GRP-issued server credential.
+- HII's separate CKAN API exposes 36 open-data packages. All carry an ambiguous
+  “Creative Commons Attribution Non-Commercial” label without a licence URL/version. Actual
+  water/rain archives are openly browsable, but July 2026 was the newest non-empty monthly folder
+  found on 5 October, so they are historical/replay candidates rather than Live feeds.
+- Actual resource validation found 11 Bangkok stations (10 water level, one rainfall) and three
+  Nonthaburi stations (two water level, one rainfall) in the mixed open station inventory; none is
+  labelled Bang Bua Thong. The monthly water station metadata also has more row values than its
+  header, which must fail closed rather than be silently remapped.
+- Next action is governance, not coding: ask HII for the exact licence/version, approved clients,
+  issued key, endpoints/cadence/quota, units/datums/timestamps/QA, coverage, retention,
+  redistribution and support contacts. A bounded no-credential catalogue parser/coverage spike is
+  allowed, but it must not appear as live evidence.
+- If approved later, implement worker-only immutable capture, separate source/observation/retrieval
+  times, quality and clock validation, station versioning, conservative freshness, stored replay,
+  and unavailable/stale UI. Rain and forecasts never prove flooding; every higher evidence use
+  needs a product-specific decision.
+
+### 6 October: sub-district rollout complete
 
 - Completed all seven steps in
   [`docs/pilot/2026-10-05_Subdistrict_Level_Plan.md`](docs/pilot/2026-10-05_Subdistrict_Level_Plan.md).
@@ -153,7 +183,8 @@ RP20/RP50 rasters and methods exist.
   reached the SERVIR **Sign in** page. Retry the login route directly if an old `?auth=unavailable`
   URL is still open; do not replace or print the stored client configuration.
 - Both public feed switches report `false`. The unrelated untracked owner deliverables were left
-  untouched. Commits remain local and unpushed.
+  untouched. The 27-commit sub-district series was subsequently pushed through `3a2767f` and the
+  branch was synchronized before the ThaiWater research began.
 
 ### 5 October: end-of-day summary
 
