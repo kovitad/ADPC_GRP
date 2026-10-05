@@ -7,8 +7,8 @@
   placement. It produces no API layer, confidence change, watch or warning yet.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. No key is configured locally, so no TWA call was made and the switch remains false.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`. Stage 0 is the latest work; verify branch
-  synchronization before continuing.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin through `03aa63b`
+  (ThaiWater Stage 0 shadow capture).
 - **Next agent:** read Section 0, "6 October: ThaiWater Stage 0 shadow capture", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
@@ -126,7 +126,8 @@ RP20/RP50 rasters and methods exist.
 
 ### 6 October: ThaiWater Stage 0 shadow capture (latest; read this first)
 
-- ADR-0065 implements the first architecture slice without changing operator-facing behavior.
+- Commit `03aa63b` implements the first architecture slice under ADR-0065 and is pushed to
+  origin. It deliberately makes no operator-facing UI change.
 - `core/flood_evidence/thaiwater.py` strictly parses TWA map responses for water level and 24-hour
   rainfall, stores every attempt/raw response through the existing fetch ledger, and normalizes
   only stations spatially inside the Bangkok/Nonthaburi pilot.
@@ -146,10 +147,26 @@ RP20/RP50 rasters and methods exist.
 - Validation: **1,239 passed, 2 skipped (1,241 collected)**; Ruff and whitespace checks clean;
   Compose config valid; migration upgrade/downgrade passed against the running PostgreSQL service,
   which was returned to `20261003_0027`. Rebuild/migrate when intentionally deploying this slice.
-- Next: configure the confirmed public key privately, enable a short shadow run, inspect real schema
-  and coverage, then add a protected source-health/coverage read model. Do not build a watch until
-  the data-science/hydrology workshop chooses its exact target, threshold, action and acceptance
-  metrics.
+- **Current UI impact: none.** Live, Planning and Assessments have no ThaiWater marker, layer,
+  card, watch or confidence change. There is nothing new to browser-check until real shadow data
+  has passed the next gate.
+- **Exact continuation order:**
+  1. Put the HII-confirmed public key in ignored `.env` as `THAIWATER_API_KEY`; never print or
+     commit it. Set `THAIWATER_SHADOW_ENABLED=true` only for the deliberate test window.
+  2. Rebuild and run `alembic upgrade head`; migration `20261005_0028` is not applied to the
+     currently running Desktop database (its upgrade/downgrade was tested, then it was returned to
+     `20261003_0027`).
+  3. Run shadow capture with no UI/incident effects. Inspect actual response shape, source health,
+     station counts, originating agencies, pilot-area placement, observation lag, quality flags,
+     future clocks, null/sentinel frequency, schema errors and raw-object growth.
+  4. Compare BMA station codes/times with Floodboard so the same sensor is one origin family, not
+     two confirmations. Check whether any ThaiWater forecast is derived from GEOGLOWS before
+     treating it as a separate model.
+  5. Only after the capture report passes, add a protected read model and a separate **Government
+     observations** Live layer with source, observed time, freshness and quality. Keep rainfall,
+     water levels, Floodboard impacts and GEOGLOWS forecasts visually and semantically separate.
+  6. Do not build a GRP watch until the data-science/hydrology workshop chooses its exact target,
+     threshold, action, labels and acceptance metrics. Public warning remains a later gate.
 
 ### 6 October: multi-source early-warning proposal
 
