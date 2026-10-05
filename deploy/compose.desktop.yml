@@ -50,6 +50,11 @@ services:
       # ADR-0049: Longdo Weather rain context; the key file is written by the launcher from .env.
       LONGDO_WEATHER_ENABLED: "true"
       LONGDO_API_KEY_FILE: /run/grp-secrets/longdo_api_key
+      # ADR-0065: optional ThaiWater shadow capture. Set true only after adding the public key.
+      THAIWATER_SHADOW_ENABLED: "${THAIWATER_SHADOW_ENABLED:-false}"
+      THAIWATER_API_KEY_FILE: /run/grp-secrets/thaiwater_api_key
+      THAIWATER_API_BASE_URL: https://twa-api-public.thaiwater.net
+      THAIWATER_POLL_MINUTES: "${THAIWATER_POLL_MINUTES:-15}"
       # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only.
       BMATRAFFIC_RELAY_ENABLED: "true"
       # ADR-0052: the anonymous live flood feed for Global Risk. Off unless the launcher is run

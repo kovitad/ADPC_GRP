@@ -100,6 +100,9 @@ if (Test-Path -LiteralPath $LocalAiKey) {
 if (-not (Write-SecretFromEnv "longdo_api_key" @("LONGDO_API_KEY"))) {
     Write-Warning "No LONGDO_API_KEY in .env; Longdo rain context stays off."
 }
+if (-not (Write-SecretFromEnv "thaiwater_api_key" @("THAIWATER_API_KEY"))) {
+    Write-Warning "No THAIWATER_API_KEY in .env; ThaiWater shadow capture stays off."
+}
 if (-not (Write-SecretFromEnv "langfuse_secret_key" @("LANGFUSE_SECRET_KEY"))) {
     Write-Warning "No LANGFUSE_SECRET_KEY in .env; Langfuse export stays off."
 }

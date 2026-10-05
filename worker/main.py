@@ -25,6 +25,8 @@ from core.flood_evidence.ingest import pull_due
 from core.flood_evidence.replay import run_one_step as replay_step
 from core.flood_evidence.retention import delete_raw
 from core.flood_evidence.retention import prune as prune_flood
+from core.flood_evidence.thaiwater import ThaiWaterClient
+from core.flood_evidence.thaiwater import run_shadow as run_thaiwater
 from core.flood_evidence.weather import LongdoWeather, run_weather
 from core.hazard_import import (
     PLATFORM_HAZARD_DATASET_ID,
@@ -71,6 +73,7 @@ def run() -> None:
     last_flood_check = 0.0
     last_retention = 0.0
     last_weather = 0.0
+    last_thaiwater = 0.0
     while not stop_event.is_set():
         if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
             release_reservations_once()
@@ -100,6 +103,19 @@ def run() -> None:
         ):
             run_flood_pulls(storage)
             last_flood_check = time.monotonic()
+        # ThaiWater (ADR-0065): government observations captured in shadow mode only.
+        if (
+            not worked
+            and settings.thaiwater_shadow_enabled
+            and time.monotonic() - last_thaiwater >= HOUSEKEEPING_SECONDS
+        ):
+            run_thaiwater_shadow(
+                storage,
+                settings.thaiwater_api_key_file,
+                settings.thaiwater_api_base_url,
+                settings.thaiwater_poll_minutes,
+            )
+            last_thaiwater = time.monotonic()
         # Rain context (ADR-0049): live pilots only, checked every 5 minutes when idle.
         if (
             not worked
@@ -158,6 +174,43 @@ def run_flood_retention(storage: LocalStorage) -> None:
                 logger.info("Flood retention %s: %s", pilot_id, result)
         except Exception:
             logger.exception("Flood retention %s failed; will retry", pilot_id)
+
+
+def run_thaiwater_shadow(
+    storage: LocalStorage, key_file: Path, base_url: str, interval_minutes: int
+) -> None:
+    try:
+        key = read_secret(key_file)
+    except (OSError, RuntimeError):
+        logger.warning("ThaiWater shadow capture is on but its key file is missing or empty")
+        return
+    client = ThaiWaterClient(key)
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                fetches = run_thaiwater(
+                    session,
+                    storage,
+                    config,
+                    client,
+                    datetime.now(UTC),
+                    base_url=base_url,
+                    interval_minutes=interval_minutes,
+                )
+            for fetch in fetches:
+                logger.info(
+                    "ThaiWater shadow %s/%s: %s, %s records, %s new observations",
+                    pilot_id,
+                    fetch.source_id,
+                    fetch.outcome,
+                    fetch.record_count,
+                    fetch.new_states,
+                )
+        except Exception:
+            logger.exception("ThaiWater shadow %s failed; will retry", pilot_id)
 
 
 def run_flood_weather(key_file: Path) -> None:

@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # ADR-0049: Longdo Weather rain context for live flood pilots. The key lives in a secret file.
     longdo_weather_enabled: bool = False
     longdo_api_key_file: Path = Path(".local/secrets/longdo_api_key")
+    # ADR-0065: worker-only ThaiWater government-observation shadow capture. No UI/warnings.
+    thaiwater_shadow_enabled: bool = False
+    thaiwater_api_key_file: Path = Path(".local/secrets/thaiwater_api_key")
+    thaiwater_api_base_url: str = "https://twa-api-public.thaiwater.net"
+    thaiwater_poll_minutes: int = Field(default=15, ge=5, le=1440)
     # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only; off on
     # servers until BMA gives permission.
     bmatraffic_relay_enabled: bool = False

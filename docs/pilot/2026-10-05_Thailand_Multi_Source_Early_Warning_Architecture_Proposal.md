@@ -36,6 +36,22 @@ lead-time testing, calibration and operational review pass. Public emergency war
 withdrawals remain with authorized Thai agencies unless a later governance decision delegates
 that role to GRP.
 
+## Implementation status
+
+Stage 0 shadow capture began on 5 October 2026 under ADR-0065:
+
+- worker-only, off-by-default ThaiWater water-level and 24-hour-rainfall polling;
+- immutable raw fetches in the existing source ledger;
+- versioned government station metadata and canonical observations in two new tables;
+- originating-agency lineage, separate observation/retrieval times, unit/datum, provider quality,
+  future-clock marking and worker-derived pilot district/sub-district placement;
+- whole-response fail-closed parsing, response caps and idempotent/correction-preserving states;
+- no API, map layer, incident-confidence change, watch or warning yet.
+
+The implementation is fixture-tested but has not called TWA because no ThaiWater key is configured
+in the local ignored `.env`. The switch remains false. PostgreSQL migration upgrade and downgrade
+were tested independently; the running Desktop database was returned to the previous migration.
+
 ## The questions this architecture answers
 
 1. What is being measured now?

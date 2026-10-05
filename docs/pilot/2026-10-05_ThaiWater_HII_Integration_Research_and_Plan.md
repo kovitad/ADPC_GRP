@@ -322,11 +322,11 @@ training-data sharing or redistribution.
 **Exit gate:** licence interpretation approved and schema anomalies resolved with HII. Otherwise
 keep this as research tooling only.
 
-### Phase 2 — controlled public-key shadow capture
+### Phase 2 — controlled public-key shadow capture (implementation started)
 
-- Implement the worker adapter behind `THAIWATER_PULLS_ENABLED=false`.
-- Poll a minimal endpoint set at a conservative documented cadence, initially water level and
-  rainfall; adjust to HII's fair-use guidance.
+- The worker adapter is implemented behind `THAIWATER_SHADOW_ENABLED=false` (ADR-0065).
+- Its initial map products are water level and 24-hour rainfall, with a configurable conservative
+  cadence; adjust it to HII's fair-use guidance.
 - Capture for 30 days without changing operator-facing incident confidence or warnings.
 - Produce daily source-health, latency, station churn, QA-flag, future-time and completeness
   reports. Compare TWA station identity with the archive, not values by station name.

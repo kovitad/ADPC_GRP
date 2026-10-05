@@ -1,16 +1,15 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 6 October 2026.
-- **Today:** a proposed Thailand multi-source early-warning architecture now assigns distinct
-  roles to Floodboard, ThaiWater, GEOGLOWS, Longdo, RP100 and reviewed labels. It proposes
-  deterministic operator watches first, then calibrated nowcasts only after event-based
-  validation and scientific approval.
-- **ThaiWater access update:** the Product Owner reports HII confirmed that the website API key is
-  public and available for everyone. ADR-0064 now permits bounded shadow ingestion with the key
-  kept out of Git/logs; licence, cadence, training and redistribution still need documentation.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`. The multi-source architecture proposal is the
-  latest work; verify branch synchronization before continuing.
-- **Next agent:** read Section 0, "6 October: multi-source early-warning proposal", first.
+- **Today:** Stage 0 of the multi-source early-warning architecture is implemented (ADR-0065):
+  off-by-default, worker-only ThaiWater water-level and 24-hour-rain shadow capture with immutable
+  raw lineage, versioned stations, canonical observations, quality/clock checks and pilot-area
+  placement. It produces no API layer, confidence change, watch or warning yet.
+- **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
+  everyone. No key is configured locally, so no TWA call was made and the switch remains false.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`. Stage 0 is the latest work; verify branch
+  synchronization before continuing.
+- **Next agent:** read Section 0, "6 October: ThaiWater Stage 0 shadow capture", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -125,7 +124,34 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
-### 6 October: multi-source early-warning proposal (latest; read this first)
+### 6 October: ThaiWater Stage 0 shadow capture (latest; read this first)
+
+- ADR-0065 implements the first architecture slice without changing operator-facing behavior.
+- `core/flood_evidence/thaiwater.py` strictly parses TWA map responses for water level and 24-hour
+  rainfall, stores every attempt/raw response through the existing fetch ledger, and normalizes
+  only stations spatially inside the Bangkok/Nonthaburi pilot.
+- Migration `20261005_0028` adds `hydro_station_version` and `hydro_observation`. Station metadata
+  changes create versions; repeated observation states are idempotent; corrected states remain in
+  history. Source administrative labels are retained separately from worker-derived GRP district
+  and sub-district codes.
+- `THAIWATER_SHADOW_ENABLED` is false by default. The worker reads
+  `THAIWATER_API_KEY_FILE`, applies a configurable 15-minute cadence, 20 MB caps and existing
+  bounded timeouts. Docker Desktop copies `THAIWATER_API_KEY` from ignored `.env`, but enables
+  capture only when explicitly requested.
+- Missing sentinels/nulls create no numeric observation; malformed responses fail closed; negative
+  rain is refused; observations over five minutes ahead are retained as `clock_status=future` and
+  are not approved for current-state use.
+- No key is present in the current `.env`; no TWA request was issued. There is deliberately no API,
+  map layer, source-health panel, incident-confidence effect, watch or warning in Stage 0.
+- Validation: **1,239 passed, 2 skipped (1,241 collected)**; Ruff and whitespace checks clean;
+  Compose config valid; migration upgrade/downgrade passed against the running PostgreSQL service,
+  which was returned to `20261003_0027`. Rebuild/migrate when intentionally deploying this slice.
+- Next: configure the confirmed public key privately, enable a short shadow run, inspect real schema
+  and coverage, then add a protected source-health/coverage read model. Do not build a watch until
+  the data-science/hydrology workshop chooses its exact target, threshold, action and acceptance
+  metrics.
+
+### 6 October: multi-source early-warning proposal
 
 - Proposed architecture:
   [`docs/pilot/2026-10-05_Thailand_Multi_Source_Early_Warning_Architecture_Proposal.md`](docs/pilot/2026-10-05_Thailand_Multi_Source_Early_Warning_Architecture_Proposal.md).

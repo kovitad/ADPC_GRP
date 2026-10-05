@@ -97,6 +97,90 @@ class FloodObservation(Base):
     rule_version: Mapped[str] = mapped_column(String(48), nullable=False)
 
 
+class HydroStationVersion(Base):
+    """One observed identity/metadata version of a government hydrology station (ADR-0065)."""
+
+    __tablename__ = "hydro_station_version"
+    __table_args__ = (
+        UniqueConstraint(
+            "pilot_id", "provider", "product", "provider_station_id", "version_hash",
+            name="uq_hydro_station_version",
+        ),
+        Index(
+            "ix_hydro_station_provider_identity", "pilot_id", "provider", "provider_station_id"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    product: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider_station_id: Mapped[str] = mapped_column(String(180), nullable=False)
+    identity_basis: Mapped[str] = mapped_column(String(24), nullable=False)
+    station_code: Mapped[str | None] = mapped_column(String(120))
+    station_name: Mapped[str] = mapped_column(Text, nullable=False)
+    station_type: Mapped[str | None] = mapped_column(String(80))
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    geometry: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
+    originating_agency_code: Mapped[str | None] = mapped_column(String(80))
+    originating_agency_name: Mapped[str | None] = mapped_column(Text)
+    source_admin: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
+    basin: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
+    district_codes: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
+    subdistrict_codes: Mapped[list[str]] = mapped_column(JSON_VALUE, nullable=False)
+    version_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    first_fetch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("flood_source_fetch.id", ondelete="RESTRICT"), nullable=False
+    )
+    last_fetch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("flood_source_fetch.id", ondelete="RESTRICT"), nullable=False
+    )
+
+
+class HydroObservation(Base):
+    """A corrected-state-preserving ThaiWater observation, separate from forecasts/impacts."""
+
+    __tablename__ = "hydro_observation"
+    __table_args__ = (
+        UniqueConstraint(
+            "pilot_id", "provider", "product", "state_hash", name="uq_hydro_observation_state"
+        ),
+        Index("ix_hydro_observation_station_time", "station_version_id", "observed_at"),
+        Index("ix_hydro_observation_pilot_time", "pilot_id", "observed_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    pilot_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    product: Mapped[str] = mapped_column(String(32), nullable=False)
+    station_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("hydro_station_version.id", ondelete="RESTRICT"), nullable=False
+    )
+    variable: Mapped[str] = mapped_column(String(64), nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    unit: Mapped[str] = mapped_column(String(32), nullable=False)
+    datum: Mapped[str | None] = mapped_column(String(32))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    quality_flag: Mapped[str | None] = mapped_column(String(32))
+    quality_control_level: Mapped[str | None] = mapped_column(String(32))
+    quality: Mapped[dict[str, object]] = mapped_column(JSON_VALUE, nullable=False)
+    clock_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    originating_agency_code: Mapped[str | None] = mapped_column(String(80))
+    originating_agency_name: Mapped[str | None] = mapped_column(Text)
+    delivery_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    raw_fetch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("flood_source_fetch.id", ondelete="RESTRICT"), nullable=False
+    )
+    state_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    adapter_version: Mapped[str] = mapped_column(String(48), nullable=False)
+
+
 class FloodAssetExposure(Base):
     """A facility's exposure and access state against one good roads snapshot (ADR-0040)."""
 

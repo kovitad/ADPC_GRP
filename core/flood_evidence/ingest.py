@@ -179,7 +179,7 @@ def _apply(
     return new_states
 
 
-def ingest_body(
+def record_raw_fetch(
     session: Session,
     storage: LocalStorage,
     config: PilotConfig,
@@ -188,9 +188,10 @@ def ingest_body(
     retrieved_at: datetime,
     stored_key: str | None = None,
 ) -> FloodSourceFetch:
-    """Record one attempt and, when its bytes parse, every observed state in it.
+    """Record one bounded source attempt and immutable successful response.
 
-    ``stored_key`` points a replay at the original raw bytes instead of storing a copy.
+    Source-specific adapters normalize only after this common ledger step. ``stored_key`` lets a
+    replay refer to the original object rather than writing another copy.
     """
 
     fetch = FloodSourceFetch(
@@ -203,14 +204,32 @@ def ingest_body(
         error=pulled.error,
     )
     session.add(fetch)
-    if pulled.outcome != FETCH_OK or pulled.body is None:
-        session.flush()
-        return fetch
-    fetch.byte_count = len(pulled.body)
-    fetch.sha256 = sha256_text_bytes(pulled.body)
-    fetch.storage_key = stored_key or _store_raw(
-        storage, config.pilot_id, source.source_id, retrieved_at, pulled.body
+    if pulled.outcome == FETCH_OK and pulled.body is not None:
+        fetch.byte_count = len(pulled.body)
+        fetch.sha256 = sha256_text_bytes(pulled.body)
+        fetch.storage_key = stored_key or _store_raw(
+            storage, config.pilot_id, source.source_id, retrieved_at, pulled.body
+        )
+    session.flush()
+    return fetch
+
+
+def ingest_body(
+    session: Session,
+    storage: LocalStorage,
+    config: PilotConfig,
+    source: SourceConfig,
+    pulled: Pulled,
+    retrieved_at: datetime,
+    stored_key: str | None = None,
+) -> FloodSourceFetch:
+    """Record one attempt and, when its bytes parse, every observed state in it."""
+
+    fetch = record_raw_fetch(
+        session, storage, config, source, pulled, retrieved_at, stored_key=stored_key
     )
+    if pulled.outcome != FETCH_OK or pulled.body is None:
+        return fetch
     try:
         drafts = parse_source(source.adapter, pulled.body, retrieved_at)
     except SourceFormatError as error:
@@ -284,5 +303,6 @@ __all__ = [
     "http_fetch",
     "ingest_body",
     "pull_due",
+    "record_raw_fetch",
     "utc",
 ]
