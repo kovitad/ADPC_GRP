@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted on 5 October 2026 as an integration gate. This does not approve ingestion.
+Accepted on 5 October 2026 as an integration gate. Amended the same day after the Product Owner
+reported that HII confirmed the website API key is public and available for everyone to use. The
+amendment permits a controlled GRP shadow-ingestion pilot; it does not approve public warning or
+unrestricted downstream redistribution.
 
 ## Context
 
@@ -10,11 +13,14 @@ Accepted on 5 October 2026 as an integration gate. This does not approve ingesti
   `/api-docs` describes rainfall, water level, canal level, discharge, reservoirs, gates/weirs,
   Bangkok flood products and CCTV.
 - Data operations tested without credentials return `401 Unauthorized`.
-- The website supplies an `x-api-key` to its own browser client. Its visibility is not a licence or
-  authorization for GRP to copy it into a backend service.
-- The Swagger contract does not state external-use terms, data licensing, attribution, quotas,
-  retention, redistribution rights or an API-key application process. It documents no `429`
-  behavior and does not accurately express gateway security.
+- The website supplies an `x-api-key` to its own browser client. Visibility alone was not treated
+  as authorization during the initial research.
+- The Product Owner subsequently reported direct confirmation from HII that this key is public and
+  may be used by everyone. This clears use of the public key for a controlled GRP pilot. The key
+  value is still deployment configuration, not source code, test data, a log field or a document.
+- The Swagger contract does not state data licensing, attribution, quotas, retention or
+  redistribution rights. It documents no `429` behavior and does not accurately express gateway
+  security. Public API access does not by itself settle those downstream uses.
 - HII separately publishes 36 open-data catalogue packages, all labelled Creative Commons
   Attribution Non-Commercial but without a licence URL/version in package metadata. The open
   water/rain archives are historical; on 5 October, July 2026 was the newest non-empty monthly
@@ -31,12 +37,13 @@ Full findings and the staged plan are in
 
 ## Decision
 
-1. **Do not reuse or disclose the website's embedded API key.** GRP will use only a credential
-   issued by HII for GRP server-to-server use, delivered through an approved channel and stored
-   through an `_FILE` secret.
-2. **Keep TWA pulls disabled until written approval covers** client type, endpoints, cadence,
-   quota, licence, attribution, storage, replay, retention, redistribution and support.
-3. **A no-credential catalogue validation spike is allowed**, but its outputs remain research or
+1. **The HII-confirmed public key may be used for a controlled pilot.** Its value is supplied
+   through deployment configuration or an `_FILE` secret and is never committed, logged, copied
+   into fixtures or returned by a GRP API. Record the HII confirmation with project governance.
+2. **Start with bounded shadow pulls, not public warning.** Confirm/document endpoint cadence,
+   fair-use expectations and attribution before sustained polling. Licence, retention and
+   redistribution remain gates for public feeds, training exports and third-party sharing.
+3. **The open-catalogue validation spike remains allowed**, but its outputs remain research or
    historical context until the ambiguous non-commercial licence is reviewed and HII resolves
    schema questions.
 4. **Workers acquire; APIs read.** No web request calls HII/TWA or performs GIS. Every attempted
@@ -60,12 +67,12 @@ Full findings and the staged plan are in
 
 ## Consequences
 
-- There is no live ThaiWater feature in the current pilot and no credential is committed or
-  borrowed from browser traffic.
-- HII authorization and legal interpretation, not implementation effort, are the first gates.
+- There is no live ThaiWater feature in the current pilot and no key value is committed.
+- The Product Owner's reported HII confirmation clears a controlled shadow-capture start. The
+  confirmation still needs to be retained in the project governance record.
 - Open archive research can improve parsers, coverage knowledge and historical replay without
   pretending it is live.
-- If access is approved, delivery starts with a 30-day shadow capture and source-health review,
-  then limited contextual display. Evidence promotion occurs one product at a time.
+- Delivery starts with a bounded shadow capture and source-health review, then limited contextual
+  display. Evidence promotion occurs one product at a time.
 - Operational ownership, monitoring, key rotation, retention, station mapping, clock validation
   and source outage behavior are mandatory parts of the integration rather than follow-up work.

@@ -8,17 +8,21 @@
 
 ## Executive finding
 
-ThaiWater is technically relevant but is **not ready for a GRP server integration**.
+ThaiWater is technically relevant and can proceed to a **controlled GRP shadow-integration
+pilot**, following the Product Owner's report that HII confirmed the website API key is public and
+available for everyone to use.
 
 - The current public application is `https://twa.thaiwater.net/th`; its API host is
   `https://twa-api-public.thaiwater.net`.
 - The API publishes Swagger UI at `/api-docs`. The documented contracts cover rainfall, river and
   canal levels, discharge, reservoirs, gates/weirs, Bangkok road-flood sensors, Bangkok flow
   sensors, CCTV, flood products and agency metadata.
-- Calls without credentials return `401 Unauthorized`. The website sends an `x-api-key`, but a key
-  embedded for the website's own client is not permission for GRP to copy or reuse it.
-- The Swagger contract lists `x-api-key` on many operations but does not state an external-use
-  process, licence, attribution, retention permission, quota, service level or rate limits.
+- Calls without the public key return `401 Unauthorized`; HII's reported confirmation clears use
+  of that key for this pilot. Its value must still be supplied through deployment configuration,
+  never committed, logged or copied into documentation/fixtures.
+- The Swagger contract lists `x-api-key` on many operations but does not state licence,
+  attribution, retention permission, quota, service level or rate limits. Public access does not
+  settle public redistribution or model-training rights.
 - HII's separate open-data catalogue is reachable without credentials and lists 36 datasets. Its
   water-level and rainfall archives are useful for historical analysis and replay, but they are
   not a live-feed substitute: on 5 October the newest non-empty monthly folders found were July
@@ -28,11 +32,11 @@ ThaiWater is technically relevant but is **not ready for a GRP server integratio
   restriction, require owner/legal confirmation before GRP redistributes or operationally uses
   the files.
 
-**Recommendation:** approve a no-credential catalogue spike only. Do not enable TWA polling or
-reuse any observed website key. Ask HII for written server-to-server access, exact terms and an
-issued GRP credential. If approved, start with a small, stored-evidence pilot for selected water
-level and rainfall stations; promote no data to operational flood evidence until field meaning,
-quality, station identity and warning rules are reviewed.
+**Recommendation:** begin a bounded shadow capture for a minimal ThaiWater endpoint set and the
+open-catalogue validation spike. Retain the HII access confirmation in the governance record and
+confirm fair-use cadence, exact terms, attribution, retention and redistribution. Promote no data
+to operational flood evidence or warning until field meaning, quality, station identity,
+thresholds and warning rules are reviewed.
 
 ## Authoritative sources checked
 
@@ -284,9 +288,10 @@ alone. Redistribution needs explicit written permission and attribution wording.
 
 Owner: ADPC product/data owner. Send HII a written request covering:
 
-1. supported external server-to-server API and production/staging base URLs;
-2. how a GRP-specific API key is issued, rotated and revoked;
-3. allowed client types and whether backend caching/storage/replay are permitted;
+1. supported production/staging base URLs and whether the public endpoint is the stable
+   server-to-server interface;
+2. how public-key changes or revocation will be announced;
+3. confirmation that backend caching/storage/replay are permitted;
 4. exact data licence/version, commercial/non-commercial interpretation for ADPC/GRP, attribution
    and whether downstream display/API/feed redistribution is allowed;
 5. quotas, burst limits, polling guidance, `429`/retry behavior, fair-use rules and service status;
@@ -299,9 +304,11 @@ Owner: ADPC product/data owner. Send HII a written request covering:
 
 Use the official contact form or `Contact@hii.or.th`. The catalogue gives dataset contacts
 `telem@hii.or.th` for telemetry and `hds@hii.or.th` for data-science products; copy them only as
-appropriate. Do not send or mention the website's embedded key value.
+appropriate. Do not place the public key value in correspondence records that will enter Git.
 
-**Exit gate:** written answers and an issued GRP credential. No answer means no TWA API build.
+**Exit gate:** the Product Owner's reported HII confirmation permits bounded shadow ingestion.
+Documented cadence and terms remain required before sustained production polling, public warning,
+training-data sharing or redistribution.
 
 ### Phase 1 — no-credential catalogue spike (approved in principle)
 
@@ -315,10 +322,11 @@ appropriate. Do not send or mention the website's embedded key value.
 **Exit gate:** licence interpretation approved and schema anomalies resolved with HII. Otherwise
 keep this as research tooling only.
 
-### Phase 2 — approved authenticated shadow capture
+### Phase 2 — controlled public-key shadow capture
 
 - Implement the worker adapter behind `THAIWATER_PULLS_ENABLED=false`.
-- Poll only an HII-approved minimal endpoint set and cadence, initially water level and rainfall.
+- Poll a minimal endpoint set at a conservative documented cadence, initially water level and
+  rainfall; adjust to HII's fair-use guidance.
 - Capture for 30 days without changing operator-facing incident confidence or warnings.
 - Produce daily source-health, latency, station churn, QA-flag, future-time and completeness
   reports. Compare TWA station identity with the archive, not values by station name.
@@ -379,12 +387,12 @@ Before enabling production polling, document:
 
 | Question | State on 5 Oct 2026 | Gate |
 | --- | --- | --- |
-| Is a technically relevant API documented? | Yes | Passed for research only |
-| Does it work without credentials? | No; 401 | Blocked |
-| May GRP reuse the website key? | No evidence of permission | **No-go** |
-| Is a GRP key/application process documented? | Not found | Blocked |
-| Are API data licence and attribution explicit? | Not found | Blocked |
-| Are quota/rate limits/retention explicit? | Not found | Blocked |
+| Is a technically relevant API documented? | Yes | Passed for controlled pilot |
+| Does it work without the public key? | No; 401 | Key required |
+| May GRP use the website key? | Product Owner reports HII confirmed it is public for everyone | Passed for controlled pilot; retain confirmation |
+| Is a separate GRP key required? | No, based on the reported HII confirmation | Not a blocker |
+| Are API data licence and attribution explicit? | Not found | Blocks public redistribution/model sharing |
+| Are quota/rate limits/retention explicit? | Not found | Conservative shadow only; blocks production |
 | Is open archive access available? | Yes | Catalogue spike only |
 | Is archive licence unambiguous and compatible? | No; BY-NC label lacks version/URL | Legal/owner review |
 | Is archive current enough for Live? | No; newest non-empty month found was July | Historical only |
@@ -392,5 +400,6 @@ Before enabling production polling, document:
 | Can rainfall prove flooding? | No | Context only |
 | Can any source calibrate HAND now? | No reviewed river Q-to-H/datum contract | Blocked |
 
-**Current decision: no-go for live TWA ingestion; go for a bounded open-catalogue validation spike
-and the provider authorization request.**
+**Current decision: go for bounded shadow TWA ingestion and the open-catalogue validation spike;
+no-go for GRP-generated public warnings, evidence promotion or downstream redistribution until
+scientific and governance gates pass.**

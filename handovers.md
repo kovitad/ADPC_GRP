@@ -1,15 +1,16 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 6 October 2026.
-- **Today:** ThaiWater/HII source research is complete. ADR-0064 keeps live TWA ingestion blocked
-  until HII issues GRP server credentials and confirms terms, licence, quota, retention and
-  redistribution. A no-credential open-catalogue validation spike may proceed; rain remains
-  context and no website key may be reused.
-- **Before that:** sub-district scope was completed across Planning, Assessments and Live
-  (ADR-0063), including worker placement, filtered cards and parent-district context.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin. ThaiWater/HII
-  research and its access gate are pushed; there are no remaining tracked changes.
-- **Next agent:** read Section 0, "6 October: ThaiWater/HII research complete", first.
+- **Today:** a proposed Thailand multi-source early-warning architecture now assigns distinct
+  roles to Floodboard, ThaiWater, GEOGLOWS, Longdo, RP100 and reviewed labels. It proposes
+  deterministic operator watches first, then calibrated nowcasts only after event-based
+  validation and scientific approval.
+- **ThaiWater access update:** the Product Owner reports HII confirmed that the website API key is
+  public and available for everyone. ADR-0064 now permits bounded shadow ingestion with the key
+  kept out of Git/logs; licence, cadence, training and redistribution still need documentation.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`. The multi-source architecture proposal is the
+  latest work; verify branch synchronization before continuing.
+- **Next agent:** read Section 0, "6 October: multi-source early-warning proposal", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -124,18 +125,47 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
-### 6 October: ThaiWater/HII research complete (latest; read this first)
+### 6 October: multi-source early-warning proposal (latest; read this first)
 
-- Commit `a616af8` records the research and phased plan:
+- Proposed architecture:
+  [`docs/pilot/2026-10-05_Thailand_Multi_Source_Early_Warning_Architecture_Proposal.md`](docs/pilot/2026-10-05_Thailand_Multi_Source_Early_Warning_Architecture_Proposal.md).
+  It is a workshop/design input, not approval to issue public warnings or implement an unvalidated
+  flood-risk score.
+- Keep sources separate by meaning: Floodboard is observed/reported impact; ThaiWater is
+  consolidated government observation and attributed provider warnings; GEOGLOWS is river-flow
+  forecast; Longdo is rain/radar context; RP100 is a planning scenario; officer/CCTV reviews are
+  labels. The same BMA sensor arriving through two channels is one evidence family.
+- Proposed flow: bounded worker adapters → immutable raw-fetch lineage → canonical observations,
+  forecasts, impacts, official-source warnings and static context → origin-aware deduplication →
+  worker spatial placement and time-window features → deterministic rules → human publication
+  gate. A later calibrated model uses the privacy-safe research archive and reviewed labels.
+- First product is an internal **GRP operator watch**, not a statutory warning: source unavailable,
+  rapid rise, verified near/above-bank level, measured road flooding, observed heavy rain,
+  GEOGLOWS river rise and relayed official-source warning. Every watch names its rule/version,
+  evidence, times, freshness, quality and expiry.
+- Data-science stages: profile sources; shadow deterministic rules; event-based retrospective
+  validation; experimental calibrated nowcast; then operational promotion. Required measures
+  include event recall, precision, false alarms per area/month, lead-time distribution, Brier
+  score/calibration, availability and subgroup performance. Random row splits and accuracy alone
+  are explicitly rejected.
+- The document includes a Mermaid flow chart, canonical data contracts, feature/label plans,
+  publication ladder, 22 workshop decisions, 90-day delivery plan and acceptance gates.
+- Owner-reported access update: HII confirmed the website key is public and available for everyone.
+  ADR-0064 and the ThaiWater research plan now permit bounded shadow capture, while keeping the key
+  value out of Git/logs and retaining licence, cadence, training and redistribution gates.
+
+### 6 October: ThaiWater/HII research complete
+
+- Commit `a616af8` records the initial research and phased plan:
   [`docs/pilot/2026-10-05_ThaiWater_HII_Integration_Research_and_Plan.md`](docs/pilot/2026-10-05_ThaiWater_HII_Integration_Research_and_Plan.md).
   Integration gate: ADR-0064. It is pushed to origin.
 - The current TWA application has a public Swagger UI and technically relevant rainfall,
   river/canal level, discharge, gate/weir, Bangkok road-flood/flow, flood-product and CCTV
   contracts. Data calls without credentials return 401. The browser application's embedded
   `x-api-key` was not copied, recorded or reused.
-- No supported external-use process, API data licence, attribution, quota, rate-limit behavior,
-  retention right or redistribution right was found. Live polling is therefore **no-go** until HII
-  gives written terms and a GRP-issued server credential.
+- The initial research found no documented external-use process, API data licence, attribution,
+  quota, rate-limit behavior, retention right or redistribution right. The later owner-reported
+  HII confirmation clears public-key use for bounded shadow capture, but not those other rights.
 - HII's separate CKAN API exposes 36 open-data packages. All carry an ambiguous
   “Creative Commons Attribution Non-Commercial” label without a licence URL/version. Actual
   water/rain archives are openly browsable, but July 2026 was the newest non-empty monthly folder
@@ -144,14 +174,13 @@ RP20/RP50 rasters and methods exist.
   Nonthaburi stations (two water level, one rainfall) in the mixed open station inventory; none is
   labelled Bang Bua Thong. The monthly water station metadata also has more row values than its
   header, which must fail closed rather than be silently remapped.
-- Next action is governance, not coding: ask HII for the exact licence/version, approved clients,
-  issued key, endpoints/cadence/quota, units/datums/timestamps/QA, coverage, retention,
-  redistribution and support contacts. A bounded no-credential catalogue parser/coverage spike is
-  allowed, but it must not appear as live evidence.
-- If approved later, implement worker-only immutable capture, separate source/observation/retrieval
-  times, quality and clock validation, station versioning, conservative freshness, stored replay,
-  and unavailable/stale UI. Rain and forecasts never prove flooding; every higher evidence use
-  needs a product-specific decision.
+- Next actions are to retain the HII confirmation, document endpoint cadence/quota and terms, and
+  implement a minimal worker-only shadow capture plus catalogue parser/coverage spike. Neither may
+  appear as live evidence initially.
+- Shadow capture must use separate source/observation/retrieval times, quality and clock
+  validation, station versioning, conservative freshness, stored replay, and unavailable/stale UI.
+  Rain and forecasts never prove flooding; every higher evidence use needs a product-specific
+  decision.
 
 ### 6 October: sub-district rollout complete
 
