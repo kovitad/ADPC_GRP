@@ -1384,6 +1384,12 @@ a.pw-chip-button { display: inline-block; }
   /* Room for "Download summary" beside "New conversation" and the allowance on a phone. */
   .pw-chat__tools { flex-wrap: wrap; justify-content: flex-end; gap: 0.35rem; }
 }
+@media (max-width: 600px) {
+  /* The three conversation actions plus the allowance must wrap inside the phone viewport. */
+  .pw-chat__top { flex-wrap: wrap; }
+  .pw-chat__tools { width: 100%; min-width: 0; margin-left: 0; justify-content: flex-start; }
+  .pw-chat__tools .button { white-space: normal; }
+}
 
 /* ADR-0034: the Global Risk layer picker above the message box. */
 .pw-pick { position: relative; display: block; width: 100%; box-sizing: border-box; margin: 0 0 0.45rem; border: 1px solid var(--pw-line); border-radius: 10px; background: var(--pw-surface); font-size: 0.8rem; }

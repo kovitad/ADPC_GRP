@@ -1,13 +1,15 @@
 # Sub-district level across Planning, Assessments and Live: findings and plan
 
-Status: decided on 5 October 2026, with the recommended answer to every question:
+Status: completed on 6 October 2026 (ADR-0063), with the recommended answer to every question:
 
 - a map click selects the sub-district and its district;
 - the default scope is this sub-district;
 - the live layer counts what is inside the sub-district, with the district total alongside;
 - the order is Planning, then Live, then Assessments.
 
-The work starts with step 1.
+All seven steps are complete. Browser checks covered Planning, Assessments and Live at desktop
+and phone widths; the Live cards and Check first count show the parent-district total alongside
+the selected sub-district.
 
 The owner's words: "District is kind of the default map boundary; however, our requirement is to
 make it work down to sub-district level, based on our current foundation data. When I select a

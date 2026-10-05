@@ -1,15 +1,14 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 5 October 2026 (end of day).
-- **Today:**
-  - the live flood feed for Global Risk (ADR-0052), and a first live test on Global Risk;
-  - a grouped top menu;
-  - live-feed contributions in Share data;
-  - the Southeast Asia PM2.5 feed (ADR-0061);
-  - one map icon and layer standard on every map page (ADR-0062).
-- **Before that:** 4 October, with Nonthaburi, the Planner Live layer and dock, and GEOGLOWS in the summary (ADR-0057 to 0060).
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, with **15 commits not pushed** since `26b1580`.
-- **Next agent:** read Section 0, "5 October: end-of-day summary", first.
+**Updated:** 6 October 2026.
+- **Today:** sub-district scope is complete across Planning, Assessments and Live (ADR-0063).
+  Planning content and summaries follow the selected scope; live incidents are placed by the
+  worker; Assessments show parent context; and Live has a district/sub-district picker, filtered
+  cards and Check first list, with parent-district totals alongside.
+- **Before that:** 5 October, with live feeds, grouped navigation, PM2.5 and the shared map icon
+  standard (ADR-0052 and ADR-0061–0062).
+- **Branch:** `pilot/river-watch-and-bangkok-flood`, with **26 commits not pushed** since `26b1580`.
+- **Next agent:** read Section 0, "6 October: sub-district rollout complete", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -124,7 +123,34 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-5 October 2026)
 
-### 5 October: end-of-day summary (latest; read this first)
+### 6 October: sub-district rollout complete (latest; read this first)
+
+- Completed all seven steps in
+  [`docs/pilot/2026-10-05_Subdistrict_Level_Plan.md`](docs/pilot/2026-10-05_Subdistrict_Level_Plan.md).
+  The decision is recorded in ADR-0063.
+- Commits, oldest first: `4655969`/`101cf2e` (area API and tests), `a73f007` (Planning
+  picker), `a380c09` (Planning scope), `e48d682` (Planner live scope), `7362878`
+  (Assessments), `8051223`
+  (Live picker/filter), then the final browser-check/record commit.
+- Browser-checked signed in on the desktop stack at 1,440 px and 390 px:
+  - Planning selects Khlong Sam Prawet with Bangkok › Lat Krabang context and switches between
+    whole district and this sub-district;
+  - Assessments shows Bangkok › Lat Krabang district › Khlong Sam Prawet sub-district;
+  - Live restores `?area=1011&subdistrict=101103`, filters map/cards/incidents, and shows parent
+    totals. Khlong Sam Prawet and all six Lat Krabang sub-districts produced distinct counts.
+  No browser console errors were seen. A phone-width Planning action-row overflow found during the
+  check was fixed.
+- Validation: **1,222 passed, 2 skipped (1,224 collected)** after the final browser adjustments;
+  Ruff, JavaScript syntax and whitespace checks are clean.
+- The Docker rebuild was attempted but package download DNS retries exceeded ten minutes. To make
+  the Python API changes live for browser acceptance, `api/flood_pilot.py`,
+  `core/flood_evidence/areas.py` and the captured area JSON were copied into the API container and
+  that container was restarted. **Run `scripts/docker-desktop.ps1` again when package networking
+  is healthy** so the image itself contains the final commits. `web/` remains bind-mounted live.
+- Both public feed switches report `false`. The unrelated untracked owner deliverables were left
+  untouched. Commits remain local and unpushed.
+
+### 5 October: end-of-day summary
 
 #### State of the machine
 

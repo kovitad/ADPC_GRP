@@ -14,6 +14,7 @@
 .fl-card.is-warn { border-color: #f1c27d; background: #fff7e3; }
 .fl-card__n { margin: 0; font-family: var(--font-display); font-size: 1.6rem; font-weight: var(--weight-strong); line-height: 1.1; }
 .fl-card__l { margin: 0.25rem 0 0; color: var(--ink-700); font-size: 0.8rem; line-height: 1.35; }
+.fl-card__parent { margin: 0.35rem 0 0; color: var(--ink-500); font-size: 0.72rem; font-weight: 650; }
 
 .fl-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); gap: 1rem; margin-top: 1rem; align-items: start; }
 .fl-map { height: min(68vh, 560px); border: 1px solid var(--line); border-radius: var(--radius-md); z-index: 0; }

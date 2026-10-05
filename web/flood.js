@@ -145,12 +145,14 @@
     return state.areas.filter((a) => a.admin_code === state.area);
   };
   const currentArea = () => currentAreas()[0] || null;
-  const inArea = (geometry) => {
-    const areas = currentAreas();
+  const inAreas = (geometry, areas) => {
     if (!areas.length) return true;
     const points = geometry.type === "Point" ? [geometry.coordinates] : vertices(geometry);
     return points.some((p) => areas.some((area) => insideArea(p, area.outline)));
   };
+  const inArea = (geometry) => inAreas(geometry, currentAreas());
+  const parentAreas = () => state.subdistrict
+    ? state.areas.filter((a) => a.admin_code === state.area) : [];
   const visibleFacilities = () => (state.assets ? state.assets.assets.filter(
     (a) => inArea({ type: "Point", coordinates: [a.lon, a.lat] }),
   ) : []);
@@ -408,6 +410,36 @@
     const facilities = visibleFacilities();
     set("exposed", facilities.filter((a) => a.exposure_state === "potentially_exposed").length);
     set("access", facilities.filter((a) => ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state)).length);
+    const parents = parentAreas();
+    const parentRoads = state.roads && parents.length
+      ? state.roads.features.filter((f) => inAreas(f.geometry, parents)) : [];
+    const parentFlooded = parentRoads.filter((f) => !f.properties.cleared);
+    const parentNow = parentFlooded.filter((f) => NOW_BANDS.has(f.properties.freshness));
+    const parentReports = state.reports && parents.length ? state.reports.features.filter(
+      (f) => inAreas(f.geometry, parents) && new Date(f.properties.observed_at).getTime() >= hourAgo,
+    ) : [];
+    const parentFacilities = state.assets && parents.length ? state.assets.assets.filter(
+      (a) => inAreas({ type: "Point", coordinates: [a.lon, a.lat] }, parents),
+    ) : [];
+    const parentValues = {
+      affected: parentNow.length,
+      blocked: parentNow.filter((f) => f.properties.provider_verdict[state.vehicle] === "blocked").length,
+      closed: parentNow.filter((f) => f.properties.closed_all).length,
+      old: parentFlooded.length - parentNow.length,
+      reports: parentReports.length,
+      exposed: parentFacilities.filter((a) => a.exposure_state === "potentially_exposed").length,
+      access: parentFacilities.filter((a) => ["access_under_review", "access_disrupted_confirmed"].includes(a.access_state)).length,
+    };
+    Object.entries(parentValues).forEach(([key, value]) => {
+      const card = $(`[data-card="${key}"]`).closest(".fl-card");
+      let context = card.querySelector(".fl-card__parent");
+      if (!context) {
+        context = el("p", "fl-card__parent");
+        card.append(context);
+      }
+      context.hidden = !state.subdistrict;
+      context.textContent = say("card.parent", { n: number(value) });
+    });
     $("[data-card-sources]").classList.toggle("is-warn", notOk > 0);
     const vehicle = say(`veh.${state.vehicle}`);
     $('[data-card-label="blocked"]').textContent = say("card.blocked", {
@@ -633,7 +665,12 @@
     list.replaceChildren();
     const items = visibleIncidents();
     const active = items.filter((i) => i.status === "active").length;
-    $("[data-inc-count]").textContent = say("inc.count", { a: active, r: items.length - active });
+    const parentCount = state.subdistrict && state.incidents
+      ? state.incidents.incidents.filter((i) => (i.district_codes || []).includes(state.area)).length
+      : null;
+    $("[data-inc-count]").textContent = parentCount == null
+      ? say("inc.count", { a: active, r: items.length - active })
+      : `${say("inc.count", { a: active, r: items.length - active })} · ${say("inc.parent", { n: parentCount })}`;
     const more = $("[data-inc-more]");
     if (!items.length) {
       list.append(el("li", "fl-inc-empty", say("inc.none")));
