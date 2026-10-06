@@ -11,8 +11,9 @@
   everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by
   TWA. Never print, commit or return it.
 - **Branch:** `pilot/river-watch-and-bangkok-flood`. ThaiWater Stage 0 is implemented in `03aa63b`;
-  the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, and the third
-  capture analysis is in local commit `5a165c1`. The local continuation has not been pushed.
+  the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, the third
+  capture analysis is in `5a165c1`, and the metadata-only window analyzer is in `e687475`. The
+  local continuation has not been pushed.
 - **Next agent:** read Section 0, "6 October: metadata-only ThaiWater window analysis", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
@@ -148,8 +149,10 @@ RP20/RP50 rasters and methods exist.
   watch or warning. Persistent capture remains disabled. The CLI was exercised against the real
   three-pull PostgreSQL/storage window and returned the documented metadata-only result.
 - Validation: **1,253 passed, 2 PostgreSQL-only tests skipped**; Ruff and whitespace checks are
-  clean. Longer observation, origin mapping, licence/retention and hydrology/product decisions
-  still gate a measurement layer.
+  clean. Commit `e687475`; the Desktop image was rebuilt with the supported launcher, API/database
+  are healthy, the worker is running, the CLI passed again from the rebuilt worker image, and the
+  signed-in browser remained on Planning after reload. Longer observation, origin mapping,
+  licence/retention and hydrology/product decisions still gate a measurement layer.
 
 ### 6 October: local SERVIR sign-in restored
 
