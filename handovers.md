@@ -132,6 +132,22 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
+### 6 October: Global Risk live-feed issue pack
+
+- The owner-requested issue folder is `.local/data-out/global-risk-platform-issues/` (ignored local
+  output). Its main brief is ready to share with the Global Risk team; a separate checklist makes
+  future feed/release testing repeatable.
+- Findings were revalidated against `SERVIR-AI/global-platform` commit `acc7b9d` (5 October). The
+  AQ Tracker public URL is the good reproducible example: 351 anonymous province rows, one
+  document-level forecast time and highest-PM2.5-first order.
+- Confirmed platform gaps: no document-to-record field mapping or relevance sort; `valid_until` is
+  returned but not enforced; generic feeds inherit a six-hour monthly-data cache; empty lists are
+  failures; generic JSON/CSV queries support `limit` but no lookup filters; risk-pack selection uses
+  hazard but not country/place; live receipts lack selected-row bytes/hash; approved feed specs
+  have no contributor version/repoint workflow.
+- The brief explicitly recommends retaining anonymous fetches rather than accepting contributor
+  secrets. No upstream code was changed, no public switch was enabled and nothing was submitted.
+
 ### 6 October: local live-feed examples
 
 - The owner-requested guide is at
