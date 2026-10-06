@@ -142,131 +142,6 @@
   const placeLayer = window.L.featureGroup().addTo(map);
   let floodOverlay = null;
   let floodPicture = null;
-  let floodObjectUrl = null;
-
-  // ---------- optional perspective scenario view (ADR-0067) ----------
-  // MapLibre is created only when requested. The normal Leaflet planner remains the supported
-  // fallback if the external style or WebGL is unavailable.
-  const mapShell = $("[data-map-shell]");
-  const map2dCanvas = $("#risk-map");
-  const map3dCanvas = $("#risk-map-3d");
-  const mapModeButtons = [...document.querySelectorAll("[data-map-mode]")];
-  const map3dButton = $("[data-map-mode=\"3d\"]");
-  const map3dNote = $("[data-3d-note]");
-  let perspectiveMap = null;
-  let perspectiveReady = false;
-  let perspectiveFailed = false;
-
-  const perspectiveBounds = () => {
-    if (state.selected?.geometry) {
-      const selectedBounds = window.L.geoJSON(state.selected.geometry).getBounds();
-      if (selectedBounds.isValid()) {
-        return [[selectedBounds.getWest(), selectedBounds.getSouth()],
-          [selectedBounds.getEast(), selectedBounds.getNorth()]];
-      }
-    }
-    if (!floodPicture?.bounds) return null;
-    return [[floodPicture.bounds[0][1], floodPicture.bounds[0][0]],
-      [floodPicture.bounds[1][1], floodPicture.bounds[1][0]]];
-  };
-
-  const fitPerspectiveScenario = ({ pitch = 55, bearing = -18 } = {}) => {
-    if (!perspectiveMap || !perspectiveReady) return;
-    const bounds = perspectiveBounds();
-    if (bounds) perspectiveMap.fitBounds(bounds, { padding: 46, duration: 650, maxZoom: 15 });
-    perspectiveMap.easeTo({ pitch, bearing, duration: 650 });
-  };
-
-  const syncPerspectiveRaster = () => {
-    if (!perspectiveMap || !perspectiveReady) return;
-    if (perspectiveMap.getLayer("grp-flood-scenario")) perspectiveMap.removeLayer("grp-flood-scenario");
-    if (perspectiveMap.getSource("grp-flood-scenario")) perspectiveMap.removeSource("grp-flood-scenario");
-    if (!floodPicture) return;
-    const [[south, west], [north, east]] = floodPicture.bounds;
-    perspectiveMap.addSource("grp-flood-scenario", {
-      type: "image",
-      url: floodPicture.url,
-      coordinates: [[west, north], [east, north], [east, south], [west, south]],
-    });
-    const before = perspectiveMap.getLayer("building-3d")
-      ? "building-3d"
-      : perspectiveMap.getStyle().layers.find((layer) => layer.type === "symbol")?.id;
-    perspectiveMap.addLayer({
-      id: "grp-flood-scenario",
-      type: "raster",
-      source: "grp-flood-scenario",
-      paint: { "raster-opacity": 0.8, "raster-fade-duration": 0 },
-    }, before);
-  };
-
-  const initPerspectiveMap = () => {
-    if (perspectiveMap) return perspectiveMap;
-    if (perspectiveFailed || !window.maplibregl || !window.maplibregl.supported()) return null;
-    try {
-      perspectiveMap = new window.maplibregl.Map({
-        container: map3dCanvas,
-        style: "https://tiles.openfreemap.org/styles/liberty",
-        center: [100.55, 13.75],
-        zoom: 9,
-        pitch: 55,
-        bearing: -18,
-        attributionControl: true,
-        maxPitch: 70,
-      });
-      perspectiveMap.addControl(new window.maplibregl.NavigationControl({ visualizePitch: true }), "top-left");
-      perspectiveMap.once("load", () => {
-        perspectiveReady = true;
-        syncPerspectiveRaster();
-        fitPerspectiveScenario();
-      });
-      perspectiveMap.on("error", () => {
-        if (perspectiveReady || perspectiveFailed) return;
-        perspectiveFailed = true;
-        perspectiveMap?.remove();
-        perspectiveMap = null;
-        setMapMode("2d");
-        syncPerspectiveAvailability();
-      });
-    } catch (_error) {
-      perspectiveFailed = true;
-      perspectiveMap = null;
-    }
-    return perspectiveMap;
-  };
-
-  const setMapMode = (mode) => {
-    const use3d = mode === "3d" && Boolean(floodPicture) && Boolean(initPerspectiveMap());
-    mapShell.classList.toggle("is-3d", use3d);
-    map2dCanvas.hidden = use3d;
-    map3dCanvas.hidden = !use3d;
-    map3dNote.hidden = !use3d;
-    mapModeButtons.forEach((button) => {
-      button.setAttribute("aria-pressed", String(button.dataset.mapMode === (use3d ? "3d" : "2d")));
-    });
-    if (use3d) {
-      perspectiveMap.resize();
-      if (perspectiveReady) fitPerspectiveScenario();
-    } else {
-      window.setTimeout(() => map.invalidateSize(), 0);
-    }
-  };
-
-  const syncPerspectiveAvailability = () => {
-    syncPerspectiveRaster();
-    const available = Boolean(
-      floodPicture && !perspectiveFailed && window.maplibregl && window.maplibregl.supported(),
-    );
-    map3dButton.disabled = !available;
-    map3dButton.title = available
-      ? "View the selected managed flood scenario in perspective"
-      : "Available when a managed flood-depth scenario has loaded and WebGL is supported";
-    if (!available && mapShell.classList.contains("is-3d")) setMapMode("2d");
-  };
-
-  mapModeButtons.forEach((button) => button.addEventListener("click", () => setMapMode(button.dataset.mapMode)));
-  $("[data-3d-camera=\"city\"]").addEventListener("click", () => fitPerspectiveScenario());
-  $("[data-3d-camera=\"top\"]").addEventListener("click", () => fitPerspectiveScenario({ pitch: 0, bearing: 0 }));
-  $("[data-3d-reset]").addEventListener("click", () => fitPerspectiveScenario());
 
 
   // ---------- map symbols: shared with every map page (web/map-symbols.js, ADR-0062) ----------
@@ -1595,21 +1470,16 @@
     if (floodOverlay) floodOverlay.remove();
     floodOverlay = null;
     floodPicture = null;
-    syncPerspectiveAvailability();
-    if (floodObjectUrl) URL.revokeObjectURL(floodObjectUrl);
-    floodObjectUrl = null;
     if (!layer || layer.available === false || !layer.bounds) return;
     const response = await fetch(layer.image_url, { credentials: "same-origin" });
     if (!response.ok) return;
-    floodObjectUrl = URL.createObjectURL(await response.blob());
+    const url = URL.createObjectURL(await response.blob());
     // Kept for the summary download's map picture (ADR-0033): a same-origin blob, so a canvas can
     // draw it without being tainted.
-    floodPicture = { url: floodObjectUrl, bounds: layer.bounds, years: layer.return_period_years };
-    floodOverlay = window.L.imageOverlay(floodObjectUrl, layer.bounds, { opacity: 0.8, interactive: false });
+    floodPicture = { url, bounds: layer.bounds, years: layer.return_period_years };
+    floodOverlay = window.L.imageOverlay(url, layer.bounds, { opacity: 0.8, interactive: false });
     if ($('[data-layer="flood"]').checked) floodOverlay.addTo(map);
     $("[data-flood-title]").textContent = `Flood depth · ${layer.return_period_years}-year`;
-    $("[data-3d-title]").textContent = `RP${layer.return_period_years} modelled planning scenario`;
-    syncPerspectiveAvailability();
   };
 
   const drawLegend = (legend) => {
