@@ -3,8 +3,9 @@
 **Updated:** 6 October 2026.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
-  shadow windows repeatably auditable. The persistent switch remains false. Results expose health,
-  lineage and coverage only—no measurement API/UI, confidence change, watch or warning. The
+  shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
+  observations for a lay reader, including a Dusit worked example. The persistent switch remains
+  false. There is still no measurement API/UI, confidence change, watch or warning. The
   Docker Desktop stack was then rebuilt with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
@@ -14,7 +15,7 @@
   the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, the third
   capture analysis is in `5a165c1`, and the metadata-only window analyzer is in `e687475`. The
   local continuation has not been pushed.
-- **Next agent:** read Section 0, "6 October: metadata-only ThaiWater window analysis", first.
+- **Next agent:** read Section 0, "6 October: Bangkok observation data briefing", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -128,6 +129,29 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
+
+### 6 October: Bangkok observation data briefing
+
+- The owner-requested Word briefing is at
+  `deliverables/thaiwater/ThaiWater_Bangkok_Observation_Data_Brief_2026-10-06.docx`. It is an
+  internal, untracked deliverable; do not publish or treat it as evidence that display or
+  redistribution rights are approved.
+- The four-page document explains the two products and field meanings in plain language, lists all
+  six retrieval records with lineage, summarizes Bangkok coverage, shows the ten districts with
+  the most station examples, and explains limitations and recommended next review.
+- Bangkok in the three-pull sample has 8 water-level stations across 7 districts (23 stored states)
+  and 122 rainfall stations across 49 districts (235 stored states). Provider quality is
+  unreported for every observation.
+- Dusit was selected as the worked example because it is tied for the most combined station
+  examples and includes both products: 2 water-level and 5 rainfall stations, with 15 stored states
+  shown individually. The document explicitly explains that the wide water-elevation range is not
+  flood depth and must not be compared across stations without datum/hydrology review.
+- The briefing repeatedly states that it is a short exploratory shadow sample, not a warning,
+  district average, threshold, safety finding or approved public product. Rain does not prove
+  flooding and no value is inferred where a station is absent.
+- Validation: the DOCX opens through `python-docx`, its ZIP package is valid, Word successfully
+  opened and repaginated it as four pages, and its extracted tables/text were reviewed. This work
+  changed no code, database, API, UI or capture setting.
 
 ### 6 October: metadata-only ThaiWater window analysis
 
