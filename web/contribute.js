@@ -468,45 +468,71 @@
     else dialog.setAttribute("open", "");
   };
 
+  const setCheckStatus = (text, kind = "") => {
+    const status = $("[data-check-status]");
+    status.textContent = text;
+    status.className = `cb-check-status${kind ? ` is-${kind}` : ""}`;
+  };
+
   const check = async () => {
     const manifest = manifestFromForm();
+    const button = $("[data-check]");
+    const form = $("[data-form]");
+    state.checked = null;
     $("[data-confirm]").hidden = true;
-    const result = await GRP.request("/api/v1/contributions", {
-      method: "POST",
-      body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true, test: state.test },
-    });
-    renderFields(result.problems || {});
-    if (result.duplicate) {
-      showBanner(result.duplicate.message, "bad");
-      showDuplicate(result.duplicate);
-      return;
+    button.disabled = true;
+    button.textContent = "Checking…";
+    form.setAttribute("aria-busy", "true");
+    setCheckStatus(`Checking this ${KINDS[state.kind].label.toLowerCase()}…`);
+    try {
+      const result = await GRP.request("/api/v1/contributions", {
+        method: "POST",
+        body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true, test: state.test },
+      });
+      renderFields(result.problems || {});
+      if (result.duplicate) {
+        setCheckStatus("This name is already on Global Risk. Nothing was sent.", "bad");
+        showBanner(result.duplicate.message, "bad");
+        showDuplicate(result.duplicate);
+        return;
+      }
+      if (Object.keys(result.problems || {}).length) {
+        setCheckStatus("Check finished. Fix the marked fields, then check again.", "bad");
+        showBanner("Fix the marked fields, then check again.", "bad");
+        return;
+      }
+      showBanner("");
+      state.checked = result;
+      const notes = $("[data-notes]");
+      notes.replaceChildren(...(result.notes || []).map((note) => {
+        const item = document.createElement("li");
+        item.textContent = note;
+        return item;
+      }));
+      $("[data-manifest]").textContent = JSON.stringify(result.manifest, null, 2);
+      // Worded to stay true whether Global Risk auto-approves (as on 30 Sep 2026) or reviews first.
+      $("[data-warning]").textContent = state.kind === "feed"
+        ? "Global Risk approves contributions at once on this server: the feed will be live for every Global Risk user, and only a Global Risk reviewer can remove it. It fetches the address again on later reads, so the address must stay up."
+        : state.kind === "weights"
+        ? "This changes the flood risk levels every Global Risk user sees, everywhere. Global Risk may apply it as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer."
+        : "Global Risk may publish this to every Global Risk user as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer.";
+      $("[data-agree-text]").textContent = state.kind === "weights"
+        ? "I understand Global Risk may change risk levels for every Global Risk user, and that I may not be able to take it back."
+        : "I understand Global Risk may make this available to every Global Risk user, and that I may not be able to take it back.";
+      $("[data-agree]").checked = false;
+      $("[data-send]").disabled = true;
+      $("[data-confirm]").hidden = false;
+      setCheckStatus("Check finished. Review the exact manifest below before sending.", "ok");
+      $("[data-confirm]").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (error) {
+      const message = error.message || "The contribution could not be checked.";
+      setCheckStatus(message, "bad");
+      showBanner(message, "bad");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Check";
+      form.removeAttribute("aria-busy");
     }
-    if (Object.keys(result.problems || {}).length) {
-      showBanner("Fix the marked fields, then check again.", "bad");
-      return;
-    }
-    showBanner("");
-    state.checked = result;
-    const notes = $("[data-notes]");
-    notes.replaceChildren(...(result.notes || []).map((note) => {
-      const item = document.createElement("li");
-      item.textContent = note;
-      return item;
-    }));
-    $("[data-manifest]").textContent = JSON.stringify(result.manifest, null, 2);
-    // Worded to stay true whether Global Risk auto-approves (as on 30 Sep 2026) or reviews first.
-    $("[data-warning]").textContent = state.kind === "feed"
-      ? "Global Risk approves contributions at once on this server: the feed will be live for every Global Risk user, and only a Global Risk reviewer can remove it. It fetches the address again on later reads, so the address must stay up."
-      : state.kind === "weights"
-      ? "This changes the flood risk levels every Global Risk user sees, everywhere. Global Risk may apply it as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer."
-      : "Global Risk may publish this to every Global Risk user as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer.";
-    $("[data-agree-text]").textContent = state.kind === "weights"
-      ? "I understand Global Risk may change risk levels for every Global Risk user, and that I may not be able to take it back."
-      : "I understand Global Risk may make this available to every Global Risk user, and that I may not be able to take it back.";
-    $("[data-agree]").checked = false;
-    $("[data-send]").disabled = true;
-    $("[data-confirm]").hidden = false;
-    $("[data-confirm]").scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   const send = async () => {
@@ -799,8 +825,10 @@
   });
   $("[data-reset]").addEventListener("click", () => {
     state.values = {};
+    state.checked = null;
     state.test = false;
     $("[data-confirm]").hidden = true;
+    setCheckStatus("");
     renderFields({});
   });
   $("[data-agree]").addEventListener("change", (event) => {

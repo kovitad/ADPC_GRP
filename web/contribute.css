@@ -30,6 +30,9 @@
 .cb-field.is-invalid textarea { border-color: #d0493a; }
 .cb-field__error { color: #b23a2b; font-size: 0.76rem; }
 .cb-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+.cb-check-status { min-height: 1.25rem; margin: 0.4rem 0 0; color: #52646c; font-size: 0.8rem; }
+.cb-check-status.is-bad { color: #a3321f; font-weight: 600; }
+.cb-check-status.is-ok { color: #166534; font-weight: 600; }
 
 .cb-confirm { margin-top: 1.25rem; padding: 1rem 1.1rem; border: 1px solid #f1d08a; border-radius: 12px; background: #fffaf0; }
 .cb-confirm h3 { margin: 0 0 0.4rem; font-size: 1rem; }

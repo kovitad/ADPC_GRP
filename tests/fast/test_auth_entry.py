@@ -267,6 +267,24 @@ def test_live_shows_thaiwater_shadow_health_without_measurements() -> None:
     assert re.search(r"/flood-i18n\.js\?v=\d{8}[a-z]", page)
 
 
+def test_contribution_check_always_reports_progress_and_result_inline() -> None:
+    page = (WEB_ROOT / "contribute.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "contribute.js").read_text(encoding="utf-8")
+    styles = (WEB_ROOT / "contribute.css").read_text(encoding="utf-8")
+
+    assert 'data-check-status role="status" aria-live="polite"' in page
+    assert 'button.textContent = "Checking…"' in script
+    assert 'form.setAttribute("aria-busy", "true")' in script
+    assert "Check finished. Fix the marked fields" in script
+    assert "Check finished. Review the exact manifest" in script
+    assert 'setCheckStatus(message, "bad")' in script
+    assert 'button.textContent = "Check"' in script
+    assert ".cb-check-status.is-bad" in styles
+    assert ".cb-check-status.is-ok" in styles
+    assert re.search(r"/contribute\.js\?v=\d{8}[a-z]", page)
+    assert re.search(r"/contribute\.css\?v=\d{8}[a-z]", page)
+
+
 def test_assessments_and_planning_share_compatible_result_context() -> None:
     assessment_page = (WEB_ROOT / "assessments.html").read_text(encoding="utf-8")
     assessment_script = (WEB_ROOT / "assessments.js").read_text(encoding="utf-8")

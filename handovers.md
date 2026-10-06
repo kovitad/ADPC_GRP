@@ -132,6 +132,21 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
+### 6 October: table contribution Check feedback restored
+
+- The owner reported that **Share data → Table → Check** appeared to do nothing. API logs showed the
+  authenticated page/list calls but no preview POST from that click, so Global Risk had not received
+  anything and this was not a silent contribution failure.
+- Check now immediately disables itself, says `Checking…`, marks the form busy and keeps an inline
+  live status beside the button. Success, validation problems, duplicate names and request failures
+  all end with visible inline text; the old top-of-page banner remains supplementary. Clear also
+  clears stale checked state. Assets are versioned `20261006a`.
+- A browser acceptance with a mocked local API selected Table, entered a complete CSV table, clicked
+  Check, observed the POST, inline completion message and exact-manifest confirmation; nothing was
+  sent. **522 focused contribution, permission and browser-contract tests pass**; Ruff, JavaScript
+  syntax and whitespace checks are clean. Reload the real signed-in page and repeat with the owner's
+  draft; inspect the now-visible message before any confirmation/send action.
+
 ### 6 October: ThaiWater shadow health shown in Live
 
 - ADR-0067 adds **ThaiWater government observations (shadow)** to Live's existing source-coverage
