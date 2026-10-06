@@ -51,11 +51,12 @@ ADR-0066 adds a protected, database-only readiness endpoint for fetch health, li
 counts and pilot station coverage. It returns no measurement values and makes no area aggregate,
 map layer, incident-confidence change, watch or warning.
 
-On 6 October the public website key was configured only in ignored local storage and two controlled
-captures passed. Migration `20261005_0028` is now applied to the Desktop database. The worker stored
-12 pilot water-level stations and 125 pilot rainfall stations; neither product covers Bang Bua
-Thong, provider quality flags were absent, and Floodboard has no normalized station code for an
-exact origin join. The switch was returned to false after the short run. See
+On 6 October the public website key was configured only in ignored local storage and three
+controlled captures over about 48 minutes passed. Migration `20261005_0028` is now applied to the
+Desktop database. The worker stored 12 pilot water-level stations and 126 pilot rainfall stations;
+neither product covers Bang Bua Thong, provider quality flags were absent, and Floodboard has no
+normalized station code for an exact origin join. The persistent switch remains false after the
+short run. See
 [`2026-10-06_ThaiWater_Shadow_Capture_Report.md`](2026-10-06_ThaiWater_Shadow_Capture_Report.md).
 No measurement read contract or operator layer is approved yet.
 

@@ -1,8 +1,9 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 6 October 2026.
-- **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against two
-  real local ThaiWater pulls. The switch was returned to false afterward. Results expose health,
+- **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
+  three real local ThaiWater pulls over about 48 minutes. The persistent switch remains false.
+  Results expose health,
   lineage and coverage only—no measurement API/UI, confidence change, watch or warning. The
   Docker Desktop stack was then rebuilt with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
@@ -153,15 +154,18 @@ RP20/RP50 rasters and methods exist.
 - The live v2 envelope is `{meta, data}` with `meta.updatedDate=null`, not the older
   `{result: "OK", data}` fixture shape. The strict adapter now recognizes and validates both
   envelopes; arbitrary `data` objects and invalid metadata still fail closed.
-- Migration `20261005_0028` is applied to the running Desktop PostgreSQL database. Two controlled
-  captures succeeded at `02:17Z` and `02:22Z`; the switch is back to false and cadence to 15
-  minutes. API, database and worker are healthy.
+- Migration `20261005_0028` is applied to the running Desktop PostgreSQL database. Controlled
+  captures succeeded at `02:17Z`, `02:22Z` and `03:05Z`; the persistent switch is false and cadence
+  is 15 minutes. API, database and worker are healthy.
 - First pull: 798 national water-level features produced 12 pilot stations/states; 2,944 rainfall
   features produced 125 pilot stations/states. Second pull: water changed to 800 features and added
-  10 new pilot states; rainfall bytes were identical and added zero, proving idempotence.
-- Final stored totals are 22 water-level states and 125 rainfall states. There are no future clocks,
-  station metadata changes or corrected duplicate station/time states. Provider quality flags are
-  absent for every placed observation, which must not be interpreted as good quality.
+  10 new pilot states; rainfall bytes were identical and added zero, proving idempotence. The third
+  pull had 799 water features/11 new pilot states and 2,963 rainfall features/118 new pilot states.
+- Final stored totals are 33 water-level states and 243 rainfall states. Rainfall gained one new
+  Department of Bangkok station (126 station identities; 94 sub-districts); this was not a metadata
+  change. Every national feature in all three pulls had a parseable measurement. There are no future
+  clocks or corrected duplicate station/time states. Provider quality flags are absent for every
+  placed observation, which must not be interpreted as good quality.
 - Coverage is sparse for water level (7 Bangkok and 3 Nonthaburi districts) and broad for rainfall
   (49 Bangkok and 3 Nonthaburi districts), but **neither product has a station in Bang Bua Thong
   (`1204`)**. Never infer local values from adjacent stations.
@@ -226,7 +230,7 @@ RP20/RP50 rasters and methods exist.
   live-capture changes have their current validation in the newest section above.
 - **Current UI impact: none.** Live, Planning and Assessments have no ThaiWater marker, layer,
   card, watch or confidence change.
-- Key configuration, migration, two-pull capture, schema inspection and the health report are now
+- Key configuration, migration, three-pull capture, schema inspection and the health report are now
   complete locally. Remaining order: collect a longer deliberate shadow window; resolve origin
   identity and licence/retention; approve per-product freshness and station display semantics; then
   consider a protected station-measurement contract and separate **Government observations** layer.
