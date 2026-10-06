@@ -142,6 +142,12 @@ RP20/RP50 rasters and methods exist.
   source requires a key, and shadow access does not establish public redistribution, retention,
   freshness or measurement-display approval. It sketches a future GRP adapter but labels the route
   and manifest as nonexistent and not approved.
+- Follow-up against `docs/adhoc/AQ Tracker API_ Brief for AI2 Agent Pilot.docx` distinguishes the
+  keyed `mapclient` API from AQ Tracker's separate anonymous province response, which GRP already
+  calls. A live check returned 351 rows, top-level-only forecast time and highest-first ordering.
+  Direct Global Risk use would lose per-row freshness and return the cleanest tail by default, so
+  GRP currently adds per-row time/expiry/category and reverses the order. Prefer the source directly
+  once AQ Tracker makes those changes and confirms redistribution/credit wording.
 - The local anonymous PM2.5 route currently returns HTTP 404 as designed because the public switch
   is off. A permanent public base URL, route switch, outside read, AQ Tracker redistribution/credit
   confirmation and explicit send approval are still required. No route was enabled and nothing was
