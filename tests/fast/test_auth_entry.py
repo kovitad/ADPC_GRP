@@ -248,6 +248,24 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "innerHTML" not in script
 
 
+def test_planning_perspective_view_keeps_the_managed_raster_flat_and_optional() -> None:
+    page = (WEB_ROOT / "planning.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "planning.js").read_text(encoding="utf-8")
+
+    assert 'data-map-mode="2d"' in page
+    assert 'data-map-mode="3d"' in page
+    assert "Perspective view—not live flooding" in page
+    assert "Flood depth stays draped on the ground" in page
+    assert 'type: "image"' in script
+    assert 'type: "raster"' in script
+    assert '"raster-opacity": 0.8' in script
+    assert "fill-extrusion-height" not in script
+    assert "window.maplibregl.supported()" in script
+    assert 'style: "https://tiles.openfreemap.org/styles/liberty"' in script
+    assert 'map2dCanvas.hidden = use3d' in script
+    assert 'map3dCanvas.hidden = !use3d' in script
+
+
 def test_assessments_and_planning_share_compatible_result_context() -> None:
     assessment_page = (WEB_ROOT / "assessments.html").read_text(encoding="utf-8")
     assessment_script = (WEB_ROOT / "assessments.js").read_text(encoding="utf-8")

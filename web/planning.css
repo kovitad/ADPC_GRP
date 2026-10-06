@@ -310,7 +310,82 @@
 /* Map */
 .pw-map { position: relative; min-height: 0; }
 .pw-map__canvas { position: absolute; inset: 0; }
+.pw-map__canvas[hidden] { display: none; }
+.pw-map__canvas--3d { background: #dce9ef; }
 .pw-map .leaflet-control-zoom { margin-top: 70px; }
+
+/* ADR-0067: optional perspective view of the managed planning scenario. The raster remains a
+   flat, colour-coded surface; 3D buildings are context, never inferred flood volume. */
+.pw-map-mode {
+  position: absolute;
+  z-index: 1060;
+  top: 14px;
+  right: 78px;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid rgb(213 226 231 / 90%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 4px 16px rgb(16 40 36 / 16%);
+  backdrop-filter: blur(8px);
+}
+.pw-map-mode button {
+  min-height: 32px;
+  padding: 0.35rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #38505c;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.pw-map-mode button[aria-pressed="true"] { background: var(--pw-forest); color: #fff; }
+.pw-map-mode button:disabled { cursor: not-allowed; opacity: 0.45; }
+.pw-map-mode button:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.pw-3d-note {
+  position: absolute;
+  z-index: 1040;
+  right: 16px;
+  bottom: 20px;
+  display: grid;
+  width: min(390px, calc(100% - 32px));
+  gap: 0.35rem;
+  box-sizing: border-box;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(214 229 234 / 90%);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 12px 32px rgb(18 48 64 / 22%);
+  color: #223943;
+  backdrop-filter: blur(10px);
+}
+.pw-3d-note[hidden] { display: none; }
+.pw-3d-note strong { color: #133f59; font-size: 0.92rem; }
+.pw-3d-note span { font-size: 0.8rem; font-weight: 650; line-height: 1.4; }
+.pw-3d-note small { color: #5b6f78; font-size: 0.72rem; line-height: 1.4; }
+.pw-3d-note div { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+.pw-3d-note button {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #c8d9df;
+  border-radius: 999px;
+  background: #f7fbfc;
+  color: #1b678f;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.pw-map.is-3d .pw-search,
+.pw-map.is-3d .pw-location,
+.pw-map.is-3d .pw-dock,
+.pw-map.is-3d .pw-area-crumbs,
+.pw-map.is-3d .pw-place-chip,
+.pw-map.is-3d .pw-result { display: none; }
+.pw-map.is-3d .pw-map-mode { right: 14px; }
+.pw-map.is-3d .maplibregl-ctrl-bottom-right { bottom: 176px; }
 
 .pw-search {
   position: absolute;
@@ -721,6 +796,9 @@
   .pw-body[data-view="chat"] .pw-map, .pw-body[data-view="map"] .pw-chat { display: none; }
   .pw-stats { grid-template-columns: repeat(2, 1fr); }
   .pw-search { width: calc(100% - 140px); }
+  .pw-map-mode { top: 64px; right: 8px; }
+  .pw-map.is-3d .pw-map-mode { top: 10px; right: 10px; }
+  .pw-3d-note { right: 8px; bottom: 8px; width: calc(100% - 16px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

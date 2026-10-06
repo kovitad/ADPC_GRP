@@ -4,7 +4,9 @@
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
-  observations for a lay reader, including a Dusit worked example. The persistent switch remains
+  observations for a lay reader, including a Dusit worked example. Planning now also has an
+  optional WebGL perspective of the same managed flood-depth PNG, kept flat beneath contextual 3D
+  buildings; the normal 2D map remains the fallback. The persistent ThaiWater switch remains
   false. There is still no measurement API/UI, confidence change, watch or warning. The
   Docker Desktop stack was then rebuilt with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
@@ -129,6 +131,21 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
+
+### 6 October: optional 3D planning-scenario view
+
+- ADR-0067 adds **2D map / 3D scenario** controls to Planning. The 3D option is enabled only after
+  a managed flood-depth overlay loads and the browser supports WebGL.
+- The perspective view lazily creates a MapLibre map with OpenFreeMap Liberty, then drapes the
+  exact same protected GRP PNG on the ground at its existing bounds. OpenFreeMap building extrusion is visual
+  context only; raster colours are never extruded or interpreted as water volume.
+- The view is explicitly labelled as a modelled planning scenario, not live flooding, and says it
+  cannot certify a location safe. Perspective, top-down and fit controls use the selected area when
+  available. A failed external style or unsupported browser returns to the normal Leaflet map.
+- Validation: **1,254 passed, 2 PostgreSQL-only tests skipped**; Ruff, JavaScript syntax and
+  whitespace checks are clean. A fresh isolated browser correctly reached the local sign-in gate,
+  but had no reusable SERVIR session, so the signed-in 3D interaction remains to be checked. Owner
+  deliverables remain untouched.
 
 ### 6 October: Bangkok observation data briefing
 
