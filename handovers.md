@@ -2,8 +2,8 @@
 
 **Updated:** 6 October 2026.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
-  three real local ThaiWater pulls over about 48 minutes. The persistent switch remains false.
-  Results expose health,
+  three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
+  shadow windows repeatably auditable. The persistent switch remains false. Results expose health,
   lineage and coverage only—no measurement API/UI, confidence change, watch or warning. The
   Docker Desktop stack was then rebuilt with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
@@ -13,7 +13,7 @@
 - **Branch:** `pilot/river-watch-and-bangkok-flood`. ThaiWater Stage 0 is implemented in `03aa63b`;
   the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, and the third
   capture analysis is in local commit `5a165c1`. The local continuation has not been pushed.
-- **Next agent:** read Section 0, "6 October: first real ThaiWater shadow captures", first.
+- **Next agent:** read Section 0, "6 October: metadata-only ThaiWater window analysis", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -127,6 +127,29 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
+
+### 6 October: metadata-only ThaiWater window analysis
+
+- `core/flood_evidence/thaiwater_analysis.py` and `python -m grpcli.thaiwater analyze` review a
+  selected stored retrieval window without contacting ThaiWater or returning measurement values.
+- The JSON report covers fetch outcomes/cadence, distinct raw responses and changes, feature and
+  missing-measurement counts, station/version churn, corrected station-times, observation lag,
+  clock states, provider-quality coverage and area-coverage counts. It explicitly records
+  `publication_approved=false`, `contains_measurement_values=false` and
+  `network_requests_made=false`.
+- Missingness fails closed: if a successful fetch's retained raw object is missing or invalid, the
+  aggregate is `null`, not zero. Correction detection includes an original state before the chosen
+  window when its correction arrives inside the window.
+- The real three-pull window from `02:00Z` through `03:10Z` reports three successful attempts per
+  product, no configured missing measurement, no corrected station-time, no future clock and no
+  reported provider quality. The report is local and ignored under
+  `.local/thaiwater-shadow-analysis.json`.
+- This slice adds no API/UI, source call, background capture, assessment input, confidence effect,
+  watch or warning. Persistent capture remains disabled. The CLI was exercised against the real
+  three-pull PostgreSQL/storage window and returned the documented metadata-only result.
+- Validation: **1,253 passed, 2 PostgreSQL-only tests skipped**; Ruff and whitespace checks are
+  clean. Longer observation, origin mapping, licence/retention and hydrology/product decisions
+  still gate a measurement layer.
 
 ### 6 October: local SERVIR sign-in restored
 

@@ -55,6 +55,12 @@ Architecture proposal:
 9. **No operator API/UI in Stage 0.** The first outputs are database/raw evidence for coverage,
    freshness, quality and overlap analysis. A later reviewed slice adds source-health and map
    reads.
+10. **Shadow-window analysis is metadata-only.** `python -m grpcli.thaiwater analyze` reads the
+    database and immutable raw objects without making a network request. It reports fetch cadence
+    and outcomes, raw changes, feature/missing counts, station/version churn, corrected
+    station-times, observation lag, clock states, quality coverage and area-coverage counts. It
+    returns no measurement value and sets `publication_approved=false`. If retained raw bytes are
+    unavailable or invalid, missingness is `null` rather than inferred as zero.
 
 ## Consequences
 
@@ -67,5 +73,7 @@ Architecture proposal:
   rainfall and conflicting duplicate station metadata fail closed for the whole response. The
   first live run found the current v2 success envelope is `{meta, data}` rather than the older
   `{result: "OK", data}` form; both recognized forms are validated explicitly.
-- Follow-up work must add controlled read models/source health, origin-sensor overlap mapping,
-  research-archive export, retention terms and one scientifically reviewed deterministic watch.
+- The protected source-health read model is recorded in ADR-0066, and the metadata-only review CLI
+  now makes longer shadow windows reproducibly auditable without widening the API/UI surface.
+- Follow-up work must still add origin-sensor overlap mapping, research-archive export, retention
+  terms and one scientifically reviewed deterministic watch.

@@ -115,6 +115,25 @@ Until a reviewed mapping is available:
   corroboration merely because both exist nearby; and
 - no watch or confidence rule may combine them as two sensors.
 
+## Repeatable window analysis
+
+The metadata-only reviewer is now available inside the API/worker environment:
+
+```bash
+python -m grpcli.thaiwater analyze \
+  --pilot bangkok \
+  --start 2026-10-06T02:00:00Z \
+  --end 2026-10-06T03:10:00Z \
+  --output /tmp/thaiwater-shadow-analysis.json
+```
+
+It reads the database and retained immutable raw objects only; it makes no provider request. The
+three-pull report confirmed three successful attempts for each product, zero configured missing
+measurements, zero corrected station-times, no future clocks and unreported quality for every
+pilot observation. It contains raw hashes and aggregate metadata but no measurement value, and
+explicitly records `publication_approved=false` and `network_requests_made=false`. If raw bytes are
+not retained or cannot be parsed, missingness is reported as unknown rather than zero.
+
 ## Gate assessment
 
 Passed:

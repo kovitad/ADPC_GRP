@@ -33,6 +33,7 @@ from core.flood_evidence.thaiwater import (
     run_shadow,
     sources,
 )
+from core.flood_evidence.thaiwater_analysis import thaiwater_shadow_analysis
 from core.storage import LocalStorage
 
 CONFIG = pilot_config("bangkok")
@@ -301,6 +302,132 @@ def test_shadow_schedule_records_both_products_and_respects_interval(
         "thaiwater_rainfall_24h",
     ]
     assert session.scalar(select(func.count()).select_from(FloodSourceFetch)) == 4
+
+
+def test_shadow_window_analysis_reports_metadata_without_measurement_values(
+    session: Session, storage: LocalStorage
+) -> None:
+    source = sources()[0]
+    ingest_product(
+        session, storage, CONFIG, source, PRODUCTS[0], Pulled(200, WATER, FETCH_OK), AT
+    )
+    missing = _feature(value=None)
+    missing["properties"].update(
+        waterlevelDatetime="2026-10-05T18:50:00+07:00", waterlevelMsl=-999
+    )
+    ingest_product(
+        session,
+        storage,
+        CONFIG,
+        source,
+        PRODUCTS[0],
+        Pulled(200, _body(missing), FETCH_OK),
+        AT + timedelta(minutes=15),
+    )
+    ingest_product(
+        session,
+        storage,
+        CONFIG,
+        source,
+        PRODUCTS[0],
+        Pulled(200, _body(_feature(value=0.91)), FETCH_OK),
+        AT + timedelta(minutes=30),
+    )
+    session.commit()
+
+    report = thaiwater_shadow_analysis(
+        session, storage, CONFIG.pilot_id, start=AT, end=AT + timedelta(minutes=30)
+    )
+    assert report["publication_approved"] is False
+    assert report["contains_measurement_values"] is False
+    assert report["network_requests_made"] is False
+    water = report["products"][0]
+    assert water["fetch_attempts"] == 3
+    assert water["fetch_outcomes"] == {"ok": 3}
+    assert water["observed_interval_minutes"] == {
+        "minimum": 15.0,
+        "median": 15.0,
+        "maximum": 15.0,
+    }
+    assert water["distinct_raw_responses"] == 3
+    assert water["raw_change_events"] == 2
+    assert water["raw_analysis_states"] == {"parsed": 3}
+    assert water["missing_measurements"] == 1
+    assert water["stored_states_created"] == 2
+    assert water["corrected_station_times"] == 1
+    assert water["quality_flag_counts"] == {"unreported": 2}
+    assert water["station_summary"]["active_station_identities"] == 1
+    assert water["station_summary"]["identities_with_multiple_versions"] == 0
+    assert [row["raw_analysis"]["state"] for row in water["fetches"]] == [
+        "parsed",
+        "parsed",
+        "parsed",
+    ]
+
+    def assert_no_measurement_value(payload) -> None:
+        if isinstance(payload, dict):
+            assert "value" not in payload
+            for child in payload.values():
+                assert_no_measurement_value(child)
+        elif isinstance(payload, list):
+            for child in payload:
+                assert_no_measurement_value(child)
+
+    assert_no_measurement_value(report)
+
+
+def test_shadow_window_analysis_does_not_claim_missingness_when_raw_is_unavailable(
+    session: Session, storage: LocalStorage
+) -> None:
+    fetch = ingest_product(
+        session, storage, CONFIG, sources()[0], PRODUCTS[0], Pulled(200, WATER, FETCH_OK), AT
+    )
+    session.commit()
+    assert fetch.storage_key is not None
+    (storage.root / fetch.storage_key).unlink()
+
+    report = thaiwater_shadow_analysis(session, storage, CONFIG.pilot_id, end=AT)
+    water = report["products"][0]
+    assert water["raw_analysis_states"] == {"raw_unavailable": 1}
+    assert water["missing_measurements"] is None
+
+
+def test_shadow_window_analysis_counts_a_correction_against_an_earlier_state(
+    session: Session, storage: LocalStorage
+) -> None:
+    source = sources()[0]
+    ingest_product(
+        session, storage, CONFIG, source, PRODUCTS[0], Pulled(200, WATER, FETCH_OK), AT
+    )
+    ingest_product(
+        session,
+        storage,
+        CONFIG,
+        source,
+        PRODUCTS[0],
+        Pulled(200, _body(_feature(value=0.91)), FETCH_OK),
+        AT + timedelta(minutes=30),
+    )
+    session.commit()
+
+    report = thaiwater_shadow_analysis(
+        session,
+        storage,
+        CONFIG.pilot_id,
+        start=AT + timedelta(minutes=20),
+        end=AT + timedelta(minutes=30),
+    )
+    assert report["products"][0]["stored_states_created"] == 1
+    assert report["products"][0]["corrected_station_times"] == 1
+
+
+def test_shadow_window_analysis_rejects_an_inverted_window(
+    session: Session, storage: LocalStorage
+) -> None:
+    with pytest.raises(ValueError, match="start must not be after end"):
+        thaiwater_shadow_analysis(
+            session, storage, CONFIG.pilot_id, start=AT + timedelta(minutes=1), end=AT
+        )
 
 
 def test_failed_pull_records_health_attempt_without_data(
