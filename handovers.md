@@ -10,8 +10,9 @@
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by
   TWA. Never print, commit or return it.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin. ThaiWater Stage 0
-  is implemented in `03aa63b`; its detailed continuation handover is committed immediately after.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`. ThaiWater Stage 0 is implemented in `03aa63b`;
+  the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, and the third
+  capture analysis is in local commit `5a165c1`. The local continuation has not been pushed.
 - **Next agent:** read Section 0, "6 October: first real ThaiWater shadow captures", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
@@ -141,7 +142,8 @@ RP20/RP50 rasters and methods exist.
   active baseline visible and no browser console errors. The interactive browser session is
   `grp-login`.
 - Full post-capture validation: **1,249 passed, 2 PostgreSQL-only tests skipped**; Ruff and
-  whitespace checks are clean. The focused ThaiWater/permission run passed 478 tests.
+  whitespace checks are clean. The focused ThaiWater/permission run passed 478 tests. Code/report
+  stabilization is commit `54e6742`; the bounded third-capture analysis is commit `5a165c1`.
 - Do not start this Desktop stack with raw `docker compose up`; use the launcher so local auth and
   other configuration are passed correctly.
 
