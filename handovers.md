@@ -7,8 +7,30 @@
   observations for a lay reader, including a Dusit worked example. Live now shows the protected
   ThaiWater shadow capture state and pilot-wide station/district coverage in its source table,
   without measurements. The persistent switch remains false. There is still no measurement
-  API/UI, confidence change, watch or warning. The Docker Desktop stack was then rebuilt with the
-  supported launcher and SERVIR sign-in was
+  API/UI, confidence change, watch or warning. Generated assessment-summary DOCX files now carry
+  the Global Risk receipt-bound hazard-map URL as a real clickable hyperlink; the URL is omitted
+  when there is no published receipt. The local Global Risk issue brief now also records the
+  auto-approved-feed retirement gap, the tested public feed URLs/statuses, the cadence-versus-cache
+  discrepancy, and a proposed operational health catalog. A companion MCP platform-tools guide now
+  records the governed tool sequence, tool-specific client rules, contribution lifecycle, confirmed
+  issues, observability, regression tests and release gates in the ignored issue-pack folder and the
+  owner-requested `06Oct2026` handoff folder. An illustrated beginner DOCX now explains MCP versus
+  APIs, Claude Desktop versus a custom host, where model/tool/presentation quality comes from, and
+  how to trace and benchmark the client with Langfuse in a deployment pipeline. A reviewed plan now
+  stages a reversible AWS free-tier trial at `servir-risk.kovitad.com`: immutable GHCR image, Caddy
+  HTTPS, swap/resource gates, a protected PM2.5 read and controlled 6-hour ThaiWater shadow window
+  before any national baseline import. Bootstrap now records the permanent feed base address while
+  both anonymous publication switches remain explicitly false. The container workflow now publishes
+  `main` and immutable seven-character SHA tags only after the complete `CI` workflow succeeds for
+  that exact main commit. The Ubuntu bootstrap has explicit `--small-host`, callback client-ID and
+  interactive ThaiWater-shadow options, so no key belongs in GitHub or shell history. PM2.5 public
+  redistribution still waits for the AQ Tracker licence/credit confirmation; no ThaiWater
+  measurement feed is approved.
+  While tracing that path, `.env.example` was corrected to point the ThaiWater key
+  at the entrypoint's non-root `/run/grp-secrets` copy; a deployment regression test enforces that
+  every runtime secret-file setting uses the tmpfs copy. No AWS, DNS, OAuth or feed setting has been
+  changed. The Docker Desktop stack was then rebuilt
+  with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by

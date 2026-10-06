@@ -61,6 +61,29 @@ Normal releases can pull the prebuilt GitHub Container Registry image and avoid 
 sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image
 ```
 
+For the temporary 1 GB Lightsail trial, use an Ubuntu 24.04 x86-64 instance, point DNS at its
+static IPv4 address, allow inbound TCP 80/443, and deploy one immutable image. The `--small-host`
+option idempotently adds 3 GB swap and bounded Docker logs; it does not make this a production-size
+host. The callback-specific SERVIR client ID is non-secret. `--enable-thaiwater-shadow` is an
+explicit external-call action: it prompts for the key without putting it in the command or shell
+history, stores it root-owned under `/srv/grp/secrets`, and enables the worker-only shadow capture.
+Omit that option on the first empty-stack run if resource behavior has not been measured.
+
+```bash
+sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh \
+  --deploy-mode image \
+  --image ghcr.io/kovitad/adpc_grp:sha-<approved-short-sha> \
+  --domain servir-risk.kovitad.com \
+  --small-host \
+  --servir-client-id '<callback-specific-public-client-id>' \
+  --admin-email '<approved-admin-email>'
+```
+
+Rerun the same command with `--enable-thaiwater-shadow` only after the empty stack is healthy. It
+preserves the existing key on later reruns. PM2.5 needs no source key: its protected route works for
+a signed-in member. The bootstrap records `GRP_PUBLIC_FEED_BASE_URL`, but anonymous flood and PM2.5
+routes stay 404 because `.env.example` leaves both publication switches false.
+
 The platform health endpoint works before identity-provider setup, but login remains unavailable. Register a callback-specific SIG public PKCE client and put its non-secret ID in `SERVIR_AUTH_CLIENT_ID` in `/srv/grp/app/.env`. GRP discovers the issuer from `SIG_MCP_BASE_URL`; `SERVIR_AUTH_ISSUER` may pin the expected result. A public client has no client secret. Follow [`../docs/access-management.md`](../docs/access-management.md); a normal SIG user account is not an application credential.
 
 Prepare future LLM configuration without enabling it. Keep `AI_FEATURE_ENABLED=false`, set provider/model/base URL as non-secret values when approved, and place the token only in `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`.

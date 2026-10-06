@@ -25,8 +25,12 @@ ENABLE_UFW="false"
 CHECK_ONLY="false"
 ADMIN_EMAIL=""
 BOOTSTRAP_THAILAND_DATA="false"
+SMALL_HOST="false"
+ENABLE_THAIWATER_SHADOW="false"
+SERVIR_CLIENT_ID=""
 SSH_ALLOW_CIDRS=()
 APT_UPDATED="false"
+DOCKER_CONFIG_CHANGED="false"
 
 log() { printf '[grp-bootstrap] %s\n' "$*"; }
 warn() { printf '[grp-bootstrap] WARNING: %s\n' "$*" >&2; }
@@ -53,7 +57,10 @@ Options:
   --domain NAME               Public DNS name (default: $DEFAULT_DOMAIN)
   --deploy-user USER          Account that owns the checkout (default: SUDO_USER)
   --admin-email EMAIL         Idempotently provision this Platform Admin and ADPC Hub
+  --servir-client-id ID       Configure the callback-specific public PKCE client ID
   --bootstrap-thailand-data   Import and activate /srv/grp/bootstrap-data after deployment
+  --small-host                Add 3 GB swap and bounded Docker logs for a 1 GB trial VM
+  --enable-thaiwater-shadow   Prompt for/store the key if needed and enable shadow capture
   --enable-ufw                Enable UFW after safe allow rules are installed
   --ssh-allow-cidr CIDR       SSH source network; repeat for multiple networks
   --check-only                Report state without changing the machine
@@ -74,7 +81,10 @@ while [ "$#" -gt 0 ]; do
         --domain) require_option_value "$@"; DOMAIN="$2"; shift 2 ;;
         --deploy-user) require_option_value "$@"; DEPLOY_USER="$2"; shift 2 ;;
         --admin-email) require_option_value "$@"; ADMIN_EMAIL="$2"; shift 2 ;;
+        --servir-client-id) require_option_value "$@"; SERVIR_CLIENT_ID="$2"; shift 2 ;;
         --bootstrap-thailand-data) BOOTSTRAP_THAILAND_DATA="true"; shift ;;
+        --small-host) SMALL_HOST="true"; shift ;;
+        --enable-thaiwater-shadow) ENABLE_THAIWATER_SHADOW="true"; shift ;;
         --enable-ufw) ENABLE_UFW="true"; shift ;;
         --ssh-allow-cidr)
             require_option_value "$@"
@@ -95,6 +105,10 @@ done
 if [ -n "$ADMIN_EMAIL" ]; then
     [[ "$ADMIN_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] \
         || die "Invalid --admin-email value"
+fi
+if [ -n "$SERVIR_CLIENT_ID" ]; then
+    [[ "$SERVIR_CLIENT_ID" =~ ^[A-Za-z0-9._:-]+$ ]] \
+        || die "Invalid --servir-client-id value"
 fi
 [ "$BOOTSTRAP_THAILAND_DATA" = "false" ] || [ -n "$ADMIN_EMAIL" ] \
     || die "--bootstrap-thailand-data requires --admin-email"
@@ -162,6 +176,9 @@ case "${VERSION_ID:-}" in
     22.04|24.04) ;;
     *) die "Supported Ubuntu releases are 22.04 and 24.04; found ${VERSION_ID:-unknown}" ;;
 esac
+if [ "$DEPLOY_MODE" = "image" ] && [ "$(dpkg --print-architecture)" != "amd64" ]; then
+    die "The current GHCR workflow publishes linux/amd64 only; choose an x86-64/AMD64 host or publish a matching multi-architecture image"
+fi
 
 apt_update() {
     if [ "$APT_UPDATED" = "false" ]; then
@@ -186,6 +203,40 @@ install_packages() {
 }
 
 install_packages ca-certificates curl git gnupg openssl debian-keyring debian-archive-keyring apt-transport-https
+
+configure_small_host() {
+    [ "$SMALL_HOST" = "true" ] || return
+    log "Configuring bounded trial-host swap and Docker logs"
+
+    if [ ! -e /swapfile ]; then
+        fallocate -l 3G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=3072 status=progress
+        chmod 0600 /swapfile
+        mkswap /swapfile >/dev/null
+    fi
+    chmod 0600 /swapfile
+    swapon --show=NAME --noheadings | grep -Fxq /swapfile || swapon /swapfile
+    grep -Eq '^/swapfile[[:space:]]' /etc/fstab \
+        || printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+    printf 'vm.swappiness=20\n' > /etc/sysctl.d/99-grp-small-host.conf
+    sysctl --system >/dev/null
+
+    install -d -m 0755 /etc/docker
+    if [ ! -e /etc/docker/daemon.json ]; then
+        cat > /etc/docker/daemon.json <<'JSON'
+{
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+JSON
+        chmod 0644 /etc/docker/daemon.json
+        DOCKER_CONFIG_CHANGED="true"
+    elif ! grep -q '"log-driver"[[:space:]]*:[[:space:]]*"local"' /etc/docker/daemon.json; then
+        warn "/etc/docker/daemon.json already exists; preserve it and review Docker log rotation manually"
+    fi
+}
 
 install_docker() {
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -215,6 +266,9 @@ EOF
         install_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     fi
     systemctl enable --now docker
+    if [ "$DOCKER_CONFIG_CHANGED" = "true" ]; then
+        systemctl restart docker
+    fi
     if ! id -nG "$DEPLOY_USER" | tr ' ' '\n' | grep -qx docker; then
         usermod --append --groups docker "$DEPLOY_USER"
         warn "$DEPLOY_USER was added to the docker group; reconnect before running Docker without sudo"
@@ -236,6 +290,7 @@ install_caddy() {
     fi
 }
 
+configure_small_host
 install_docker
 install_caddy
 
@@ -302,7 +357,11 @@ set_env_value() {
 }
 
 set_env_value GRP_PUBLIC_BASE_URL "https://$DOMAIN"
+set_env_value GRP_PUBLIC_FEED_BASE_URL "https://$DOMAIN"
 set_env_value SERVIR_AUTH_REDIRECT_URI "https://$DOMAIN/api/v1/auth/callback"
+if [ -n "$SERVIR_CLIENT_ID" ]; then
+    set_env_value SERVIR_AUTH_CLIENT_ID "$SERVIR_CLIENT_ID"
+fi
 if [ "$DEPLOY_MODE" = "image" ]; then
     set_env_value GRP_IMAGE "$IMAGE"
 else
@@ -337,6 +396,25 @@ write_secret_if_missing postgres_password "$POSTGRES_PASSWORD"
 write_secret_if_missing database_url "postgresql+psycopg://grp:${POSTGRES_PASSWORD}@db:5432/grp"
 write_secret_if_missing session_secret "$(openssl rand -hex 48)"
 unset POSTGRES_PASSWORD
+
+if [ "$ENABLE_THAIWATER_SHADOW" = "true" ]; then
+    if [ ! -s "$SECRETS_DIR/thaiwater_api_key" ]; then
+        [ -t 0 ] || die "ThaiWater key is missing and no interactive terminal is available"
+        read -r -s -p "ThaiWater API key: " THAIWATER_KEY
+        printf '\n'
+        [ -n "$THAIWATER_KEY" ] || die "ThaiWater API key cannot be empty"
+        write_secret_if_missing thaiwater_api_key "$THAIWATER_KEY"
+        unset THAIWATER_KEY
+    else
+        log "Preserving existing secret: thaiwater_api_key"
+    fi
+    chown root:root "$SECRETS_DIR/thaiwater_api_key"
+    chmod 0600 "$SECRETS_DIR/thaiwater_api_key"
+    set_env_value THAIWATER_API_KEY_FILE "/run/grp-secrets/thaiwater_api_key"
+    set_env_value THAIWATER_SHADOW_ENABLED "true"
+    chown "$DEPLOY_USER:$DEPLOY_GROUP" "$APP_DIR/.env"
+    chmod 0640 "$APP_DIR/.env"
+fi
 
 configure_caddy() {
     local candidate

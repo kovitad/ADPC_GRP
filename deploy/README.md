@@ -1,6 +1,6 @@
 # Staging deployment
 
-The Ubuntu 24.04 staging host uses Caddy as a systemd service and Docker Compose for FastAPI, the worker, and PostGIS. Caddy is the only public application entry point. FastAPI binds to `127.0.0.1:8000`; PostgreSQL has no host port.
+The Ubuntu 24.04 staging host uses Caddy as a systemd service and Docker Compose for FastAPI, the worker, and PostGIS. Caddy is the only public application entry point. FastAPI binds to `127.0.0.1:8000`; PostgreSQL has no host port. Bootstrap records the HTTPS domain as both the application and permanent feed base address, but anonymous flood and PM2.5 routes remain off until their separate publication switches are explicitly approved.
 
 Start with the operational runbook in [`BOOTSTRAP.md`](BOOTSTRAP.md). The bootstrap supports two release paths:
 

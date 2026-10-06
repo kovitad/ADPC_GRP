@@ -13,6 +13,49 @@ def test_staging_compose_mounts_source_read_only_and_worker_scratch_on_disk() ->
     assert "/srv/grp/tmp:/tmp" in compose
 
 
+def test_staging_secret_file_settings_use_the_container_tmpfs_copy() -> None:
+    environment = (REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    file_settings = [
+        line
+        for line in environment.splitlines()
+        if "_FILE=/run/" in line and not line.lstrip().startswith("#")
+    ]
+    assert file_settings
+    assert all("=/run/grp-secrets/" in line for line in file_settings)
+    assert "/run/source-secrets/" not in environment
+
+
+def test_staging_sets_permanent_feed_address_but_keeps_public_routes_off() -> None:
+    environment = (REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
+    script = (REPOSITORY_ROOT / "deploy" / "bootstrap-ubuntu.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'set_env_value GRP_PUBLIC_FEED_BASE_URL "https://$DOMAIN"' in script
+    assert '--small-host) SMALL_HOST="true"' in script
+    assert '--enable-thaiwater-shadow) ENABLE_THAIWATER_SHADOW="true"' in script
+    assert 'set_env_value THAIWATER_API_KEY_FILE "/run/grp-secrets/thaiwater_api_key"' in script
+    assert 'read -r -s -p "ThaiWater API key: " THAIWATER_KEY' in script
+    assert "FLOOD_FEED_PUBLIC=false" in environment
+    assert "AIR_QUALITY_FEED_PUBLIC=false" in environment
+
+
+def test_container_publish_waits_for_successful_main_ci_and_tags_the_exact_sha() -> None:
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "container.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "workflow_run:" in workflow
+    assert "workflows: [CI]" in workflow
+    assert "branches: [main]" in workflow
+    assert "github.event.workflow_run.conclusion == 'success'" in workflow
+    assert "ref: ${{ github.event.workflow_run.head_sha }}" in workflow
+    assert "git rev-parse --short=7 HEAD" in workflow
+    assert "type=raw,value=sha-${{ steps.release.outputs.short_sha }}" in workflow
+    assert "platforms: linux/amd64" in workflow
+
+
 def test_staging_bootstrap_can_provision_and_install_thailand_data() -> None:
     script = (REPOSITORY_ROOT / "deploy" / "bootstrap-ubuntu.sh").read_text(
         encoding="utf-8"
