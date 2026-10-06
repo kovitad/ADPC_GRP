@@ -27,7 +27,7 @@
     vehicle: "sedan", all: false,
     situation: null, roads: null, reports: null, selected: null, cameras: null,
     assets: null, facility: null, incidents: null, incident: null, allIncidents: false,
-    canWrite: false, changes: null, window: 60, weather: null,
+    canWrite: false, changes: null, window: 60, weather: null, governmentObservations: null,
   };
   const say = PilotText.t;
   let map = null;
@@ -473,7 +473,30 @@
       const label = { floodboard_roads: "cov.fb.roads", floodboard_reports: "cov.fb.reports", longdo_events: "cov.longdo_events" }[s.source_id];
       row(label ? say(label) : s.source_id, say(`cov.${s.state}`), detail, tone);
     });
-    row(say("cov.bma"), say("cov.not"), say("cov.bma.detail"), "none");
+    const government = state.governmentObservations;
+    if (
+      government && government.publication_approved === false
+      && government.state !== "not_available_in_replay"
+    ) {
+      const tone = government.state === "ok" ? "ok"
+        : government.state === "degraded" ? "warn"
+          : ["offline", "credential_missing"].includes(government.state) ? "bad" : "none";
+      const products = (government.products || []).map((product) => {
+        const label = say(`cov.gov.product.${product.product}`);
+        const stations = number(product.coverage?.stations || 0);
+        const districts = number(product.coverage?.districts?.length || 0);
+        const last = product.last_success_at ? ago(product.last_success_at) : say("cov.gov.never");
+        return say("cov.gov.product.detail", { label, stations, districts, last });
+      });
+      row(
+        say("cov.gov"),
+        say(`cov.gov.state.${government.state}`),
+        `${products.join(" ")} ${say("cov.gov.limit")}`.trim(),
+        tone,
+      );
+    } else if (!REPLAY) {
+      row(say("cov.gov"), say("cov.gov.state.unavailable"), say("cov.gov.limit"), "none");
+    }
     const cams = state.cameras ? state.cameras.cameras : [];
     if (cams.length && state.cameras.placeholders_only) {
       row(say("cov.cctv"), say("cov.test"), say("cov.cctv.detail.test", { n: cams.length }), "warn");
@@ -1422,11 +1445,12 @@
         GRP.request(`${API}/incidents`),
       ]);
       Object.assign(state, { situation, roads, reports, assets, incidents });
-      try {
-        state.weather = await GRP.request(`${API}/weather`);
-      } catch (error) {
-        state.weather = null;  // rain is context: the page works without it
-      }
+      const [weather, governmentObservations] = await Promise.all([
+        GRP.request(`${API}/weather`).catch(() => null),
+        GRP.request(`${API}/government-observations/status`).catch(() => null),
+      ]);
+      state.weather = weather;  // rain is context: the page works without it
+      state.governmentObservations = governmentObservations;  // health/coverage only; no values
       loadChanges();
       showBanner("");
       drawAll();

@@ -4,9 +4,11 @@
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
-  observations for a lay reader, including a Dusit worked example. The persistent switch remains
-  false. There is still no measurement API/UI, confidence change, watch or warning. The
-  Docker Desktop stack was then rebuilt with the supported launcher and SERVIR sign-in was
+  observations for a lay reader, including a Dusit worked example. Live now shows the protected
+  ThaiWater shadow capture state and pilot-wide station/district coverage in its source table,
+  without measurements. The persistent switch remains false. There is still no measurement
+  API/UI, confidence change, watch or warning. The Docker Desktop stack was then rebuilt with the
+  supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by
@@ -129,6 +131,21 @@ RP20/RP50 rasters and methods exist.
 ---
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
+
+### 6 October: ThaiWater shadow health shown in Live
+
+- ADR-0067 adds **ThaiWater government observations (shadow)** to Live's existing source-coverage
+  table. It reads only the protected ADR-0066 status endpoint; the browser never contacts ThaiWater.
+- The row shows capture state plus each product's pilot-wide station count, covered-district count
+  and age of the last stored pull. English and Thai labels distinguish water level from 24-hour
+  rainfall.
+- It returns no measurement values, district averages or map layer and explicitly says publication
+  is not approved. It changes no incident, confidence, watch or warning. Replays do not borrow live
+  status, and a failed optional request does not break the flood page.
+- Validation: **1,254 passed, 2 PostgreSQL-only tests skipped**; 503 focused ThaiWater, permission
+  and browser-contract tests passed; Ruff, JavaScript syntax and whitespace checks are clean.
+  `web/` is bind-mounted in the healthy Desktop stack, but the signed-in row still needs a browser
+  check and reload for the `20261006a` assets.
 
 ### 6 October: 3D Planning experiment removed
 

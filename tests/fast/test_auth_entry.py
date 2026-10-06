@@ -248,6 +248,25 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "innerHTML" not in script
 
 
+def test_live_shows_thaiwater_shadow_health_without_measurements() -> None:
+    page = (WEB_ROOT / "flood.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "flood.js").read_text(encoding="utf-8")
+    text = (WEB_ROOT / "flood-i18n.js").read_text(encoding="utf-8")
+
+    assert "government-observations/status" in script
+    assert "product.coverage?.stations" in script
+    assert "product.coverage?.districts?.length" in script
+    assert "product.last_success_at" in script
+    assert "government.publication_approved === false" in script
+    assert "governmentObservations;  // health/coverage only; no values" in script
+    assert "ThaiWater government observations (shadow)" in text
+    assert "ข้อมูลตรวจวัดภาครัฐจาก ThaiWater (โหมดเงา)" in text
+    assert "no measurement values" in text
+    assert "ไม่มีค่าตรวจวัด" in text
+    assert re.search(r"/flood\.js\?v=\d{8}[a-z]", page)
+    assert re.search(r"/flood-i18n\.js\?v=\d{8}[a-z]", page)
+
+
 def test_assessments_and_planning_share_compatible_result_context() -> None:
     assessment_page = (WEB_ROOT / "assessments.html").read_text(encoding="utf-8")
     assessment_script = (WEB_ROOT / "assessments.js").read_text(encoding="utf-8")
