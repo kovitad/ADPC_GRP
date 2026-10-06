@@ -156,6 +156,22 @@
   let perspectiveMap = null;
   let perspectiveReady = false;
   let perspectiveFailed = false;
+  let perspectiveSupported = null;
+
+  // MapLibre GL JS 4 no longer exports the old maplibregl.supported() helper. Probe the same WebGL
+  // contexts its Map constructor uses, then let the constructor's try/catch remain the final gate.
+  const supportsPerspective = () => {
+    if (perspectiveSupported !== null) return perspectiveSupported;
+    if (!window.maplibregl?.Map) {
+      perspectiveSupported = false;
+      return false;
+    }
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    perspectiveSupported = Boolean(context);
+    context?.getExtension("WEBGL_lose_context")?.loseContext();
+    return perspectiveSupported;
+  };
 
   const perspectiveBounds = () => {
     if (state.selected?.geometry) {
@@ -201,7 +217,7 @@
 
   const initPerspectiveMap = () => {
     if (perspectiveMap) return perspectiveMap;
-    if (perspectiveFailed || !window.maplibregl || !window.maplibregl.supported()) return null;
+    if (perspectiveFailed || !supportsPerspective()) return null;
     try {
       perspectiveMap = new window.maplibregl.Map({
         container: map3dCanvas,
@@ -253,9 +269,7 @@
 
   const syncPerspectiveAvailability = () => {
     syncPerspectiveRaster();
-    const available = Boolean(
-      floodPicture && !perspectiveFailed && window.maplibregl && window.maplibregl.supported(),
-    );
+    const available = Boolean(floodPicture && !perspectiveFailed && supportsPerspective());
     map3dButton.disabled = !available;
     map3dButton.title = available
       ? "View the selected managed flood scenario in perspective"

@@ -260,7 +260,8 @@ def test_planning_perspective_view_keeps_the_managed_raster_flat_and_optional() 
     assert 'type: "raster"' in script
     assert '"raster-opacity": 0.8' in script
     assert "fill-extrusion-height" not in script
-    assert "window.maplibregl.supported()" in script
+    assert 'canvas.getContext("webgl2") || canvas.getContext("webgl")' in script
+    assert "window.maplibregl.supported()" not in script
     assert 'style: "https://tiles.openfreemap.org/styles/liberty"' in script
     assert 'map2dCanvas.hidden = use3d' in script
     assert 'map3dCanvas.hidden = !use3d' in script
