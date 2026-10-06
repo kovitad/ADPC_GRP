@@ -132,6 +132,21 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
+### 6 October: local live-feed examples
+
+- The owner-requested guide is at
+  `.local/data-out/live_feed/GRP_Live_Feed_Examples.md` (ignored local output). It gives complete
+  Share data form values for serving PM2.5 through a permanent ADPC GRP domain, a generic direct
+  JSON example and the deployment/external-read checklist.
+- It records why ThaiWater cannot be submitted directly: Global Risk fetches anonymously while the
+  source requires a key, and shadow access does not establish public redistribution, retention,
+  freshness or measurement-display approval. It sketches a future GRP adapter but labels the route
+  and manifest as nonexistent and not approved.
+- The local anonymous PM2.5 route currently returns HTTP 404 as designed because the public switch
+  is off. A permanent public base URL, route switch, outside read, AQ Tracker redistribution/credit
+  confirmation and explicit send approval are still required. No route was enabled and nothing was
+  contributed.
+
 ### 6 October: table contribution Check feedback restored
 
 - The owner reported that **Share data → Table → Check** appeared to do nothing. API logs showed the
