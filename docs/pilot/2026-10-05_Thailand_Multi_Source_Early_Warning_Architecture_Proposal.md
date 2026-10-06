@@ -45,12 +45,17 @@ Stage 0 shadow capture began on 5 October 2026 under ADR-0065:
 - versioned government station metadata and canonical observations in two new tables;
 - originating-agency lineage, separate observation/retrieval times, unit/datum, provider quality,
   future-clock marking and worker-derived pilot district/sub-district placement;
-- whole-response fail-closed parsing, response caps and idempotent/correction-preserving states;
-- no API, map layer, incident-confidence change, watch or warning yet.
+- whole-response fail-closed parsing, response caps and idempotent/correction-preserving states.
+
+ADR-0066 adds a protected, database-only readiness endpoint for fetch health, lineage, quality/clock
+counts and pilot station coverage. It returns no measurement values and makes no area aggregate,
+map layer, incident-confidence change, watch or warning.
 
 The implementation is fixture-tested but has not called TWA because no ThaiWater key is configured
-in the local ignored `.env`. The switch remains false. PostgreSQL migration upgrade and downgrade
-were tested independently; the running Desktop database was returned to the previous migration.
+in the local ignored `.env` or secret path. The switch remains false. PostgreSQL migration upgrade
+and downgrade were tested independently; the running Desktop database was returned to the previous
+migration. A real coverage/health report is therefore still required before any measurement read
+contract or operator layer.
 
 ## The questions this architecture answers
 

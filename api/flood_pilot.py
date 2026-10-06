@@ -48,6 +48,7 @@ from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.feed import build_feed, serialise
+from core.flood_evidence.government_observations import government_observation_status
 from core.flood_evidence.incident_store import (
     REPORT_WINDOW_HOURS,
     incident_detail,
@@ -267,6 +268,33 @@ def read_flood_pilot(config: FloodPilot) -> dict[str, Any]:
 )
 def read_situation(config: FloodPilot, session: DatabaseSession, as_of: AsOf = None) -> dict:
     return situation(session, config, _as_of(as_of, config))
+
+
+@router.get(
+    "/{pilot_id}/government-observations/status",
+    summary="Stored ThaiWater shadow-capture health and pilot coverage; no measurement values",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def read_government_observation_status(
+    config: FloodPilot, session: DatabaseSession, as_of: AsOf = None
+) -> dict[str, Any]:
+    settings = get_settings()
+    try:
+        key_configured = (
+            settings.thaiwater_api_key_file.is_file()
+            and settings.thaiwater_api_key_file.stat().st_size > 0
+        )
+    except OSError:
+        key_configured = False
+    return government_observation_status(
+        session,
+        config,
+        _as_of(as_of, config),
+        capture_enabled=settings.thaiwater_shadow_enabled,
+        key_configured=key_configured,
+        base_url=settings.thaiwater_api_base_url,
+        interval_minutes=settings.thaiwater_poll_minutes,
+    )
 
 
 @router.get(

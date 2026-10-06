@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from core.db import Base
 from core.flood_evidence.config import pilot_config
+from core.flood_evidence.government_observations import government_observation_status
 from core.flood_evidence.ingest import Pulled
 from core.flood_evidence.models import (
     FETCH_FORMAT_ERROR,
@@ -308,3 +309,85 @@ def test_failed_pull_records_health_attempt_without_data(
     assert fetch.outcome == FETCH_HTTP_ERROR and fetch.http_status == 401
     assert fetch.storage_key is None
     assert session.scalar(select(func.count()).select_from(HydroObservation)) == 0
+
+
+def test_protected_read_model_reports_health_and_coverage_without_values(
+    session: Session, storage: LocalStorage
+) -> None:
+    configured = sources(interval_minutes=15)
+    ingest_product(
+        session, storage, CONFIG, configured[0], PRODUCTS[0], Pulled(200, WATER, FETCH_OK), AT
+    )
+    ingest_product(
+        session, storage, CONFIG, configured[1], PRODUCTS[1], Pulled(200, RAIN, FETCH_OK), AT
+    )
+    session.commit()
+
+    status = government_observation_status(
+        session,
+        CONFIG,
+        AT + timedelta(minutes=1),
+        capture_enabled=True,
+        key_configured=True,
+        base_url="https://example.invalid",
+        interval_minutes=15,
+    )
+    assert status["state"] == "ok"
+    assert status["publication_approved"] is False
+    assert [product["product"] for product in status["products"]] == [
+        "waterlevel",
+        "rainfall_24h",
+    ]
+    water = status["products"][0]
+    assert water["last_success_features"] == 2
+    assert water["coverage"]["stations"] == 1
+    assert water["coverage"]["districts"]
+    assert water["coverage"]["subdistricts"]
+    assert water["coverage"]["originating_agencies"] == [
+        {"code": "C00000002", "name": "สำนักการระบายน้ำ กรุงเทพมหานคร", "stations": 1}
+    ]
+    assert water["observations"]["stored_observation_states"] == 1
+    assert water["observations"]["clock_status_counts"] == {"valid": 1}
+    # The protected health contract contains lineage and counts, never measurement values.
+    assert "value" not in water["observations"]
+    assert "latest_value" not in water
+
+
+def test_read_model_distinguishes_disabled_missing_credential_and_failed_attempt(
+    session: Session, storage: LocalStorage
+) -> None:
+    arguments = {
+        "session": session,
+        "config": CONFIG,
+        "as_of": AT,
+        "base_url": "https://example.invalid",
+        "interval_minutes": 15,
+    }
+    disabled = government_observation_status(
+        **arguments, capture_enabled=False, key_configured=False
+    )
+    missing = government_observation_status(
+        **arguments, capture_enabled=True, key_configured=False
+    )
+    awaiting = government_observation_status(
+        **arguments, capture_enabled=True, key_configured=True
+    )
+    assert disabled["state"] == "capture_disabled"
+    assert missing["state"] == "credential_missing"
+    assert awaiting["state"] == "awaiting_first_fetch"
+
+    ingest_product(
+        session,
+        storage,
+        CONFIG,
+        sources()[0],
+        PRODUCTS[0],
+        Pulled(401, None, FETCH_HTTP_ERROR, "ThaiWater did not return 200"),
+        AT,
+    )
+    session.commit()
+    failed = government_observation_status(
+        **arguments, capture_enabled=True, key_configured=True
+    )
+    assert failed["state"] == "offline"
+    assert failed["products"][0]["last_attempt_outcome"] == FETCH_HTTP_ERROR

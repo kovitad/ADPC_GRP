@@ -1,15 +1,15 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 6 October 2026.
-- **Today:** Stage 0 of the multi-source early-warning architecture is implemented (ADR-0065):
-  off-by-default, worker-only ThaiWater water-level and 24-hour-rain shadow capture with immutable
-  raw lineage, versioned stations, canonical observations, quality/clock checks and pilot-area
-  placement. It produces no API layer, confidence change, watch or warning yet.
+- **Today:** Stage 0 shadow capture is implemented (ADR-0065), followed by a protected,
+  database-only readiness/coverage endpoint (ADR-0066). It exposes fetch health, raw hashes,
+  coverage, agencies and quality/clock counts, but no measurement values, map layer, confidence
+  change, watch or warning.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. No key is configured locally, so no TWA call was made and the switch remains false.
 - **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin. ThaiWater Stage 0
   is implemented in `03aa63b`; its detailed continuation handover is committed immediately after.
-- **Next agent:** read Section 0, "6 October: ThaiWater Stage 0 shadow capture", first.
+- **Next agent:** read Section 0, "6 October: ThaiWater readiness read contract", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -124,7 +124,33 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
-### 6 October: ThaiWater Stage 0 shadow capture (latest; read this first)
+### 6 October: ThaiWater readiness read contract (latest; read this first)
+
+- ADR-0066 adds the protected endpoint
+  `/api/v1/pilot/flood/{pilot_id}/government-observations/status`. It uses the existing pilot
+  membership rules and reads the database only; a web request never contacts ThaiWater.
+- `core/flood_evidence/government_observations.py` reports capture/credential readiness, each
+  product's latest attempt and success, raw SHA-256 lineage, feature/state counts, latest observed
+  and retrieval times, clock/quality counts, and latest-version station coverage by worker-derived
+  district/sub-district, originating agency and identity basis.
+- The endpoint returns no measurement value and explicitly reports `publication_approved=false`.
+  It calculates no area average and changes no incident, confidence, watch or warning. Replays
+  return `not_available_in_replay` rather than borrowing live evidence.
+- States distinguish `capture_disabled`, `credential_missing`, `awaiting_first_fetch`, `ok`,
+  `degraded` and `offline`. Key presence is a boolean; key value/path/headers are never returned.
+- The local ignored `.env` and `.local/secrets/thaiwater_api_key` were checked without reading or
+  printing values: neither currently contains the ThaiWater key. Therefore migration, live capture
+  and real-data acceptance remain blocked on owner-side secret configuration.
+- Tests cover read-model lineage/counts, no measurement field, disabled/missing/awaiting/failure
+  states, and the full role/Hub permission matrix. Full validation: **1,246 passed, 2 skipped**;
+  Ruff and whitespace checks are clean. No user-facing browser test is needed because this slice
+  adds no UI.
+- Next: configure the key privately, migrate the intended environment to `20261005_0028`, run a
+  short capture, query this endpoint, and record a real coverage/health report. Review schema,
+  lag, quality, clocks, missingness, source agencies and BMA/Floodboard sensor overlap before adding
+  any station-measurement response or **Government observations** map layer.
+
+### 6 October: ThaiWater Stage 0 shadow capture
 
 - Commit `03aa63b` implements the first architecture slice under ADR-0065 and is pushed to
   origin. It deliberately makes no operator-facing UI change.
@@ -142,8 +168,9 @@ RP20/RP50 rasters and methods exist.
 - Missing sentinels/nulls create no numeric observation; malformed responses fail closed; negative
   rain is refused; observations over five minutes ahead are retained as `clock_status=future` and
   are not approved for current-state use.
-- No key is present in the current `.env`; no TWA request was issued. There is deliberately no API,
-  map layer, source-health panel, incident-confidence effect, watch or warning in Stage 0.
+- No key was present when Stage 0 was implemented, so no TWA request was issued. Stage 0 itself
+  added no API or UI; the later ADR-0066 endpoint exposes health/coverage only, with no measurement,
+  map-layer, incident-confidence, watch or warning effect.
 - Validation: **1,239 passed, 2 skipped (1,241 collected)**; Ruff and whitespace checks clean;
   Compose config valid; migration upgrade/downgrade passed against the running PostgreSQL service,
   which was returned to `20261003_0027`. Rebuild/migrate when intentionally deploying this slice.
@@ -162,7 +189,8 @@ RP20/RP50 rasters and methods exist.
   4. Compare BMA station codes/times with Floodboard so the same sensor is one origin family, not
      two confirmations. Check whether any ThaiWater forecast is derived from GEOGLOWS before
      treating it as a separate model.
-  5. Only after the capture report passes, add a protected read model and a separate **Government
+  5. The protected health/coverage read model now exists under ADR-0066. Only after the live
+     capture report passes, add a separate station-measurement contract and **Government
      observations** Live layer with source, observed time, freshness and quality. Keep rainfall,
      water levels, Floodboard impacts and GEOGLOWS forecasts visually and semantically separate.
   6. Do not build a GRP watch until the data-science/hydrology workshop chooses its exact target,

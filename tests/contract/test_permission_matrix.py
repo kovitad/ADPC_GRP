@@ -137,6 +137,7 @@ MATRIX = {
     "flood_pilots": (401, 200, 200, 200, 200),
     "flood_pilot": (401, 200, 200, 403, 200),
     "flood_situation": (401, 200, 200, 403, 200),
+    "flood_government_observation_status": (401, 200, 200, 403, 200),
     "flood_roads": (401, 200, 200, 403, 200),
     "flood_reports": (401, 200, 200, 403, 200),
     "flood_areas": (401, 200, 200, 403, 200),
@@ -261,6 +262,10 @@ MATRIX_OPERATION_IDS = {
     "flood_pilots": "list_flood_pilots_api_v1_pilot_flood_get",
     "flood_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
     "flood_situation": "read_situation_api_v1_pilot_flood__pilot_id__situation_get",
+    "flood_government_observation_status": (
+        "read_government_observation_status_"
+        "api_v1_pilot_flood__pilot_id__government_observations_status_get"
+    ),
     "flood_feed": "read_flood_feed_api_v1_pilot_flood__pilot_id__feed_json_get",
     "flood_roads": "read_roads_api_v1_pilot_flood__pilot_id__roads_get",
     "flood_reports": "read_reports_api_v1_pilot_flood__pilot_id__reports_get",
@@ -626,6 +631,11 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         "flood_pilots": ("GET", "/api/v1/pilot/flood", None),
         "flood_pilot": ("GET", "/api/v1/pilot/flood/bangkok", None),
         "flood_situation": ("GET", "/api/v1/pilot/flood/bangkok/situation", None),
+        "flood_government_observation_status": (
+            "GET",
+            "/api/v1/pilot/flood/bangkok/government-observations/status",
+            None,
+        ),
         "flood_roads": ("GET", "/api/v1/pilot/flood/bangkok/roads", None),
         "flood_reports": ("GET", "/api/v1/pilot/flood/bangkok/reports", None),
         "flood_areas": ("GET", "/api/v1/pilot/flood/bangkok/areas", None),
