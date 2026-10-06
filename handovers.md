@@ -130,6 +130,13 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
+### 6 October: 3D Planning experiment removed
+
+- The owner rejected the optional perspective-map experiment after the first signed-in view mixed
+  poorly with Planning. Commits `184b692` and `5f14f19` fully revert it, including MapLibre,
+  OpenFreeMap, the controls, tests and ADR-0067. Planning is back to its prior 2D Leaflet behavior.
+- Do not resume 3D work. Continue with the gated ThaiWater work described below instead.
+
 ### 6 October: Bangkok observation data briefing
 
 - The owner-requested Word briefing is at
