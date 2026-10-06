@@ -200,14 +200,25 @@ def run_thaiwater_shadow(
                     base_url=base_url,
                     interval_minutes=interval_minutes,
                 )
-            for fetch in fetches:
+                # run_shadow commits each product independently. Snapshot fields while rows remain
+                # attached; committed ORM rows are expired and cannot lazy-load after this context.
+                summaries = [
+                    (
+                        fetch.source_id,
+                        fetch.outcome,
+                        fetch.record_count,
+                        fetch.new_states,
+                    )
+                    for fetch in fetches
+                ]
+            for source_id, outcome, record_count, new_states in summaries:
                 logger.info(
                     "ThaiWater shadow %s/%s: %s, %s records, %s new observations",
                     pilot_id,
-                    fetch.source_id,
-                    fetch.outcome,
-                    fetch.record_count,
-                    fetch.new_states,
+                    source_id,
+                    outcome,
+                    record_count,
+                    new_states,
                 )
         except Exception:
             logger.exception("ThaiWater shadow %s failed; will retry", pilot_id)

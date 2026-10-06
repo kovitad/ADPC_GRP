@@ -138,11 +138,21 @@ def test_waterlevel_and_rain_are_distinct_observation_products() -> None:
     assert water.stations[0].agency_code == "C00000002"
 
 
+def test_current_v2_meta_envelope_is_accepted_without_inventing_success() -> None:
+    payload = json.loads(WATER)
+    payload.pop("result")
+    payload["meta"] = {"updatedDate": None}
+    parsed = parse_product(json.dumps(payload).encode(), PRODUCTS[0])
+    assert parsed.feature_count == 2
+
+
 @pytest.mark.parametrize(
     "body",
     [
         b"not json",
         json.dumps({"result": "ERROR", "data": {}}).encode(),
+        json.dumps({"data": {}}).encode(),
+        json.dumps({"meta": {"updatedDate": "not-a-time"}, "data": {}}).encode(),
         _body({**_feature(), "geometry": {"type": "LineString", "coordinates": []}}),
         _body(_feature(observed_at="2026-10-05 18:50:00", value=1.0)),
         _body(_feature(product="rainfall", value=-1.0)),

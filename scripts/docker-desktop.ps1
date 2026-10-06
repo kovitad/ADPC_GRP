@@ -20,7 +20,15 @@ $ErrorActionPreference = "Stop"
 $NativeErrors = "Continue"
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepositoryRoot
-$Compose = @("compose", "-f", "deploy/compose.desktop.yml")
+$Compose = @("compose")
+# Compose resolves its implicit .env relative to the compose-file project directory (`deploy`),
+# not reliably from this script's working directory. Pass the ignored repository .env explicitly
+# so non-secret switches (including ThaiWater shadow mode) reach Compose interpolation. Secrets
+# are still copied into files below and are never injected as container environment variables.
+if (Test-Path -LiteralPath (Join-Path $RepositoryRoot ".env")) {
+    $Compose += @("--env-file", ".env")
+}
+$Compose += @("-f", "deploy/compose.desktop.yml")
 
 if ($Down) {
     docker @Compose down

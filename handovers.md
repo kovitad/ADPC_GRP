@@ -1,15 +1,17 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 6 October 2026.
-- **Today:** Stage 0 shadow capture is implemented (ADR-0065), followed by a protected,
-  database-only readiness/coverage endpoint (ADR-0066). It exposes fetch health, raw hashes,
-  coverage, agencies and quality/clock counts, but no measurement values, map layer, confidence
-  change, watch or warning.
+- **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against two
+  real local ThaiWater pulls. The switch was returned to false afterward. Results expose health,
+  lineage and coverage only—no measurement API/UI, confidence change, watch or warning. The
+  Docker Desktop stack was then rebuilt with the supported launcher and SERVIR sign-in was
+  restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
-  everyone. No key is configured locally, so no TWA call was made and the switch remains false.
+  everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by
+  TWA. Never print, commit or return it.
 - **Branch:** `pilot/river-watch-and-bangkok-flood`, synchronized with origin. ThaiWater Stage 0
   is implemented in `03aa63b`; its detailed continuation handover is committed immediately after.
-- **Next agent:** read Section 0, "6 October: ThaiWater readiness read contract", first.
+- **Next agent:** read Section 0, "6 October: first real ThaiWater shadow captures", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -124,7 +126,59 @@ RP20/RP50 rasters and methods exist.
 
 ## 0. Start here (sessions of 24 September-6 October 2026)
 
-### 6 October: ThaiWater readiness read contract (latest; read this first)
+### 6 October: local SERVIR sign-in restored
+
+- The running API had been started without `SERVIR_AUTH_CLIENT_ID`, although the ignored local
+  client-registration file existed and OIDC discovery was reachable. This caused every
+  `/api/v1/auth/login` attempt to return `?auth=unavailable`.
+- Re-running `scripts/docker-desktop.ps1` rebuilt and recreated the stack through the supported
+  path, injecting the existing client ID without printing it. API, worker and database started;
+  `/api/v1/healthz` returned HTTP 200.
+- Browser acceptance completed with `kovitad.janlakhon@adpc.net`: SERVIR password sign-in returned
+  to `/workspace.html`, showed Kovitad Janlakhon as an active ADPC Hub Admin, and remained signed in
+  after a reload. Data Library and Planning both loaded from the signed-in navigation with the
+  active baseline visible and no browser console errors. The interactive browser session is
+  `grp-login`.
+- Full post-capture validation: **1,249 passed, 2 PostgreSQL-only tests skipped**; Ruff and
+  whitespace checks are clean. The focused ThaiWater/permission run passed 478 tests.
+- Do not start this Desktop stack with raw `docker compose up`; use the launcher so local auth and
+  other configuration are passed correctly.
+
+### 6 October: first real ThaiWater shadow captures (latest; read this first)
+
+- Full report:
+  [`docs/pilot/2026-10-06_ThaiWater_Shadow_Capture_Report.md`](docs/pilot/2026-10-06_ThaiWater_Shadow_Capture_Report.md).
+- The confirmed website key is in ignored local configuration only. Both approved endpoints
+  returned HTTP 200. Never print or commit the key; do not move it into URLs or API responses.
+- The live v2 envelope is `{meta, data}` with `meta.updatedDate=null`, not the older
+  `{result: "OK", data}` fixture shape. The strict adapter now recognizes and validates both
+  envelopes; arbitrary `data` objects and invalid metadata still fail closed.
+- Migration `20261005_0028` is applied to the running Desktop PostgreSQL database. Two controlled
+  captures succeeded at `02:17Z` and `02:22Z`; the switch is back to false and cadence to 15
+  minutes. API, database and worker are healthy.
+- First pull: 798 national water-level features produced 12 pilot stations/states; 2,944 rainfall
+  features produced 125 pilot stations/states. Second pull: water changed to 800 features and added
+  10 new pilot states; rainfall bytes were identical and added zero, proving idempotence.
+- Final stored totals are 22 water-level states and 125 rainfall states. There are no future clocks,
+  station metadata changes or corrected duplicate station/time states. Provider quality flags are
+  absent for every placed observation, which must not be interpreted as good quality.
+- Coverage is sparse for water level (7 Bangkok and 3 Nonthaburi districts) and broad for rainfall
+  (49 Bangkok and 3 Nonthaburi districts), but **neither product has a station in Bang Bua Thong
+  (`1204`)**. Never infer local values from adjacent stations.
+- Exact origin deduplication remains blocked: Floodboard retains `bma_sensor`/`bma_dds` lineage but
+  no normalized originating station code, while ThaiWater has provider station IDs/codes. Do not
+  count nearby records as independent corroboration.
+- A post-commit logging-only `DetachedInstanceError` was found after the first successful storage
+  pass. `worker/main.py` now snapshots log fields while ORM rows remain attached; the second capture
+  logged both products successfully.
+- `scripts/docker-desktop.ps1` now passes the repository `.env` explicitly to Compose interpolation.
+  Previously the key secret was copied but `THAIWATER_SHADOW_ENABLED` remained false because
+  Compose resolved implicit `.env` relative to `deploy/`.
+- Next: collect a longer reviewed shadow window only when deliberately enabled; define per-product
+  display freshness; resolve sensor origins; and obtain licence/retention review. Do not add a
+  measurement layer until these gates pass, and do not build a watch without hydrology approval.
+
+### 6 October: ThaiWater readiness read contract
 
 - ADR-0066 adds the protected endpoint
   `/api/v1/pilot/flood/{pilot_id}/government-observations/status`. It uses the existing pilot
@@ -138,17 +192,14 @@ RP20/RP50 rasters and methods exist.
   return `not_available_in_replay` rather than borrowing live evidence.
 - States distinguish `capture_disabled`, `credential_missing`, `awaiting_first_fetch`, `ok`,
   `degraded` and `offline`. Key presence is a boolean; key value/path/headers are never returned.
-- The local ignored `.env` and `.local/secrets/thaiwater_api_key` were checked without reading or
-  printing values: neither currently contains the ThaiWater key. Therefore migration, live capture
-  and real-data acceptance remain blocked on owner-side secret configuration.
+- At implementation time neither ignored secret location contained a key. The key was later added
+  locally and the controlled-run results are documented in the section above.
 - Tests cover read-model lineage/counts, no measurement field, disabled/missing/awaiting/failure
   states, and the full role/Hub permission matrix. Full validation: **1,246 passed, 2 skipped**;
   Ruff and whitespace checks are clean. No user-facing browser test is needed because this slice
   adds no UI.
-- Next: configure the key privately, migrate the intended environment to `20261005_0028`, run a
-  short capture, query this endpoint, and record a real coverage/health report. Review schema,
-  lag, quality, clocks, missingness, source agencies and BMA/Floodboard sensor overlap before adding
-  any station-measurement response or **Government observations** map layer.
+- This gate has now run locally; see the section above and the capture report. Measurement display
+  remains blocked by the documented coverage, quality, origin and time-window questions.
 
 ### 6 October: ThaiWater Stage 0 shadow capture
 
@@ -171,30 +222,16 @@ RP20/RP50 rasters and methods exist.
 - No key was present when Stage 0 was implemented, so no TWA request was issued. Stage 0 itself
   added no API or UI; the later ADR-0066 endpoint exposes health/coverage only, with no measurement,
   map-layer, incident-confidence, watch or warning effect.
-- Validation: **1,239 passed, 2 skipped (1,241 collected)**; Ruff and whitespace checks clean;
-  Compose config valid; migration upgrade/downgrade passed against the running PostgreSQL service,
-  which was returned to `20261003_0027`. Rebuild/migrate when intentionally deploying this slice.
+- Stage 0 validation at implementation was **1,239 passed, 2 skipped**; the later readiness and
+  live-capture changes have their current validation in the newest section above.
 - **Current UI impact: none.** Live, Planning and Assessments have no ThaiWater marker, layer,
-  card, watch or confidence change. There is nothing new to browser-check until real shadow data
-  has passed the next gate.
-- **Exact continuation order:**
-  1. Put the HII-confirmed public key in ignored `.env` as `THAIWATER_API_KEY`; never print or
-     commit it. Set `THAIWATER_SHADOW_ENABLED=true` only for the deliberate test window.
-  2. Rebuild and run `alembic upgrade head`; migration `20261005_0028` is not applied to the
-     currently running Desktop database (its upgrade/downgrade was tested, then it was returned to
-     `20261003_0027`).
-  3. Run shadow capture with no UI/incident effects. Inspect actual response shape, source health,
-     station counts, originating agencies, pilot-area placement, observation lag, quality flags,
-     future clocks, null/sentinel frequency, schema errors and raw-object growth.
-  4. Compare BMA station codes/times with Floodboard so the same sensor is one origin family, not
-     two confirmations. Check whether any ThaiWater forecast is derived from GEOGLOWS before
-     treating it as a separate model.
-  5. The protected health/coverage read model now exists under ADR-0066. Only after the live
-     capture report passes, add a separate station-measurement contract and **Government
-     observations** Live layer with source, observed time, freshness and quality. Keep rainfall,
-     water levels, Floodboard impacts and GEOGLOWS forecasts visually and semantically separate.
-  6. Do not build a GRP watch until the data-science/hydrology workshop chooses its exact target,
-     threshold, action, labels and acceptance metrics. Public warning remains a later gate.
+  card, watch or confidence change.
+- Key configuration, migration, two-pull capture, schema inspection and the health report are now
+  complete locally. Remaining order: collect a longer deliberate shadow window; resolve origin
+  identity and licence/retention; approve per-product freshness and station display semantics; then
+  consider a protected station-measurement contract and separate **Government observations** layer.
+  Do not build a GRP watch until the data-science/hydrology workshop chooses its exact target,
+  threshold, action, labels and acceptance metrics. Public warning remains a later gate.
 
 ### 6 October: multi-source early-warning proposal
 

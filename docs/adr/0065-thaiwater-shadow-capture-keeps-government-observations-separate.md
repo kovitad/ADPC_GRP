@@ -64,6 +64,8 @@ Architecture proposal:
 - The first live run requires migration `20261005_0028`; applications still never migrate at
   startup.
 - TWA schema drift, invalid coordinates, non-ISO or timezone-less observation times, negative
-  rainfall and conflicting duplicate station metadata fail closed for the whole response.
+  rainfall and conflicting duplicate station metadata fail closed for the whole response. The
+  first live run found the current v2 success envelope is `{meta, data}` rather than the older
+  `{result: "OK", data}` form; both recognized forms are validated explicitly.
 - Follow-up work must add controlled read models/source health, origin-sensor overlap mapping,
   research-archive export, retention terms and one scientifically reviewed deterministic watch.

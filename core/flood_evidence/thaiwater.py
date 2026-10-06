@@ -46,7 +46,7 @@ from core.flood_evidence.observation import SourceFormatError
 from core.storage import LocalStorage
 
 PROVIDER = "thaiwater"
-ADAPTER_VERSION = "ThaiWaterShadow v0.1"
+ADAPTER_VERSION = "ThaiWaterShadow v0.2"
 FUTURE_TOLERANCE = timedelta(minutes=5)
 DEFAULT_BASE_URL = "https://twa-api-public.thaiwater.net"
 
@@ -224,8 +224,17 @@ def parse_product(body: bytes, product: Product) -> ParsedProduct:
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise SourceFormatError("ThaiWater response is not JSON") from error
     root = _object(payload, "response")
-    if root.get("result") != "OK":
+    result = root.get("result")
+    if result is not None and result != "OK":
         raise SourceFormatError("ThaiWater result is not OK")
+    if result is None:
+        # The live v2 map endpoints use {meta, data}; older recorded responses use
+        # {result: "OK", data}. Require one recognized success envelope rather than treating an
+        # arbitrary object with a data member as successful.
+        meta = _object(root.get("meta"), "meta")
+        updated_at = meta.get("updatedDate")
+        if updated_at is not None:
+            _moment(updated_at, "meta.updatedDate")
     grouped = _object(root.get("data"), "data")
     stations: dict[str, StationDraft] = {}
     values: list[ValueDraft] = []

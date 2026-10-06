@@ -51,11 +51,13 @@ ADR-0066 adds a protected, database-only readiness endpoint for fetch health, li
 counts and pilot station coverage. It returns no measurement values and makes no area aggregate,
 map layer, incident-confidence change, watch or warning.
 
-The implementation is fixture-tested but has not called TWA because no ThaiWater key is configured
-in the local ignored `.env` or secret path. The switch remains false. PostgreSQL migration upgrade
-and downgrade were tested independently; the running Desktop database was returned to the previous
-migration. A real coverage/health report is therefore still required before any measurement read
-contract or operator layer.
+On 6 October the public website key was configured only in ignored local storage and two controlled
+captures passed. Migration `20261005_0028` is now applied to the Desktop database. The worker stored
+12 pilot water-level stations and 125 pilot rainfall stations; neither product covers Bang Bua
+Thong, provider quality flags were absent, and Floodboard has no normalized station code for an
+exact origin join. The switch was returned to false after the short run. See
+[`2026-10-06_ThaiWater_Shadow_Capture_Report.md`](2026-10-06_ThaiWater_Shadow_Capture_Report.md).
+No measurement read contract or operator layer is approved yet.
 
 ## The questions this architecture answers
 
