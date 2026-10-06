@@ -142,9 +142,6 @@ RP20/RP50 rasters and methods exist.
 - The view is explicitly labelled as a modelled planning scenario, not live flooding, and says it
   cannot certify a location safe. Perspective, top-down and fit controls use the selected area when
   available. A failed external style or unsupported browser returns to the normal Leaflet map.
-- Browser follow-up fixed the first signed-in load: MapLibre GL JS 4.7.1 no longer exports the old
-  `maplibregl.supported()` helper. GRP now probes WebGL directly and keeps the constructor fallback;
-  the script cache key is `20261006b` so an open browser receives the fix.
 - Validation: **1,254 passed, 2 PostgreSQL-only tests skipped**; Ruff, JavaScript syntax and
   whitespace checks are clean. A fresh isolated browser correctly reached the local sign-in gate,
   but had no reusable SERVIR session, so the signed-in 3D interaction remains to be checked. Owner
