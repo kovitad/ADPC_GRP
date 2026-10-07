@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="1.3.0"
+readonly SCRIPT_VERSION="1.4.0"
 readonly DEFAULT_REPOSITORY="https://github.com/kovitad/ADPC_GRP.git"
 readonly DEFAULT_IMAGE="ghcr.io/kovitad/adpc_grp:main"
 readonly DEFAULT_DOMAIN="staging-risk-servir.adpc.net"
@@ -28,6 +28,7 @@ BOOTSTRAP_THAILAND_DATA="false"
 SMALL_HOST="false"
 ENABLE_THAIWATER_SHADOW="false"
 ENABLE_PUBLIC_PILOT_FEEDS="false"
+ENABLE_PUBLIC_FLOOD_FEED="false"
 SERVIR_CLIENT_ID=""
 SSH_ALLOW_CIDRS=()
 APT_UPDATED="false"
@@ -63,6 +64,7 @@ Options:
   --small-host                Add 3 GB swap and bounded Docker logs for a 1 GB trial VM
   --enable-thaiwater-shadow   Prompt for/store the key if needed and enable shadow capture
   --enable-public-pilot-feeds Publish approved ThaiWater and PM2.5 pilot feeds anonymously
+  --enable-public-flood-feed  Pull Floodboard and publish the district feed after first success
   --enable-ufw                Enable UFW after safe allow rules are installed
   --ssh-allow-cidr CIDR       SSH source network; repeat for multiple networks
   --check-only                Report state without changing the machine
@@ -88,6 +90,7 @@ while [ "$#" -gt 0 ]; do
         --small-host) SMALL_HOST="true"; shift ;;
         --enable-thaiwater-shadow) ENABLE_THAIWATER_SHADOW="true"; shift ;;
         --enable-public-pilot-feeds) ENABLE_PUBLIC_PILOT_FEEDS="true"; shift ;;
+        --enable-public-flood-feed) ENABLE_PUBLIC_FLOOD_FEED="true"; shift ;;
         --enable-ufw) ENABLE_UFW="true"; shift ;;
         --ssh-allow-cidr)
             require_option_value "$@"
@@ -368,6 +371,10 @@ fi
 if [ "$ENABLE_PUBLIC_PILOT_FEEDS" = "true" ]; then
     set_env_value THAIWATER_FEED_PUBLIC "true"
     set_env_value AIR_QUALITY_FEED_PUBLIC "true"
+fi
+if [ "$ENABLE_PUBLIC_FLOOD_FEED" = "true" ]; then
+    set_env_value FLOOD_PILOT_PULLS_ENABLED "true"
+    set_env_value FLOOD_FEED_PUBLIC "true"
 fi
 if [ "$DEPLOY_MODE" = "image" ]; then
     set_env_value GRP_IMAGE "$IMAGE"

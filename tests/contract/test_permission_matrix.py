@@ -843,11 +843,23 @@ def test_the_public_flood_feed_is_closed_unless_switched_on(world, monkeypatch) 
 
     enabled = world["settings"].model_copy(update={"flood_feed_public": True})
     monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
+    # Enabling publication before a successful roads snapshot must not expose 56 misleading zeros.
+    waiting = client.get(path)
+    assert waiting.status_code == 503
+    assert waiting.json()["error"]["code"] == "FLOOD_FEED_NOT_READY"
+
+    ready_feed = {
+        "checked_at": "2026-10-07T05:30:00Z",
+        "as_of": "2026-10-07T05:30:00Z",
+        "valid_until": "2026-10-07T06:00:00Z",
+        "districts": [{"district_code": "1001", "active_incidents": 0}],
+        "records": [],
+    }
+    monkeypatch.setattr(flood_module, "build_feed", lambda _session, _config: ready_feed)
     anonymous = client.get(path)
     assert anonymous.status_code == 200
     assert anonymous.headers["cache-control"] == "public, max-age=60"
-    body = anonymous.json()
-    assert len(body["districts"]) == 56 and body["records"] == []
+    assert anonymous.json() == ready_feed
     assert client.get("/api/v1/public/flood/no-such/feed.json").status_code == 404
     assert client.get("/api/v1/public/flood/r00000000000/feed.json").status_code == 404
 

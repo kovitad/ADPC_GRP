@@ -84,10 +84,13 @@ preserves the existing key on later reruns. PM2.5 needs no source key: its prote
 a signed-in member. The bootstrap records `GRP_PUBLIC_FEED_BASE_URL`, but anonymous feeds stay 404
 because `.env.example` leaves every publication switch false. After provider approval, the explicit
 `--enable-public-pilot-feeds` option enables only the ThaiWater and PM2.5 anonymous pilot routes;
-it does not enable the general flood feed or submit a Global Risk contribution. Verify them at:
+it does not submit a Global Risk contribution. The separate `--enable-public-flood-feed` option
+enables regular Floodboard pulls and the anonymous district route. That route returns 503 until a
+successful timestamped roads snapshot exists, then 200. Verify the feeds at:
 
 - `/api/v1/public/flood/bangkok/government-observations/feed.json`
 - `/api/v1/public/aq/sea/feed.json`
+- `/api/v1/public/flood/bangkok/feed.json`
 
 The platform health endpoint works before identity-provider setup, but login remains unavailable. Register a callback-specific SIG public PKCE client and put its non-secret ID in `SERVIR_AUTH_CLIENT_ID` in `/srv/grp/app/.env`. GRP discovers the issuer from `SIG_MCP_BASE_URL`; `SERVIR_AUTH_ISSUER` may pin the expected result. A public client has no client secret. Follow [`../docs/access-management.md`](../docs/access-management.md); a normal SIG user account is not an application credential.
 

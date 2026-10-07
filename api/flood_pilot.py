@@ -190,8 +190,15 @@ def _as_of(value: str | None, config: PilotConfig | None = None) -> datetime:
 AsOf = Annotated[str | None, Query(description="ISO 8601 time with zone; default now")]
 
 
-def _feed_response(session, config: PilotConfig, request: Request, cache: str) -> Response:
-    body, etag = serialise(build_feed(session, config))
+def _feed_response(
+    session,
+    config: PilotConfig,
+    request: Request,
+    cache: str,
+    *,
+    feed: dict[str, Any] | None = None,
+) -> Response:
+    body, etag = serialise(feed if feed is not None else build_feed(session, config))
     headers = {"ETag": etag, "Cache-Control": cache}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
@@ -227,8 +234,19 @@ def read_public_flood_feed(pilot_id: str, session: DatabaseSession, request: Req
         raise not_found()
     caller = request.client.host if request.client else "unknown"
     limiter.check("public_flood_feed_per_caller_per_minute", caller, 30, 60)
+    feed = build_feed(session, config)
+    # ADR-0069: never let a contribution validator accept 56 misleading zero rows before the
+    # worker has stored a successful roads snapshot with bounded freshness.
+    if not all(feed.get(field) for field in ("checked_at", "as_of", "valid_until")):
+        raise GrpError(
+            503,
+            "FLOOD_FEED_NOT_READY",
+            "The flood feed is waiting for its first successful source snapshot.",
+        )
     public_reads.record(f"flood:{config.pilot_id}")
-    return _feed_response(session, config, request, "public, max-age=60")
+    return _feed_response(
+        session, config, request, "public, max-age=60", feed=feed
+    )
 
 
 @router.get(

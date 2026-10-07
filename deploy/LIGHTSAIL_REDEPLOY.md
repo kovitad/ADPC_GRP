@@ -28,7 +28,7 @@ sudo curl -fsSL https://raw.githubusercontent.com/kovitad/ADPC_GRP/main/deploy/b
 ## 4. Deploy the approved pilot image and enable both public pilot feeds
 
 ```bash
-sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-d29b465 --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds
+sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-<approved-short-sha> --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds --enable-public-flood-feed
 ```
 
 The bootstrap preserves the existing database, `/srv/grp/secrets`, OAuth settings, ThaiWater
@@ -52,7 +52,13 @@ curl -i https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-o
 curl -i https://servir-risk.kovitad.com/api/v1/public/aq/sea/feed.json
 ```
 
-Expected results are HTTP `200` for health and both public feeds. Confirm the map-header fix too:
+```bash
+curl -i https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/feed.json
+```
+
+Expected results are HTTP `200` for health, ThaiWater and PM2.5. The flood feed returns `503
+FLOOD_FEED_NOT_READY` until its first successful Floodboard roads snapshot, then `200`; never submit
+it while it is 503. Confirm the map-header fix too:
 
 ```bash
 curl -sI https://servir-risk.kovitad.com/flood.html | grep -i '^Referrer-Policy:'

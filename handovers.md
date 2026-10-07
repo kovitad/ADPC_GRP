@@ -33,8 +33,12 @@
   problem. Nothing was stored, approved, retried or published; the old contribution was untouched.
   Production header inspection afterward showed the host still serves `Referrer-Policy:
   no-referrer`, proving the `d29b465` OSM map-header fix exists on `main` but was not applied to
-  Caddy on the host. Rerun bootstrap with image `sha-d29b465`, then require
-  `strict-origin-when-cross-origin` externally before retesting map tiles.
+  Caddy on the host. Rerun bootstrap with the next approved immutable image, then require
+  `strict-origin-when-cross-origin` externally before retesting map tiles. At the owner's request,
+  ADR-0069 now adds `--enable-public-flood-feed`: it enables Floodboard pulls and the district
+  route together, but the anonymous route returns `503 FLOOD_FEED_NOT_READY` until a successful
+  roads snapshot supplies `checked_at`, `as_of` and `valid_until`. This prevents 56 unfetched zero
+  rows from being accepted as a live feed.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
