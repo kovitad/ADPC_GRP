@@ -33,8 +33,11 @@
   rerunning bootstrap with the corrected immutable image. While tracing that path, `.env.example`
   was corrected to point the ThaiWater key
   at the entrypoint's non-root `/run/grp-secrets` copy; a deployment regression test enforces that
-  every runtime secret-file setting uses the tmpfs copy. No AWS, DNS, OAuth or feed setting has been
-  changed. The Docker Desktop stack was then rebuilt
+  every runtime secret-file setting uses the tmpfs copy. The owner provisioned the 1 GB Lightsail
+  host and pointed `servir-risk.kovitad.com` at its static IPv4. The first bootstrap created swap,
+  installed Docker/Caddy, pulled the image and started PostGIS, then stopped safely at migration on
+  the entrypoint error above; API/worker, OAuth, ThaiWater capture and public feeds did not start.
+  The Docker Desktop stack was then rebuilt
   with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
