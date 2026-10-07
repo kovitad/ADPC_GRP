@@ -8,15 +8,17 @@
 
 The connected Global Risk deployment previously **auto-approved** a test feed. A successful
 `contribute_submit` may therefore make a feed public immediately, and contributors may be unable
-to withdraw it. These prompts authorize one submission attempt for each named pilot feed. They do
-not authorize retries, renamed duplicates, public answer receipts or changes to the manifests.
+to withdraw it. These prompts authorize one submission attempt for each named pilot feed and one
+separately named direct-upstream PM2.5 diagnostic. They do not authorize retries, renamed
+duplicates, public answer receipts or changes to the manifests.
 
 A failed attempt is a useful test result. If a call fails or times out, Claude must inspect
 `contribute_status` before doing anything else and must not retry automatically.
 
 ## Public URLs to check first
 
-- PM2.5: <https://servir-risk.kovitad.com/api/v1/public/aq/sea/feed.json>
+- GRP-normalized PM2.5: <https://servir-risk.kovitad.com/api/v1/public/aq/sea/feed.json>
+- Direct upstream PM2.5 diagnostic: <https://api-aq-servir.adpc.net/api/public/pm25/latest/?format=json>
 - ThaiWater: <https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-observations/feed.json>
 
 Both should return HTTP 200 without signing in. PM2.5 currently has province forecast records;
@@ -31,9 +33,10 @@ Use the SERVIR Global Risk MCP connector for this task.
 
 First call platform_capabilities and confirm that contribute_submit, contribute_status and feeds_query are available, and that kind="feed" with adapter="generic_json" is supported.
 
-Then perform a read-only preflight of these two anonymous JSON URLs if your available tools permit it:
+Then perform a read-only preflight of these three anonymous JSON URLs if your available tools permit it:
 1. https://servir-risk.kovitad.com/api/v1/public/aq/sea/feed.json
-2. https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-observations/feed.json
+2. https://api-aq-servir.adpc.net/api/public/pm25/latest/?format=json
+3. https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-observations/feed.json
 
 For each URL report whether it is reachable, whether the top-level records member is an array, the record count, the keys in one sample record, and the newest relevant timestamp. Do not print every record.
 
@@ -87,6 +90,78 @@ Manifest:
   "license": "Provider-approved temporary pilot publication; attribution required",
   "usage_notes": "Southeast Asia only, values in micrograms per cubic metre. The category is indicative because US EPA categories are for 24-hour averages while this is one 3-hour forecast step. This is a forecast, not a measurement. Check forecast_time and valid_until. Credit SERVIR Southeast Asia / ADPC AQ Tracker and NASA GEOS-CF."
 }
+```
+
+## Prompt 2A: diagnose the upstream PM2.5 feed directly
+
+This intentionally bypasses the GRP relay and uses a different diagnostic dataset name. The source
+returns 351 records under `data`, but `forecast_time` and `init_date` exist only at the top level,
+not inside each record. This test discovers whether Global Risk rejects that shape, accepts it with
+missing timestamps, or silently orders records by source order. Any of those outcomes is useful to
+report. A successful submission may still be auto-approved and permanent.
+
+```text
+Use the SERVIR Global Risk MCP connector. This is an authorized diagnostic test of the original upstream PM2.5 JSON, separate from the ADPC GRP relay. First call platform_capabilities and confirm kind="feed" and adapter="generic_json" are supported. Then make exactly one contribute_submit call with kind="feed" and the manifest below.
+
+Keep the dataset name sea_pm25_upstream_direct_diagnostic_20261007 exactly as written so it cannot be confused with the GRP-normalized feed. Do not repair the source shape, copy top-level timestamps into records, rename the dataset, alter fields, retry, or submit a duplicate. Do not publish an answer or create a receipt.
+
+The diagnostic question is whether Global Risk notices that fetch.as_of_field="forecast_time" names a top-level field while individual records under data do not contain forecast_time. If validation declines the contribution, quote the complete safe error and every rejected field, then stop. That declined result is a successful diagnostic outcome. If the call times out or is ambiguous, call contribute_status and search for this exact dataset before doing anything else, then stop. If the contribution succeeds, immediately call contribute_status and report contribution_id, state, reviewer or auto-approval state, fetched record count, sample fields, timestamp/staleness interpretation, warnings, and whether contributor withdrawal remains possible.
+
+Manifest:
+{
+  "dataset": "sea_pm25_upstream_direct_diagnostic_20261007",
+  "title": "DIAGNOSTIC: upstream Southeast Asia PM2.5 feed shape",
+  "description": "Diagnostic direct registration of the SERVIR Southeast Asia / ADPC AQ Tracker public PM2.5 endpoint. It contains one province record per area, but forecast_time and init_date are top-level metadata rather than fields in each data record. This test is intended to expose validation, timestamp, ordering and staleness behavior. It is a NASA GEOS-CF bias-corrected model forecast, not a station measurement.",
+  "source": "SERVIR Southeast Asia / ADPC AQ Tracker, from NASA GEOS-CF (bias-corrected), direct upstream diagnostic",
+  "validation": "single-agency",
+  "residency": "external call-out",
+  "cadence": "a new 3-hourly forecast step every 3 hours; source cache 15 minutes",
+  "adapter": "generic_json",
+  "fetch": {
+    "url": "https://api-aq-servir.adpc.net/api/public/pm25/latest/?format=json",
+    "records_path": "data",
+    "as_of_field": "forecast_time",
+    "fields": {
+      "province": "area_name",
+      "country": "country",
+      "area_id": "area_id",
+      "pm25_avg": "pm25_avg",
+      "pm25_min": "pm25_min",
+      "pm25_max": "pm25_max",
+      "lat": "lat",
+      "lon": "lon"
+    }
+  },
+  "pack": "risk",
+  "hazards": ["air_quality", "pm25"],
+  "countries": ["Thailand", "Laos", "Cambodia", "Vietnam", "Myanmar", "Malaysia", "Singapore", "Indonesia", "Philippines", "Brunei", "Timor-Leste"],
+  "license": "Provider-approved temporary pilot publication; attribution required",
+  "usage_notes": "DIAGNOSTIC FEED. The source keeps forecast_time and init_date at the top level, not per record. Do not treat missing record timestamps as current data. Values are micrograms per cubic metre from a model forecast, not station measurements. Credit SERVIR Southeast Asia / ADPC AQ Tracker and NASA GEOS-CF."
+}
+```
+
+If it is accepted, run these read-only diagnostics:
+
+```text
+Use feeds_query for sea_pm25_upstream_direct_diagnostic_20261007 with limit 12. Show the returned order, province, country, pm25_avg and pm25_max. Also show the feed-level pulled-at time, record as-of value, stale_data state, record_order explanation and every warning exactly as returned. Determine whether the 12 records are the highest PM2.5 values, the lowest values, source order, or another order. Do not publish an answer or create a receipt.
+```
+
+```text
+Use feeds_query for sea_pm25_upstream_direct_diagnostic_20261007 with limit 351. Report whether any returned record contains forecast_time, init_date or valid_until. Compare the newest-data/staleness claim made by Global Risk with the top-level forecast_time shown by the source, without inventing a per-record time. Do not publish an answer or create a receipt.
+```
+
+If both PM2.5 feeds were accepted, run this comparison:
+
+```text
+Query sea_pm25_upstream_direct_diagnostic_20261007 and sea_pm25_province_forecast separately with the same limit of 12. Compare record ordering, timestamp availability, valid_until, stale_data, warnings and the provinces returned. Explain which differences are caused by the upstream timestamps being top-level rather than repeated in every record. Do not combine the feeds, submit anything else, publish an answer or create a receipt.
+```
+
+### Short issue report for the team tonight
+
+After the test, ask Claude:
+
+```text
+Prepare a concise technical issue report for the Global Risk team. Include UTC test time, MCP tool names, exact diagnostic dataset name, source URL, contribution_id and state if any, whether auto-approval occurred, expected behavior, observed behavior, the complete safe validation or warning text, record count, timestamp location mismatch, record ordering, stale_data behavior, duplicate/retry avoidance, and recommended platform change. Exclude OAuth tokens, cookies, API keys and secret values. Clearly separate facts observed from recommendations.
 ```
 
 ## Prompt 3: make one ThaiWater submission attempt
