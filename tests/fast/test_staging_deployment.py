@@ -13,6 +13,21 @@ def test_staging_compose_mounts_source_read_only_and_worker_scratch_on_disk() ->
     assert "/srv/grp/tmp:/tmp" in compose
 
 
+def test_entrypoint_populates_secret_tmpfs_before_transferring_directory_ownership() -> None:
+    entrypoint = (REPOSITORY_ROOT / "deploy" / "container-entrypoint.sh").read_text(
+        encoding="utf-8"
+    )
+
+    create = "install -d -o 0 -g 0 -m 0700 /run/grp-secrets"
+    copy = 'install -o 0 -g 0 -m 0400 "$source" "/run/grp-secrets/$name"'
+    transfer_file = 'chown 10001:10001 "/run/grp-secrets/$name"'
+    transfer_directory = "chown 10001:10001 /run/grp-secrets"
+    assert entrypoint.index(create) < entrypoint.index(copy)
+    assert entrypoint.index(copy) < entrypoint.index(transfer_file)
+    assert entrypoint.index(transfer_file) < entrypoint.index(transfer_directory)
+    assert "install -d -o 10001" not in entrypoint
+
+
 def test_staging_secret_file_settings_use_the_container_tmpfs_copy() -> None:
     environment = (REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
 

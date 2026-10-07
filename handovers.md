@@ -25,8 +25,13 @@
   that exact main commit. The Ubuntu bootstrap has explicit `--small-host`, callback client-ID and
   interactive ThaiWater-shadow options, so no key belongs in GitHub or shell history. PM2.5 public
   redistribution still waits for the AQ Tracker licence/credit confirmation; no ThaiWater
-  measurement feed is approved.
-  While tracing that path, `.env.example` was corrected to point the ThaiWater key
+  measurement feed is approved. The first real Lightsail migration exposed a dedicated-Compose
+  capability bug: the entrypoint transferred its mode-0700 tmpfs directory to UID 10001 before
+  copying secrets, while `CAP_DAC_OVERRIDE` was intentionally absent. It now populates the
+  root-owned tmpfs, transfers each file, and transfers the directory last; a regression test pins
+  that order. The failed first run created only the internal database volume and can be resumed by
+  rerunning bootstrap with the corrected immutable image. While tracing that path, `.env.example`
+  was corrected to point the ThaiWater key
   at the entrypoint's non-root `/run/grp-secrets` copy; a deployment regression test enforces that
   every runtime secret-file setting uses the tmpfs copy. No AWS, DNS, OAuth or feed setting has been
   changed. The Docker Desktop stack was then rebuilt
