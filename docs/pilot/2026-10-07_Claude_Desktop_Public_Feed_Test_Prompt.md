@@ -51,7 +51,114 @@ data. Every test must record the source timestamp, Global Risk pulled-at time, `
 warnings. Do not describe a record as current from cadence alone. For the direct upstream diagnostic,
 do not invent per-record `forecast_time` or `valid_until` values that the source does not provide.
 
-## Prompt 1: preflight both feeds without submitting
+## Bangkok flood districts: URL and existing contribution
+
+**Permanent feed URL (currently disabled):**
+<https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/feed.json>
+
+The primary dataset was already submitted and auto-approved on 5 October 2026:
+
+- dataset: `bangkok_flood_districts_live`;
+- contribution ID: `47b51ee65c4659f9`;
+- registered URL: an expired temporary Cloudflare tunnel;
+- contributor withdrawal: refused because the contribution is already approved;
+- permanent URL today: HTTP 404 because `FLOOD_FEED_PUBLIC=false`;
+- regular Floodboard capture today: disabled, so the Lightsail database does not yet contain the
+  normal district incident source needed for a meaningful feed.
+
+Do not reuse or replace the primary name: `contribute_submit` cannot update an approved
+contribution. The separately named diagnostic below is authorized only to discover how the
+platform handles the currently disabled permanent URL. It must never be described as the
+production flood feed.
+
+Use this Claude Desktop prompt to inspect the existing registration:
+
+```text
+Use the SERVIR Global Risk MCP connector. Call contribute_status and find the exact contribution with dataset bangkok_flood_districts_live or contribution_id 47b51ee65c4659f9. Report its state, registered URL if exposed, contributor/reviewer, auto-approval status and audit warnings. Then call feeds_query for bangkok_flood_districts_live with limit 56. Report fetch success, pulled-at time, cache state, served_stale, stale reason, as_of, valid_until, record count and whether Bang Sue appears. Do not submit, retry, rename, withdraw, publish an answer or create a receipt. Treat any cached result from the expired tunnel as historical, not current.
+```
+
+### One-attempt diagnostic submission under a different name
+
+The owner has authorized one diagnostic attempt even if it fails. The expected result while the
+permanent endpoint returns 404 is a clear decline. If the platform unexpectedly accepts and
+auto-approves it, report that as a platform issue because it accepted an unreachable feed.
+
+```text
+Use the SERVIR Global Risk MCP connector. Make exactly one contribute_submit call with kind="feed" and the manifest below. This is a diagnostic of the new Lightsail URL, not a replacement of the existing production dataset.
+
+Do not change the dataset name, retry, create another name, publish an answer or create a receipt. Before submission, note the current HTTP result from the URL if your tools can check it. If contribution validation declines it because the endpoint is disabled, unreachable, empty or malformed, quote the complete safe error and stop; that is a successful diagnostic result. If the call times out or is ambiguous, call contribute_status and search for the exact diagnostic dataset before doing anything else. If it succeeds, immediately call contribute_status and report contribution_id, state, auto-approval, fetch result, record count, warnings and whether contributor withdrawal is possible. Then stop.
+
+Manifest:
+{
+  "dataset": "bangkok_flood_districts_lightsail_diagnostic_20261007",
+  "title": "DIAGNOSTIC: Bangkok and Nonthaburi flood districts from Lightsail",
+  "description": "Diagnostic registration of the permanent ADPC GRP Lightsail flood-district endpoint. One record is expected for each of 56 Bangkok and Nonthaburi districts, with active/receding incidents, confidence wording and nearby-facility counts. Zero means no incident was found in available reports, not proof that a district is dry. This diagnostic must not replace or be confused with bangkok_flood_districts_live.",
+  "source": "ADPC GRP Bangkok flood pilot, derived from Floodboard public sources and OpenStreetMap facilities",
+  "validation": "unvalidated",
+  "residency": "external call-out",
+  "cadence": "Floodboard roads checked every 10 minutes; incidents recomputed whenever the export changes",
+  "adapter": "generic_json",
+  "fetch": {
+    "url": "https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/feed.json",
+    "records_path": "districts",
+    "as_of_field": "as_of",
+    "fields": {
+      "district_code": "district_code",
+      "district": "district_name_en",
+      "district_th": "district_name_th",
+      "province": "province",
+      "active": "active_incidents",
+      "receding": "receding_incidents",
+      "worst_confidence": "worst_confidence",
+      "facilities_nearby": "facilities_nearby",
+      "as_of": "as_of",
+      "valid_until": "valid_until"
+    }
+  },
+  "pack": "risk",
+  "hazards": ["flood", "flashflood"],
+  "countries": ["Thailand"],
+  "license": "CC BY 4.0 derived from Floodboard; facility counts from OpenStreetMap under ODbL",
+  "usage_notes": "DIAGNOSTIC FEED for Bangkok and Nonthaburi only. Do not interpret zero incidents as proof that a district is dry. Check as_of, valid_until and stale_data. Credit Floodboard and OpenStreetMap contributors. Do not use this diagnostic alongside bangkok_flood_districts_live as independent evidence."
+}
+```
+
+If the diagnostic is accepted, test it once:
+
+```text
+Use feeds_query for bangkok_flood_districts_lightsail_diagnostic_20261007 with limit 56. Report record count, whether all records have district_code, as_of and valid_until, whether Bang Sue is present, pulled-at/cache/stale state, and every warning. Do not treat it as independent from bangkok_flood_districts_live, publish an answer or create a receipt.
+```
+
+### Replacement after the Lightsail feed is genuinely ready
+
+Because the old contribution cannot be updated by its contributor, a future replacement may use
+`bangkok_flood_districts_live_v2`. Do not submit that production-style replacement until all of
+these are true:
+
+1. the Lightsail URL returns HTTP 200 anonymously;
+2. regular Floodboard pulls are enabled and healthy;
+3. the response contains all 56 district records;
+4. every record has current `as_of` and `valid_until` values;
+5. the diagnostic has been withdrawn or a maintainer confirms it will not be double-counted;
+6. the Global Risk team agrees how to retire or exclude the broken original feed.
+
+After the permanent endpoint is enabled and verified with 56 fresh district records, the safer
+option is still to send this request to a Global Risk maintainer; it is not an MCP
+`contribute_submit` call:
+
+```text
+Please repoint the already approved Global Risk feed bangkok_flood_districts_live, contribution ID 47b51ee65c4659f9, from its expired temporary Cloudflare tunnel to:
+https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/feed.json
+
+Before changing it, please fetch and validate the endpoint, confirm it contains 56 district records under districts, confirm each record has as_of and valid_until, and preserve the existing dataset name and provenance. Please do not create a duplicate contribution. After repointing, please report the fetch time, record count, cache state and audit result.
+```
+
+For reference only, the original manifest uses `records_path="districts"`,
+`as_of_field="as_of"`, cadence "Floodboard roads checked every 10 minutes", pack `risk`, hazards
+`flood` and `flashflood`, and countries `["Thailand"]`. Do not send it again while contribution
+`47b51ee65c4659f9` exists.
+
+## Prompt 1: preflight the three active URLs without submitting
 
 Copy the complete prompt below into Claude Desktop with the **SERVIR Global Risk** connector on.
 
