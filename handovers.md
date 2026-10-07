@@ -18,8 +18,10 @@
   one-attempt-only Claude Desktop prompts for normalized PM2.5, ThaiWater and a separately named
   direct-upstream PM2.5 diagnostic, plus read-only preflight, status checks and post-submit
   questions. The direct source keeps forecast times at the top level, intentionally exposing the
-  generic reader's validation/order/staleness behavior for a team issue report. The guide handles
-  auto-approval, timeout ambiguity and failed validation without retries or public answer receipts.
+  generic reader's validation/order/staleness behavior for a team issue report. The guide now
+  separates declared product cadence, HTTP cache duration and Global Risk's previously observed
+  six-hour fetched-copy cache. It handles auto-approval, timeout ambiguity and failed validation
+  without retries or public answer receipts.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual

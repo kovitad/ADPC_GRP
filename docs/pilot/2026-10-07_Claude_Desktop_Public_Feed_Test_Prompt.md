@@ -21,8 +21,26 @@ A failed attempt is a useful test result. If a call fails or times out, Claude m
 - Direct upstream PM2.5 diagnostic: <https://api-aq-servir.adpc.net/api/public/pm25/latest/?format=json>
 - ThaiWater: <https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-observations/feed.json>
 
-Both should return HTTP 200 without signing in. PM2.5 currently has province forecast records;
-ThaiWater has the latest valid water-level and 24-hour-rainfall observation per pilot station.
+All three should return HTTP 200 without signing in. PM2.5 currently has province forecast
+records; ThaiWater has the latest valid water-level and 24-hour-rainfall observation per pilot
+station.
+
+## Cadence and cache expectations
+
+The `cadence` text sent in each contribution manifest describes when the underlying product should
+change. It is not a promise that Global Risk will fetch that often.
+
+| Feed | Cadence declared to Global Risk | Source/GRP endpoint cache | Timestamp to inspect |
+| --- | --- | --- | --- |
+| GRP-normalized PM2.5 | New 3-hourly forecast step every 3 hours; new runs daily | GRP caches its upstream read for 10 minutes; its public response permits 5 minutes | Each record has `forecast_time` and `valid_until` |
+| Direct upstream PM2.5 diagnostic | New 3-hourly forecast step every 3 hours; source cache 15 minutes | Upstream HTTP response permits 15 minutes | `forecast_time` exists only at the top level, which is the diagnostic mismatch |
+| ThaiWater pilot observations | Source checked every 15 minutes; latest valid value retained per station/product | GRP public response permits 5 minutes | Each record has `observed_at`, `retrieved_at` and `valid_until` |
+
+Previous live-feed testing found that Global Risk may cache a fetched feed for up to **six hours**.
+Consequently, `feeds_query` can return an older platform copy even while the source URL has newer
+data. Every test must record the source timestamp, Global Risk pulled-at time, `stale_data` state and
+warnings. Do not describe a record as current from cadence alone. For the direct upstream diagnostic,
+do not invent per-record `forecast_time` or `valid_until` values that the source does not provide.
 
 ## Prompt 1: preflight both feeds without submitting
 
@@ -38,7 +56,7 @@ Then perform a read-only preflight of these three anonymous JSON URLs if your av
 2. https://api-aq-servir.adpc.net/api/public/pm25/latest/?format=json
 3. https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-observations/feed.json
 
-For each URL report whether it is reachable, whether the top-level records member is an array, the record count, the keys in one sample record, and the newest relevant timestamp. Do not print every record.
+For each URL report whether it is reachable, its HTTP Cache-Control value, its records container (`records` or `data`), the record count, the keys in one sample record, and the newest relevant timestamp. Distinguish product cadence, endpoint cache duration and Global Risk's own fetched-copy age. Do not print every record.
 
 Do not call contribute_submit yet. Do not publish an answer or create a receipt. Do not modify either feed.
 ```
