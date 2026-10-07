@@ -25,16 +25,25 @@ All three should return HTTP 200 without signing in. PM2.5 currently has provinc
 records; ThaiWater has the latest valid water-level and 24-hour-rainfall observation per pilot
 station.
 
+A fourth dataset, `bangkok_flood_districts_live`, was submitted on 5 October as contribution
+`47b51ee65c4659f9` and auto-approved, but it points to an expired temporary Cloudflare tunnel. Its
+intended permanent route is
+`https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/feed.json`, which remains disabled
+until regular Floodboard pulls and `FLOOD_FEED_PUBLIC` are deliberately enabled. Do not submit a
+renamed duplicate and do not report the old contribution as current merely because Global Risk
+still has a cached copy.
+
 ## Cadence and cache expectations
 
 The `cadence` text sent in each contribution manifest describes when the underlying product should
 change. It is not a promise that Global Risk will fetch that often.
 
-| Feed | Cadence declared to Global Risk | Source/GRP endpoint cache | Timestamp to inspect |
-| --- | --- | --- | --- |
-| GRP-normalized PM2.5 | New 3-hourly forecast step every 3 hours; new runs daily | GRP caches its upstream read for 10 minutes; its public response permits 5 minutes | Each record has `forecast_time` and `valid_until` |
-| Direct upstream PM2.5 diagnostic | New 3-hourly forecast step every 3 hours; source cache 15 minutes | Upstream HTTP response permits 15 minutes | `forecast_time` exists only at the top level, which is the diagnostic mismatch |
-| ThaiWater pilot observations | Source checked every 15 minutes; latest valid value retained per station/product | GRP public response permits 5 minutes | Each record has `observed_at`, `retrieved_at` and `valid_until` |
+| Feed | Cadence declared to Global Risk | Source/GRP endpoint cache | Timestamp to inspect | Current caveat |
+| --- | --- | --- | --- | --- |
+| Bangkok flood districts (`bangkok_flood_districts_live`) | Floodboard roads checked every 10 minutes; incidents recomputed whenever the export changes | GRP public response permits 1 minute when enabled | Each district record has `as_of` and `valid_until` | Previously auto-approved contribution `47b51ee65c4659f9` points to an expired temporary Cloudflare tunnel. The permanent Lightsail flood route and regular Floodboard pulls are not enabled; do not treat an old cached result as current. |
+| GRP-normalized PM2.5 | New 3-hourly forecast step every 3 hours; new runs daily | GRP caches its upstream read for 10 minutes; its public response permits 5 minutes | Each record has `forecast_time` and `valid_until` | Province-level model forecast, not a station measurement. |
+| Direct upstream PM2.5 diagnostic | New 3-hourly forecast step every 3 hours; source cache 15 minutes | Upstream HTTP response permits 15 minutes | `forecast_time` exists only at the top level, which is the diagnostic mismatch | Diagnostic representation of the same AQ Tracker/GEOS-CF product, not independent evidence. |
+| ThaiWater pilot observations | Source checked every 15 minutes; latest valid value retained per station/product | GRP public response permits 5 minutes | Each record has `observed_at`, `retrieved_at` and `valid_until` | Pilot-wide station observations; current contribution mapping may not support a defensible district subset. |
 
 Previous live-feed testing found that Global Risk may cache a fetched feed for up to **six hours**.
 Consequently, `feeds_query` can return an older platform copy even while the source URL has newer

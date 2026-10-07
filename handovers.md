@@ -24,7 +24,9 @@
   without retries or public answer receipts. It also includes a comprehensive Bang Sue risk-pack
   report prompt that separates district flood exposure, incident reports, pilot-wide ThaiWater
   observations and province-level PM2.5 context while requiring timestamps, units, lineage, cache
-  state and localization gaps.
+  state and localization gaps. Its cadence table also includes the previously approved
+  `bangkok_flood_districts_live` contribution and prominently marks its expired tunnel/currently
+  disabled permanent route so an old cached result is never presented as live.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
