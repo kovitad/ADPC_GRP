@@ -123,7 +123,25 @@ Manifest:
 }
 ```
 
-If the diagnostic is accepted, test it once:
+### Observed diagnostic result, 7 October 2026
+
+The test was run once and stopped as instructed:
+
+- preflight at 05:19:56 UTC: HTTP 404 in 60 ms, no redirect and no `Cache-Control` header;
+- body: `{"error":{"code":"NOT_FOUND","message":"We could not find this item.","support_ref":"GRP-64JL-33"}}`;
+- one `contribute_submit` call sent at 05:20:01 UTC and answered in about 9.9 seconds;
+- platform result: `declined`;
+- exact problem: `the feed did not answer through generic_json: feed unavailable: HTTPError: 404 Client Error: Not Found for url: https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/feed.json`;
+- no `contribution_id`, approval, stored records, retry, alternate name, public answer or receipt;
+- the existing `bangkok_flood_districts_live` contribution was untouched.
+
+This confirms that the deployed platform performs a test pull through `generic_json` and refuses an
+unreachable feed before storing the contribution. Because the result was an unambiguous decline,
+no status lookup or withdrawal was necessary. The diagnostic name should remain unused; verify with
+`contribute_status` before any future reuse if there is uncertainty. The support reference may help
+correlate API logs but is not itself evidence that a server-side log entry exists.
+
+If a later diagnostic is accepted, test it once:
 
 ```text
 Use feeds_query for bangkok_flood_districts_lightsail_diagnostic_20261007 with limit 56. Report record count, whether all records have district_code, as_of and valid_until, whether Bang Sue is present, pulled-at/cache/stale state, and every warning. Do not treat it as independent from bangkok_flood_districts_live, publish an answer or create a receipt.

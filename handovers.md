@@ -27,8 +27,14 @@
   state and localization gaps. Its cadence table also includes the previously approved
   `bangkok_flood_districts_live` contribution and prominently marks its expired tunnel/currently
   disabled permanent route so an old cached result is never presented as live. At the owner's
-  request it includes one separately named Lightsail diagnostic submission, expected to decline
-  while the endpoint is 404, plus strict gates before any future `...live_v2` replacement.
+  request it includes one separately named Lightsail diagnostic submission, plus strict gates
+  before any future `...live_v2` replacement. The diagnostic was run once: endpoint preflight 404,
+  then Global Risk declined it after about 9.9 seconds with the exact `generic_json` HTTP 404
+  problem. Nothing was stored, approved, retried or published; the old contribution was untouched.
+  Production header inspection afterward showed the host still serves `Referrer-Policy:
+  no-referrer`, proving the `d29b465` OSM map-header fix exists on `main` but was not applied to
+  Caddy on the host. Rerun bootstrap with image `sha-d29b465`, then require
+  `strict-origin-when-cross-origin` externally before retesting map tiles.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual

@@ -28,7 +28,7 @@ sudo curl -fsSL https://raw.githubusercontent.com/kovitad/ADPC_GRP/main/deploy/b
 ## 4. Deploy the approved pilot image and enable both public pilot feeds
 
 ```bash
-sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-3985efd --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds
+sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-d29b465 --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds
 ```
 
 The bootstrap preserves the existing database, `/srv/grp/secrets`, OAuth settings, ThaiWater
@@ -52,8 +52,15 @@ curl -i https://servir-risk.kovitad.com/api/v1/public/flood/bangkok/government-o
 curl -i https://servir-risk.kovitad.com/api/v1/public/aq/sea/feed.json
 ```
 
-Expected results are HTTP `200` for health and both public feeds. Never paste API keys, OAuth
-tokens, cookies or secret-file contents into the terminal command, documentation or chat.
+Expected results are HTTP `200` for health and both public feeds. Confirm the map-header fix too:
+
+```bash
+curl -sI https://servir-risk.kovitad.com/flood.html | grep -i '^Referrer-Policy:'
+```
+
+The expected value is `strict-origin-when-cross-origin`. If it still says `no-referrer`, Caddy has
+not applied the map fix. Never paste API keys, OAuth tokens, cookies or secret-file contents into
+the terminal command, documentation or chat.
 
 ## Troubleshooting sudo
 
