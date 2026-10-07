@@ -71,6 +71,16 @@ def test_container_publish_waits_for_successful_main_ci_and_tags_the_exact_sha()
     assert "platforms: linux/amd64" in workflow
 
 
+def test_running_container_cli_uses_the_non_root_secret_owner() -> None:
+    script = (REPOSITORY_ROOT / "deploy" / "bootstrap-ubuntu.sh").read_text(
+        encoding="utf-8"
+    )
+
+    command = "exec --no-TTY --user 10001:10001 api python -m grpcli."
+    assert script.count(command) == 4
+    assert "exec --no-TTY api python" not in script
+
+
 def test_staging_bootstrap_can_provision_and_install_thailand_data() -> None:
     script = (REPOSITORY_ROOT / "deploy" / "bootstrap-ubuntu.sh").read_text(
         encoding="utf-8"

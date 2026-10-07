@@ -493,17 +493,17 @@ done
 
 if [ -n "$ADMIN_EMAIL" ]; then
     log "Applying declarative Platform Admin and ADPC Hub configuration"
-    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.admin \
+    "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.admin \
         bootstrap-platform-admin --email "$ADMIN_EMAIL"
-    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.admin \
+    "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.admin \
         ensure-hub --actor-email "$ADMIN_EMAIL" --code adpc --name "ADPC Hub"
 fi
 
 if [ "$BOOTSTRAP_THAILAND_DATA" = "true" ]; then
     log "Installing the supported Thailand baseline from $SOURCE_DATA_DIR"
-    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.bootstrap install-thailand \
+    "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.bootstrap install-thailand \
         --actor-email "$ADMIN_EMAIL" --hub-code adpc
-    "${COMPOSE[@]}" exec --no-TTY api python -m grpcli.bootstrap status
+    "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.bootstrap status
 fi
 
 RELEASE_TIME="$(date -u +%Y%m%dT%H%M%SZ)"

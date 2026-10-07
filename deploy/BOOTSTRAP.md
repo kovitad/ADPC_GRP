@@ -119,7 +119,7 @@ sudo docker compose --env-file /srv/grp/app/.env \
   -f /srv/grp/app/deploy/compose.yml ps
 curl --fail http://127.0.0.1:8000/api/v1/healthz
 sudo docker compose --env-file /srv/grp/app/.env \
-  -f /srv/grp/app/deploy/compose.yml exec --no-TTY api \
+  -f /srv/grp/app/deploy/compose.yml exec --no-TTY --user 10001:10001 api \
   python -m grpcli.bootstrap status
 sudo journalctl -u caddy --since "15 minutes ago" --no-pager
 ```

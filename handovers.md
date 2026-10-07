@@ -36,8 +36,15 @@
   every runtime secret-file setting uses the tmpfs copy. The owner provisioned the 1 GB Lightsail
   host and pointed `servir-risk.kovitad.com` at its static IPv4. The first bootstrap created swap,
   installed Docker/Caddy, pulled the image and started PostGIS, then stopped safely at migration on
-  the entrypoint error above; API/worker, OAuth, ThaiWater capture and public feeds did not start.
-  The Docker Desktop stack was then rebuilt
+  the entrypoint error above. The corrected image then deployed successfully over HTTPS and made a
+  real shadow pull: 795 national water-level records yielded 12 new pilot observations, and 2,071
+  national 24-hour-rainfall records yielded 131. API/database/worker remained healthy on 1 GB RAM
+  with no restart or OOM. Callback client registration then succeeded, but Admin provisioning found
+  a second privilege-boundary issue: `docker compose exec` defaults to image user root and bypasses
+  the entrypoint's `gosu`; root intentionally lacks permission to UID-10001's mode-0400 tmpfs files.
+  Bootstrap now runs all CLI commands inside an existing API container explicitly as `10001:10001`.
+  OAuth sign-in and protected UI acceptance remain next; public feeds remain off. The Docker Desktop
+  stack was then rebuilt
   with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
