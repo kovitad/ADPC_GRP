@@ -149,6 +149,8 @@ def test_synthetic_case_matches_hand_designed_expected_result_exactly(world) -> 
     assert final_state == "succeeded"
     assert len(completed_trace["steps"]) == 6
     assert all(step["state"] == "completed" for step in completed_trace["steps"])
+    assert completed_trace["steps"][3]["label"] == "Area shelter records loaded"
+    assert "selected area" in completed_trace["steps"][4]["detail"]
     assert completed_trace["steps"][-1]["detail"] == "Saved 7 locked shelter results."
 
     expected_summary = json.loads((CASE / "expected_summary.json").read_text(encoding="utf-8"))

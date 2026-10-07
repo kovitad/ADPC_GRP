@@ -1,6 +1,45 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 28 September 2026 (`main` at `c907c34` plus this note, pushed; 659 tests pass, 2 skip; ADR-0031 Global Risk map link, ADR-0032 contributions to Global Risk, ADR-0033 district summary download; migration `20260928_0021`). **Next agent: read Section 0, "Session of 28 September", first.**
+**Updated:** 6 October 2026.
+- **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
+  three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
+  shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
+  observations for a lay reader, including a Dusit worked example. Live now shows the protected
+  ThaiWater shadow capture state and pilot-wide station/district coverage in its source table,
+  without measurements. The persistent switch remains false. There is still no measurement
+  API/UI, confidence change, watch or warning. Generated assessment-summary DOCX files now carry
+  the Global Risk receipt-bound hazard-map URL as a real clickable hyperlink; the URL is omitted
+  when there is no published receipt. The local Global Risk issue brief now also records the
+  auto-approved-feed retirement gap, the tested public feed URLs/statuses, the cadence-versus-cache
+  discrepancy, and a proposed operational health catalog. A companion MCP platform-tools guide now
+  records the governed tool sequence, tool-specific client rules, contribution lifecycle, confirmed
+  issues, observability, regression tests and release gates in the ignored issue-pack folder and the
+  owner-requested `06Oct2026` handoff folder. An illustrated beginner DOCX now explains MCP versus
+  APIs, Claude Desktop versus a custom host, where model/tool/presentation quality comes from, and
+  how to trace and benchmark the client with Langfuse in a deployment pipeline. A reviewed plan now
+  stages a reversible AWS free-tier trial at `servir-risk.kovitad.com`: immutable GHCR image, Caddy
+  HTTPS, swap/resource gates, a protected PM2.5 read and controlled 6-hour ThaiWater shadow window
+  before any national baseline import. Bootstrap now records the permanent feed base address while
+  both anonymous publication switches remain explicitly false. The container workflow now publishes
+  `main` and immutable seven-character SHA tags only after the complete `CI` workflow succeeds for
+  that exact main commit. The Ubuntu bootstrap has explicit `--small-host`, callback client-ID and
+  interactive ThaiWater-shadow options, so no key belongs in GitHub or shell history. PM2.5 public
+  redistribution still waits for the AQ Tracker licence/credit confirmation; no ThaiWater
+  measurement feed is approved.
+  While tracing that path, `.env.example` was corrected to point the ThaiWater key
+  at the entrypoint's non-root `/run/grp-secrets` copy; a deployment regression test enforces that
+  every runtime secret-file setting uses the tmpfs copy. No AWS, DNS, OAuth or feed setting has been
+  changed. The Docker Desktop stack was then rebuilt
+  with the supported launcher and SERVIR sign-in was
+  restored and browser-proven for the ADPC Hub Admin account.
+- **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
+  everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by
+  TWA. Never print, commit or return it.
+- **Branch:** `pilot/river-watch-and-bangkok-flood`. ThaiWater Stage 0 is implemented in `03aa63b`;
+  the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, the third
+  capture analysis is in `5a165c1`, and the metadata-only window analyzer is in `e687475`. The
+  local continuation has not been pushed.
+- **Next agent:** read Section 0, "6 October: Bangkok observation data briefing", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -113,7 +152,1531 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-2 October 2026, `main` at `e408f96` plus this note)
+## 0. Start here (sessions of 24 September-6 October 2026)
+
+### 6 October: Global Risk live-feed issue pack
+
+- The owner-requested issue folder is `.local/data-out/global-risk-platform-issues/` (ignored local
+  output). Its main brief is ready to share with the Global Risk team; a separate checklist makes
+  future feed/release testing repeatable.
+- Findings were revalidated against `SERVIR-AI/global-platform` commit `acc7b9d` (5 October). The
+  AQ Tracker public URL is the good reproducible example: 351 anonymous province rows, one
+  document-level forecast time and highest-PM2.5-first order.
+- Confirmed platform gaps: no document-to-record field mapping or relevance sort; `valid_until` is
+  returned but not enforced; generic feeds inherit a six-hour monthly-data cache; empty lists are
+  failures; generic JSON/CSV queries support `limit` but no lookup filters; risk-pack selection uses
+  hazard but not country/place; live receipts lack selected-row bytes/hash; approved feed specs
+  have no contributor version/repoint workflow.
+- The brief explicitly recommends retaining anonymous fetches rather than accepting contributor
+  secrets. No upstream code was changed, no public switch was enabled and nothing was submitted.
+
+### 6 October: local live-feed examples
+
+- The owner-requested guide is at
+  `.local/data-out/live_feed/GRP_Live_Feed_Examples.md` (ignored local output). It gives complete
+  Share data form values for serving PM2.5 through a permanent ADPC GRP domain, a generic direct
+  JSON example and the deployment/external-read checklist.
+- It records why ThaiWater cannot be submitted directly: Global Risk fetches anonymously while the
+  source requires a key, and shadow access does not establish public redistribution, retention,
+  freshness or measurement-display approval. It sketches a future GRP adapter but labels the route
+  and manifest as nonexistent and not approved.
+- Follow-up against `docs/adhoc/AQ Tracker API_ Brief for AI2 Agent Pilot.docx` distinguishes the
+  keyed `mapclient` API from AQ Tracker's separate anonymous province response, which GRP already
+  calls. A live check returned 351 rows, top-level-only forecast time and highest-first ordering.
+  Direct Global Risk use would lose per-row freshness and return the cleanest tail by default, so
+  GRP currently adds per-row time/expiry/category and reverses the order. Prefer the source directly
+  once AQ Tracker makes those changes and confirms redistribution/credit wording.
+- The local anonymous PM2.5 route currently returns HTTP 404 as designed because the public switch
+  is off. A permanent public base URL, route switch, outside read, AQ Tracker redistribution/credit
+  confirmation and explicit send approval are still required. No route was enabled and nothing was
+  contributed.
+
+### 6 October: table contribution Check feedback restored
+
+- The owner reported that **Share data → Table → Check** appeared to do nothing. API logs showed the
+  authenticated page/list calls but no preview POST from that click, so Global Risk had not received
+  anything and this was not a silent contribution failure.
+- Check now immediately disables itself, says `Checking…`, marks the form busy and keeps an inline
+  live status beside the button. Success, validation problems, duplicate names and request failures
+  all end with visible inline text; the old top-of-page banner remains supplementary. Clear also
+  clears stale checked state. Assets are versioned `20261006a`.
+- A browser acceptance with a mocked local API selected Table, entered a complete CSV table, clicked
+  Check, observed the POST, inline completion message and exact-manifest confirmation; nothing was
+  sent. **522 focused contribution, permission and browser-contract tests pass**; Ruff, JavaScript
+  syntax and whitespace checks are clean. Reload the real signed-in page and repeat with the owner's
+  draft; inspect the now-visible message before any confirmation/send action.
+
+### 6 October: ThaiWater shadow health shown in Live
+
+- ADR-0067 adds **ThaiWater government observations (shadow)** to Live's existing source-coverage
+  table. It reads only the protected ADR-0066 status endpoint; the browser never contacts ThaiWater.
+- The row shows capture state plus each product's pilot-wide station count, covered-district count
+  and age of the last stored pull. English and Thai labels distinguish water level from 24-hour
+  rainfall.
+- It returns no measurement values, district averages or map layer and explicitly says publication
+  is not approved. It changes no incident, confidence, watch or warning. Replays do not borrow live
+  status, and a failed optional request does not break the flood page.
+- Validation: **1,254 passed, 2 PostgreSQL-only tests skipped**; 503 focused ThaiWater, permission
+  and browser-contract tests passed; Ruff, JavaScript syntax and whitespace checks are clean.
+  `web/` is bind-mounted in the healthy Desktop stack, but the signed-in row still needs a browser
+  check and reload for the `20261006a` assets.
+
+### 6 October: 3D Planning experiment removed
+
+- The owner rejected the optional perspective-map experiment after the first signed-in view mixed
+  poorly with Planning. Commits `184b692` and `5f14f19` fully revert it, including MapLibre,
+  OpenFreeMap, the controls, tests and ADR-0067. Planning is back to its prior 2D Leaflet behavior.
+- Do not resume 3D work. Continue with the gated ThaiWater work described below instead.
+
+### 6 October: Bangkok observation data briefing
+
+- The owner-requested Word briefing is at
+  `deliverables/thaiwater/ThaiWater_Bangkok_Observation_Data_Brief_2026-10-06.docx`. It is an
+  internal, untracked deliverable; do not publish or treat it as evidence that display or
+  redistribution rights are approved.
+- The four-page document explains the two products and field meanings in plain language, lists all
+  six retrieval records with lineage, summarizes Bangkok coverage, shows the ten districts with
+  the most station examples, and explains limitations and recommended next review.
+- Bangkok in the three-pull sample has 8 water-level stations across 7 districts (23 stored states)
+  and 122 rainfall stations across 49 districts (235 stored states). Provider quality is
+  unreported for every observation.
+- Dusit was selected as the worked example because it is tied for the most combined station
+  examples and includes both products: 2 water-level and 5 rainfall stations, with 15 stored states
+  shown individually. The document explicitly explains that the wide water-elevation range is not
+  flood depth and must not be compared across stations without datum/hydrology review.
+- The briefing repeatedly states that it is a short exploratory shadow sample, not a warning,
+  district average, threshold, safety finding or approved public product. Rain does not prove
+  flooding and no value is inferred where a station is absent.
+- Validation: the DOCX opens through `python-docx`, its ZIP package is valid, Word successfully
+  opened and repaginated it as four pages, and its extracted tables/text were reviewed. This work
+  changed no code, database, API, UI or capture setting.
+
+### 6 October: metadata-only ThaiWater window analysis
+
+- `core/flood_evidence/thaiwater_analysis.py` and `python -m grpcli.thaiwater analyze` review a
+  selected stored retrieval window without contacting ThaiWater or returning measurement values.
+- The JSON report covers fetch outcomes/cadence, distinct raw responses and changes, feature and
+  missing-measurement counts, station/version churn, corrected station-times, observation lag,
+  clock states, provider-quality coverage and area-coverage counts. It explicitly records
+  `publication_approved=false`, `contains_measurement_values=false` and
+  `network_requests_made=false`.
+- Missingness fails closed: if a successful fetch's retained raw object is missing or invalid, the
+  aggregate is `null`, not zero. Correction detection includes an original state before the chosen
+  window when its correction arrives inside the window.
+- The real three-pull window from `02:00Z` through `03:10Z` reports three successful attempts per
+  product, no configured missing measurement, no corrected station-time, no future clock and no
+  reported provider quality. The report is local and ignored under
+  `.local/thaiwater-shadow-analysis.json`.
+- This slice adds no API/UI, source call, background capture, assessment input, confidence effect,
+  watch or warning. Persistent capture remains disabled. The CLI was exercised against the real
+  three-pull PostgreSQL/storage window and returned the documented metadata-only result.
+- Validation: **1,253 passed, 2 PostgreSQL-only tests skipped**; Ruff and whitespace checks are
+  clean. Commit `e687475`; the Desktop image was rebuilt with the supported launcher, API/database
+  are healthy, the worker is running, the CLI passed again from the rebuilt worker image, and the
+  signed-in browser remained on Planning after reload. Longer observation, origin mapping,
+  licence/retention and hydrology/product decisions still gate a measurement layer.
+
+### 6 October: local SERVIR sign-in restored
+
+- The running API had been started without `SERVIR_AUTH_CLIENT_ID`, although the ignored local
+  client-registration file existed and OIDC discovery was reachable. This caused every
+  `/api/v1/auth/login` attempt to return `?auth=unavailable`.
+- Re-running `scripts/docker-desktop.ps1` rebuilt and recreated the stack through the supported
+  path, injecting the existing client ID without printing it. API, worker and database started;
+  `/api/v1/healthz` returned HTTP 200.
+- Browser acceptance completed with `kovitad.janlakhon@adpc.net`: SERVIR password sign-in returned
+  to `/workspace.html`, showed Kovitad Janlakhon as an active ADPC Hub Admin, and remained signed in
+  after a reload. Data Library and Planning both loaded from the signed-in navigation with the
+  active baseline visible and no browser console errors. The interactive browser session is
+  `grp-login`.
+- Full post-capture validation: **1,249 passed, 2 PostgreSQL-only tests skipped**; Ruff and
+  whitespace checks are clean. The focused ThaiWater/permission run passed 478 tests. Code/report
+  stabilization is commit `54e6742`; the bounded third-capture analysis is commit `5a165c1`.
+- Do not start this Desktop stack with raw `docker compose up`; use the launcher so local auth and
+  other configuration are passed correctly.
+
+### 6 October: first real ThaiWater shadow captures (latest; read this first)
+
+- Full report:
+  [`docs/pilot/2026-10-06_ThaiWater_Shadow_Capture_Report.md`](docs/pilot/2026-10-06_ThaiWater_Shadow_Capture_Report.md).
+- The confirmed website key is in ignored local configuration only. Both approved endpoints
+  returned HTTP 200. Never print or commit the key; do not move it into URLs or API responses.
+- The live v2 envelope is `{meta, data}` with `meta.updatedDate=null`, not the older
+  `{result: "OK", data}` fixture shape. The strict adapter now recognizes and validates both
+  envelopes; arbitrary `data` objects and invalid metadata still fail closed.
+- Migration `20261005_0028` is applied to the running Desktop PostgreSQL database. Controlled
+  captures succeeded at `02:17Z`, `02:22Z` and `03:05Z`; the persistent switch is false and cadence
+  is 15 minutes. API, database and worker are healthy.
+- First pull: 798 national water-level features produced 12 pilot stations/states; 2,944 rainfall
+  features produced 125 pilot stations/states. Second pull: water changed to 800 features and added
+  10 new pilot states; rainfall bytes were identical and added zero, proving idempotence. The third
+  pull had 799 water features/11 new pilot states and 2,963 rainfall features/118 new pilot states.
+- Final stored totals are 33 water-level states and 243 rainfall states. Rainfall gained one new
+  Department of Bangkok station (126 station identities; 94 sub-districts); this was not a metadata
+  change. Every national feature in all three pulls had a parseable measurement. There are no future
+  clocks or corrected duplicate station/time states. Provider quality flags are absent for every
+  placed observation, which must not be interpreted as good quality.
+- Coverage is sparse for water level (7 Bangkok and 3 Nonthaburi districts) and broad for rainfall
+  (49 Bangkok and 3 Nonthaburi districts), but **neither product has a station in Bang Bua Thong
+  (`1204`)**. Never infer local values from adjacent stations.
+- Exact origin deduplication remains blocked: Floodboard retains `bma_sensor`/`bma_dds` lineage but
+  no normalized originating station code, while ThaiWater has provider station IDs/codes. Do not
+  count nearby records as independent corroboration.
+- A post-commit logging-only `DetachedInstanceError` was found after the first successful storage
+  pass. `worker/main.py` now snapshots log fields while ORM rows remain attached; the second capture
+  logged both products successfully.
+- `scripts/docker-desktop.ps1` now passes the repository `.env` explicitly to Compose interpolation.
+  Previously the key secret was copied but `THAIWATER_SHADOW_ENABLED` remained false because
+  Compose resolved implicit `.env` relative to `deploy/`.
+- Next: collect a longer reviewed shadow window only when deliberately enabled; define per-product
+  display freshness; resolve sensor origins; and obtain licence/retention review. Do not add a
+  measurement layer until these gates pass, and do not build a watch without hydrology approval.
+
+### 6 October: ThaiWater readiness read contract
+
+- ADR-0066 adds the protected endpoint
+  `/api/v1/pilot/flood/{pilot_id}/government-observations/status`. It uses the existing pilot
+  membership rules and reads the database only; a web request never contacts ThaiWater.
+- `core/flood_evidence/government_observations.py` reports capture/credential readiness, each
+  product's latest attempt and success, raw SHA-256 lineage, feature/state counts, latest observed
+  and retrieval times, clock/quality counts, and latest-version station coverage by worker-derived
+  district/sub-district, originating agency and identity basis.
+- The endpoint returns no measurement value and explicitly reports `publication_approved=false`.
+  It calculates no area average and changes no incident, confidence, watch or warning. Replays
+  return `not_available_in_replay` rather than borrowing live evidence.
+- States distinguish `capture_disabled`, `credential_missing`, `awaiting_first_fetch`, `ok`,
+  `degraded` and `offline`. Key presence is a boolean; key value/path/headers are never returned.
+- At implementation time neither ignored secret location contained a key. The key was later added
+  locally and the controlled-run results are documented in the section above.
+- Tests cover read-model lineage/counts, no measurement field, disabled/missing/awaiting/failure
+  states, and the full role/Hub permission matrix. Full validation: **1,246 passed, 2 skipped**;
+  Ruff and whitespace checks are clean. No user-facing browser test is needed because this slice
+  adds no UI.
+- This gate has now run locally; see the section above and the capture report. Measurement display
+  remains blocked by the documented coverage, quality, origin and time-window questions.
+
+### 6 October: ThaiWater Stage 0 shadow capture
+
+- Commit `03aa63b` implements the first architecture slice under ADR-0065 and is pushed to
+  origin. It deliberately makes no operator-facing UI change.
+- `core/flood_evidence/thaiwater.py` strictly parses TWA map responses for water level and 24-hour
+  rainfall, stores every attempt/raw response through the existing fetch ledger, and normalizes
+  only stations spatially inside the Bangkok/Nonthaburi pilot.
+- Migration `20261005_0028` adds `hydro_station_version` and `hydro_observation`. Station metadata
+  changes create versions; repeated observation states are idempotent; corrected states remain in
+  history. Source administrative labels are retained separately from worker-derived GRP district
+  and sub-district codes.
+- `THAIWATER_SHADOW_ENABLED` is false by default. The worker reads
+  `THAIWATER_API_KEY_FILE`, applies a configurable 15-minute cadence, 20 MB caps and existing
+  bounded timeouts. Docker Desktop copies `THAIWATER_API_KEY` from ignored `.env`, but enables
+  capture only when explicitly requested.
+- Missing sentinels/nulls create no numeric observation; malformed responses fail closed; negative
+  rain is refused; observations over five minutes ahead are retained as `clock_status=future` and
+  are not approved for current-state use.
+- No key was present when Stage 0 was implemented, so no TWA request was issued. Stage 0 itself
+  added no API or UI; the later ADR-0066 endpoint exposes health/coverage only, with no measurement,
+  map-layer, incident-confidence, watch or warning effect.
+- Stage 0 validation at implementation was **1,239 passed, 2 skipped**; the later readiness and
+  live-capture changes have their current validation in the newest section above.
+- **Current UI impact: none.** Live, Planning and Assessments have no ThaiWater marker, layer,
+  card, watch or confidence change.
+- Key configuration, migration, three-pull capture, schema inspection and the health report are now
+  complete locally. Remaining order: collect a longer deliberate shadow window; resolve origin
+  identity and licence/retention; approve per-product freshness and station display semantics; then
+  consider a protected station-measurement contract and separate **Government observations** layer.
+  Do not build a GRP watch until the data-science/hydrology workshop chooses its exact target,
+  threshold, action, labels and acceptance metrics. Public warning remains a later gate.
+
+### 6 October: multi-source early-warning proposal
+
+- Proposed architecture:
+  [`docs/pilot/2026-10-05_Thailand_Multi_Source_Early_Warning_Architecture_Proposal.md`](docs/pilot/2026-10-05_Thailand_Multi_Source_Early_Warning_Architecture_Proposal.md).
+  It is a workshop/design input, not approval to issue public warnings or implement an unvalidated
+  flood-risk score.
+- Keep sources separate by meaning: Floodboard is observed/reported impact; ThaiWater is
+  consolidated government observation and attributed provider warnings; GEOGLOWS is river-flow
+  forecast; Longdo is rain/radar context; RP100 is a planning scenario; officer/CCTV reviews are
+  labels. The same BMA sensor arriving through two channels is one evidence family.
+- Proposed flow: bounded worker adapters → immutable raw-fetch lineage → canonical observations,
+  forecasts, impacts, official-source warnings and static context → origin-aware deduplication →
+  worker spatial placement and time-window features → deterministic rules → human publication
+  gate. A later calibrated model uses the privacy-safe research archive and reviewed labels.
+- First product is an internal **GRP operator watch**, not a statutory warning: source unavailable,
+  rapid rise, verified near/above-bank level, measured road flooding, observed heavy rain,
+  GEOGLOWS river rise and relayed official-source warning. Every watch names its rule/version,
+  evidence, times, freshness, quality and expiry.
+- Data-science stages: profile sources; shadow deterministic rules; event-based retrospective
+  validation; experimental calibrated nowcast; then operational promotion. Required measures
+  include event recall, precision, false alarms per area/month, lead-time distribution, Brier
+  score/calibration, availability and subgroup performance. Random row splits and accuracy alone
+  are explicitly rejected.
+- The document includes a Mermaid flow chart, canonical data contracts, feature/label plans,
+  publication ladder, 22 workshop decisions, 90-day delivery plan and acceptance gates.
+- Owner-reported access update: HII confirmed the website key is public and available for everyone.
+  ADR-0064 and the ThaiWater research plan now permit bounded shadow capture, while keeping the key
+  value out of Git/logs and retaining licence, cadence, training and redistribution gates.
+
+### 6 October: ThaiWater/HII research complete
+
+- Commit `a616af8` records the initial research and phased plan:
+  [`docs/pilot/2026-10-05_ThaiWater_HII_Integration_Research_and_Plan.md`](docs/pilot/2026-10-05_ThaiWater_HII_Integration_Research_and_Plan.md).
+  Integration gate: ADR-0064. It is pushed to origin.
+- The current TWA application has a public Swagger UI and technically relevant rainfall,
+  river/canal level, discharge, gate/weir, Bangkok road-flood/flow, flood-product and CCTV
+  contracts. Data calls without credentials return 401. The browser application's embedded
+  `x-api-key` was not copied, recorded or reused.
+- The initial research found no documented external-use process, API data licence, attribution,
+  quota, rate-limit behavior, retention right or redistribution right. The later owner-reported
+  HII confirmation clears public-key use for bounded shadow capture, but not those other rights.
+- HII's separate CKAN API exposes 36 open-data packages. All carry an ambiguous
+  “Creative Commons Attribution Non-Commercial” label without a licence URL/version. Actual
+  water/rain archives are openly browsable, but July 2026 was the newest non-empty monthly folder
+  found on 5 October, so they are historical/replay candidates rather than Live feeds.
+- Actual resource validation found 11 Bangkok stations (10 water level, one rainfall) and three
+  Nonthaburi stations (two water level, one rainfall) in the mixed open station inventory; none is
+  labelled Bang Bua Thong. The monthly water station metadata also has more row values than its
+  header, which must fail closed rather than be silently remapped.
+- Next actions are to retain the HII confirmation, document endpoint cadence/quota and terms, and
+  implement a minimal worker-only shadow capture plus catalogue parser/coverage spike. Neither may
+  appear as live evidence initially.
+- Shadow capture must use separate source/observation/retrieval times, quality and clock
+  validation, station versioning, conservative freshness, stored replay, and unavailable/stale UI.
+  Rain and forecasts never prove flooding; every higher evidence use needs a product-specific
+  decision.
+
+### 6 October: sub-district rollout complete
+
+- Completed all seven steps in
+  [`docs/pilot/2026-10-05_Subdistrict_Level_Plan.md`](docs/pilot/2026-10-05_Subdistrict_Level_Plan.md).
+  The decision is recorded in ADR-0063.
+- Commits, oldest first: `4655969`/`101cf2e` (area API and tests), `a73f007` (Planning
+  picker), `a380c09` (Planning scope), `e48d682` (Planner live scope), `7362878`
+  (Assessments), `8051223` (Live picker/filter), then `e0de28b` (browser checks, ADR and
+  handover).
+- Browser-checked signed in on the desktop stack at 1,440 px and 390 px:
+  - Planning selects Khlong Sam Prawet with Bangkok › Lat Krabang context and switches between
+    whole district and this sub-district;
+  - Assessments shows Bangkok › Lat Krabang district › Khlong Sam Prawet sub-district;
+  - Live restores `?area=1011&subdistrict=101103`, filters map/cards/incidents, and shows parent
+    totals. Khlong Sam Prawet and all six Lat Krabang sub-districts produced distinct counts.
+  No browser console errors were seen. A phone-width Planning action-row overflow found during the
+  check was fixed.
+- Validation: **1,222 passed, 2 skipped (1,224 collected)** after the final browser adjustments;
+  Ruff, JavaScript syntax and whitespace checks are clean.
+- The Docker rebuild was attempted but package download DNS retries exceeded ten minutes. To make
+  the Python API changes live for browser acceptance, `api/flood_pilot.py`,
+  `core/flood_evidence/areas.py` and the captured area JSON were copied into the API container and
+  that container was restarted. **Run `scripts/docker-desktop.ps1` again when package networking
+  is healthy** so the image itself contains the final commits. `web/` remains bind-mounted live.
+- After the API-container restart, the owner briefly saw the sign-in-unavailable screen. It was
+  transient. The SERVIR client ID is set, OIDC discovery resolves from the container,
+  `/api/v1/auth/login` returns the AuthKit authorization redirect, and a clean headless browser
+  reached the SERVIR **Sign in** page. Retry the login route directly if an old `?auth=unavailable`
+  URL is still open; do not replace or print the stored client configuration.
+- Both public feed switches report `false`. The unrelated untracked owner deliverables were left
+  untouched. The 27-commit sub-district series was subsequently pushed through `3a2767f` and the
+  branch was synchronized before the ThaiWater research began.
+
+### 5 October: end-of-day summary
+
+#### State of the machine
+
+- **Docker Desktop stack:** up and rebuilt with `scripts/docker-desktop.ps1`, so the images
+  include today's code. `web/` is a live bind mount.
+- **Still running for the owner's Global Risk test:**
+  - `scripts/feed-test-address.ps1` (relay on port 8090, plus a Cloudflare quick tunnel);
+  - test address: `https://establishment-boot-jump-music.trycloudflare.com`;
+  - the public routes are switched **on** (`AIR_QUALITY_FEED_PUBLIC` and `FLOOD_FEED_PUBLIC`).
+
+  When the owner has finished testing: stop the script (Ctrl+C, or end its process), then run
+  `.\scripts\docker-desktop.ps1` without those variables to switch the routes off.
+- **Tests:** 1,206 pass and 2 skip; Ruff is clean. If a full run ever hangs, run with
+  `-p no:cacheprovider`. One hang on 5 October did not repeat that way.
+
+#### Commits on 5 October (oldest first, none pushed)
+
+| Commit | What | Record |
+| --- | --- | --- |
+| `9850bdf` | Live flood feed for Global Risk: protected route, public route behind a switch, feed-only relay | ADR-0052 |
+| `5958f80` | Record of the first Global Risk test: auto-approved, cannot be withdrawn | test plan |
+| `51e64f0` | Top bar grouped into Live, Share data, Admin and the person's menu | nav plan |
+| `6f7c586`, `c36871b` | Share data → Live feed: from this platform or another source, with Test the feed | ADR-0052 |
+| `91d8bb0` | Office lock files untracked and ignored | |
+| `692736e` | Southeast Asia PM2.5 republished from SERVIR-SEA's public feed | ADR-0061 |
+| `6c7a119` | Feeds tested before preview and send; cards show "already sent" and outside reads | ADR-0052 |
+| `ce16cca`, `a38097a` | PM2.5 test mode through a temporary address, under a `_test<n>` name | |
+| `12957ef` | `residency` sent with every feed (Global Risk declined the first PM2.5 test without it) | |
+| `ec35afa` | Planner map icon system | ADR-0062 |
+| `2167a2a` | One map standard on every map page (`web/map-symbols.js` and `.css`), plus "you are here" | ADR-0062 amendment |
+| `f526496` | Mixed clusters show their two main symbols, not a folder-like glyph | ADR-0062 |
+
+#### On Global Risk now (the deployment auto-approves; nothing can be withdrawn by us)
+
+- **`bangkok_flood_districts_live`** (contribution `47b51ee65c4659f9`). It points at a closed
+  tunnel, so it serves stale data, then declines.
+- **`sea_pm25_province_forecast_test1`.** The first attempt was declined (missing `residency`,
+  now fixed). Whether the owner re-sent it is not recorded here: check
+  `contribute_status()`. Once the test tunnel closes, it will also point at a dead address.
+- Both names go in the maintainer note
+  (`docs/pilot/2026-10-05_Global_Risk_Maintainer_Note_Feed_Repoint.md`). Add the PM2.5 test name
+  before sending.
+
+#### Owner actions
+
+1. **Push the branch:** `git push`.
+2. **Finish the PM2.5 test, then say so,** so the tunnel can be closed and the routes switched off.
+3. **Send the maintainer note,** with both feed names.
+4. **A permanent public host** (Lightsail, 2 GB RAM and 60 GB disk, static IP). Set
+   `GRP_PUBLIC_FEED_BASE_URL` there, and the platform feeds become sendable.
+5. **Ask the AQ Tracker team (SERVIR-SEA):**
+   - confirm we may republish their feed, and the credit line;
+   - add a per-row time and a lowest-first sort, so Global Risk can read their feed directly.
+6. **Decide two wording questions** from the icon pack:
+   - keep "N/A — no data" (the owner's 25 September choice, enforced by a test) or switch to
+     the pack's "Unable to assess";
+   - align the centre cards' "Lower mapped flood exposure" with the pack's "Not exposed under
+     the selected scenario".
+7. **Signed-in browser checks:**
+   - the grouped menu;
+   - Share data live feeds;
+   - the Planner icons, clusters and "you are here";
+   - the flood page pins;
+   - the Assessments and Data preview maps.
+
+#### Search and selected area (added late on 5 October)
+
+- **Search a point of interest** (for example "Big C Wong Sawang"):
+  - the map flies to street level and drops a red, named pin;
+  - the district the point sits in is found from the district shapes and selected;
+  - a "Near …" card lists live items within 1 km, nearest first, with "Show live data here".
+- **The selected district or sub-district is now obvious:** a white-cased navy outline, the rest
+  of the map lightly dimmed, and its name in readable case.
+- **Search spelling is still OpenStreetMap's.** "big c wongsawang" finds nothing, while "Big C
+  Wong Sawang" or the Thai name works. Forgiving Thai search needs a **Longdo Map** key (the rain
+  key is refused for search).
+
+#### Sub-district level (planned and decided late on 5 October)
+
+- **Plan:** `docs/pilot/2026-10-05_Subdistrict_Level_Plan.md`.
+- **The data is there:** 7,436 sub-districts with shapes (180 in Bangkok, 52 in Nonthaburi), and
+  sub-district population and exposure for 7,255 areas (none for Bangkok). Assessments already
+  run on sub-districts.
+- **Gaps:**
+  - Planning hides the level switch and dead-ends at sub-district level;
+  - search does not find sub-districts in other districts;
+  - the live layer rolls a sub-district up to its district;
+  - the live page has districts only.
+- **Decided:**
+  - a click selects the sub-district and its district;
+  - the default scope is the sub-district;
+  - live counts what is inside, with the district total;
+  - the order is Planning, then Live, then Assessments.
+
+#### Next to build
+
+1. Longdo Map search on the server, once the owner has a Longdo Map key.
+2. Symbols for volunteer centres and early-warning resources (none in the icon pack yet).
+3. An air-quality page, which turns on the Live ▾ entry. Then a Planner PM2.5 layer and a line in
+   the district summary.
+4. The earlier queue, still open:
+   - retry the Nonthaburi OSM capture;
+   - the camera check;
+   - W3 DDPM reports.
+
+### 5 October (evening): Planner map icon system (ADR-0062)
+
+- **What:** the owner's icon pack (`docs/enhancement/GRP_Map_Icon_UX_Pack_v1.0`) on the Planner
+  map:
+  - shape is the feature, colour is the source, and a ring and badge are the assessment status;
+  - every live point is a keyboard-focusable pin with a tooltip and an accessible name;
+  - one shared cluster group shows the dominant symbol, or for a mixed cluster its two main
+    symbols overlapped (the first neutral glyph looked like a folder; fixed in `f526496`), and
+    points on one spot spread out (spiderfy);
+  - legend rows are grouped, with the map's symbol, a short name, the source, the count and an
+    "i" button for source, date and limits;
+  - the status legend uses the same symbols.
+- **Kept:** the owner's 25 September "N/A" wording instead of "Unable to assess".
+- **Every map page now uses the same library** (`web/map-symbols.js` and `.css`): Planning, the
+  flood pilot, Assessments, Data preview, Data inspector and River Watch. It sets the base map,
+  the boundary style and the pins. Planning also has "you are here" after "Use my location".
+- **Not yet:**
+  - symbols for volunteer centres and early-warning resources;
+  - a signed-in check.
+- **Also running:** the PM2.5 test address (`scripts/feed-test-address.ps1`), started for the
+  owner's Global Risk test. Close it and run `.\scripts\docker-desktop.ps1` to switch the public
+  routes off afterwards.
+
+### 5 October (later): menu, live-feed contributions, air quality (ADR-0061)
+
+- **Global Risk test.** The flood districts feed was submitted through a temporary tunnel with
+  the owner's yes. The deployment **auto-approves**, so it went live for everyone and cannot be
+  withdrawn:
+  - contribution `47b51ee65c4659f9`;
+  - receipt `25e8f83c33fa518f`.
+
+  The tunnel is now closed and the public switch is off.
+  `docs/pilot/2026-10-05_Global_Risk_Maintainer_Note_Feed_Repoint.md` is a draft asking the
+  maintainers to remove or re-point the feed; the owner sends it.
+- **Top menu** (`51e64f0`):
+  - Planning;
+  - Assessments;
+  - Live ▾, built from a pilot registry in `web/grp-common.js`;
+  - Share data ▾;
+  - Admin ▾;
+  - the person's own menu (My access, Sign out);
+  - ☰ on narrow screens.
+- **Share data → Live feed** (`6f7c586`):
+  - "From this platform" lists GRP's feeds, or says why one cannot be sent (no
+    `GRP_PUBLIC_FEED_BASE_URL`, or the route is switched off);
+  - "From another source" takes any JSON feed, and "Test the feed" reads it like Global Risk,
+    through a pinned public address;
+  - temporary tunnel, private and credentialed URLs are refused.
+- **Air quality** (ADR-0061). AQ Tracker has a **public feed with no key**. GRP republishes it
+  with the time on every row, worst last, and an indicative US EPA category:
+  - routes: `GET /api/v1/air-quality/sea/latest` (protected) and
+    `/api/v1/public/aq/sea/feed.json` (404 unless `AIR_QUALITY_FEED_PUBLIC`);
+  - on 5 October 2026, Global Risk's own reader returned Nonthaburi 94.7 and Bangkok 83.1 µg/m³
+    as the worst.
+- **Live feed contributions finished:**
+  - a feed is tested the way Global Risk reads it, on preview and again on send, so a dead
+    address or an empty list never reaches Global Risk;
+  - feed names share the dataset namespace with tables;
+  - each "From this platform" card says whether GRP already sent it, and when its public route
+    was last read from outside (in memory, since the API started);
+  - "Fix and send again" works for feeds;
+  - an approved feed shows `feeds_query("<name>")`.
+
+  The districts feed sent through the MCP on 5 October is not in GRP's own records, so its card
+  will not say "already sent". Global Risk's gate still refuses the name.
+- **Test mode for the PM2.5 feed** (`ce16cca`):
+  - the PM2.5 card in Share data has "Test it on Global Risk now";
+  - `scripts/feed-test-address.ps1` switches the public routes on, starts the relay (which now
+    also serves `/air-quality/feed.json`) and a quick tunnel, then prints the address;
+  - a tunnel address is accepted only in test mode, under a `_test<n>` name.
+
+  On 5 October the test address answered from outside: 351 provinces, sorted, with Nonthaburi and
+  Bangkok the worst.
+  The first send was declined for a missing `residency`; fixed in `12957ef`. The test feed stays on Global Risk after the tunnel closes; add its name to
+  the maintainer note.
+- **Next:**
+  1. a permanent public host (Lightsail with a static IP), then share the flood districts and
+     PM2.5 feeds from Share data;
+  2. ask the AQ Tracker team to confirm redistribution and the credit line, and to add a per-row
+     time and a lowest-first sort, so Global Risk could read them directly;
+  3. an air-quality page, then flip the Live menu entry from "soon";
+  4. send the maintainer note.
+
+### 5 October: the live feed for Global Risk (ADR-0052)
+
+- **Stack:** Docker Desktop had stopped at about 22:58 UTC on 4 October. It was restarted on
+  5 October and rebuilt with `scripts/docker-desktop.ps1`, so the copied fixes are now in the
+  images. 4.4 GB of memory was free.
+- **Built:**
+  - `core/flood_evidence/feed.py`;
+  - the protected route `GET /api/v1/pilot/flood/{pilot_id}/feed.json`;
+  - the public route `GET /api/v1/public/flood/{pilot_id}/feed.json`, which is 404 unless
+    `FLOOD_FEED_PUBLIC=true`;
+  - `grpcli/feed_relay.py`, which serves `/feed.json` only.
+
+  Tests: `test_flood_feed`, `test_feed_relay`, the permission matrix and the public-route test.
+- **Real data:** 65 incidents and 56 districts, 67 KB.
+- **Checked against Global Risk's own code** at `a8a43c2`: the validator passes both manifests,
+  and `generic_json` sorts by our timestamps. The manifests were fixed so `as_of` is mapped into
+  `fields`, and they now cover Bangkok and Nonthaburi.
+- **Next:** follow `docs/pilot/2026-10-05_Live_Feed_MCP_Test_Plan.md`. Each step needs the
+  owner's yes at the time:
+  1. install `cloudflared`;
+  2. switch the public feed on;
+  3. open the tunnel;
+  4. stage the districts feed;
+  5. run `feeds_query`, `assemble_pack(pack="risk", place="Bangkok", hazard="flood")` and
+     `publish_answer`;
+  6. withdraw.
+- **Hosting:** a permanent feed needs a static IP. Lightsail with 2 GB RAM and 60 GB disk fits
+  the whole stack (measured at rest: about 400 MB of memory, an 850 MB database and 5.9 GB of
+  stored files). 1 GB or less fits a feed-only host.
+
+### 4 October (evening): Nonthaburi, the Planner map and GEOGLOWS in the summary
+
+Branch `pilot/river-watch-and-bangkok-flood`, **not pushed**: the owner runs
+`git push -u origin pilot/river-watch-and-bangkok-flood` (the agent's push was blocked).
+1,149 tests pass, 2 skip; Ruff is clean.
+
+#### Commits this session (oldest first)
+
+| Commit | What | Record |
+| --- | --- | --- |
+| `3f8eb43` | Nonthaburi live sources validated, and the expansion planned | `docs/pilot/` validation |
+| `219bd01` | Live pilot extended to Nonthaburi (56 districts) with Pak Kret's 52 public cameras | ADR-0057 |
+| `5ae53e6`, `f51d4b6` | Layers button fixes: a cached page, and a selector shared with the chat picker | ADR-0058 |
+| `010f24d` | Planner "Live layer": 13 switches, one per source, all off by default, whole area | ADR-0058 |
+| `defd13b` | District summary section 7: GEOGLOWS river outlook, labelled exploratory, in English and Thai | ADR-0059 |
+| `01f4e3d`, `833d2f9` | Camera points could not be clicked; points are now SVG panes above the district shapes | ADR-0060 |
+| `6f8818e` | One map dock (Layers, Details, Run) replaces the floating cards | ADR-0060 |
+
+#### What the owner can see now
+
+- **Planner map:**
+  - Layers → "Live layer (Bangkok, Nonthaburi)", with 13 switches: roads with flooding reported,
+    five report kinds, OSM facilities, DDPM centres, four camera providers and district outlines.
+  - A click on any point opens its card in the dock's **Details** tab. Stacked points show a
+    pick list.
+  - The dock folds with `»` or Esc. Layers sections fold and are remembered.
+  - Phones get a bottom sheet.
+- **District summary (Word, English and Thai)**, nine sections:
+  1. At a glance
+  2. Map
+  3. Evacuation centres
+  4. People
+  5. Global Risk evidence
+  6. Live reported flooding, with bmatraffic pictures
+  7. River outlook (GEOGLOWS, exploratory)
+  8. What this cannot tell you
+  9. Sources and versions
+- **River outlook coverage:**
+  - 28 of 50 Bangkok districts (their River Watch main reach);
+  - Nonthaburi: 1204 uses the Bang Bua Thong canal, and 1201, 1202 and 1206 use the Chao Phraya;
+  - other districts get a one-line gap.
+- **Checked on real data on 4 October:**
+  - Bang Phlat: falling, peak about 8,312 m³/s;
+  - Bang Bua Thong: rising, peak about 1.2 m³/s.
+
+#### How the running stack was updated (no rebuild)
+
+- **Memory is tight** (about 1.4 GB free), so no image rebuild. `core/` and `api/` were copied
+  into `grp-desktop-api-1` (and the worker where it mattered) with `docker cp`, then the
+  container was restarted.
+- **`web/` is a live bind mount**, so page changes need only Ctrl+F5. The page version tag is now
+  `?v=20261004g`.
+- **Rebuild the images** with `scripts/docker-desktop.ps1` when memory allows, so the copied
+  files become permanent. Never use a raw `compose up`: it drops `SERVIR_AUTH_CLIENT_ID`.
+- **Sign-in:** one "Sign-in is temporarily unavailable" screen on 4 October was a transient
+  failure to reach the AuthKit staging issuer. The settings were intact and the next attempt
+  signed in.
+
+#### Owner actions
+
+1. **Push the branch** (command above).
+2. **Signed-in browser checks.** None of today's Planner changes has been checked signed in:
+   - the dock;
+   - a camera card under a selected district;
+   - the pick list;
+   - the district profile in Details;
+   - the Run tab;
+   - a summary download with section 7;
+   - the Live layer switches.
+3. **Send the drafts:**
+   - the Floodboard credit note;
+   - the Global Risk maintainer questions;
+   - the BMA addition;
+   - the Pak Kret request;
+   - the Nakhon Nonthaburi feed request.
+4. **Decide:**
+   - D1 (DDPM sample reports);
+   - D2 (who the live report is for, and the officer checks);
+   - D3 (hydrologist-confirmed reaches; the summary says "not confirmed" until then);
+   - D5;
+   - the Ubuntu host;
+   - where the archive backup goes;
+   - how the baseline centres layer treats the 309 flagged DDPM records (recommended: show them
+     marked "location doubtful", and report them to DDPM).
+
+#### Next to implement (in order)
+
+1. **Fix whatever the signed-in checks find** in the dock (ADR-0060). If panning is slow with
+   every switch on (about 3,000 SVG points), give the dense camera and facility layers their own
+   canvas pane with click forwarding, or cluster them by zoom.
+2. **Retry the OSM capture for Nonthaburi.** Overpass returned 504s on 4 October:
+   `python -m grpcli.osm_assets_capture --pilot bangkok`.
+3. **Planner plan step 5:** the feed endpoint `GET /api/v1/pilot/flood/{pilot_id}/feed.json`
+   (backlog E1-1, ADR-0052), on the same fact builder, protected until a host exists.
+4. **W3, DDPM reports:** the shared fact bundle, then the live shift report.
+5. **Camera check** (water, partial water or dry): after BMA's permission. Keep Pak Kret pictures
+   on screen only, never in reports, until the municipality replies.
+6. **Rebuild the images, then deploy to the Ubuntu host** when it exists.
+
+#### Known gaps
+
+- **Overpass:** the Nonthaburi OSM facilities are not captured yet.
+- **BMA flood cameras** (872): their relay fails, so they have no picture in GRP; the card links
+  to the official viewer.
+- **GEOGLOWS reaches are chosen by rule** and not confirmed by a hydrologist. Bang Yai and Sai
+  Noi have no reach. River Watch content is now visible to planners in the summary only
+  (ADR-0059 widens ADR-0036).
+- **Headless browser harness:** used for every page check today, with a stub server and real
+  recorded data, kept in the session scratchpad. It cannot narrow a window below about 500 px,
+  so phone checks ran at 500 px.
+
+### 4 October (morning): roadmap input for the dev team
+
+This repo is the owner's exploratory test bed. This section is written so the owner can turn it
+into a roadmap for the dev team: what was proven, the workstreams, and the open decisions.
+Branch `pilot/river-watch-and-bangkok-flood`, not pushed. 1,064 fast and contract tests pass,
+2 skip; Ruff is clean. Stack rebuilt with `scripts/docker-desktop.ps1`.
+
+#### Done and verified today
+
+| What | Evidence | Record |
+| --- | --- | --- |
+| In-page bmatraffic camera pictures | checked by the owner in a signed-in browser | ADR-0051 |
+| **Whole Bangkok:** 50 districts; rain stays on 4 to keep Longdo calls flat | first live run (03:24 UTC): **123 active incidents across 21 districts**, 878 ms; 1,067 OSM facilities | ADR-0053, `100931d` |
+| **Research archive:** each finished UTC day saved as state-change tables, no personal data | first real day (3 Oct): 2.9 MB; 17,493 road states, 4,316 reports, 158 incidents, 784 incident events, 146 facility changes, 2 labels; no links or provider IDs | ADR-0055, `2e0adf9`, data card `docs/data/flood_research_archive_datacard.md` |
+| Backup capture cleaned | `reports.csv` IDs and text hashed, links dropped; the 29 earlier files cleaned with the owner's yes; capture restarted (PID 11660) | ADR-0055 |
+| Global Risk live-feed plan, revised against its source code | `SERVIR-AI/global-platform` at `a8a43c2` read | `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md` |
+| DDPM reports design | four reports by planning horizon from one fact bundle | `docs/pilot/2026-10-04_DDPM_Planner_Reports_Design.md` |
+
+Facts that shape the roadmap:
+
+- **Shared codes.** GRP's boundary codes and the flood pilot's are the same (Chatuchak `1030`,
+  sub-districts `1030xx`), so live data joins the DDPM baseline directly.
+- **No DDPM shelters in Bangkok.** The delivery names 75 provinces, not Bangkok. The 8 points first counted in Bangkok are records from other provinces whose coordinates land there, all flagged `district_name_mismatch` (309 such records nationwide); they are now left out. There are 55 volunteer centres
+  in Bangkok, and no villages. That BMA holds the capital's local data is an inference, to
+  confirm with DDPM.
+- **Global Risk feeds have two traps.** `generic_json` feeds are cached for **6 hours**, and an
+  **empty list counts as a failure**. Unknown manifest fields are refused, the URL must be
+  anonymous, and staging and withdrawal work.
+- **GEOGLOWS is rivers only.** It forecasts river flow, not Bangkok street flooding. It has no
+  "high" threshold, because upstream return periods fail, and its 2 reaches are not confirmed.
+
+#### Workstreams (for the roadmap)
+
+**W1. Live flood monitoring, Bangkok** (built; Gate A local demo)
+- **Has:**
+  - Floodboard evidence, incidents and confidence;
+  - facilities, cameras (bmatraffic relay locally) and officer checks;
+  - replay, grounded answers and whole Bangkok.
+- **Next:**
+  - a downloadable **shift report** from the fact bundle;
+  - the **camera check** (water, partial water or dry): up to 2 cameras per active incident every
+    15 minutes, through `api/ai_gateway.py`, about $1.70 a day at worst (example priced with
+    Claude Haiku 4.5). It needs BMA's permission first.
+- **Blocked by:** BMA terms for cameras (request drafted); the relay is local only.
+
+**W2. Global Risk live feed** (planned; drafts ready)
+- **Has:** the plan; two manifest drafts (`docs/pilot/global_risk_manifests/`); maintainer
+  questions; the Floodboard credit note.
+- **Next:**
+  - **Step 1:** the feed endpoint `GET /api/v1/pilot/flood/{pilot_id}/feed.json`, protected for
+    now, with ADR-0052;
+  - then the districts feed first (never empty), and incidents on a flooding day.
+- **Blocked by:**
+  - a **public HTTPS host** (the Ubuntu deployment, never run yet);
+  - the maintainers' answers on the **6-hour cache** and **empty lists**;
+  - sending the drafts.
+
+**W3. DDPM planner reports** (designed)
+- **Has:** the district Word document (ADR-0033); replay; grounded answers.
+- **Next:**
+  - the fact bundle shared by every output;
+  - the live shift report;
+  - a province pre-season roll-up;
+  - an event (after-action) summary from the archive.
+- **Blocked by:** DDPM sample reports (D1) and who the Bangkok live report is for (D2).
+
+**W4. River forecasts (GEOGLOWS)** (Phase A built; since 4 October evening also in the district summary, labelled exploratory, ADR-0059)
+- **Next:**
+  - hydrologist-confirmed reaches and the districts each affects (D3);
+  - a daily reach summary, which is the easiest first Global Risk contribution, since it is daily
+    and never empty (D4);
+  - HAND (Phase B) is still blocked on local hydrology data.
+- **Rule:** any "high" threshold is a scientific-method change, so it needs an ADR and scientific
+  approval.
+
+**W5. Research archive for data scientists** (built today)
+- **Next:**
+  - add GEOGLOWS runs and camera-check labels once they run;
+  - one external backup (it is a single copy on a laptop);
+  - move to the Ubuntu host;
+  - an optional GeoParquet copy;
+  - read-only access for ADPC data scientists.
+- **Watch:** the worker archives before retention every hour. `python -m grpcli.flood_pilot
+  archive` does it by hand.
+
+**W6. Insurance and partners** (future; nothing to build)
+- **Already secured:** the archive and pinned rule versions.
+- **Still needed:**
+  - a GRP-side audit trail (Global Risk receipts keep no fetched rows);
+  - licences for commercial use: OSM share-alike, DDPM permission, GEOGLOWS to confirm;
+  - a separate partner channel.
+- **Limits:** crowd reports are never a payout trigger, and no report states a loss.
+
+**W7. Live flood evidence in the Planner, Bangkok** (steps 1-2 built 4 October: `5f18f81` stores `district_codes` in the worker, and was checked live with 145 of 145 active incidents coded; `75adfbf` adds the Planner live layer `GET /api/v1/maps/live-flood`; step 3 adds the `live_flood` answer mode (D7 rain yes, D8 wording approved, never cached; Lat Krabang checked on real data); step 4 adds DDPM evacuation centres to the facility check (read from the data library, not Git; flagged and synthetic records left out, so none in Bangkok); the district summary Word download gains section 6 "Live reported flooding" with up to 4 credited BMA camera pictures, and a Thai version (`lang=th`, button "ดาวน์โหลดสรุป (ไทย)"); the owner reports BMA said camera pictures are public data; pictures come only from bmatraffic cameras within 400 m of a listed incident (checked on real data: Suan Luang 2 pictures; Lat Krabang none, because its nearest cameras are BMA flood cameras whose relay fails); step 5, the feed endpoint, is next; nothing outside the code blocks
+it, so do it before W2 submission)
+- **Plan:** `docs/pilot/2026-10-04_Planner_Live_Flood_Integration_Plan.md`.
+- **Steps:**
+  1. district codes on incidents, in the worker;
+  2. the live layer "Reported flooding on roads (live, not a flood map)";
+  3. live facts in Planner answers, with `snapshot_at` in the cache key and fixed "no warnings"
+     wording;
+  4. DDPM shelters in the exposure run (none in Bangkok once misplaced records are left out);
+  5. the feed endpoint on the same fact builder.
+- **Rules:** live data never enters an assessment; sub-districts roll up to their district; no
+  warnings. ADR-0056.
+
+#### NEXT TO IMPLEMENT: facilities and cameras on the Planner's live map (W7b)
+
+**Status:** BUILT on 4 October 2026 with the recommended answers (both on, cameras grouped,
+"Live now" list included); see ADR-0056 item 6.
+- On real data: Suan Luang 3 facilities and 16 cameras (3 with pictures); Lat Krabang 2
+  facilities and 19 cameras.
+- The running app was updated by copying the two Python files into the API container and
+  restarting it. `web/` is a live bind mount, so page changes need no rebuild. Rebuild the image
+  properly when memory allows.
+- **Not yet checked in a browser** (the Chrome extension was not connected): the owner's check
+  is the acceptance test.
+
+Design:
+`docs/pilot/2026-10-04_Planner_Live_Map_UX_Design.md`, which has ASCII mock-ups of every card.
+The owner asked for "evacuation centres near flood points and cameras, and when I click each
+point it details out, careful about UX".
+
+**What the planner gets** (Bangkok areas, under the existing live switch):
+- **Two sub-switches**, each with a count: "Facilities with flooding reported nearby" and
+  "Cameras near reported flooding". The time shows beside the heading and turns amber after
+  2 hours.
+- **DDPM evacuation centres with flooding nearby:** the existing pin gets an orange ring and a
+  wave badge, not a second pin.
+- **Schools, hospitals and clinics:** ringed letter markers.
+- **Cameras:** a glyph with a green dot when GRP can show a picture, grey otherwise. They are
+  grouped per incident at district zoom and shown one by one from zoom 15.
+- **Cards** all follow one pattern: title, plain meaning, facts, related-item buttons, "what this
+  is not", source and time. They are at most 300 px wide, and a bottom sheet on a phone.
+  - **Incident:** the confidence word with its reason in plain words, depth, reports, last
+    report, and "nearby facilities/cameras" buttons.
+  - **DDPM centre:** a separate "LIVE · as of" block above the existing assessment content; the
+    two never mix.
+  - **Facility:** the distance, and access "not confirmed" (amber when a frontage road is closed
+    or risky).
+  - **Camera:** a live picture through the relay, refreshing every 10 s while open, pausable,
+    stopped on close or after 10 minutes; the official viewer link otherwise. The note says "an
+    empty road is not proof it is dry".
+- **A "Live now" list** in the panel, which can be used with a keyboard and flies to each item.
+- **States:** loading, no incidents ("no report is not proof that it is dry"), stale, camera
+  failure, sub-district roll-up.
+
+**Build steps:**
+1. **API** (`core/flood_evidence/planner_layer.py`, `GET /api/v1/maps/live-flood`). Add:
+   - `facilities`: `potentially_exposed` in the district, with incident links and the computed
+     access state; no officer-confirmed state (D2);
+   - `cameras`: within 400 m of incident roads, deduplicated, at most 40, with the name in both
+     languages, `picture_url` only for relay cameras, and the viewer link.
+
+   Tests cover these. No new route.
+2. **Map** (`web/planning.js`, `planning.html`, `planning.css`): sub-switches with counts, ringed
+   markers, rings on DDPM pins, camera grouping by zoom, the grouped legend, and remembering
+   choices.
+3. **Cards:** incident, facility, the DDPM live block and camera, with picture refresh and pause.
+   Built with DOM only, never raw HTML from data.
+4. **"Live now" list** in the panel.
+5. **Browser check** on Suan Luang (pictures) and Lat Krabang (none), at desktop and phone widths,
+   with screenshots.
+6. ADR-0056 amendment, then the handover.
+
+**Rules:**
+- not a flood map, not a warning;
+- live data never enters the assessment;
+- "flooding reported nearby", never "flooded";
+- access is never assumed;
+- no officer checks;
+- credits for Floodboard, OSM, DDPM and BMA traffic cameras.
+
+**Owner questions before building** (the recommended answer comes first):
+- sub-switches on by default (yes / off);
+- group cameras at district zoom (yes / always individual);
+- include the "Live now" list now (yes / later).
+
+**After W7b:** step 5 of the Planner plan (the Global Risk feed endpoint, backlog E1-1), then E3
+(DDPM reports).
+
+#### BUILT: one map dock replaces the floating cards (ADR-0060, 4 October 2026)
+
+- **Why:** the owner reported cards floating, covering each other and not folding.
+- **What:** a right-hand dock with three tabs (Layers, Details, Run).
+  - Every card opens in Details, one at a time, with a ring on the point.
+  - Stacked points show a pick list.
+  - The district profile opens in the dock.
+  - Layers fold into four remembered sections; "Live now" opens in Details.
+  - Place messages are a toast.
+  - Phones get a bottom sheet.
+- **Also fixed:** camera points inside a selected district could not be clicked. Points are now
+  SVG panes above the district shapes.
+- **Design:** `docs/pilot/2026-10-04_Planner_Map_Panels_UX_Design.md`.
+- **Checked:** in the headless harness (desktop and phone width). Not yet checked signed in,
+  including the district profile and the Run tab.
+
+#### BUILT: GEOGLOWS river outlook in the district summary (ADR-0059, 4 October 2026)
+
+- **What:** section 7, "River outlook (GEOGLOWS, exploratory)", in English and Thai. It has:
+  - the trend;
+  - the median peak and band;
+  - the peak and run times;
+  - freshness;
+  - a numpy-drawn chart;
+  - fixed caveats.
+
+  "What this cannot tell you" is now 8, and "Sources" is 9.
+- **Coverage:**
+  - 28 of 50 Bangkok districts, using their River Watch main reach;
+  - Nonthaburi 1204 (canal), and 1201, 1202 and 1206 (Chao Phraya);
+  - other districts get a one-line gap.
+- **Code:** `api/river_outlook.py`, `_river_section` in `core/summary_docx.py`.
+- **Checked:** real data for Bang Phlat and Bang Bua Thong, rendered through Word in both
+  languages. Not yet checked through a signed-in download.
+- **Open:** D3 (reaches confirmed by a hydrologist) still applies; the section says "not
+  confirmed" until then.
+
+#### BUILT: Planner "Live layer" with one switch per source (ADR-0058, 4 October 2026)
+
+- **What:** Layers → "Live layer (Bangkok, Nonthaburi)", 13 switches, all off by default:
+  - roads with flooding reported;
+  - five report kinds;
+  - OSM facilities and DDPM centres;
+  - four camera providers;
+  - outlines.
+
+  Counts are shown, and the incident, facility and camera cards keep working.
+- **Routes:** `GET /api/v1/maps/live-flood/summary` and `.../sources/{name}`, trimmed with no
+  officer data.
+- **Checked:** with real data in a headless test server. Not yet checked signed in.
+- **Fixed today:**
+  - the Layers button had opened the chat's Global Risk picker, because two elements shared
+    `data-layers` since `894eca1`;
+  - a cached page could break start-up;
+  - version tags are now checked by a test.
+  - live points did not open cards once a district was selected, because the centres' canvas
+    covered the live canvas (`01f4e3d`). That was not enough: the selected district's filled
+    shape also covered the canvas, so live points are now SVG in the live pane, above the district
+    shapes, and clicks on empty space still reach the district.
+
+#### BUILT: the live pilot covers Nonthaburi (ADR-0057, 4 October 2026)
+
+- **Coverage:** 56 districts. Outlines come from `core/data/flood_pilot_bangkok_areas.json`;
+  `in_pilot()` replaces the `10` prefix checks.
+- **DDPM:** 64 evacuation centres in Nonthaburi.
+- **Pak Kret:** 52 cameras, relayed on screen only. A live picture was checked through the relay.
+- **Drafts to send:** the Pak Kret request and the Nakhon Nonthaburi feed request.
+- **Follow-up:** run `python -m grpcli.osm_assets_capture --pilot bangkok` again when Overpass
+  answers; it timed out on 4 October. Nonthaburi incidents start at the first snapshot after
+  deployment.
+
+The validation and plan below are kept for reference.
+
+#### (Reference) expand the live pilot to Nonthaburi (validated 4 October 2026)
+
+See `docs/pilot/2026-10-04_Nonthaburi_Expansion_Validation_and_Plan.md`. **Validated:**
+- Floodboard already covers all six districts: 314 road segments and 82 reports in 24 hours.
+- Pak Kret municipality has **52 working cameras** (JPEG, no login; a test picture was live).
+- Longdo/iTIC has 21 Nonthaburi cameras, which are the same Pak Kret ones.
+- **64 usable DDPM evacuation centres**, against none in Bangkok.
+
+**Rejected:**
+- the World Flood CCTV aggregator (cameras it doesn't own; automated use discouraged);
+- the Nakhon Nonthaburi GIS (no public interface; would need reverse-engineering);
+- the old BMA cpudapp link (404; bmatraffic.com is already used).
+
+**Gap:** cameras exist only in Pak Kret.
+
+**Code changes:** outlines from the GRP boundary table, area checks instead of the `10` prefix, a
+Pak Kret camera registry and relay, OSM capture, and naming. About a day of work.
+
+**Waiting on the owner:** go-ahead; how to handle Pak Kret's terms (none stated); whether to
+request a feed from Nakhon Nonthaburi.
+
+#### Open decisions (owner)
+
+| ID | Decision | Unblocks |
+| --- | --- | --- |
+| D1 | Get one DDPM situation report and one pre-season plan as samples | W3 report formats |
+| D2 | Who the Bangkok live report is for (DDPM central, BMA or both), and whether Planners see officer checks | W1/W3/W7 wording and access |
+| D3 | Who confirms GEOGLOWS reaches and their districts (ADPC or RID hydrologist) | W4 |
+| D4 | First Global Risk contribution: the GEOGLOWS daily summary, then Bangkok districts? | W2/W4 |
+| D5 | Look for a Floodboard-like source outside Bangkok, or stay Bangkok-only | W1 scale |
+| Host | Run the Ubuntu deployment and choose a permanent domain | W2, W5 |
+| Send | Floodboard credit note, maintainer questions, BMA addition (all drafted, none sent) | W1, W2 |
+| Model | Camera-check model (the gateway is OpenAI-style today) | W1 |
+| Backup | Where the archive's external backup goes | W5 |
+| D7 | ~~Rain for Planners~~ decided 4 Oct: yes, labelled as context. River Watch for Planners still waits on D3 | W7 |
+| D8 | ~~Official warnings wording~~ approved 4 Oct (TMD, DDPM, BMA); in `core/flood_evidence/planner_answer.py` | W7 |
+
+#### Decided today
+
+- Feed: incidents plus districts; the route stays protected until a host exists; the Ubuntu host;
+  the name `bangkok_flood_incidents_live`.
+- Whole Bangkok.
+- Archive: start now; local, then Ubuntu; strip report text and delete the old text; stable
+  officer pseudonyms.
+- D7: rain may appear in Planner answers, labelled as context. D8: the fixed "no warnings" text.
+
+#### Why this work exists (the case, in short)
+
+The full case is in the proposal for the dev team,
+`docs/proposals/GRP_Live_Flood_Intelligence_Proposal_2026-10-04.docx`.
+
+- **Problem.** GRP answers pre-season questions (RP100 scenario, shelters, population). It had no
+  picture of flooding now and no days-ahead outlook. Bangkok flood information is spread across
+  many systems. The spec v0.3 calls this "lack of a shared, current, evidence-linked
+  interpretation of what the data means for a decision". DDPM planners, and later insurers, need
+  evidence → incident → consequence → decision, with history to learn from.
+- **Live data.**
+  - Floodboard is the only usable open live source (CC BY 4.0). BMA's catalogue has no water-level
+    data and no licence.
+  - GRP turns it into incidents with confidence words, facility exposure, a "what changed" view,
+    grounded answers and replay.
+  - **It describes flooding now and never issues a warning (D8).**
+- **GEOGLOWS.**
+  - A free, global, daily 7-day river-flow forecast. It is the only days-ahead source we hold, for
+    riverine provinces (Chao Phraya, Nonthaburi/Bang Bua Thong).
+  - It is not street flooding, it has no "high" threshold (upstream return periods fail), and
+    its reaches are unconfirmed.
+  - HAND depth (Phase B) needs local hydrology.
+- **Consolidation.** One fact bundle per (area, window, audience) feeds the Planner, DDPM
+  reports, the Global Risk feed and the archive, so numbers agree everywhere.
+- **History.** The daily research archive keeps state changes, labels and rule versions with no
+  personal data, so models and insurance-grade event histories can be built later.
+
+#### Developer detail (where things are)
+
+| Area | Files and entry points | Notes |
+| --- | --- | --- |
+| Pilot config | `core/data/flood_pilot_bangkok.json` (`demo_corridor` = 50 districts, `rain_areas` = 4) | ADR-0053 |
+| Ingest and incidents | `core/flood_evidence/ingest.py`, `incident_store.py` (`update_incidents` stores `district_codes`), `incidents.py`, `geo.district_codes` | worker only; ADR-0041, ADR-0056 |
+| Facilities | `assets.py` (OSM), `ddpm_shelters.py` (`pilot_assets` = OSM plus the current DDPM shelter version, read from the DB), `exposure.py` | ADR-0040, ADR-0056 |
+| Facts and answers | `briefing.build_facts`, `answer.py` (gate), `planner_answer.py` (`NO_WARNINGS`, officer fields removed) | ADR-0043, ADR-0056 |
+| Planner | `GET /api/v1/maps/live-flood` (`api/maps.py` → `planner_layer.py`); `live_flood` mode in `api/planning.py`; `web/planning.js` (`syncLiveFlood`, `data-live-flood-toggle`) | live answers never cached |
+| Archive | `archive.py` (`export_pending`, run by the worker before retention); `python -m grpcli.flood_pilot archive`; storage `research/flood/bangkok/v1/`; salt `private/flood-archive-salt` | ADR-0055; data card `docs/data/flood_research_archive_datacard.md` |
+| Backup capture | `grpcli/floodboard_capture.py` (cleans `reports.csv`; `--clean-existing`); restart it after a reboot | PID changes on restart |
+| Global Risk feed | plan `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`; manifests `docs/pilot/global_risk_manifests/`; endpoint **not built** (ADR-0052 reserved) | 6-hour cache and empty-list findings |
+| Restart | `scripts/docker-desktop.ps1` only (keeps `SERVIR_AUTH_CLIENT_ID`); a rebuild took 10-15 minutes on 4 October | never a raw `compose up` |
+
+Verified on 4 October 2026:
+- 145 of 145 active incidents carried district codes (06:47 UTC run).
+- The live layer: Lat Krabang 21 incidents and 112 roads; sub-district 103005 rolls up to
+  Chatuchak; 3415 is refused.
+- The live answer for Lat Krabang (computed path).
+- 8 DDPM points found in Bangkok, later shown to be misplaced records from other provinces and left out.
+- First archive day: 2.9 MB.
+- Tests: 1,086 pass, 2 skip.
+
+Not yet verified:
+- an AI-worded live answer in a signed-in browser;
+- DDPM centre exposure rows (they start at the first snapshot after the step 4 rebuild);
+- the Planner layer seen in a browser.
+
+### 3 October (latest): bmatraffic pictures inside the page (ADR-0051)
+
+- **Window failed:** the small window stayed on bmatraffic's home page. Cutting its `opener`
+  also stopped GRP from sending it on to the camera. It has been removed.
+- **Owner's choice:** a relay for the local demo only.
+  - `core/flood_evidence/camera_relay.py` and `GET .../cameras/{camera_id}/frame.jpg`.
+  - On demand, shared, at most one picture a second per camera and 8 a second overall, kept in
+    memory only.
+  - `BMATRAFFIC_RELAY_ENABLED` is set only in `compose.desktop.yml`; when it is off, cameras keep
+    the new-tab link.
+  - The page refreshes an image inside the card and pauses after 10 minutes.
+- **Live check:** camera 1362 gave a real 21.6 KB picture through the running app.
+  Not yet checked in a browser (the Chrome extension was not connected).
+- **Fix, same day:** every camera showed the same picture, because bmatraffic sends the session's
+  last-opened camera. Now there is one session per watched camera (idle sessions are dropped
+  after 30 seconds, at most 16). 1362 and 1108 checked live.
+- **Checked by the owner (4 October):** the in-page bmatraffic pictures look good in a
+  signed-in browser.
+- **BMA request:** now says what the demo does and asks permission before wider use (Gate B).
+- **Tests:** 1,089 passed, 2 skipped; Ruff clean.
+
+### 3 October: camera fixes and source switches on the map
+
+- **bmatraffic was blank in GRP:** its pictures need a bmatraffic session cookie (`SameSite=Lax`),
+  which a browser never sends from inside our page. The cameras now open in a new tab. They are
+  not proxied (see the ADR-0050 amendment). In-page players (Longdo HLS, BMA MP4) rank first.
+- **BMA flood relay:** answers HTTP 500 upstream. The player gives up after 12 seconds with a
+  clear message.
+- **Map:** one switch per source (roads, reports by original source, facilities, cameras by
+  provider, outline), remembered in `localStorage`.
+- **Checked by the owner (3 October):** the layer switches work, and bmatraffic cameras open and
+  play in a new tab.
+- **Then:** bmatraffic cameras open in a small reused window beside the map. On the first click
+  it opens bmatraffic's home page so the session is set, then moves to the camera (ADR-0050
+  amendment 2). A new-tab link is kept as a fallback. Not yet checked in a browser.
+
+### 3 October: Global Risk live-feed plan (plan only)
+
+- **Written:** `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`. Nothing has been built,
+  submitted or registered.
+- **Key finding:** Global Risk already serves a contributed live feed (`usgs_quakes_m45_month`)
+  as `generic_json` with an external call-out. That is the pattern to copy: GRP serves
+  `feed.json` and Global Risk keeps only a manifest.
+  - Global Risk must be able to reach the URL, so a public HTTPS host is the real blocker.
+- **v1 scope:** incident records only, with confidence and reasons. No report text, usernames,
+  camera links, Longdo events or rain.
+- **Next:** the owner answers the 6 decisions at the end of the plan. Then Step 1 (the endpoint,
+  tests and ADR-0052) can be built locally under Gate A.
+
+### 3 October: bmatraffic.com cameras first (ADR-0050)
+
+- **Requested:** the owner asked to use `bmatraffic.com`, which is faster.
+- **Built:** `grpcli/bmatraffic_cameras_capture.py` keeps 520 Bangkok cameras, with internal IPs
+  dropped. The new live kind `iframe` embeds `PlayVideo.aspx?ID=` in a sandbox.
+  - The site is http only; `allow_http_links` is declared for this source only. This needs
+    HTTPS or a proxy before Gate B.
+  - Ranking is bmatraffic, then Longdo HLS, then the BMA relay. 1,413 cameras in all.
+- **Next:** the owner asked for a **plan** (not built) to publish a live feed from this data to
+  Global Risk and later serve it through MCP:
+  `docs/pilot/2026-10-03_Global_Risk_Live_Feed_Plan.md`. Routing (Longdo part 3) is on hold.
+
+### 3 October: Longdo APIs. Part 2, rain context (ADR-0049)
+
+- **Built:** `core/flood_evidence/weather.py` and table `flood_weather` (migration
+  `20261003_0027`).
+  - A worker step that runs only when the radar time changes, for the 4 districts and the top 10
+    incidents: rain now (`/area`) and +15/+30 minutes (`/forecast/area`).
+  - `/polygon` answers 403 on this key, so districts use circles.
+  - The key goes `.env` → launcher → `longdo_api_key` secret file → `LONGDO_API_KEY_FILE`, and
+    is never logged (`httpx` logger at WARNING) or stored.
+- **On the page:** a "Rain now" card, rain on each incident, a coverage row and fact `W`.
+- **Next:** switch cameras to bmatraffic.com (the owner's request), then part 3, routing.
+
+### 3 October: Longdo APIs. Part 1, flood events (ADR-0048)
+
+- **Chosen:** the owner chose all three Longdo integrations: events, rain and forecast, and
+  routing. The key is in `.env` as `LONGDO_API_KEY`; never print or log it.
+- **Built:** source `longdo_events` (public feed, no key). It keeps flood events only, in Bangkok
+  time, drops expired ones, skips points outside the region, and maps contributors to families
+  (`doh`, `itic`, `longdo_user`). DOH is official, like BMA. The direct copy beats Floodboard's
+  relay of the same `longdo:<eid>`.
+- **Freshness** comes from `start`, so the morning DOH statuses age out of the 6-hour window.
+- **Next:** part 2, rain now and the 30-minute forecast (Weather API, key server-side, live
+  only, never evidence); part 3, routing access (read-only, a separate `route_check` field).
+
+### 3 October: live camera views, BMA plus iTIC/Longdo (ADR-0047)
+
+- **BMA stream hosts are not public** (no DNS). BMA's page plays them through its relay
+  `/api/proxy?rtcUrl=…`, which returned HTTP 500 for every camera tried from here.
+- **Added iTIC/Longdo:** the documented feed `camera.longdo.com/feed/?command=json`. 21 Bangkok
+  cameras with HLS, live and playable by other sites. `grpcli/longdo_cameras_capture.py` writes
+  `core/data/flood_pilot_bangkok_cameras_longdo.json`. The registry loads all camera files
+  together (893 cameras).
+- **On the page:** "▶ Play live here" (hls.js from jsDelivr, or MP4 through BMA's relay), one
+  player at a time, a 15 s failure message, camera markers that open a camera card, and a credit
+  line on each player.
+- **Verified by the owner:** a Bang Sue iTIC/Longdo camera plays live in the page (3 October).
+  The owner also reports that BMA's own page plays video ("all working fine"), so BMA's relay is
+  up. The HTTP 500s seen here came from command-line requests, not a browser. Still to confirm:
+  whether a BMA camera (for example `EB-LB-62-C1` near the top Lat Krabang incident) plays inside
+  GRP. If it does not, ask BMA to allow GRP's page to use the relay.
+
+### 3 October: real BMA cameras (ADR-0046)
+
+- **Source:** BMA's flood site serves its camera list without a login. The owner approved it for
+  the demo.
+- **Built:** `grpcli/bma_cameras_capture.py` wrote 872 cameras inside Bangkok to
+  `core/data/flood_pilot_bangkok_cameras.json`, with the source, SHA-256 and "terms not
+  confirmed". The raw download is in `.local/bma_cameras.json`.
+- **How cameras are used:** each is an `external_viewer` with a live-view link opened in a new
+  tab, status unknown, never ingested. The page shows the BMA sensor each camera watches.
+- **Live:** cameras sit 30 m from the top conflicting Lat Krabang incident (sensor `FL.LKB.01`).
+- **The BMA request** is now about permission (terms, embedding, status, headings).
+- **Tests:** 1,048 pass and 2 skip.
+
+### 3 October: retention (ADR-0045), and the backup capture hung
+
+- **Retention:**
+  - raw downloads 14 days (whole UTC day folders, deleted only after the commit; fetch rows and
+    SHA-256 kept);
+  - report IDs 14 days, then `pruned:`;
+  - facility states 7 days;
+  - runs hourly in the worker, live pilots only.
+
+  Replays refuse periods whose raw data has been removed. Raw storage is about 30 MB a day, so
+  roughly 0.4 GB at 14 days.
+- **Backup capture:** `grpcli/floodboard_capture.py` hung silently after 12:12 (its urllib call
+  has no overall deadline). It was restarted at 14:40. The worker's own pulls kept saving, so
+  nothing was lost. The capture is now only a backup; drop it once the worker has run cleanly
+  for a day.
+- **Tests:** 6 retention tests. 1,045 pass and 2 skip.
+
+### 3 October: replay injections, slice 6b (ADR-0044)
+
+- **Injections:** a synthetic report (source, depth or dry, time; placed at the map centre on the
+  page), and a source outage. Synthetic IDs always parse as `synthetic_demo`, and incidents gain
+  the reason `synthetic_evidence`.
+- **Row locks** on `flood_replay`: worker steps use `SKIP LOCKED`, and changes wait. This fixed a
+  real deadlock between the worker and a concurrent wipe.
+- **Real check:** a synthetic 0 cm BMA reading turned a high-confidence incident conflicting, and
+  a roads outage made health degraded. The test replays were deleted.
+- **Tests:** 11 replay tests. 1,036 pass and 2 skip.
+
+### 3 October: replay, slice 6a (ADR-0044)
+
+- **Built:**
+  - `core/flood_evidence/replay.py` and table `flood_replay` (migration `20261003_0026`).
+  - `PilotConfig.base_id` and `clock`, with `now_for(config)` in every flood route.
+  - A worker step: one stored fetch per idle pass.
+  - Replay routes (list, create, read, advance, restart, delete).
+  - On the page, `?replay=`: a purple REPLAY bar, the player, ages from the replay clock, officer
+    writes off, and AI off.
+- **Real check:** 10:00–11:40 replayed in 76 s and matched live runs exactly after 11:08. The
+  test replay was deleted.
+- **Tests:** 8 replay tests. 1,023 pass and 2 skip.
+- **Next, slice 6b:** inject a synthetic report or a source outage into a replay.
+
+### 3 October: grounded questions, slice 7b (ADR-0043)
+
+- **Built:**
+  - `core/flood_evidence/answer.py`: the prompt, the gate and the bilingual computed answer.
+  - `POST /pilot/flood/{id}/ask`. It always returns the computed answer, with AI wording only
+    when it passes the gate.
+  - On the page: the "Ask about the situation" section.
+- **Fixed before shipping:** the gateway's `channel` must be `web` or `mcp`.
+- **Tests:** 17 tests with a fake provider. 985 pass and 2 skip.
+- **Not verified:** a live AI answer. No provider call was made, to spare the owner's allowance.
+- **Next:**
+  - Slice 6, replay of the captured flood.
+  - Real BMA and CCTV data once access is granted.
+  - Retention for raw fetches before Gate B.
+
+### 3 October: what changed and the fact bundle, slice 7a (ADR-0043)
+
+- **Built:** `core/flood_evidence/briefing.py`, with tools named after the tweak and `build_facts`
+  (labels S, C, I1–I15, F1…, L).
+- **Routes:** `/changes` and `/facts`, with `area` and `since_minutes`.
+- **On the page:** a "What changed" panel with windows of 30 minutes, 1 hour, 3 hours and
+  6 hours.
+- **The first incident run is a baseline,** at 11:08 Bangkok time on 3 October. Windows before it
+  say so.
+- **Tests:** 5 tests. 963 pass and 2 skip.
+- **Next, slice 7b:** the AI question with a groundedness gate, falling back to the computed
+  answer.
+
+### 3 October: officer checks, slice 5b (ADR-0042)
+
+- **Built:**
+  - `core/flood_evidence/reviews.py` and table `flood_review` (migration `20261003_0025`).
+  - `POST /pilot/flood/{id}/incidents/{incident_id}/reviews` with actions `flooding_seen`,
+    `dry_seen` and `cannot_tell`.
+  - `POST /pilot/flood/{id}/facilities/access` with actions `access_disrupted` and `withdraw`.
+  - Audit events, typed bodies and notes of at most 500 characters.
+- **Rules:**
+  - Reviews count for 3 hours, and only while the incident still holds a reviewed road.
+  - They never change the engine's confidence; they add `verification`.
+  - "Officer saw dry" ranks first.
+  - Facility `access_disrupted_confirmed` can only come from an officer and can be withdrawn.
+  - A Platform Admin with no pilot-Hub membership is read-only. Placeholder cameras cannot be
+    named in a review.
+- **On the page:** the officer state, three buttons and a note on the incident card; the history;
+  "Access is cut (I saw it)" and withdraw on the facility card; officer badges in the queue.
+- **Tests:** 12 review tests. 948 pass and 2 skip. The stack is on `20261003_0025`.
+- **Not verified:** a real signed-in POST. The owner should try one review after signing in.
+- **Next:** slice 6, replay over the saved captures, or slice 7, grounded questions.
+
+### 3 October: incidents, slice 5a (ADR-0041)
+
+- **Built:**
+  - `core/flood_evidence/incidents.py`, the pure grouping and assessment.
+  - `core/flood_evidence/incident_store.py`, which keeps identity, merge and split, recession
+    and events, and skips older snapshots.
+  - `core/flood_evidence/geo.py`, shared distances and area tests.
+  - Migration `20261003_0024`.
+  - The worker runs it after exposure on each good roads snapshot.
+  - Routes `/incidents` and `/incidents/{id}`.
+  - On the page: a "Check first" queue and an incident card.
+- **Rules:**
+  - Families are BMA, Traffy and crowd. `cluster` and `news` never count.
+  - Confidence: `conflicting` for fresh dry or 0 cm evidence within 100 m; `high` for BMA plus
+    another family; `medium` for two families or BMA alone; otherwise `low`.
+  - Freshness comes from the newest report.
+- **Live at 11:15:** 58 open incidents in the four districts.
+  - The first to check: Chao Khun Thahan and Lat Krabang roads, 92 segments, 36 reports, BMA
+    readings, and three fresh "cleared" reports nearby.
+  - The first pass took 4.8 s.
+- **Tests:** 15 incident tests (spec A–D, merge, split, recede and close, out-of-order). 926 pass
+  and 2 skip.
+- **Next, slice 5b:** officer reviews and facility access confirmation.
+  - Reviews are time-bound and store the road keys reviewed.
+  - Every review is audited, with CSRF and the matrix covered.
+  - Notes are capped and rendered as text only.
+
+### 3 October: facilities near flooding, slice 4 (ADR-0040), and the sign-in fix
+
+- **Demo area widened (later the same day):** the owner added Bang Kapi (1006) and Lat Krabang
+  (1011) to `demo_corridor`, which now covers four districts. The OSM capture was re-run with one
+  box per district and now holds 94 facilities. The BMA camera request now names all four
+  districts.
+
+- **Sign-in was "unavailable".** Restarting with raw `docker compose up` drops the shell-only
+  `SERVIR_AUTH_CLIENT_ID`. **Always restart with `scripts/docker-desktop.ps1`.** After using the
+  launcher, `/api/v1/auth/login` redirects to SERVIR again.
+  - The only local account is `kovitad.janlakhon@adpc.net` (Platform Admin, adpc Hub Admin).
+  - The owner wrote `janlakkon`. If that is a different SERVIR email, add it with
+    `scripts/docker-desktop.ps1 -AdminEmail <email>`, but only once the owner confirms.
+- **Facilities:**
+  - `grpcli/osm_assets_capture.py` wrote `core/data/flood_pilot_bangkok_assets.json`: 52 OSM
+    schools, hospitals and clinics in Bang Sue and Chatuchak, ODbL.
+  - `core/flood_evidence/assets.py` sets two states per facility:
+    - exposure: `potentially_exposed` within 150 m of flooding now, else `no_report_nearby`;
+    - access: `access_under_review` when a closed or truck-risky road is within 60 m, else
+      `access_unknown`. It is never "accessible".
+  - The worker stores `flood_asset_exposure` rows after each roads snapshot (migration
+    `20261003_0023`). `GET /pilot/flood/{id}/assets` reads them.
+  - On the page: H, C and S markers, two cards, a facility card, facilities listed in the road
+    card, and `?facility=` links.
+- **Live result at 10:35:** Kasemrad Prachachuen Hospital is potentially exposed (78 m) and so is
+  Atthamit School (69 m). Access for both is unknown.
+- **Tests:** 11 facility tests, including tweak scenario 8. 901 pass and 2 skip, and Ruff is clean.
+- **Next:**
+  - Slice 5: incidents and the officer check, which is also where `access_disrupted_confirmed`
+    is recorded.
+  - Bring in a road network if access should move beyond "unknown".
+  - Replace the placeholder cameras with BMA's list once it arrives.
+
+### 3 October (later): CCTV P0 for the Bang Sue and Chatuchak corridor (ADR-0039)
+
+- **Corridor:** the owner chose Bang Sue (1029) and Chatuchak (1030). It is `demo_corridor` in
+  `core/data/flood_pilot_bangkok.json` and the page's default view. At 10:10 it had 15 roads with
+  flooding reported, all from Traffy reports through Floodboard.
+- **Camera list:** the owner will ask BMA for it. The request is drafted in Thai and English in
+  `docs/pilot/2026-10-03_BMA_CCTV_Metadata_Request.md`; nothing has been sent from GRP.
+- **Built:**
+  - `core/flood_evidence/cameras.py`: a registry that fails closed, `frame_capable`,
+    `corroboration_role` (at best "an officer can look") and `nearby_cameras`.
+  - `core/data/flood_pilot_bangkok_cameras.json`: three labelled **placeholder** cameras near
+    Pracha Chuen and Soi Phahon Yothin 37.
+  - Routes `/cameras` and `/roads/{road_id}/cameras`.
+  - On the page: camera markers (hollow for test entries), and a CCTV row in the evidence card
+    giving distance, health, mode and every reason a camera cannot confirm.
+  - A coverage row saying "test entries only".
+- **Tests:** 23 camera tests, including tweak scenarios 4 (a camera facing away) and 5 (a
+  viewer-only camera never reaches frame code). The road lookup is also tested.
+- **Next:**
+  - When BMA answers, replace the placeholders with real entries (`external_viewer` or `embed`,
+    following BMA's permission). Then decide how camera health is checked.
+  - Slice 4: OSM schools, hospitals and clinics in the corridor.
+
+### 3 October: Bangkok Live Risk Intelligence, slices 1-2 (ADR-0038)
+
+- **Branch `pilot/river-watch-and-bangkok-flood`, not pushed.**
+  - `0d8c285` commits the 2 October Pilot work (River Watch, HAND practice, Thai).
+  - The next commits add the Bangkok plan and this build.
+- **Inputs, all in `docs/pilot/`:**
+  - the owner's spec `Bangkok_Flood_GRP_Pilot_Development_Spec_v0.3.md`;
+  - `GRP_Bangkok_Integration_Tweak_v0.1.md`;
+  - `expected_outcome.docx` (Thai, four screens).
+- **The plan** is `docs/pilot/2026-10-03_Bangkok_Flood_Pilot_Implementation_Plan.md`.
+  - Section 2: live source checks.
+  - Section 6a: the tweak refinements.
+  - Section 6b: the expected-outcome mapping.
+  - Section 7: the owner's decisions.
+  - Slice order: 1 registry and Floodboard, 2 observe map, 3 CCTV P0, 4 exposure, 5 incidents,
+    6 replay, 7 AI.
+- **Owner decisions (3 October):** capture now; OSM for schools and hospitals; Hub operators can
+  open the view; build slices 1 and 2 first.
+  - **Demo corridor, decided later the same day:** Bang Sue and Chatuchak. It is `demo_corridor` in
+    the pilot config and the page's default view. Its evidence was Traffy-only at 10:10.
+- **Facts measured on 3 October:**
+  - Floodboard's `roads.geojson` and `reports.csv` are CC BY 4.0 and need no key.
+  - Roads have no IDs; GRP uses a geometry SHA-256.
+  - `conf` and `current_weight` decay without a state change.
+  - `stats.json` and `feed.json` return 404, and `robots.txt` disallows `/api/cam/`.
+  - The BMA water-level entry on data.go.th has only a data dictionary and no licence.
+  - The community CCTV list has no licence.
+- **Built:**
+  - `core/flood_evidence/`: config, Floodboard adapter, observation model, freshness, ingest,
+    situation.
+  - Migration `20261003_0022`.
+  - Worker pulls behind `FLOOD_PILOT_PULLS_ENABLED`, which is on only in `compose.desktop.yml`.
+  - `api/flood_pilot.py`: six protected read-only routes under `/api/v1/pilot/flood`.
+  - `web/flood.html`, `flood.js`, `flood-i18n.js` and `flood.css`, with a Pilot nav item for
+    non-admin `adpc` members.
+  - `PilotText.extend` added to `pilot-i18n.js`.
+  - The CLI `grpcli/flood_pilot.py`, with `ingest-capture` and `pull`.
+  - Redacted fixtures in `tests/fixtures/floodboard/`.
+- **Capture still running:** `grpcli/floodboard_capture.py` has been a detached local process
+  since 09:28 on 3 October (PID 26672 and its child). It saves both exports every 20 minutes into
+  the ignored `.local/capture/floodboard/`.
+  - It will not survive a reboot. Restart it with
+    `python -m grpcli.floodboard_capture --every-minutes 20`, or replace it with a Task Scheduler
+    job.
+  - Keep it until the worker pulls have run cleanly for a day.
+- **Verified:**
+  - 850 tests pass and 2 skip, and Ruff is clean. The permission matrix gives
+    `(401, 200, 200, 403, 200)` for the flood routes.
+  - The migration ran on the Desktop stack. The worker pulls live: 5,134 roads and 749 reports.
+  - The captures were backfilled. Loading them after the live pull exposed an out-of-order bug,
+    now fixed and tested.
+  - At 09:50: 742 roads had flooding reported now, 129 were not passable by car according to
+    Floodboard, 19 were closed, and there were 128 reports in the last hour.
+  - The page was rendered headless from the real API answers with a stubbed sign-in: Thai,
+    English, an evidence card (`?road=`), and Bang Khen at 504 px (`?area=1005`).
+  - **Not verified:** a signed-in browser pass on the real stack.
+- **Next:**
+  1. Slice 3: manual CCTV `external_viewer` entries for Bang Sue and Chatuchak. Wait for the
+     owner's answer on where the camera list comes from.
+  2. (Corridor chosen: Bang Sue and Chatuchak.)
+  3. Slice 4: OSM schools, hospitals and clinics, with states `potentially_exposed` and
+     `access_unknown`.
+  4. Add a retention rule for raw fetches before Gate B (about 43 MB a day gzipped).
+  5. Add a Bang Bua Thong outline to the area picker from the Thailand hierarchy.
+
+### 2 October: River Watch pilot tab (ADR-0036), committed on 3 October as `0d8c285`
+
+- **What it is.** A new **Pilot** tab (`/pilot.html`), shown to Hub Admins and Platform Admins
+  only, that reads the live, public GEOGLOWS river forecast and explains it in plain language:
+  - a headline sentence ("expected to RISE until Tue 6 Oct, then go down again");
+  - the peak in cubic metres per second, compared with Olympic pools or bathtubs;
+  - the middle half of the forecasts, and the forecast run in Bangkok time;
+  - the source line;
+  - a seven-day SVG chart;
+  - "What this is not" and "What to check next" boxes;
+  - specialist provenance, with the exact GEOGLOWS response to download;
+  - a feed preview that is **not sent** and is built from the same summary as the card.
+- **Plans:**
+  - `docs/pilot/2026-10-02_Bang_Bua_Thong_GEOGLOWS_River_Watch_Plan.md`, the owner's plan,
+    version 2.1. Phase A is the River Watch card, built here. Phase B is a HAND flood-depth
+    experiment from Daniel's workflow and the 11-slide architecture deck.
+  - `docs/pilot/2026-10-02_Pilot_Tab_Phase_B_HAND_Plan.md`, the Phase B plan for the Pilot tab.
+    **B1 is built** (ADR-0037, below); B2 to B4 are not.
+    - Possible now, with no keys: B1, a synthetic depth demo with a slider; B2, a synthetic
+      GeoTIFF pipeline in the worker; B3, a readiness panel.
+    - Blocked: B4, real Q-derived depth. It needs a reviewed reach, HAND or bare-earth terrain, a
+      Q-to-H curve on the same vertical reference, a hydraulic reviewer and validation evidence,
+      which are data and decisions rather than API keys.
+    - Copernicus GLO-30 is reachable without a key, but it is a surface model and poor in towns.
+      No HAND tool is installed.
+  - The earlier separate Phase A tab plan is no longer in `docs/pilot`; ADR-0036 records that
+    build.
+- **Owner choices:** show both exploratory reaches, `430537201` (near Nonthaburi) and
+  `430392813` (near Bang Bua Thong town), labelled "not confirmed" and given no river name. The
+  tab is for Admins only.
+- **Code:**
+  - `core/river_watch.py`: pure parsing, checks and the one summary shared by the card and the
+    feed preview.
+  - `api/river_watch.py`: four `protected` `AdminUser` routes under `/api/v1/pilot/river-watch`
+    (`reaches`, the card, `feed-preview` and `raw/{run}`), an allow-list, a per-process cache per
+    (reach, run) that keeps the raw bytes, a run-list check every 30 minutes, and a fall-back to
+    the previous run when the newest fails and nothing is held.
+  - `web/pilot.*`, plus the Pilot item in `grp-common.js`, now `?v=20261002a` on every page.
+- **Facts measured on 2 October:**
+  - the median series is blank at hourly steps and is never filled from `high_res`;
+  - `/dates` answers CSV;
+  - `gen_date` is the retrieval time;
+  - the run is pinned with `date=YYYYMMDD`;
+  - `returnperiods` is broken upstream, so there is no "high" line.
+- **Verified:**
+  - 757 tests pass and 2 skip, including 40 new River Watch tests and 4 new permission-matrix
+    routes. Ruff is clean.
+  - The API image was rebuilt and serves the routes (401 without a session).
+  - Live fetches for both reaches succeeded.
+  - The page was rendered in headless Chromium with the real API output and a stubbed sign-in,
+    at desktop and 504 px widths, in the latest, older and unavailable states.
+  - **Not verified:** a signed-in browser pass on the real stack. Minting a local session cookie
+    was blocked, so the owner should open `/pilot.html` after signing in.
+- **B1 practice slider (ADR-0037), built the same day:**
+  - `core/hand_depth.py` holds the one depth rule: edge = 0 and not wet; missing, negative or
+    outside = unknown; NumPy `depth_block` imported lazily.
+  - The made-up 12 × 20 grid is served by `api/hand_demo.py` at `GET /api/v1/pilot/hand-demo`
+    (`protected`, Admins).
+  - `web/pilot-practice.js` draws the dashed "Practice example · made-up ground" section: a
+    0-5 m slider, a colour grid with counts, a side view, the H = 3 m worked rule and a "why no
+    real map" box.
+  - 777 tests pass and 2 skip; ruff is clean.
+  - The page was rendered headless with a stubbed sign-in at 1.2 m and 3.0 m, desktop and
+    504 px. It has not been seen signed in.
+- **Thai version (same day):** the whole Pilot page is now in Thai and English, with a ไทย/EN
+  switch.
+  - Text lives in `web/pilot-i18n.js` (`PilotText`): static elements use `data-t` or
+    `data-t-html`, and the scripts call `say(...)`.
+  - The default is Thai. The choice is remembered in `localStorage`, and `?lang=en` overrides it.
+  - Dates, numbers and Thai day names use `th-TH`.
+  - Server text (river spot names, worked-example places) is mapped by key on the client. The
+    specialist scope note and GEOGLOWS error details stay in English.
+  - Wording follows the owner's Thai Product Manager guide
+    (`docs/pilot/2026-10-02_Bang_Bua_Thong_Flood_Pilot_Product_Manager_Guide_TH.docx`).
+  - All 123 keys exist in both languages. Rendered headless in Thai and English.
+  - The other improvements from that guide are agreed but not built yet:
+    - a "flow, level, depth" explainer;
+    - a "missing link" picture showing the flow-to-height step;
+    - an example of why heights must share a reference point;
+    - separate software and real-world status tags;
+    - four plain caveats;
+    - a glossary.
+- **River map and plain names (same day, ADR-0036 amendment):**
+  - "Where is this river spot?" draws the GEOGLOWS model line in orange over OpenStreetMap
+    tiles, with the named canals nearby highlighted in blue, using Leaflet from unpkg as Planning
+    does.
+  - The line and canal geometry are stored in `core/data/river_watch_reaches.json`, which records
+    its sources and is packaged through `package-data`. `/reaches` returns it as `map`.
+  - `430537201` is now labelled "Big river near Nonthaburi: probably the Chao Phraya (not
+    confirmed)". Its line sits on the wide river on the map, and its catchment is about
+    148,000 km².
+  - `430392813` is "Small canal near Bang Bua Thong town", about 147 km² over 10.6 km, near
+    Khlong Lam Ri and Khlong Lak Khon.
+  - Overpass was down, so the canal names came from Nominatim.
+  - The terms of the Esri Living Atlas GEOGLOWS layer still need to be confirmed.
+- **Bangkok by district (same day, ADR-0036 amendment):**
+  - The Pilot page has two modes: "บางบัวทอง (2 จุด)" and "กรุงเทพฯ รายเขต".
+  - The data was captured once with `python -m grpcli.river_watch_capture --province Bangkok`
+    into `core/data/river_watch_bangkok.json`. It covers 50 districts and 58 GEOGLOWS segments:
+    17 districts on the Chao Phraya, 11 with only small streams, and 22 with no model river.
+  - New routes: `/pilot/river-watch/districts` and `/districts/{code}`.
+  - The main river is the one draining the most land. Inland districts carry a red caution box.
+  - Pitfall: in Git Bash, prefix `docker exec … /tmp/...` with `MSYS_NO_PATHCONV=1`. Otherwise
+    the path is rewritten to a Windows path, and the capture fails only when it writes its output.
+- **Not done, by design:** no feed registration, no public endpoint, no thresholds or warnings,
+  and no link to Planning or RP100. Next:
+  - a hydrologist picks one reach;
+  - settle the GEOGLOWS licence (CC BY-NC-SA 4.0 or CC BY 4.0);
+  - ask Global Risk how a feed's run time, valid time and reach scope are handled.
+
+### 2 October (later): Mangrove Sprint Lab, a separate project
+
+GRP's code was not changed in this session. The work was a new, independent repository for the
+SERVIR mangrove sprint, built from the brief in `docs/adhoc/2026-10-02_Mangrove_Sprint_Lab_Claude_Code_Bootstrap.md`.
+That brief is the owner's file and is still untracked here.
+
+- **Where it is:**
+  - Local: `D:\adpcworkspace\mangrove-sprint-lab`.
+  - Remote: <https://github.com/SERVIRSEA/mangrove-sprint-lab>. The repo is **public**, so it
+    holds no internal document links or people's names.
+  - Commits: `b7e8b53` and `466d27e` on `main`, pushed.
+  - Handover: the lab's own `CLAUDE.md`, with `docs/ACCEPTANCE.md` and `docs/SPRINT_NOTES.md`.
+- **The owner's saved git login can push to SERVIRSEA.** Git Credential Manager pushed with
+  no org access block. That repo has its own local git name and email, because none is set
+  globally.
+- **What it is:** a Python 3.12 / uv command-line client called `msl`.
+  - It connects over the hosted contribution REST API (`POST /api/contribute`,
+    `GET /api/contribute/<id>`) or over MCP streamable HTTP at `/mcp`. The transport is chosen
+    explicitly and never falls back to the other.
+  - The token comes from SIG's `grp-login.py` helper. The helper is not vendored because it
+    states no licence; its SHA-256 on 2 October is recorded in the lab's `docs/CONNECTIONS.md`.
+  - It previews manifests locally, sends behind explicit gates, follows status with bounded
+    polling, and writes a JSONL trace per operation.
+  - An offline demo runs on synthetic data near 0,0.
+  - The official MCP SDK is pinned to 1.30, below 2.0, because the 2.x client was reworked.
+- **Ported from GRP (from `14e4993`; GRP has no licence file):**
+  - `core/contribution_rules.py`: required fields, the 3-40 character layer rule, Drive links,
+    contact fields;
+  - from `api/mcp_client.py`: the endpoint, the bearer token, and "401 means sign in";
+  - from `api/sig_connection.py`: renewing a token shortly before it expires;
+  - from `api/langfuse.py`: traces that hold only safe fields.
+- **Verified:**
+  - 58 tests pass with the network blocked, and ruff is clean.
+  - A fresh clone from GitHub installs, passes its tests and runs the demo.
+  - Live, with no real token:
+    - both endpoints answer 401;
+    - a real MCP SDK session with a fake token gives `sign_in_required`.
+  - Adapters are tested against fake responses only. Sign-in, `discover`, the `trace-emit`
+    resource and any live contribution have **not** been run.
+- **Found while testing:**
+  - The hosted REST 401 has **no `WWW-Authenticate` header**; the body is
+    `{"detail":"login required"}`. The runbook says it does. MCP's 401 does have the header.
+    GRP only uses MCP, so GRP is not affected.
+  - Mangrove data has no published contract:
+    - there is no mangrove pack;
+    - `vector` accepts points only;
+    - `raster` accepts hazard, risk or vulnerability classes, or population counts.
+
+    The lab reports these as gaps and does not force the data to fit.
+- **Cleanup:** only the two scratch folders this task created were deleted (the downloaded
+  runbook and helper, and the fresh-clone check).
 
 ### 2 October: committed, pushed and rebuilt
 

@@ -668,3 +668,85 @@ def test_listing_global_risk_needs_a_servir_sign_in_and_says_when_it_is_down(wor
     assert signed_out.status_code == 401
     assert signed_out.json()["error"]["code"] == "SIG_REAUTH_REQUIRED"
     assert down.status_code == 503 and down.json()["error"]["code"] == "SIG_UNAVAILABLE"
+
+
+# ADR-0052: a live feed is tested the way Global Risk will read it, before it is shown or sent.
+FEED = {
+    "dataset": "bangkok_flood_districts_live", "title": "Flood by district",
+    "description": "56 districts.", "source": "ADPC GRP", "validation": "unvalidated",
+    "cadence": "every 10 minutes", "url": "https://grp.example.org/api/v1/public/flood/bangkok/feed.json",
+    "records_path": "districts", "fields": {"district": "district_name_en", "as_of": "as_of"},
+    "as_of_field": "as_of",
+}
+
+
+def _feed_test(monkeypatch, result: dict) -> list:
+    asked = []
+
+    def fake(url, records_path, fields, as_of_field, *_rest):
+        asked.append(url)
+        return result
+
+    monkeypatch.setattr(api.contributions, "check_feed", fake)
+    return asked
+
+
+def test_a_feed_preview_says_what_global_risk_would_read(world, monkeypatch) -> None:
+    asked = _feed_test(monkeypatch, {"ok": True, "count": 56, "returned_by_default": 12,
+                                     "order": "sorted newest-last by as_of", "notes": []})
+    body = _send(_client(world, "planner@example.test"), FEED, kind="feed", preview=True).json()
+
+    assert body["problems"] == {} and body["manifest"]["fetch"]["records_path"] == "districts"
+    assert any("would read 56 records" in note for note in body["notes"])
+    assert asked == [FEED["url"]] and FakeMcp.calls == []
+
+
+def test_a_dead_or_empty_feed_is_never_sent(world, monkeypatch) -> None:
+    _feed_test(monkeypatch, {"ok": False, "problem": "The feed answered HTTP 503."})
+    client = _client(world, "planner@example.test")
+
+    for preview in (True, False):
+        body = _send(client, FEED, kind="feed", preview=preview).json()
+        assert body["sent"] is False and "HTTP 503" in body["problems"]["url"]
+    assert FakeMcp.calls == [] and _rows(world) == []
+
+
+def test_a_feed_name_shares_the_dataset_names_with_tables(world, monkeypatch) -> None:
+    _feed_test(monkeypatch, {"ok": True, "count": 1, "returned_by_default": 1, "order": "x",
+                             "notes": []})
+    _existing(world, kind="table", name="bangkok_flood_districts_live")
+    body = _send(_client(world, "planner@example.test"), FEED, kind="feed", preview=True).json()
+    assert "Already sent" in body["problems"]["dataset"]
+
+
+def test_platform_feeds_say_when_a_feed_was_sent_and_last_read(world, monkeypatch) -> None:
+    from core import public_reads
+
+    public_reads.reset()
+    public_reads.record("flood:bangkok")
+    _existing(world, kind="feed", name="bangkok_flood_districts_live")
+    feeds = {f["dataset"]: f for f in _client(world, "planner@example.test").get(
+        "/api/v1/contributions/platform-feeds?hub_code=adpc").json()["feeds"]}
+
+    districts = feeds["bangkok_flood_districts_live"]
+    assert districts["sent"]["source"] == "this_hub" and districts["sent"]["state"] == "approved"
+    assert districts["last_read"]["count"] == 1
+    assert feeds["sea_pm25_province_forecast"]["sent"] is None
+    assert feeds["sea_pm25_province_forecast"]["last_read"] is None
+
+
+def test_a_confirmed_feed_is_sent_nested_as_global_risk_expects(world, monkeypatch) -> None:
+    _feed_test(monkeypatch, {"ok": True, "count": 56, "returned_by_default": 12, "order": "x",
+                             "notes": []})
+    FakeMcp.submit = {"status": "approved", "contribution_id": "c0ffee0000000002", "kind": "feed",
+                      "decision_note": "auto-approved", "preview": {"dataset": FEED["dataset"]}}
+    client = _client(world, "planner@example.test")
+    checked = _send(client, FEED, kind="feed", preview=True).json()["manifest"]
+    started = _send(client, checked, kind="feed").json()
+
+    assert started["sent"] is True
+    name, arguments = FakeMcp.calls[0]
+    assert name == "contribute_submit" and arguments["kind"] == "feed"
+    sent = arguments["manifest"]
+    assert sent["adapter"] == "generic_json" and sent["fetch"]["url"] == FEED["url"]
+    assert "url" not in sent and sent["dataset"] == FEED["dataset"]

@@ -1,0 +1,97 @@
+/* GRP map symbols, shared by every map page (ADR-0062). Used with web/map-symbols.js. */
+/* Shape = feature type, colour = source, ring + badge = assessment status. */
+
+.grp-map-marker { background: none; border: 0; }
+
+.grp-pin { position: relative; display: block; width: 34px; height: 40px; transition: transform 0.12s ease-out; transform-origin: 50% 100%; }
+
+.grp-pin__icon { display: block; width: 34px; height: 40px; pointer-events: none; }
+
+.grp-pin__badge { position: absolute; right: -6px; top: -4px; width: 17px; height: 17px; pointer-events: none; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 30%)); }
+
+/* Status rings sit around the pin head and stay readable in grayscale (solid, solid, dashed). */
+
+.grp-pin.status-exposed::before,
+
+.grp-pin.status-not-exposed::before,
+
+.grp-pin.status-unable::before { content: ""; position: absolute; left: -3px; top: -3px; width: 40px; height: 40px; border-radius: 50%; box-sizing: border-box; pointer-events: none; }
+
+.grp-pin.status-exposed::before { border: 3px solid #C43D36; }
+
+.grp-pin.status-not-exposed::before { border: 3px solid #2E7D32; }
+
+.grp-pin.status-unable::before { border: 3px dashed #7D8894; }
+
+/* Live context, not assessment: flooding reported nearby, a live picture available, muted reports. */
+
+.grp-pin.is-near-flood::after { content: ""; position: absolute; left: -4px; top: -4px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 0 3px #f97316, 0 0 0 6px rgb(249 115 22 / 25%); pointer-events: none; }
+
+.grp-pin.has-picture::after { content: ""; position: absolute; right: -2px; top: -2px; width: 11px; height: 11px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 2px #fff; pointer-events: none; }
+
+.grp-pin.is-muted { opacity: 0.55; filter: saturate(0.4); }
+
+/* Hover, keyboard focus and the selected point. */
+
+.leaflet-marker-icon.grp-map-marker:hover .grp-pin { transform: scale(1.1); }
+
+.leaflet-marker-icon.grp-map-marker:focus-visible { outline: none; }
+
+.leaflet-marker-icon.grp-map-marker:focus-visible .grp-pin { transform: scale(1.15); filter: drop-shadow(0 0 0 #2563eb) drop-shadow(0 0 3px #2563eb); }
+
+.leaflet-marker-icon.grp-map-marker.is-selected { z-index: 10000 !important; }
+
+.leaflet-marker-icon.grp-map-marker.is-selected .grp-pin { transform: scale(1.24); filter: drop-shadow(0 0 0 #2563eb) drop-shadow(0 0 4px #2563eb) drop-shadow(0 0 8px rgb(37 99 235 / 55%)); }
+
+/* Clusters: the layer's own symbol and the count. */
+
+.grp-cluster { position: relative; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 0 3px rgb(255 255 255 / 70%), 0 2px 8px rgb(16 40 36 / 35%); }
+
+.grp-cluster__icon { width: 26px; height: 30px; }
+
+.grp-cluster b { position: absolute; right: -6px; bottom: -4px; min-width: 20px; padding: 1px 5px; border-radius: 999px; background: #172331; color: #ffffff; font: 700 11px/16px system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 2px #fff; }
+
+.marker-cluster-anim .leaflet-marker-icon, .marker-cluster-anim .leaflet-marker-shadow { transition: transform 0.25s ease-out, opacity 0.25s ease-in; }
+
+
+
+
+
+
+
+
+
+/* Live context on pins (not assessment results). */
+.grp-pin.is-access-review::after { content: ""; position: absolute; left: -4px; top: -4px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 0 3px #c92a2a, 0 0 0 6px rgb(201 42 42 / 22%); pointer-events: none; }
+.grp-pin.is-offline { opacity: 0.6; }
+.grp-pin.is-offline::after { content: ""; position: absolute; right: -2px; top: -2px; width: 11px; height: 11px; border-radius: 50%; background: #a61e1e; box-shadow: 0 0 0 2px #fff; pointer-events: none; }
+.grp-pin.is-placeholder { opacity: 0.45; filter: grayscale(1); }
+
+/* "You are here": a pulsing blue dot and its accuracy circle. */
+.grp-you { display: block; width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3px solid #ffffff; box-sizing: border-box; box-shadow: 0 0 0 2px rgb(37 99 235 / 35%), 0 2px 6px rgb(0 0 0 / 35%); animation: grp-you-pulse 2s ease-out infinite; }
+@keyframes grp-you-pulse { 0% { box-shadow: 0 0 0 0 rgb(37 99 235 / 55%), 0 2px 6px rgb(0 0 0 / 35%); } 70% { box-shadow: 0 0 0 14px rgb(37 99 235 / 0%), 0 2px 6px rgb(0 0 0 / 35%); } 100% { box-shadow: 0 0 0 0 rgb(37 99 235 / 0%), 0 2px 6px rgb(0 0 0 / 35%); } }
+@media (prefers-reduced-motion: reduce) { .grp-you { animation: none; } }
+
+/* A small pin for legends and keys; the same symbol, ring and badge as on the map. */
+.grp-pin--legend { width: 22px; height: 26px; flex: none; transform: none; margin: 3px 4px 0 2px; }
+.grp-pin--legend .grp-pin__icon { width: 22px; height: 26px; }
+.grp-pin--legend .grp-pin__badge { width: 12px; height: 12px; right: -5px; top: -3px; }
+.grp-pin--legend.status-exposed::before, .grp-pin--legend.status-not-exposed::before, .grp-pin--legend.status-unable::before { width: 28px; height: 28px; left: -3px; top: -3px; }
+.grp-pin--legend.is-near-flood::after, .grp-pin--legend.is-access-review::after { left: -3px; top: -3px; width: 28px; height: 28px; }
+.map-key--symbols { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; }
+.map-key--symbols > span { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* Mixed cluster: its two most common symbols, overlapped. */
+.grp-cluster.is-mixed .grp-cluster__icon { position: absolute; width: 22px; height: 26px; }
+.grp-cluster__icon--back { left: 6px; top: 7px; opacity: 0.85; }
+.grp-cluster__icon--front { left: 17px; top: 12px; }
+
+/* A searched place: a red map pin with its name always shown. */
+.grp-search-pin { position: relative; display: block; width: 28px; height: 38px; }
+.grp-search-pin::before { content: ""; position: absolute; left: 1px; top: 0; width: 26px; height: 26px; border-radius: 50% 50% 50% 0; background: #d93025; border: 2px solid #ffffff; box-sizing: border-box; transform: rotate(-45deg); transform-origin: 50% 50%; box-shadow: 0 2px 6px rgb(0 0 0 / 35%); top: 2px; }
+.grp-search-pin::after { content: ""; position: absolute; left: 10px; top: 10px; width: 8px; height: 8px; border-radius: 50%; background: #7a1912; }
+.grp-search-label { padding: 2px 8px; border: 0; border-radius: 6px; background: #ffffff; color: #1f2937; font-size: 0.78rem; font-weight: 700; box-shadow: 0 1px 4px rgb(0 0 0 / 30%); }
+.grp-search-label::before { display: none; }
+/* The selected area's name, at its centre. */
+.grp-area-label { padding: 3px 9px; border: 1px solid #28415E; border-radius: 999px; background: rgb(255 255 255 / 92%); color: #28415E; font-size: 0.8rem; font-weight: 700; box-shadow: 0 1px 4px rgb(0 0 0 / 20%); }
+.grp-area-label::before { display: none; }

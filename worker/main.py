@@ -1,6 +1,7 @@
 import logging
 import signal
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
 
@@ -17,7 +18,16 @@ from core.boundary_import import (
 )
 from core.data_import_jobs import ImportClaim, claim_next_import, fail_import, version_id_for_import
 from core.data_library_models import DataImportJob
-from core.db import get_engine, session_scope
+from core.db import get_engine, read_secret, session_scope
+from core.flood_evidence.archive import export_pending as archive_flood_days
+from core.flood_evidence.config import PILOT_IDS, pilot_config
+from core.flood_evidence.ingest import pull_due
+from core.flood_evidence.replay import run_one_step as replay_step
+from core.flood_evidence.retention import delete_raw
+from core.flood_evidence.retention import prune as prune_flood
+from core.flood_evidence.thaiwater import ThaiWaterClient
+from core.flood_evidence.thaiwater import run_shadow as run_thaiwater
+from core.flood_evidence.weather import LongdoWeather, run_weather
 from core.hazard_import import (
     PLATFORM_HAZARD_DATASET_ID,
     HazardImportError,
@@ -42,6 +52,8 @@ logger = logging.getLogger("grp.worker")
 stop_event = Event()
 POLL_SECONDS = 3
 HOUSEKEEPING_SECONDS = 60
+RETENTION_SECONDS = 3600
+WEATHER_SECONDS = 300
 
 
 def _request_stop(_signum: int, _frame: object) -> None:
@@ -58,9 +70,19 @@ def run() -> None:
     storage = LocalStorage(settings.storage_root)
     logger.info("Worker started (lease %d min)", settings.job_lease_minutes)
     last_housekeeping = 0.0
+    last_flood_check = 0.0
+    last_retention = 0.0
+    last_weather = 0.0
+    last_thaiwater = 0.0
     while not stop_event.is_set():
         if time.monotonic() - last_housekeeping >= HOUSEKEEPING_SECONDS:
             release_reservations_once()
+            # ADR-0045: flood-pilot retention, at most once an hour. The research archive
+            # (ADR-0055) goes first, so a finished day is kept before anything is removed.
+            if time.monotonic() - last_retention >= RETENTION_SECONDS:
+                run_flood_archive(storage)
+                run_flood_retention(storage)
+                last_retention = time.monotonic()
             last_housekeeping = time.monotonic()
             logger.info("Worker heartbeat")
         worked = run_one_job(storage, settings.job_lease_minutes)
@@ -73,8 +95,164 @@ def run() -> None:
             )
         if not worked:
             worked = run_one_inspection(settings.data_in_root, settings.job_lease_minutes, storage)
+        # Flood pilot pulls run only when nothing else is waiting, and are checked once a minute.
+        if (
+            not worked
+            and settings.flood_pilot_pulls_enabled
+            and time.monotonic() - last_flood_check >= HOUSEKEEPING_SECONDS
+        ):
+            run_flood_pulls(storage)
+            last_flood_check = time.monotonic()
+        # ThaiWater (ADR-0065): government observations captured in shadow mode only.
+        if (
+            not worked
+            and settings.thaiwater_shadow_enabled
+            and time.monotonic() - last_thaiwater >= HOUSEKEEPING_SECONDS
+        ):
+            run_thaiwater_shadow(
+                storage,
+                settings.thaiwater_api_key_file,
+                settings.thaiwater_api_base_url,
+                settings.thaiwater_poll_minutes,
+            )
+            last_thaiwater = time.monotonic()
+        # Rain context (ADR-0049): live pilots only, checked every 5 minutes when idle.
+        if (
+            not worked
+            and settings.longdo_weather_enabled
+            and time.monotonic() - last_weather >= WEATHER_SECONDS
+        ):
+            run_flood_weather(settings.longdo_api_key_file)
+            last_weather = time.monotonic()
+        # Replays (ADR-0044): one stored fetch per idle pass, after everything live.
+        if not worked:
+            worked = run_one_replay_step(storage)
         if not worked:
             stop_event.wait(POLL_SECONDS)
+
+
+def run_flood_pulls(storage: LocalStorage) -> None:
+    """Pull every flood-pilot source that is due (ADR-0038). A failure never stops the worker."""
+
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                pull_due(session, storage, config)
+        except Exception:
+            logger.exception("Flood pilot %s pull failed; will retry", pilot_id)
+
+
+def run_flood_archive(storage: LocalStorage) -> None:
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                written = archive_flood_days(session, storage, config)
+            if written:
+                logger.info("Flood research archive %s: wrote %s", pilot_id, ", ".join(written))
+        except Exception:
+            logger.exception("Flood research archive %s failed; will retry", pilot_id)
+
+
+def run_flood_retention(storage: LocalStorage) -> None:
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                result = prune_flood(session, config, datetime.now(UTC))
+                session.commit()
+            delete_raw(storage, result)
+            if any(result[k] for k in ("raw_fetches_cleared", "report_ids_pruned",
+                                        "exposure_rows_removed")):
+                logger.info("Flood retention %s: %s", pilot_id, result)
+        except Exception:
+            logger.exception("Flood retention %s failed; will retry", pilot_id)
+
+
+def run_thaiwater_shadow(
+    storage: LocalStorage, key_file: Path, base_url: str, interval_minutes: int
+) -> None:
+    try:
+        key = read_secret(key_file)
+    except (OSError, RuntimeError):
+        logger.warning("ThaiWater shadow capture is on but its key file is missing or empty")
+        return
+    client = ThaiWaterClient(key)
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                fetches = run_thaiwater(
+                    session,
+                    storage,
+                    config,
+                    client,
+                    datetime.now(UTC),
+                    base_url=base_url,
+                    interval_minutes=interval_minutes,
+                )
+                # run_shadow commits each product independently. Snapshot fields while rows remain
+                # attached; committed ORM rows are expired and cannot lazy-load after this context.
+                summaries = [
+                    (
+                        fetch.source_id,
+                        fetch.outcome,
+                        fetch.record_count,
+                        fetch.new_states,
+                    )
+                    for fetch in fetches
+                ]
+            for source_id, outcome, record_count, new_states in summaries:
+                logger.info(
+                    "ThaiWater shadow %s/%s: %s, %s records, %s new observations",
+                    pilot_id,
+                    source_id,
+                    outcome,
+                    record_count,
+                    new_states,
+                )
+        except Exception:
+            logger.exception("ThaiWater shadow %s failed; will retry", pilot_id)
+
+
+def run_flood_weather(key_file: Path) -> None:
+    try:
+        key = read_secret(key_file)
+    except (OSError, RuntimeError):
+        logger.warning("Longdo Weather is on but its key file is missing or empty")
+        return
+    client = LongdoWeather(key=key)
+    for pilot_id in PILOT_IDS:
+        config = pilot_config(pilot_id)
+        if config is None:
+            continue
+        try:
+            with Session(get_engine()) as session:
+                stored = run_weather(session, config, client, datetime.now(UTC))
+                session.commit()
+            if stored:
+                logger.info("Longdo Weather %s: %d scopes recorded", pilot_id, stored)
+        except Exception as error:
+            logger.error("Longdo Weather %s failed: %s", pilot_id,
+                         client.redact(f"{type(error).__name__}: {error}"))
+
+
+def run_one_replay_step(storage: LocalStorage) -> bool:
+    try:
+        with Session(get_engine()) as session:
+            return replay_step(session, storage, datetime.now(UTC))
+    except SQLAlchemyError:
+        logger.exception("Replay step database error; will retry")
+        return False
 
 
 def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:

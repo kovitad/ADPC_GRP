@@ -20,7 +20,15 @@ $ErrorActionPreference = "Stop"
 $NativeErrors = "Continue"
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepositoryRoot
-$Compose = @("compose", "-f", "deploy/compose.desktop.yml")
+$Compose = @("compose")
+# Compose resolves its implicit .env relative to the compose-file project directory (`deploy`),
+# not reliably from this script's working directory. Pass the ignored repository .env explicitly
+# so non-secret switches (including ThaiWater shadow mode) reach Compose interpolation. Secrets
+# are still copied into files below and are never injected as container environment variables.
+if (Test-Path -LiteralPath (Join-Path $RepositoryRoot ".env")) {
+    $Compose += @("--env-file", ".env")
+}
+$Compose += @("-f", "deploy/compose.desktop.yml")
 
 if ($Down) {
     docker @Compose down
@@ -96,6 +104,12 @@ if (Test-Path -LiteralPath $LocalAiKey) {
     Copy-Item -LiteralPath $LocalAiKey -Destination (Join-Path $SecretRoot "ai_key_adpc") -Force
 } elseif (-not (Write-SecretFromEnv "ai_key_adpc" @("OPENAI_API_KEY"))) {
     Write-Warning "No AI provider key found; the AI test call will report AI unavailable."
+}
+if (-not (Write-SecretFromEnv "longdo_api_key" @("LONGDO_API_KEY"))) {
+    Write-Warning "No LONGDO_API_KEY in .env; Longdo rain context stays off."
+}
+if (-not (Write-SecretFromEnv "thaiwater_api_key" @("THAIWATER_API_KEY"))) {
+    Write-Warning "No THAIWATER_API_KEY in .env; ThaiWater shadow capture stays off."
 }
 if (-not (Write-SecretFromEnv "langfuse_secret_key" @("LANGFUSE_SECRET_KEY"))) {
     Write-Warning "No LANGFUSE_SECRET_KEY in .env; Langfuse export stays off."

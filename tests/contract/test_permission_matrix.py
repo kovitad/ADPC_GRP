@@ -91,6 +91,9 @@ MATRIX = {
     "hazard_overlay": (401, 404, 404, 404, 403),
     "vulnerability_overlay": (401, 404, 404, 404, 403),
     "dataset_features": (401, 404, 404, 404, 403),
+    "live_flood": (401, 404, 404, 404, 403),
+    "live_flood_summary": (401, 200, 200, 200, 403),
+    "live_flood_source": (401, 200, 200, 200, 403),
     # ADR-0029: a planning conversation is its owner's, in a Hub they plan for. Every planning
     # role reads its own; a Platform Admin with no planning membership has none to read.
     "read_conversation": (401, 200, 200, 200, 403),
@@ -104,6 +107,9 @@ MATRIX = {
     "list_contributions": (401, 404, 404, 404, 404),
     "check_contribution": (401, 404, 404, 404, 404),
     "on_global_risk": (401, 404, 404, 404, 404),
+    # ADR-0052: live-feed contributions follow the same dev-only rule.
+    "platform_feeds": (401, 404, 404, 404, 404),
+    "feed_check": (401, 404, 404, 404, 404),
     # ADR-0033: the district summary downloads need a planning role; an unknown district is not
     # found, and a Platform Admin with no planning membership is refused first.
     "summary_docx": (401, 404, 404, 404, 403),
@@ -113,6 +119,61 @@ MATRIX = {
     # ADR-0034: the Planning layer picker follows the planning conversation: every planning role
     # reads its own Hub's list, a Platform Admin with no planning membership has none.
     "global_risk_layers": (401, 200, 200, 200, 403),
+    # Sub-district plan: area search and lookup by point follow the planning catalogue rules.
+    "areas_search": (401, 200, 200, 200, 403),
+    "areas_at": (401, 200, 200, 200, 403),
+    # ADR-0036: the River Watch pilot is for Admins. An unknown reach is not found, after the
+    # caller is authorized, so no matrix case reaches GEOGLOWS.
+    "river_watch_reaches": (401, 403, 200, 200, 200),
+    "river_watch_forecast": (401, 403, 404, 404, 404),
+    "river_watch_feed_preview": (401, 403, 404, 404, 404),
+    "river_watch_raw": (401, 403, 404, 404, 404),
+    # Phase B1 practice example: made-up data, Admins only like the rest of the Pilot tab.
+    "hand_practice": (401, 403, 200, 200, 200),
+    "river_watch_districts": (401, 403, 200, 200, 200),
+    "river_watch_district": (401, 403, 404, 404, 404),
+    # ADR-0038: a flood pilot is open to every role in its configured Hubs (Bangkok: adpc) and to
+    # Platform Admins; another Hub's Admin is refused. The list only names pilots you can open.
+    "flood_pilots": (401, 200, 200, 200, 200),
+    "flood_pilot": (401, 200, 200, 403, 200),
+    "flood_situation": (401, 200, 200, 403, 200),
+    "flood_government_observation_status": (401, 200, 200, 403, 200),
+    "flood_roads": (401, 200, 200, 403, 200),
+    "flood_reports": (401, 200, 200, 403, 200),
+    "flood_areas": (401, 200, 200, 403, 200),
+    "flood_cameras": (401, 200, 200, 403, 200),
+    "flood_assets": (401, 200, 200, 403, 200),
+    "flood_incidents": (401, 200, 200, 403, 200),
+    # ADR-0052: the Global Risk feed follows the pilot rules; its anonymous copy is off by default.
+    "flood_feed": (401, 200, 200, 403, 200),
+    # No incident is stored in the fixture, so allowed callers are told it is not found.
+    "flood_incident": (401, 404, 404, 403, 404),
+    # ADR-0042: recording an observation needs a pilot-Hub membership. A Platform Admin with no
+    # membership reads but never writes; no incident exists here, so members get 404.
+    "flood_incident_review": (401, 404, 404, 403, 403),
+    "flood_facility_access": (401, 404, 404, 403, 403),
+    "flood_changes": (401, 200, 200, 403, 200),
+    "flood_facts": (401, 200, 200, 403, 200),
+    # A non-member Platform Admin gets the computed answer without AI (200, withheld).
+    "flood_ask": (401, 200, 200, 403, 200),
+    # ADR-0044: anyone who can open the pilot sees its replays; building, moving, restarting and
+    # deleting one needs a pilot-Hub membership. The fixture has no stored fetches (422 for a new
+    # replay) and no replay (404).
+    "flood_replays": (401, 200, 200, 403, 200),
+    "flood_replay_create": (401, 422, 422, 403, 403),
+    "flood_replay": (401, 404, 404, 403, 404),
+    "flood_replay_advance": (401, 404, 404, 403, 403),
+    "flood_replay_restart": (401, 404, 404, 403, 403),
+    "flood_replay_delete": (401, 404, 404, 403, 403),
+    "flood_replay_inject_report": (401, 404, 404, 403, 403),
+    "flood_replay_inject_outage": (401, 404, 404, 403, 403),
+    "flood_weather": (401, 200, 200, 403, 200),
+    # No road is stored in the fixture, so allowed callers are told it is not found.
+    "flood_road_cameras": (401, 404, 404, 403, 404),
+    # ADR-0051: the relay is off unless switched on, so members get 404 here.
+    "flood_camera_frame": (401, 404, 404, 403, 404),
+    # An unknown pilot is not found for any signed-in caller; it names no Hub to check.
+    "flood_unknown_pilot": (401, 404, 404, 404, 404),
 }
 
 # Matrix case -> FastAPI operation ID. Keeping this explicit makes each exercised operation
@@ -167,6 +228,9 @@ MATRIX_OPERATION_IDS = {
         "vulnerability_overlay_api_v1_maps_vulnerability__version_id__overlay_png_get"
     ),
     "dataset_features": "dataset_features_api_v1_maps_datasets__version_id__features_get",
+    "live_flood": "live_flood_api_v1_maps_live_flood_get",
+    "live_flood_summary": "live_flood_summary_api_v1_maps_live_flood_summary_get",
+    "live_flood_source": "live_flood_source_api_v1_maps_live_flood_sources__name__get",
     "read_conversation": "read_conversation_api_v1_planning_conversation_get",
     "clear_conversation": "clear_conversation_api_v1_planning_conversation_delete",
     "centre_indicator_values": "centre_indicator_values_api_v1_maps_centres_indicator_values_post",
@@ -175,15 +239,84 @@ MATRIX_OPERATION_IDS = {
     "list_contributions": "list_contributions_api_v1_contributions_get",
     "check_contribution": "create_contribution_api_v1_contributions_post",
     "on_global_risk": "on_global_risk_api_v1_contributions_on_global_risk_get",
+    "areas_search": "search_areas_api_v1_catalog_areas_search_get",
+    "areas_at": "area_at_api_v1_catalog_areas_at_get",
+    "platform_feeds": "list_platform_feeds_api_v1_contributions_platform_feeds_get",
+    "feed_check": "check_live_feed_api_v1_contributions_feed_check_post",
     "read_contribution": "read_contribution_api_v1_contributions__contribution_id__get",
     "refresh_contribution": (
         "refresh_contribution_api_v1_contributions__contribution_id__refresh_post"
     ),
     "global_risk_layers": "global_risk_layers_api_v1_planning_global_risk_layers_get",
+    "river_watch_reaches": "list_reaches_api_v1_pilot_river_watch_reaches_get",
+    "river_watch_forecast": "river_forecast_api_v1_pilot_river_watch__reach_id__get",
+    "river_watch_feed_preview": (
+        "river_feed_preview_api_v1_pilot_river_watch__reach_id__feed_preview_get"
+    ),
+    "river_watch_raw": "river_raw_response_api_v1_pilot_river_watch__reach_id__raw__run__get",
+    "hand_practice": "hand_practice_api_v1_pilot_hand_demo_get",
+    "river_watch_districts": "list_districts_api_v1_pilot_river_watch_districts_get",
+    "river_watch_district": (
+        "read_district_api_v1_pilot_river_watch_districts__admin_code__get"
+    ),
+    "flood_pilots": "list_flood_pilots_api_v1_pilot_flood_get",
+    "flood_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
+    "flood_situation": "read_situation_api_v1_pilot_flood__pilot_id__situation_get",
+    "flood_government_observation_status": (
+        "read_government_observation_status_"
+        "api_v1_pilot_flood__pilot_id__government_observations_status_get"
+    ),
+    "flood_feed": "read_flood_feed_api_v1_pilot_flood__pilot_id__feed_json_get",
+    "flood_roads": "read_roads_api_v1_pilot_flood__pilot_id__roads_get",
+    "flood_reports": "read_reports_api_v1_pilot_flood__pilot_id__reports_get",
+    "flood_areas": "read_areas_api_v1_pilot_flood__pilot_id__areas_get",
+    "flood_cameras": "read_cameras_api_v1_pilot_flood__pilot_id__cameras_get",
+    "flood_assets": "read_assets_api_v1_pilot_flood__pilot_id__assets_get",
+    "flood_incidents": "read_incidents_api_v1_pilot_flood__pilot_id__incidents_get",
+    "flood_incident": (
+        "read_incident_api_v1_pilot_flood__pilot_id__incidents__incident_id__get"
+    ),
+    "flood_incident_review": (
+        "post_incident_review_api_v1_pilot_flood__pilot_id__incidents__incident_id__reviews_post"
+    ),
+    "flood_facility_access": (
+        "post_facility_access_api_v1_pilot_flood__pilot_id__facilities_access_post"
+    ),
+    "flood_changes": "read_changes_api_v1_pilot_flood__pilot_id__changes_get",
+    "flood_facts": "read_facts_api_v1_pilot_flood__pilot_id__facts_get",
+    "flood_ask": "ask_api_v1_pilot_flood__pilot_id__ask_post",
+    "flood_replays": "list_replays_api_v1_pilot_flood__pilot_id__replays_get",
+    "flood_replay_create": "post_replay_api_v1_pilot_flood__pilot_id__replays_post",
+    "flood_replay": "read_replay_api_v1_pilot_flood__pilot_id__replays__replay_id__get",
+    "flood_replay_advance": (
+        "post_advance_api_v1_pilot_flood__pilot_id__replays__replay_id__advance_post"
+    ),
+    "flood_replay_restart": (
+        "post_restart_api_v1_pilot_flood__pilot_id__replays__replay_id__restart_post"
+    ),
+    "flood_replay_delete": (
+        "delete_replay_api_v1_pilot_flood__pilot_id__replays__replay_id__delete"
+    ),
+    "flood_replay_inject_report": (
+        "post_inject_report_api_v1_pilot_flood__pilot_id__replays__replay_id__inject_report_post"
+    ),
+    "flood_replay_inject_outage": (
+        "post_inject_outage_api_v1_pilot_flood__pilot_id__replays__replay_id__inject_outage_post"
+    ),
+    "flood_weather": "read_weather_api_v1_pilot_flood__pilot_id__weather_get",
+    "flood_road_cameras": (
+        "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
+    ),
+    "flood_camera_frame": (
+        "read_camera_frame_api_v1_pilot_flood__pilot_id__cameras__camera_id__frame_jpg_get"
+    ),
+    "flood_unknown_pilot": "read_flood_pilot_api_v1_pilot_flood__pilot_id__get",
 }
 
 # Protected operations covered elsewhere. Remove an entry when its role behavior moves into MATRIX.
 KNOWN_UNCOVERED = {
+    # ADR-0061: tests/fast/test_air_quality_feed.py covers it without calling AQ Tracker.
+    "read_air_quality_api_v1_air_quality_sea_latest_get",
     # AI gateway permission cases live in fast tests.
     "ai_test_call_api_v1_ai_test_call_post",
     # Golden assessment tests cover Hub submission.
@@ -456,6 +589,9 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             None,
         ),
         "dataset_features": ("GET", f"/api/v1/maps/datasets/{user_id}/features", None),
+        "live_flood": ("GET", f"/api/v1/maps/live-flood?boundary_id={user_id}", None),
+        "live_flood_summary": ("GET", "/api/v1/maps/live-flood/summary", None),
+        "live_flood_source": ("GET", "/api/v1/maps/live-flood/sources/outlines", None),
         "read_conversation": ("GET", "/api/v1/planning/conversation", None),
         "clear_conversation": ("DELETE", "/api/v1/planning/conversation", None),
         "centre_indicator_values": (
@@ -477,8 +613,83 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
         ),
         "read_contribution": ("GET", f"/api/v1/contributions/{user_id}", None),
         "on_global_risk": ("GET", "/api/v1/contributions/on-global-risk", None),
+        "areas_search": ("GET", "/api/v1/catalog/areas/search?q=bang", None),
+        "areas_at": ("GET", "/api/v1/catalog/areas/at?lat=13.8&lon=100.5", None),
+        "platform_feeds": ("GET", "/api/v1/contributions/platform-feeds", None),
+        "feed_check": ("POST", "/api/v1/contributions/feed-check",
+                       {"hub_code": "adpc", "url": "https://example.org/x.json",
+                        "records_path": "a", "fields": {"b": "c"}}),
         "refresh_contribution": ("POST", f"/api/v1/contributions/{user_id}/refresh", None),
         "global_risk_layers": ("GET", "/api/v1/planning/global-risk-layers", None),
+        "river_watch_reaches": ("GET", "/api/v1/pilot/river-watch/reaches", None),
+        "river_watch_forecast": ("GET", "/api/v1/pilot/river-watch/1", None),
+        "river_watch_feed_preview": ("GET", "/api/v1/pilot/river-watch/1/feed-preview", None),
+        "river_watch_raw": ("GET", "/api/v1/pilot/river-watch/1/raw/2026100100", None),
+        "hand_practice": ("GET", "/api/v1/pilot/hand-demo?stage_m=3", None),
+        "river_watch_districts": ("GET", "/api/v1/pilot/river-watch/districts", None),
+        "river_watch_district": ("GET", "/api/v1/pilot/river-watch/districts/no-such", None),
+        "flood_pilots": ("GET", "/api/v1/pilot/flood", None),
+        "flood_pilot": ("GET", "/api/v1/pilot/flood/bangkok", None),
+        "flood_situation": ("GET", "/api/v1/pilot/flood/bangkok/situation", None),
+        "flood_government_observation_status": (
+            "GET",
+            "/api/v1/pilot/flood/bangkok/government-observations/status",
+            None,
+        ),
+        "flood_roads": ("GET", "/api/v1/pilot/flood/bangkok/roads", None),
+        "flood_reports": ("GET", "/api/v1/pilot/flood/bangkok/reports", None),
+        "flood_areas": ("GET", "/api/v1/pilot/flood/bangkok/areas", None),
+        "flood_cameras": ("GET", "/api/v1/pilot/flood/bangkok/cameras", None),
+        "flood_assets": ("GET", "/api/v1/pilot/flood/bangkok/assets", None),
+        "flood_incidents": ("GET", "/api/v1/pilot/flood/bangkok/incidents", None),
+        "flood_incident": ("GET", f"/api/v1/pilot/flood/bangkok/incidents/{user_id}", None),
+        "flood_incident_review": (
+            "POST", f"/api/v1/pilot/flood/bangkok/incidents/{user_id}/reviews",
+            {"action": "flooding_seen"},
+        ),
+        "flood_facility_access": (
+            "POST", "/api/v1/pilot/flood/bangkok/facilities/access",
+            {"asset_id": "osm:node/0", "action": "access_disrupted"},
+        ),
+        "flood_changes": ("GET", "/api/v1/pilot/flood/bangkok/changes", None),
+        "flood_facts": ("GET", "/api/v1/pilot/flood/bangkok/facts", None),
+        "flood_ask": (
+            "POST", "/api/v1/pilot/flood/bangkok/ask", {"question": "What changed?"}
+        ),
+        "flood_replays": ("GET", "/api/v1/pilot/flood/bangkok/replays", None),
+        "flood_replay_create": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays",
+            {"start_at": "2026-10-01T00:00:00Z", "end_at": "2026-10-01T01:00:00Z"},
+        ),
+        "flood_replay": ("GET", "/api/v1/pilot/flood/bangkok/replays/r00000000000", None),
+        "flood_replay_advance": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/advance",
+            {"by_minutes": 10},
+        ),
+        "flood_replay_restart": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/restart", None
+        ),
+        "flood_replay_delete": (
+            "DELETE", "/api/v1/pilot/flood/bangkok/replays/r00000000000", None
+        ),
+        "flood_replay_inject_report": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/inject-report",
+            {"at": "2026-10-03T04:00:00Z", "lat": 13.8, "lon": 100.5},
+        ),
+        "flood_weather": ("GET", "/api/v1/pilot/flood/bangkok/weather", None),
+        "flood_replay_inject_outage": (
+            "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/inject-outage",
+            {"source_id": "floodboard_roads", "start": "2026-10-03T04:00:00Z",
+             "end": "2026-10-03T04:30:00Z"},
+        ),
+        "flood_road_cameras": (
+            "GET", "/api/v1/pilot/flood/bangkok/roads/0123456789abcdef/cameras", None
+        ),
+        "flood_camera_frame": (
+            "GET", "/api/v1/pilot/flood/bangkok/cameras/bmatraffic%3A1362/frame.jpg", None
+        ),
+        "flood_unknown_pilot": ("GET", "/api/v1/pilot/flood/no-such", None),
+        "flood_feed": ("GET", "/api/v1/pilot/flood/bangkok/feed.json", None),
     }
     method, path, body = requests[route]
     request_headers = dict(headers)
@@ -576,3 +787,66 @@ def test_person_is_rate_limited_after_sixty_requests_a_minute(world) -> None:
 
     assert statuses[:60] == [200] * 60
     assert statuses[60] == 429
+
+
+def test_the_camera_relay_serves_only_bmatraffic_pictures_when_switched_on(
+    world, monkeypatch
+) -> None:
+    import api.flood_pilot as flood_module
+    from core.flood_evidence.camera_relay import BmatrafficRelay
+
+    picture = b"\xff\xd8" + b"x" * 20_000
+    enabled = world["settings"].model_copy(update={"bmatraffic_relay_enabled": True})
+    monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
+    asked: list[str] = []
+
+    def site(_session: str, path: str) -> tuple[int, str, bytes]:
+        asked.append(path)
+        return (200, "image/jpeg", picture) if path.startswith("/show.aspx") else (
+            200, "text/html", b"<html>")
+
+    monkeypatch.setattr(flood_module, "shared_relay", lambda: BmatrafficRelay(fetch=site))
+    limiter.reset()
+    client, headers = _client(world, "planner")
+    base = "/api/v1/pilot/flood/bangkok/cameras"
+    response = client.get(f"{base}/bmatraffic%3A1362/frame.jpg", headers=headers)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.content == picture
+    # Only registry cameras from bmatraffic: another provider or an unknown ID never reaches it.
+    asked.clear()
+    for camera_id in ("bma%3AAC-DD-2-B-C1", "bmatraffic%3A99999999", "bmatraffic%3Aabc"):
+        assert client.get(f"{base}/{camera_id}/frame.jpg", headers=headers).status_code == 404
+    assert asked == []
+    cameras = client.get(base, headers=headers).json()["cameras"]
+    kinds = {(c["provider"], (c["live"] or {}).get("kind")) for c in cameras}
+    assert ("BMA_TRAFFIC", "frames") in kinds and ("BMA_TRAFFIC", None) not in kinds
+
+
+def test_the_public_flood_feed_is_closed_unless_switched_on(world, monkeypatch) -> None:
+    import api.flood_pilot as flood_module
+
+    limiter.reset()
+    client, headers = _client(world, "planner")
+    path = "/api/v1/public/flood/bangkok/feed.json"
+    assert client.get(path).status_code == 404
+    # The signed-in copy answers, with an ETag that gives 304 when nothing changed.
+    signed_in = client.get("/api/v1/pilot/flood/bangkok/feed.json", headers=headers)
+    assert signed_in.status_code == 200 and signed_in.headers["cache-control"].startswith("private")
+    again = client.get("/api/v1/pilot/flood/bangkok/feed.json",
+                       headers={**headers, "If-None-Match": signed_in.headers["etag"]})
+    assert again.status_code == 304
+    # A replay ID never resolves, even for a pilot member.
+    replay = client.get("/api/v1/pilot/flood/r00000000000/feed.json", headers=headers)
+    assert replay.status_code == 404
+
+    enabled = world["settings"].model_copy(update={"flood_feed_public": True})
+    monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
+    anonymous = client.get(path)
+    assert anonymous.status_code == 200
+    assert anonymous.headers["cache-control"] == "public, max-age=60"
+    body = anonymous.json()
+    assert len(body["districts"]) == 56 and body["records"] == []
+    assert client.get("/api/v1/public/flood/no-such/feed.json").status_code == 404
+    assert client.get("/api/v1/public/flood/r00000000000/feed.json").status_code == 404

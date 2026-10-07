@@ -1,5 +1,6 @@
 """Map layers for the Planning workspace: flood overlay picture, centers, placeholders."""
 
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -15,6 +16,8 @@ from api.planning_access import planner_membership
 from api.settings import get_settings
 from core.assessment_models import Boundary, Dataset, DatasetVersion, Feature
 from core.data_library_models import CentreIndicatorValue
+from core.flood_evidence import planner_sources
+from core.flood_evidence.planner_layer import live_layer
 from core.hazard_overlay import legend
 from core.storage import LocalStorage
 
@@ -186,8 +189,20 @@ def map_layers(
         "evacuation_centers": centers,
         "supporting_points": supporting_points,
         "vulnerability": vulnerability,
+        # ADR-0057: the districts with live reported flooding, so the page shows its live group
+        # only there. Empty for a Hub the pilot does not include.
+        "live_flood_areas": _live_flood_areas(hub.hub_code),
         "note": "Available source layers are displayed directly; an assessment is optional.",
     }
+
+
+def _live_flood_areas(hub_code: str) -> list[str]:
+    from core.flood_evidence.config import pilot_config
+
+    config = pilot_config("bangkok")
+    if config is None or hub_code.strip().lower() not in config.hubs:
+        return []
+    return sorted(config.demo_corridor.get("areas") or [])
 
 
 # ADR-0030: an indicator a planner cannot read is withheld with the reason, not silently dropped.
@@ -397,3 +412,65 @@ def centre_indicator_values(
         })
         values.setdefault(str(feature_id), {})[key] = value
     return {"indicators": list(indicators.values()), "values": values}
+
+
+@router.get(
+    "/live-flood",
+    summary="Live reported flooding on roads for a Bangkok planning area (not a flood map)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def live_flood(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    boundary_id: UUID,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """Stored live items inside the area, never part of an assessment."""
+
+    hub = planner_membership(principal, hub_code)
+    boundary = session.get(Boundary, boundary_id)
+    if boundary is None or not boundary.is_supported:
+        raise not_found()
+    return live_layer(
+        session,
+        hub.hub_code,
+        boundary.admin_code,
+        boundary.admin_level,
+        relay=get_settings().bmatraffic_relay_enabled,
+        area_name=boundary.name,
+        area_outline=boundary.geom,
+    )
+
+
+@router.get(
+    "/live-flood/summary",
+    summary="Counts for every live map source over the whole pilot area (Bangkok, Nonthaburi)",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def live_flood_summary(
+    principal: SignedInMember,
+    session: DatabaseSession,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """ADR-0058: the Live layer's switches show these counts before anything is drawn."""
+
+    hub = planner_membership(principal, hub_code)
+    return planner_sources.summary(session, hub.hub_code, get_settings().bmatraffic_relay_enabled)
+
+
+@router.get(
+    "/live-flood/sources/{name}",
+    summary="One live map source for the whole pilot area, without officer checks",
+    openapi_extra={"x-grp-access": "protected"},
+)
+def live_flood_source(
+    name: Literal["roads", "reports", "facilities", "cameras", "outlines"],
+    principal: SignedInMember,
+    session: DatabaseSession,
+    hub_code: str | None = Query(default=None, max_length=64),
+) -> dict[str, object]:
+    """ADR-0058: loaded when its switch is first ticked; never part of an assessment."""
+
+    hub = planner_membership(principal, hub_code)
+    return planner_sources.source(session, hub.hub_code, name,
+                                  get_settings().bmatraffic_relay_enabled)

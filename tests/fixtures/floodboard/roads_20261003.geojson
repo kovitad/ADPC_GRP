@@ -1,0 +1,331 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.50481,
+       13.73958
+      ],
+      [
+       100.50486,
+       13.73966
+      ],
+      [
+       100.50504,
+       13.73991
+      ],
+      [
+       100.50544,
+       13.74037
+      ],
+      [
+       100.50547,
+       13.74041
+      ],
+      [
+       100.50627,
+       13.74134
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "ถนนราชวงศ์",
+    "nameEn": "Ratchawong Road",
+    "hw": "secondary",
+    "depthCm": null,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": true,
+    "conf": 0.19,
+    "updated": 1790928600000,
+    "verdict": {
+     "motorbike": "ok",
+     "sedan": "ok",
+     "pickup": "ok",
+     "truck": "ok"
+    },
+    "sources": [
+     "bma_dds"
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.50697,
+       13.74236
+      ],
+      [
+       100.50709,
+       13.74252
+      ],
+      [
+       100.50725,
+       13.74274
+      ],
+      [
+       100.50753,
+       13.74312
+      ],
+      [
+       100.50792,
+       13.74364
+      ],
+      [
+       100.50802,
+       13.74377
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "ถนนราชวงศ์",
+    "nameEn": "Ratchawong Road",
+    "hw": "secondary",
+    "depthCm": null,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": true,
+    "conf": 0.19,
+    "updated": 1790928600000,
+    "verdict": {
+     "motorbike": "ok",
+     "sedan": "ok",
+     "pickup": "ok",
+     "truck": "ok"
+    },
+    "sources": [
+     "bma_dds"
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.66433,
+       13.72641
+      ],
+      [
+       100.66408,
+       13.72632
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "ซอยพัฒนาการ 65",
+    "nameEn": "Soi Phatthanakan 65",
+    "hw": "residential",
+    "depthCm": null,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": false,
+    "conf": 0.27,
+    "updated": 1790958130642,
+    "verdict": {
+     "motorbike": "caution",
+     "sedan": "caution",
+     "pickup": "caution",
+     "truck": "caution"
+    },
+    "sources": [
+     "traffy"
+    ],
+    "estimated": true,
+    "spreadM": 97
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.79125,
+       13.83633
+      ],
+      [
+       100.79152,
+       13.83573
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "ราษฎร์อุทิศ 58",
+    "nameEn": "Rat Uthit 58",
+    "hw": "residential",
+    "depthCm": 80,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": false,
+    "conf": 0.37,
+    "updated": 1790956675411,
+    "verdict": {
+     "motorbike": "risky",
+     "sedan": "risky",
+     "pickup": "risky",
+     "truck": "risky"
+    },
+    "sources": [
+     "traffy"
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.79152,
+       13.83573
+      ],
+      [
+       100.79192,
+       13.83495
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "ราษฎร์อุทิศ 58",
+    "nameEn": "Rat Uthit 58",
+    "hw": "residential",
+    "depthCm": 80,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": false,
+    "conf": 0.54,
+    "updated": 1790956675411,
+    "verdict": {
+     "motorbike": "blocked",
+     "sedan": "blocked",
+     "pickup": "blocked",
+     "truck": "blocked"
+    },
+    "sources": [
+     "traffy"
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.78943,
+       13.8284
+      ],
+      [
+       100.78974,
+       13.82764
+      ],
+      [
+       100.79002,
+       13.82698
+      ],
+      [
+       100.79044,
+       13.82715
+      ],
+      [
+       100.79084,
+       13.82732
+      ]
+     ],
+     [
+      [
+       100.78992,
+       13.82863
+      ],
+      [
+       100.78951,
+       13.82948
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "",
+    "nameEn": "",
+    "hw": "zone",
+    "depthCm": 60,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": false,
+    "conf": 0.3,
+    "updated": 1790994468727,
+    "verdict": {
+     "motorbike": "risky",
+     "sedan": "risky",
+     "pickup": "risky",
+     "truck": "risky"
+    },
+    "sources": [
+     "cluster"
+    ],
+    "estimated": true,
+    "zone": 7
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       100.66437,
+       13.72642
+      ],
+      [
+       100.66433,
+       13.72641
+      ]
+     ]
+    ]
+   },
+   "properties": {
+    "name": "ซอยพัฒนาการ 65",
+    "nameEn": "Soi Phatthanakan 65",
+    "hw": "residential",
+    "depthCm": null,
+    "closedAll": false,
+    "closedSmall": false,
+    "cleared": false,
+    "conf": 0.27,
+    "updated": 1790958130642,
+    "verdict": {
+     "motorbike": "caution",
+     "sedan": "caution",
+     "pickup": "caution",
+     "truck": "caution"
+    },
+    "sources": [
+     "traffy"
+    ],
+    "estimated": true,
+    "spreadM": 114
+   }
+  }
+ ]
+}

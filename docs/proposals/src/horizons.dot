@@ -1,0 +1,10 @@
+digraph H {
+  graph [rankdir=LR, fontname="Segoe UI", bgcolor="white", pad=0.25, nodesep=0.25];
+  node [shape=box, style="rounded,filled", fontname="Segoe UI", fontsize=11, color="#4b5563", width=2.3];
+  edge [color="#6b7280", arrowsize=0.7];
+  a [label="Months ahead\nPre-season preparedness\nRP100, shelters, population\n(built: district Word report)", fillcolor="#dbeafe"];
+  b [label="Days ahead\nAnticipatory watch\nGEOGLOWS river trend + rain\n(mostly gap)", fillcolor="#fef3c7"];
+  c [label="Hours\nLive situation\nincidents, facilities, cameras\n(built for Bangkok)", fillcolor="#d1fae5"];
+  d [label="After the event\nAfter-action / modelling\nreplay + daily archive\n(archive built)", fillcolor="#ede9fe"];
+  a -> b -> c -> d;
+}

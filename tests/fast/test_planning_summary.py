@@ -166,6 +166,34 @@ def test_the_word_summary_names_global_risks_flood_layer_and_polygon() -> None:
     assert "Villages (villages_th_register)" in text and "GRP's own data" in text
 
 
+def test_a_subdistrict_word_summary_names_its_parent_and_global_risk_scope() -> None:
+    import io
+
+    from docx import Document
+
+    from core.summary_docx import render_summary
+
+    facts = {
+        "generated_at": "5 Oct 2026 16:00", "prepared_by": "Planner", "hub": "ADPC Hub",
+        "area": {
+            "name": "WONG SAWANG", "name_th": "วงศ์สว่าง", "admin_level": "subdistrict",
+            "district_name": "BANG SUE", "district_name_th": "บางซื่อ",
+            "province_name": "BANGKOK", "country_name": "Thailand",
+        },
+        "centres": {"total": 0, "rows": [], "gap_note": "No centres.",
+                    "source_line": "Shelters"},
+    }
+
+    document = Document(io.BytesIO(render_summary(facts)))
+    text = "\n".join(p.text for p in document.paragraphs)
+
+    assert "Flood preparedness summary: WONG SAWANG Sub-district, BANG SUE" in text
+    assert (
+        "Global Risk evidence is for BANG SUE district (it has no sub-district evidence)."
+        in text
+    )
+
+
 def test_only_the_chosen_layers_are_listed_and_a_missing_one_says_so() -> None:
     rows = global_risk_stats({
         "selected_layers": ["schools", "early_warning_towers_ddpm"],

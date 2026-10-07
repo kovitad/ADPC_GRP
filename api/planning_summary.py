@@ -1,8 +1,8 @@
-"""Download everything the Planning page knows about one district, as .docx or .csv (ADR-0033).
+"""Download everything Planning knows about one selected area, as .docx or .csv (ADR-0033).
 
 Every fact is read here from GRP's own records, through the same functions the page uses, so the
-document says what the panel says. The browser supplies only the district, the assessment and a
-map picture it drew; the picture is checked to be a modest PNG and is otherwise just an image.
+document says what the panel says. The browser supplies only the area, the assessment and a map
+picture it drew; the picture is checked to be a modest PNG and is otherwise just an image.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import io
 import re
 import struct
 from datetime import UTC, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 from uuid import UUID
 
@@ -32,9 +32,11 @@ from api.maps import CentreIndicatorRequest, centre_indicator_values, dataset_fe
 from api.permissions import SignedInMember
 from api.planning import _canonical_sig_place
 from api.planning_access import planner_membership
+from api.river_outlook import outlook as river_outlook
 from api.sessions import CurrentPrincipal
 from core.assessment_models import AssessmentFeature, Boundary, Feature
 from core.contribution_models import APPROVED, SigContribution
+from core.flood_evidence.summary_live import live_section
 from core.planning_memory_models import PlanningChatMessage
 from core.summary_docx import STATUS_LABELS, render_summary
 
@@ -59,6 +61,8 @@ class SummaryRequest(BaseModel):
     # A PNG the browser drew from the page's own layers, as base64 or a data: URL.
     map_png: str | None = Field(default=None, max_length=8_500_000)
     map_has_basemap: bool = False
+    # The document's language; texts from data and Global Risk stay as written (ADR-0056).
+    lang: Literal["en", "th"] = "en"
 
 
 def _map_picture(value: str | None) -> bytes | None:
@@ -91,13 +95,13 @@ def _centres(
     session, principal: CurrentPrincipal, hub_code: str, boundary: Boundary,
     assessment_id: UUID | None, layers: dict[str, Any],
 ) -> dict[str, Any]:
-    """The assessment's rows when it belongs to this district; otherwise the source list."""
+    """The assessment's rows when it belongs to this area; otherwise the source list."""
 
     result = None
     if assessment_id is not None:
         result = assessment_result(assessment_id, principal, session)
         if (result.get("area_detail") or {}).get("admin_code") != boundary.admin_code:
-            result = None  # another district's result never enters this one's document
+            result = None  # another area's result never enters this one's document
     rows: list[dict[str, Any]] = []
     if result is not None:
         pairs = session.execute(
@@ -352,6 +356,18 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
                         "Village register", str(source.get("version_id", ""))[:8]])
     sources.append(["boundary", f"{boundary.name} ({boundary.admin_code})", boundary.source,
                     boundary.edition])
+    # ADR-0056: live reported flooding for Bangkok, never part of the assessment above.
+    live = live_section(session, hub.hub_code, boundary.admin_code, boundary.admin_level)
+    # ADR-0059: the GEOGLOWS river outlook, labelled exploratory.
+    river = river_outlook(boundary.admin_code)
+    if river.get("available"):
+        sources.append(["river outlook (exploratory)",
+                        f"GEOGLOWS reach {river['reach']['reach_id']}",
+                        "GEOGLOWS River Forecast System (ECMWF)", river["summary"]["run"]])
+    if live.get("available"):
+        sources.append(["live reported flooding (not part of the assessment)",
+                        "Floodboard roads and reports, grouped by GRP", "Floodboard, CC BY 4.0",
+                        live["as_of"]])
 
     limits = list(result["limits"] if result else LIMITS)
     if result:
@@ -379,15 +395,18 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
         },
         "supporting": supporting,
         "global_risk": _global_risk(session, principal, hub.hub_id, boundary),
+        "live": live,
+        "river": river,
         "limits": limits,
         "sources": sources,
     }
 
 
-def _filename(area: dict[str, Any], extension: str) -> tuple[str, str]:
+def _filename(area: dict[str, Any], extension: str, lang: str = "en") -> tuple[str, str]:
     stem = re.sub(r"[^A-Za-z0-9]+", "-", str(area.get("name") or "district")).strip("-").lower()
     day = datetime.now(BANGKOK).strftime("%Y-%m-%d")
-    ascii_name = f"grp-flood-summary-{stem or 'district'}-{day}.{extension}"
+    suffix = "-th" if lang == "th" else ""
+    ascii_name = f"grp-flood-summary-{stem or 'district'}-{day}{suffix}.{extension}"
     return ascii_name, (
         f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(ascii_name)}"
     )
@@ -395,7 +414,7 @@ def _filename(area: dict[str, Any], extension: str) -> tuple[str, str]:
 
 @router.post(
     "/summary.docx",
-    summary="The district's planning summary as a Word document",
+    summary="The selected area's planning summary as a Word document",
     openapi_extra={"x-grp-access": "protected"},
     response_class=Response,
 )
@@ -404,18 +423,24 @@ def summary_docx(
 ) -> Response:
     picture = _map_picture(payload.map_png)
     facts = gather(session, principal, payload)
-    facts["map"] = {
-        "png": picture,
-        "caption": (
-            f"{_map_title(facts)} District outline and evacuation centres over the flood-depth "
-            "display preview (about 1.9 km per pixel; each centre's status comes from the "
-            "full-resolution layer)."
+    if payload.lang == "th":
+        caption = (
+            f"รูปที่ 1 {facts['area'].get('name_th') or facts['area'].get('name', '')} "
+            f"({facts['centres']['scenario']}) ขอบเขตพื้นที่และศูนย์พักพิงบนภาพแสดงความลึกน้ำ"
+            "อย่างหยาบ (ประมาณ 1.9 กม. ต่อพิกเซล สถานะของแต่ละศูนย์มาจากข้อมูลความละเอียดเต็ม)"
+            + (" แผนที่ฐาน © ผู้ร่วมพัฒนา OpenStreetMap" if payload.map_has_basemap else "")
+        )
+    else:
+        caption = (
+            f"{_map_title(facts)} Selected area outline and evacuation centres over the "
+            "flood-depth display preview (about 1.9 km per pixel; each centre's status comes "
+            "from the full-resolution layer)."
             + (" Base map © OpenStreetMap contributors." if payload.map_has_basemap else "")
-        ),
-    }
-    _, disposition = _filename(facts["area"], "docx")
+        )
+    facts["map"] = {"png": picture, "caption": caption}
+    _, disposition = _filename(facts["area"], "docx", payload.lang)
     return Response(
-        render_summary(facts),
+        render_summary(facts, payload.lang),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": disposition, "Cache-Control": "no-store"},
     )
@@ -434,7 +459,7 @@ def _cell(value: Any) -> Any:
 
 @router.get(
     "/summary/centres.csv",
-    summary="The district's evacuation-centre table as CSV",
+    summary="The selected area's evacuation-centre table as CSV",
     openapi_extra={"x-grp-access": "protected"},
     response_class=Response,
 )
@@ -458,7 +483,8 @@ def summary_centres_csv(
     for row in centres["rows"]:
         writer.writerow([_cell(v) for v in (
             row["name"], row.get("subdistrict"), row.get("village"), row.get("capacity"),
-            row.get("supporting_unit"), STATUS_LABELS.get(row["status"], row["status"]),
+            row.get("supporting_unit"),
+            STATUS_LABELS.get(row["status"], {}).get("en", row["status"]),
             "" if row.get("depth_m") is None else round(row["depth_m"], 2),
             *[(row["indicators"] or {}).get(key) for key in titles],
         )])

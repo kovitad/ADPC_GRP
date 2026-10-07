@@ -45,6 +45,26 @@ services:
       DATA_IN_ROOT: /srv/grp/data-in
       # Local-only pilot: ZIP upload is quarantined in the shared data volume.
       SHELTER_BROWSER_UPLOAD_ENABLED: "true"
+      # ADR-0038: the worker pulls Floodboard's open exports for the Bangkok flood pilot. Local only.
+      FLOOD_PILOT_PULLS_ENABLED: "true"
+      # ADR-0049: Longdo Weather rain context; the key file is written by the launcher from .env.
+      LONGDO_WEATHER_ENABLED: "true"
+      LONGDO_API_KEY_FILE: /run/grp-secrets/longdo_api_key
+      # ADR-0065: optional ThaiWater shadow capture. Set true only after adding the public key.
+      THAIWATER_SHADOW_ENABLED: "${THAIWATER_SHADOW_ENABLED:-false}"
+      THAIWATER_API_KEY_FILE: /run/grp-secrets/thaiwater_api_key
+      THAIWATER_API_BASE_URL: https://twa-api-public.thaiwater.net
+      THAIWATER_POLL_MINUTES: "${THAIWATER_POLL_MINUTES:-15}"
+      # ADR-0051: relay bmatraffic.com camera pictures into the flood page. Local demo only.
+      BMATRAFFIC_RELAY_ENABLED: "true"
+      # ADR-0052: the anonymous live flood feed for Global Risk. Off unless the launcher is run
+      # with FLOOD_FEED_PUBLIC=true; the API port stays on 127.0.0.1, and only grpcli.feed_relay
+      # is put behind a tunnel.
+      FLOOD_FEED_PUBLIC: "${FLOOD_FEED_PUBLIC:-false}"
+      # ADR-0061: the anonymous PM2.5 feed (republished from SERVIR-SEA AQ Tracker). Off by default.
+      AIR_QUALITY_FEED_PUBLIC: "${AIR_QUALITY_FEED_PUBLIC:-false}"
+      # The permanent public address feeds are shared from (Share data). Unset: none yet.
+      GRP_PUBLIC_FEED_BASE_URL: "${GRP_PUBLIC_FEED_BASE_URL:-}"
       # Draft methods run only here, for the SYNTHETIC test case (never on servers).
       ALLOW_DRAFT_METHODS: "true"
       # Local testing clicks through pages quickly; servers keep the Section 13.1 limit of 60.

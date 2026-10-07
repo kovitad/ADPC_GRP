@@ -140,16 +140,35 @@ window.GRP = (() => {
     body.append(row);
   };
 
-  // One top bar for every signed-in page: same items, same order, always left-aligned.
+  // One top bar for every signed-in page, as a grouped menu (docs/pilot/2026-10-05_Navigation_
+  // Live_Feeds_and_Air_Quality_Plan.md): Planning, Assessments, Live, Share data, Admin and the
+  // person's own menu. Every item keeps its data attribute, so pages can still show or hide it.
   const NAV_ITEMS = [
     { key: "planning", label: "Planning", href: "/planning.html" },
     { key: "assessments", label: "Assessments", href: "/assessments.html" },
-    { key: "share", label: "Share data", href: "/contribute.html" },
-    { key: "access", label: "My access", href: "/workspace.html" },
-    { key: "admin", label: "Administration", href: "/workspace.html#admin-panel", attr: "data-admin-menu", hidden: true },
-    { key: "data", label: "Source data", href: "/data-inspector.html", attr: "data-data-menu", hidden: true },
-    { key: "library", label: "Data library", href: "/data-library.html", attr: "data-library-menu", hidden: true },
-    { key: "platform", label: "Platform", href: "/platform.html", attr: "data-platform-menu", hidden: true },
+    {
+      key: "live", label: "Live", items: [
+        // The pilot registry: one entry per pilot. `access` says who may see it.
+        { key: "pilot", label: "Bangkok and Nonthaburi flood", note: "live", href: "/flood.html", attr: "data-pilot-menu", access: "flood", hidden: true },
+        { key: "river", label: "River Watch (GEOGLOWS)", note: "live", href: "/pilot.html", attr: "data-river-menu", access: "admin", hidden: true },
+        { key: "air", label: "Southeast Asia air quality", note: "soon", href: "/air-quality.html", attr: "data-air-menu", access: "admin", hidden: true, soon: true },
+      ],
+    },
+    {
+      key: "share", label: "Share data", items: [
+        { key: "share", label: "Contribute data (files and tables)", href: "/contribute.html" },
+        { key: "share-live", label: "Contribute a live feed", href: "/contribute.html#live-feed" },
+        { key: "share-list", label: "My contributions", href: "/contribute.html#cb-list-heading" },
+      ],
+    },
+    {
+      key: "admin", label: "Admin", items: [
+        { key: "admin", label: "Administration", href: "/workspace.html#admin-panel", attr: "data-admin-menu", hidden: true },
+        { key: "data", label: "Source data", href: "/data-inspector.html", attr: "data-data-menu", hidden: true },
+        { key: "library", label: "Data library", href: "/data-library.html", attr: "data-library-menu", hidden: true },
+        { key: "platform", label: "Platform", href: "/platform.html", attr: "data-platform-menu", hidden: true },
+      ],
+    },
   ];
   const PAGE_KEYS = {
     "/planning.html": "planning",
@@ -160,12 +179,116 @@ window.GRP = (() => {
     "/data-inspector.html": "data",
     "/data-preview.html": "data",
     "/data-library.html": "library",
+    "/pilot.html": "river",
+    "/flood.html": "pilot",
+    "/air-quality.html": "air",
   };
 
   let mePromise = null;
   const me = () => {
     mePromise = mePromise || request("/api/v1/me");
     return mePromise;
+  };
+
+  const menuLink = (item, current) => {
+    const link = document.createElement("a");
+    link.href = item.href;
+    link.dataset.nav = item.key;
+    link.setAttribute("role", "menuitem");
+    if (item.attr) link.setAttribute(item.attr, "");
+    if (item.hidden) link.hidden = true;
+    const label = document.createElement("span");
+    label.textContent = item.label;
+    link.append(label);
+    if (item.note) {
+      const note = document.createElement("small");
+      note.className = `grp-menu__note${item.soon ? " is-soon" : ""}`;
+      note.textContent = item.note;
+      link.append(note);
+    }
+    if (item.key === current) {
+      link.classList.add("is-active");
+      link.setAttribute("aria-current", "page");
+    }
+    if (item.soon) {
+      // Listed so people know it is coming; not a link until its page exists.
+      link.removeAttribute("href");
+      link.setAttribute("aria-disabled", "true");
+      link.classList.add("is-soon");
+    }
+    return link;
+  };
+
+  // A click-to-open menu: Esc or a click outside closes it, arrow keys move between items.
+  const openMenus = new Set();
+  const closeMenus = (except = null) => {
+    openMenus.forEach((menu) => {
+      if (menu === except) return;
+      menu.classList.remove("is-open");
+      menu.querySelector(".grp-menu__button").setAttribute("aria-expanded", "false");
+      openMenus.delete(menu);
+    });
+  };
+  const visibleItems = (menu) => [...menu.querySelectorAll(".grp-menu__panel [role=menuitem]")]
+    .filter((item) => !item.hidden);
+  const buildMenu = (key, label, items, current) => {
+    const menu = document.createElement("div");
+    menu.className = "grp-menu";
+    menu.dataset.menu = key;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "grp-menu__button";
+    button.setAttribute("aria-haspopup", "menu");
+    button.setAttribute("aria-expanded", "false");
+    button.textContent = label;
+    const panel = document.createElement("div");
+    panel.className = "grp-menu__panel";
+    panel.setAttribute("role", "menu");
+    panel.setAttribute("aria-label", label);
+    items.forEach((item) => panel.append(item instanceof Node ? item : menuLink(item, current)));
+    menu.append(button, panel);
+    if (items.some((item) => !(item instanceof Node) && item.key === current)) {
+      button.classList.add("is-active");
+    }
+    const open = (focusFirst) => {
+      closeMenus(menu);
+      menu.classList.add("is-open");
+      button.setAttribute("aria-expanded", "true");
+      openMenus.add(menu);
+      if (focusFirst) visibleItems(menu)[0]?.focus();
+    };
+    button.addEventListener("click", () => {
+      if (menu.classList.contains("is-open")) closeMenus();
+      else open(false);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open(true);
+      }
+    });
+    panel.addEventListener("keydown", (event) => {
+      const list = visibleItems(menu);
+      const at = list.indexOf(document.activeElement);
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        list[(at + step + list.length) % list.length]?.focus();
+      } else if (event.key === "Escape") {
+        closeMenus();
+        button.focus();
+      }
+    });
+    return menu;
+  };
+
+  // A group with nothing the person may open is hidden, and shows again when a page reveals an
+  // item (workspace.js reveals the Administration link after its own access check).
+  const syncGroups = (nav) => {
+    nav.querySelectorAll(".grp-menu[data-menu]").forEach((menu) => {
+      if (menu.dataset.menu === "user") return;
+      menu.hidden = visibleItems(menu).length === 0;
+    });
   };
 
   const renderTopbar = () => {
@@ -190,50 +313,99 @@ window.GRP = (() => {
     name.textContent = "Global Risk Platform";
     brand.append(logo, name);
 
+    const burger = document.createElement("button");
+    burger.type = "button";
+    burger.className = "grp-topbar__burger";
+    burger.setAttribute("aria-label", "Menu");
+    burger.setAttribute("aria-expanded", "false");
+    burger.textContent = "☰";
+
     const nav = document.createElement("nav");
     nav.className = "grp-topbar__nav";
+    nav.id = "grp-main-menu";
     nav.setAttribute("aria-label", "Main menu");
+    burger.setAttribute("aria-controls", nav.id);
     NAV_ITEMS.forEach((item) => {
-      const link = document.createElement("a");
-      link.href = item.href;
-      link.textContent = item.label;
-      link.dataset.nav = item.key;
-      if (item.attr) link.setAttribute(item.attr, "");
-      if (item.hidden) link.hidden = true;
-      if (item.key === current) {
-        link.classList.add("is-active");
-        link.setAttribute("aria-current", "page");
+      if (item.items) {
+        nav.append(buildMenu(item.key, item.label, item.items, current));
+        return;
       }
+      const link = menuLink(item, current);
+      link.removeAttribute("role");
+      link.classList.add("grp-topbar__link");
       nav.append(link);
     });
 
     const user = document.createElement("div");
     user.className = "grp-topbar__user";
-    const who = document.createElement("span");
-    who.className = "grp-topbar__name";
-    who.dataset.topbarName = "";
-    const signOut = document.createElement("button");
-    signOut.type = "button";
-    signOut.className = "grp-topbar__signout";
-    signOut.dataset.signOut = "";
-    signOut.textContent = "Sign out";
     const running = document.createElement("a");
     running.className = "grp-topbar__jobs";
     running.dataset.topbarJobs = "";
     running.hidden = true;
-    user.append(running, who, signOut);
+    const signOut = document.createElement("button");
+    signOut.type = "button";
+    signOut.className = "grp-topbar__signout";
+    signOut.dataset.signOut = "";
+    signOut.setAttribute("role", "menuitem");
+    signOut.textContent = "Sign out";
+    const userMenu = buildMenu("user", "Account", [
+      { key: "access", label: "My access", href: "/workspace.html" },
+      signOut,
+    ], current);
+    const who = userMenu.querySelector(".grp-menu__button");
+    who.classList.add("grp-topbar__name");
+    who.dataset.topbarName = "";
+    user.append(running, userMenu);
 
-    slot.append(brand, nav, user);
+    slot.append(brand, burger, nav, user);
+    syncGroups(nav);
+
+    burger.addEventListener("click", () => {
+      const open = !slot.classList.contains("is-menu-open");
+      slot.classList.toggle("is-menu-open", open);
+      burger.setAttribute("aria-expanded", String(open));
+    });
+    document.addEventListener("click", (event) => {
+      if (![...openMenus].some((menu) => menu.contains(event.target))) closeMenus();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeMenus();
+        slot.classList.remove("is-menu-open");
+        burger.setAttribute("aria-expanded", "false");
+      }
+    });
+    new MutationObserver(() => syncGroups(nav)).observe(nav, {
+      subtree: true, attributes: true, attributeFilter: ["hidden"],
+    });
 
     me()
       .then((identity) => {
         who.textContent = identity.display_name || identity.email;
         who.title = identity.email;
         const isHubAdmin = identity.memberships.some((m) => m.role === "admin");
-        nav.querySelector('[data-nav="admin"]').hidden = !(isHubAdmin || identity.is_platform_admin);
-        nav.querySelector('[data-nav="data"]').hidden = !(isHubAdmin || identity.is_platform_admin);
-        nav.querySelector('[data-nav="library"]').hidden = !(isHubAdmin || identity.is_platform_admin);
+        const isAdmin = isHubAdmin || identity.is_platform_admin;
+        nav.querySelector('[data-nav="admin"]').hidden = !isAdmin;
+        nav.querySelector('[data-nav="data"]').hidden = !isAdmin;
+        nav.querySelector('[data-nav="library"]').hidden = !isAdmin;
         nav.querySelector('[data-nav="platform"]').hidden = !identity.is_platform_admin;
+        // ADR-0036: River Watch is for Admins. ADR-0038: the Bangkok flood view is open to every
+        // member of the pilot's Hubs. Pilots marked "soon" show to Admins only.
+        nav.querySelectorAll(".grp-menu__panel [data-nav]").forEach((link) => {
+          const spec = NAV_ITEMS.flatMap((group) => group.items || []).find((i) => i.key === link.dataset.nav);
+          if (spec && spec.access === "admin") link.hidden = !isAdmin;
+        });
+        const floodLink = nav.querySelector('[data-nav="pilot"]');
+        if (isAdmin) {
+          floodLink.hidden = false;
+        } else if (identity.memberships.length) {
+          request("/api/v1/pilot/flood")
+            .then((answer) => {
+              floodLink.hidden = !(answer.pilots && answer.pilots.length);
+            })
+            .catch(() => {});
+        }
+        syncGroups(nav);
       })
       .catch(() => {});
   };

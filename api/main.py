@@ -8,6 +8,7 @@ from api import (
     access,
     admin,
     ai,
+    air_quality,
     assessments,
     audit,
     auth,
@@ -15,11 +16,14 @@ from api import (
     contributions,
     data_inspector,
     data_library,
+    flood_pilot,
+    hand_demo,
     health,
     maps,
     planning,
     planning_summary,
     platform,
+    river_watch,
     uploads,
 )
 from api.errors import register_error_handlers
@@ -54,8 +58,14 @@ for module in (
     sig,
     data_inspector,
     data_library,
+    river_watch,
+    hand_demo,
+    flood_pilot,
 ):
     app.include_router(module.router, prefix="/api/v1")
+app.include_router(flood_pilot.public_router, prefix="/api/v1")
+app.include_router(air_quality.router, prefix="/api/v1")
+app.include_router(air_quality.public_router, prefix="/api/v1")
 
 
 @app.get("/admin", include_in_schema=False)

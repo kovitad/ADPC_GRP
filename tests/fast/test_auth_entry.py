@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -109,13 +110,22 @@ def test_every_signed_in_page_uses_the_same_top_bar() -> None:
         assert "workspace-nav" not in page and "pw-nav" not in page, name
 
 
-def test_shared_menu_is_compact_and_wraps_on_small_screens() -> None:
+def test_shared_menu_groups_pages_and_folds_on_small_screens() -> None:
     styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+    common = (WEB_ROOT / "grp-common.js").read_text(encoding="utf-8")
 
+    # Planning, Assessments, Live, Share data and Admin, with My access in the person's menu.
+    for label in ('label: "Live"', 'label: "Share data"', 'label: "Admin"', '"My access"',
+                  '"Contribute a live feed"', '"River Watch (GEOGLOWS)"'):
+        assert label in common, label
+    # Menus open on click and close with Esc; pages can still show or hide each item.
+    assert 'aria-haspopup", "menu"' in common and '"Escape"' in common
+    for attr in ("data-admin-menu", "data-data-menu", "data-library-menu", "data-platform-menu",
+                 "data-pilot-menu"):
+        assert attr in common, attr
+    # Narrow screens: the groups become a list opened with the menu button.
     assert "@media (max-width: 900px)" in styles
-    assert "flex-wrap: wrap" in styles
-    assert "flex: 1 0 100%" in styles
-    assert "padding: 0.36rem 0.58rem" in styles
+    assert ".grp-topbar.is-menu-open .grp-topbar__nav { display: flex; }" in styles
 
 
 def test_data_inspector_supports_profiles_and_shareable_reports() -> None:
@@ -217,6 +227,9 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Candidate means lower mapped flood exposure" in page
     assert "Deterministic evidence summary · not publishable" in script
     assert "Key findings from Global Risk evidence" in script
+    assert "/api/v1/maps/live-flood?${params}" in script
+    assert "district_totals.incidents" in script
+    assert "more incident${elsewhere === 1" in script
     assert "Existing evidence may be restored from this browser tab" in script
     # The connection banner offers the one action that helps, and warns before expiry.
     assert "Sign in again" in script
@@ -224,14 +237,52 @@ def test_planning_sig_embed_is_sandboxed_and_educational() -> None:
     assert "Global Risk metadata consistency" in script
     assert "payload.map_note" in script
     assert "verified flood-hazard map" in script
-    assert "/planning.js?v=20260929b" in page
-    assert "/planning.css?v=20260929c" in page
+    # Versioned so a browser never mixes a cached page with a new script (that broke Layers).
+    assert re.search(r"/planning\.js\?v=\d{8}[a-z]", page)
+    assert re.search(r"/planning\.css\?v=\d{8}[a-z]", page)
     assert "Local upload" in script
     assert "Platform baseline" in script
     assert "Synthetic demo" in script
     assert "Manage shelter sources" in page
     assert 'const STORE_KEY = "grp.planning.v5"' in script
     assert "innerHTML" not in script
+
+
+def test_live_shows_thaiwater_shadow_health_without_measurements() -> None:
+    page = (WEB_ROOT / "flood.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "flood.js").read_text(encoding="utf-8")
+    text = (WEB_ROOT / "flood-i18n.js").read_text(encoding="utf-8")
+
+    assert "government-observations/status" in script
+    assert "product.coverage?.stations" in script
+    assert "product.coverage?.districts?.length" in script
+    assert "product.last_success_at" in script
+    assert "government.publication_approved === false" in script
+    assert "governmentObservations;  // health/coverage only; no values" in script
+    assert "ThaiWater government observations (shadow)" in text
+    assert "ข้อมูลตรวจวัดภาครัฐจาก ThaiWater (โหมดเงา)" in text
+    assert "no measurement values" in text
+    assert "ไม่มีค่าตรวจวัด" in text
+    assert re.search(r"/flood\.js\?v=\d{8}[a-z]", page)
+    assert re.search(r"/flood-i18n\.js\?v=\d{8}[a-z]", page)
+
+
+def test_contribution_check_always_reports_progress_and_result_inline() -> None:
+    page = (WEB_ROOT / "contribute.html").read_text(encoding="utf-8")
+    script = (WEB_ROOT / "contribute.js").read_text(encoding="utf-8")
+    styles = (WEB_ROOT / "contribute.css").read_text(encoding="utf-8")
+
+    assert 'data-check-status role="status" aria-live="polite"' in page
+    assert 'button.textContent = "Checking…"' in script
+    assert 'form.setAttribute("aria-busy", "true")' in script
+    assert "Check finished. Fix the marked fields" in script
+    assert "Check finished. Review the exact manifest" in script
+    assert 'setCheckStatus(message, "bad")' in script
+    assert 'button.textContent = "Check"' in script
+    assert ".cb-check-status.is-bad" in styles
+    assert ".cb-check-status.is-ok" in styles
+    assert re.search(r"/contribute\.js\?v=\d{8}[a-z]", page)
+    assert re.search(r"/contribute\.css\?v=\d{8}[a-z]", page)
 
 
 def test_assessments_and_planning_share_compatible_result_context() -> None:
@@ -241,9 +292,13 @@ def test_assessments_and_planning_share_compatible_result_context() -> None:
 
     assert 'data-open-planning' in assessment_page
     assert 'data-incompatible' in assessment_page
-    assert "/assessments.js?v=20260928b" in assessment_page
+    assert re.search(r"/assessments\.js\?v=\d{8}[a-z]", assessment_page)
     assert "Boolean(dataset.synthetic) === Boolean(boundary.synthetic)" in assessment_script
-    assert "Real district: synthetic test inputs are excluded." in assessment_script
+    assert "synthetic test inputs are excluded." in assessment_script
+    assert "data-area-breadcrumb" in assessment_page
+    assert "data-result-breadcrumb" in assessment_page
+    assert "parentDistrictOutline" in assessment_script
+    assert "parent district context" in assessment_page
     assert "/planning.html?assessment_id=" in assessment_script
     assert 'get("assessment_id")' in planning_script
     assert "/assessments.html?assessment_id=" in planning_script

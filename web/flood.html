@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="th" data-title-key="fl.page.title">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b453d" />
+    <title>Bangkok Live Risk Intelligence | SERVIR Global Risk Platform</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="/styles.css?v=20261005a" />
+    <link rel="stylesheet" href="/pilot.css?v=20261003a" />
+    <link rel="stylesheet" href="/flood.css?v=20261005a" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+    <link rel="stylesheet" href="/map-symbols.css?v=20261005d" />
+    <script src="/map-symbols.js?v=20261005d"></script>
+    <script src="/grp-common.js?v=20261005a" defer></script>
+    <script src="/pilot-i18n.js?v=20261003a" defer></script>
+    <script src="/flood-i18n.js?v=20261006a" defer></script>
+    <script src="/flood.js?v=20261006a" defer></script>
+  </head>
+  <body class="workspace-body">
+    <header data-grp-topbar></header>
+    <main class="workspace-main workspace-main--wide" id="main-content">
+      <div class="rw-titlebar">
+        <div>
+          <p class="eyebrow" data-t="fl.eyebrow">Pilot · Bangkok · local demo</p>
+          <h1 data-t="fl.title">Bangkok Live Risk Intelligence</h1>
+        </div>
+        <div class="fl-titletools">
+          <a class="fl-switch" href="/pilot.html" data-river-link hidden data-t="fl.toRiver">River Watch and HAND →</a>
+          <div class="rw-lang" role="group" aria-label="Language / ภาษา">
+            <button type="button" data-lang="th" aria-pressed="false" lang="th">ไทย</button>
+            <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
+          </div>
+        </div>
+      </div>
+      <p class="workspace-intro" data-t-html="fl.intro"></p>
+
+      <p class="fl-replaybar" data-replay-bar role="status" hidden></p>
+      <section class="fl-player" aria-labelledby="fl-player-h" data-player hidden>
+        <h2 id="fl-player-h" class="fl-sr" data-t="rp.player">Replay controls</h2>
+        <p class="fl-player__clock" data-player-clock></p>
+        <p class="fl-muted" data-player-progress></p>
+        <div class="fl-player__buttons">
+          <button type="button" class="button button--primary button--compact" data-player-play data-t="rp.play">Play</button>
+          <label class="fl-field fl-field--inline"><span data-t="rp.speed">Speed</span>
+            <select data-player-speed><option value="1">1×</option><option value="5">5×</option><option value="20" selected>20×</option><option value="60">60×</option></select>
+          </label>
+          <button type="button" class="button button--secondary button--compact" data-player-step="10" data-t="rp.step10">+10 min</button>
+          <button type="button" class="button button--secondary button--compact" data-player-step="60" data-t="rp.step60">+1 hour</button>
+          <button type="button" class="button button--secondary button--compact" data-player-restart data-t="rp.restart">Restart</button>
+          <button type="button" class="button button--secondary button--compact" data-player-delete data-t="rp.delete">Delete replay</button>
+          <a class="fl-switch" href="/flood.html" data-t="rp.live">Back to live data</a>
+        </div>
+        <p class="fl-review__status" data-player-status aria-live="polite"></p>
+        <details class="fl-inject" data-inject>
+          <summary data-t="rp.inject">Add a test event</summary>
+          <p class="fl-muted" data-t="rp.inject.note"></p>
+          <div class="fl-player__buttons">
+            <label class="fl-field"><span data-t="rp.inject.kind">Event</span>
+              <select data-inject-kind><option value="report" data-t="rp.inject.report">A made-up report</option><option value="outage" data-t="rp.inject.outage">A source stops answering</option></select></label>
+            <label class="fl-field" data-inject-only="report"><span data-t="rp.inject.source">Reported by</span>
+              <select data-inject-source><option value="crowd" data-t="src.crowd">Floodboard public report</option><option value="traffy" data-t="src.traffy">Traffy</option><option value="bma_sensor" data-t="src.bma_sensor">BMA sensor</option></select></label>
+            <label class="fl-field" data-inject-only="report"><span data-t="rp.inject.depth">Depth (cm)</span>
+              <input type="number" min="0" max="300" value="40" data-inject-depth /></label>
+            <label class="fl-check" data-inject-only="report"><input type="checkbox" data-inject-dry /><span data-t="rp.inject.dry">Says it is dry</span></label>
+            <label class="fl-field" data-inject-only="outage"><span data-t="rp.inject.feed">Which download</span>
+              <select data-inject-feed><option value="floodboard_roads" data-t="rp.inject.feed.floodboard_roads">Floodboard roads</option><option value="floodboard_reports" data-t="rp.inject.feed.floodboard_reports">Floodboard reports</option></select></label>
+            <label class="fl-field"><span data-t="rp.inject.after">Minutes after the replay clock</span>
+              <input type="number" min="1" max="720" value="5" data-inject-after /></label>
+            <label class="fl-field" data-inject-only="outage"><span data-t="rp.inject.for">For how many minutes</span>
+              <input type="number" min="5" max="720" value="30" data-inject-for /></label>
+            <button type="button" class="button button--secondary button--compact" data-inject-add data-t="rp.inject.add">Add</button>
+          </div>
+          <p class="fl-review__status" data-inject-status aria-live="polite"></p>
+          <ul class="fl-timeline" data-inject-list></ul>
+        </details>
+      </section>
+      <p class="rw-banner is-bad" data-banner hidden></p>
+
+      <section class="fl-controls" aria-label="View">
+        <label class="fl-field">
+          <span data-t="fl.area">District</span>
+          <select data-area></select>
+        </label>
+        <label class="fl-field" data-subdistrict-field hidden>
+          <span data-t="fl.subdistrict">Sub-district</span>
+          <select data-subdistrict></select>
+        </label>
+        <label class="fl-field">
+          <span data-t="fl.vehicle">Colour roads for</span>
+          <select data-vehicle>
+            <option value="sedan" data-t="veh.sedan">Car</option>
+            <option value="motorbike" data-t="veh.motorbike">Motorbike</option>
+            <option value="pickup" data-t="veh.pickup">Pickup</option>
+            <option value="truck" data-t="veh.truck">Truck</option>
+          </select>
+        </label>
+        <label class="fl-check">
+          <input type="checkbox" data-all />
+          <span data-t="fl.showAll">Also show roads marked clear with no recent report</span>
+        </label>
+        <button type="button" class="button button--secondary button--compact" data-refresh data-t="fl.refresh">Check again</button>
+        <p class="fl-asof" data-asof aria-live="polite"></p>
+      </section>
+
+      <section class="fl-cards" aria-label="Now" data-cards>
+        <div class="fl-card"><p class="fl-card__n" data-card="affected">–</p><p class="fl-card__l" data-t="card.affected">Roads with flooding reported now</p></div>
+        <div class="fl-card"><p class="fl-card__n" data-card="blocked">–</p><p class="fl-card__l" data-card-label="blocked"></p></div>
+        <div class="fl-card"><p class="fl-card__n" data-card="closed">–</p><p class="fl-card__l" data-t="card.closed">Roads reported closed to all traffic</p></div>
+        <div class="fl-card"><p class="fl-card__n" data-card="reports">–</p><p class="fl-card__l" data-t="card.reports">Reports in the last hour</p></div>
+        <div class="fl-card fl-card--quiet"><p class="fl-card__n" data-card="old">–</p><p class="fl-card__l" data-t="card.old">Flooded roads with no recent report</p></div>
+        <div class="fl-card"><p class="fl-card__n" data-card="exposed">–</p><p class="fl-card__l" data-t="card.exposed">Schools, hospitals and clinics with flooding reported nearby</p></div>
+        <div class="fl-card"><p class="fl-card__n" data-card="access">–</p><p class="fl-card__l" data-t="card.access">Of those, access to check</p></div>
+        <div class="fl-card fl-card--rain"><p class="fl-card__n fl-card__n--word" data-rain-now>–</p><p class="fl-card__l" data-t="rain.card">Rain now (heaviest in this area)</p><p class="fl-card__l" data-rain-30></p></div>
+        <div class="fl-card" data-card-sources><p class="fl-card__n" data-card="sources">–</p><p class="fl-card__l" data-t="card.sources">Sources not working normally</p></div>
+      </section>
+
+      <section class="fl-incidents" aria-labelledby="fl-inc-h">
+        <div class="fl-inc-head">
+          <h2 id="fl-inc-h" data-t="inc.title">Check first</h2>
+          <p class="fl-inc-count" data-inc-count aria-live="polite"></p>
+        </div>
+        <p class="fl-inc-intro" data-t="inc.intro"></p>
+        <ol class="fl-inc-list" data-incidents></ol>
+        <button type="button" class="fl-linkbtn" data-inc-more hidden></button>
+      </section>
+
+      <section class="fl-changes" aria-labelledby="fl-ch-h">
+        <div class="fl-inc-head">
+          <h2 id="fl-ch-h" data-t="ch.title">What changed</h2>
+          <label class="fl-field fl-field--inline">
+            <span data-t="ch.window">Over the last</span>
+            <select data-ch-window>
+              <option value="30" data-t="ch.w.30">30 minutes</option>
+              <option value="60" selected data-t="ch.w.60">hour</option>
+              <option value="180" data-t="ch.w.180">3 hours</option>
+              <option value="360" data-t="ch.w.360">6 hours</option>
+            </select>
+          </label>
+        </div>
+        <div data-changes aria-live="polite"></div>
+        <p class="fl-muted" data-t="ch.computed">Computed from stored evidence; no AI.</p>
+      </section>
+
+      <section class="fl-ask" aria-labelledby="fl-ask-h">
+        <h2 id="fl-ask-h" data-t="ask.title">Ask about the situation</h2>
+        <p class="fl-inc-intro" data-t="ask.intro"></p>
+        <div class="fl-ask__chips" data-ask-suggestions></div>
+        <label class="fl-ask__label" for="fl-ask-q" data-t="ask.label">Your question</label>
+        <div class="fl-ask__row">
+          <textarea id="fl-ask-q" class="fl-ask__q" maxlength="300" rows="2" data-ask-q></textarea>
+          <button type="button" class="button button--primary" data-ask data-t="ask.button">Ask</button>
+        </div>
+        <p class="fl-review__status" data-ask-status aria-live="polite"></p>
+        <div data-ask-result aria-live="polite"></div>
+      </section>
+
+      <div class="fl-main">
+        <section class="fl-mapwrap" aria-label="Map">
+          <div class="fl-map" data-map></div>
+          <fieldset class="fl-layers" data-layers></fieldset>
+          <ul class="fl-legend" data-legend></ul>
+          <p class="fl-mapnote" data-t-html="fl.mapNote"></p>
+        </section>
+
+        <aside class="fl-evidence" data-evidence aria-live="polite">
+          <p class="fl-evidence__empty" data-t="ev.empty">Tap a road on the map to see the evidence behind it.</p>
+        </aside>
+      </div>
+
+      <section class="fl-coverage" aria-labelledby="fl-coverage-h">
+        <h2 id="fl-coverage-h" data-t="cov.title">What this view is built from</h2>
+        <p class="fl-coverage__note" data-coverage-note></p>
+        <div class="rw-table-wrap">
+          <table class="rw-table">
+            <thead><tr><th scope="col" data-t="cov.th.what">Evidence</th><th scope="col" data-t="cov.th.state">State</th><th scope="col" data-t="cov.th.detail">Detail</th></tr></thead>
+            <tbody data-coverage></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="rw-cards">
+        <section class="rw-card rw-not">
+          <h2 data-t="not.title">What this is not</h2>
+          <ul>
+            <li data-t-html="not.1"></li>
+            <li data-t-html="not.2"></li>
+            <li data-t-html="not.3"></li>
+            <li data-t-html="not.4"></li>
+          </ul>
+        </section>
+        <section class="rw-card rw-next">
+          <h2 data-t="next.title">Coming next in this pilot</h2>
+          <ul>
+            <li data-t="next.1"></li>
+            <li data-t="next.2"></li>
+            <li data-t="next.3"></li>
+            <li data-t="next.4"></li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="fl-replays" aria-labelledby="fl-rp-h" data-replays hidden>
+        <h2 id="fl-rp-h" data-t="rp.title">Replay a past period</h2>
+        <p class="fl-inc-intro" data-t="rp.intro"></p>
+        <p class="fl-muted" data-rp-available></p>
+        <div class="fl-ask__row fl-rp__form">
+          <label class="fl-field"><span data-t="rp.start">Start</span><select data-rp-start></select></label>
+          <label class="fl-field"><span data-t="rp.length">Length</span>
+            <select data-rp-length><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="6">6</option></select>
+          </label>
+          <button type="button" class="button button--secondary" data-rp-create data-t="rp.create">Build replay</button>
+        </div>
+        <p class="fl-review__status" data-rp-status aria-live="polite"></p>
+        <ul class="fl-timeline" data-rp-list></ul>
+      </section>
+
+      <p class="fl-attrib" data-t-html="fl.attrib"></p>
+    </main>
+  </body>
+</html>

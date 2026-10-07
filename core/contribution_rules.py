@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-KINDS = ("vector", "raster", "table", "document", "weights")
+KINDS = ("vector", "raster", "table", "document", "weights", "feed")
 
 REQUIRED: dict[str, tuple[str, ...]] = {
     "vector": ("layer", "url", "title", "description", "source", "license", "vintage"),
@@ -28,6 +28,11 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     ),
     "document": ("pack", "url", "source", "title", "pub_date", "temporal", "validation"),
     "weights": ("hazard", "weights", "rationale"),
+    # A live JSON feed Global Risk fetches itself through generic_json (ADR-0052, Share data).
+    "feed": (
+        "dataset", "title", "description", "source", "validation", "cadence", "url",
+        "records_path", "fields",
+    ),
 }
 OPTIONAL: dict[str, tuple[str, ...]] = {
     "vector": ("countries", "name_field", "usage_notes"),
@@ -35,11 +40,13 @@ OPTIONAL: dict[str, tuple[str, ...]] = {
     "table": ("csv_text", "url", "as_of_field", "usage_notes", "pack"),
     "document": ("usage_notes", "doc_type", "event", "countries", "crops", "filename"),
     "weights": (),
+    "feed": ("as_of_field", "pack", "hazards", "countries", "license", "usage_notes",
+             "residency"),
 }
 # The field Global Risk knows the contribution by, used to match it in contribute_status.
 NAME_FIELD = {
     "vector": "layer", "raster": "layer", "table": "dataset", "document": "title",
-    "weights": "hazard",
+    "weights": "hazard", "feed": "dataset",
 }
 
 VALIDATION = {
@@ -50,6 +57,13 @@ CADENCE = {"monthly", "daily", "annual", "irregular"}
 TEMPORAL = {"forecast", "retrospective"}
 PACKS = {"risk", "food-security"}
 RASTER_PREFIXES = ("hazard_", "risk_", "vulnerability_", "population_")
+# A feed URL must stay up: Global Risk re-reads it, and an approved feed cannot be withdrawn.
+TEMPORARY_HOSTS = ("trycloudflare.com", "ngrok.io", "ngrok-free.app", "ngrok.app", "loca.lt",
+                   "localhost.run", "serveo.net", "localtunnel.me")
+FEED_FETCH_KEYS = ("url", "records_path", "as_of_field", "fields")
+# Owner's choice (5 Oct 2026): a test may go through a temporary tunnel, but only under a test
+# name, so the real name stays free. The test feed is left behind when the tunnel closes.
+TEST_FEED_NAME = re.compile(r"^[a-z][a-z0-9_]*_test\d+$")
 SNAKE = re.compile(r"^[a-z][a-z0-9_]{1,79}$")
 # Global Risk's gate (30 Sep 2026): "layer must be snake_case: lowercase letters, digits,
 # underscores, 3-40 chars". A longer name is declined after the whole submit round trip.
@@ -106,11 +120,19 @@ def _as_mapping(value: Any) -> dict | None:
     return None
 
 
-def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
-    """Clean the manifest and name every problem GRP can see before sending it."""
+def check_manifest(kind: str, manifest: dict[str, Any], test: bool = False) -> Checked:
+    """Clean the manifest and name every problem GRP can see before sending it.
+
+    ``test`` is a live-feed test: a temporary tunnel address is allowed, under a test name only.
+    """
 
     if kind not in KINDS:
         return Checked({}, {"kind": f"Choose one of: {', '.join(KINDS)}."})
+    if kind == "feed" and isinstance(manifest.get("fetch"), dict):
+        # A checked feed comes back nested; flatten it so the same checks run again on send.
+        fetch = manifest["fetch"]
+        manifest = {**{k: v for k, v in manifest.items() if k not in {"fetch", "adapter"}},
+                    **{k: fetch.get(k) for k in FEED_FETCH_KEYS if k in fetch}}
     allowed = set(REQUIRED[kind]) | set(OPTIONAL[kind])
     cleaned: dict[str, Any] = {}
     for key, value in manifest.items():
@@ -130,7 +152,11 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
     if kind == "table" and "csv_text" not in cleaned and "url" not in cleaned:
         problems["csv_text"] = "Paste the CSV or give a link to it."
 
-    if "url" in cleaned:
+    if kind == "feed" and "url" in cleaned:
+        problem = feed_url_problem(str(cleaned["url"]), allow_temporary=test)
+        if problem:
+            problems["url"] = problem
+    elif "url" in cleaned:
         url, problem = drive_download_url(str(cleaned["url"]))
         if problem:
             problems["url"] = problem
@@ -162,7 +188,7 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
             problems[key] = "Write the date as YYYY-MM (or YYYY-MM-DD)."
     if "validation" in cleaned and cleaned["validation"] not in VALIDATION:
         problems["validation"] = f"One of: {', '.join(sorted(VALIDATION))}."
-    if "cadence" in cleaned and cleaned["cadence"] not in CADENCE:
+    if kind != "feed" and "cadence" in cleaned and cleaned["cadence"] not in CADENCE:
         problems["cadence"] = f"One of: {', '.join(sorted(CADENCE))}."
     if "temporal" in cleaned and cleaned["temporal"] not in TEMPORAL:
         problems["temporal"] = "forecast or retrospective."
@@ -171,14 +197,14 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
     for key in ("usage_notes",):
         if key in cleaned and len(str(cleaned[key])) > 500:
             problems[key] = "At most 500 characters."
-    for key in ("countries", "crops"):
+    for key in ("countries", "crops", "hazards"):
         if key in cleaned and isinstance(cleaned[key], str):
             cleaned[key] = [part.strip() for part in cleaned[key].split(",") if part.strip()]
 
     # A population count grid needs no legend (Global Risk's own field note).
     if kind == "raster" and str(cleaned.get("layer", "")).startswith("population_"):
         problems.pop("legend", None)
-    for key in ("legend", "declared", "columns"):
+    for key in ("legend", "declared", "columns", "fields"):
         if key in cleaned:
             mapping = _as_mapping(cleaned[key])
             if mapping is None:
@@ -211,7 +237,60 @@ def check_manifest(kind: str, manifest: dict[str, Any]) -> Checked:
                 elif any(name.startswith("population_") for name in numbers):
                     problems["weights"] = "A population count grid cannot be weighted."
                 cleaned["weights"] = numbers
+
+    if kind == "feed":
+        if test and "dataset" in cleaned and not TEST_FEED_NAME.fullmatch(str(cleaned["dataset"])):
+            problems["dataset"] = (
+                "A test feed's name ends with _test and a number, e.g. "
+                "sea_pm25_province_forecast_test1, so the real name stays free."
+            )
+        if "dataset" in cleaned and not SNAKE.fullmatch(str(cleaned["dataset"])):
+            problems["dataset"] = (
+                "Lower-case letters, digits and underscores, starting with a letter."
+            )
+        fields = cleaned.get("fields")
+        if isinstance(fields, dict) and not all(isinstance(v, str) and v for v in fields.values()):
+            problems["fields"] = "Each output field maps to a path in the record, such as \"name\"."
+        as_of = cleaned.get("as_of_field")
+        if as_of and isinstance(fields, dict) and as_of not in fields:
+            # Global Risk sorts on the mapped output field, not the raw record (seen 5 Oct 2026).
+            problems["as_of_field"] = (
+                "Use one of the output field names above, so records sort by it."
+            )
+        cleaned.setdefault("pack", "risk")
+        # Global Risk requires residency for every feed (declined without it, 5 Oct 2026). A feed
+        # it fetches at query time is always an external call-out.
+        cleaned.setdefault("residency", "external call-out")
+        checked.manifest = {
+            **{k: v for k, v in cleaned.items() if k not in FEED_FETCH_KEYS},
+            "adapter": "generic_json",
+            "fetch": {k: cleaned[k] for k in FEED_FETCH_KEYS if k in cleaned},
+        }
     return checked
+
+
+def feed_url_problem(url: str, allow_temporary: bool = False) -> str | None:
+    """Why Global Risk could not, or should not, fetch this feed URL. None when it looks fine."""
+
+    import ipaddress
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme not in {"http", "https"} or not host:
+        return "Use an http or https link."
+    if parsed.username or parsed.password:
+        return "The link cannot carry a user name or password: Global Risk fetches it anonymously."
+    if host == "localhost" or host.endswith((".local", ".internal", ".localhost")):
+        return "Global Risk cannot reach this computer. Use a public address."
+    try:
+        if not ipaddress.ip_address(host).is_global:
+            return "Global Risk cannot reach a private address. Use a public one."
+    except ValueError:
+        pass
+    if host.endswith(TEMPORARY_HOSTS) and not allow_temporary:
+        return ("This is a temporary tunnel address. An approved feed cannot be withdrawn, so use "
+                "an address that will stay up.")
+    return None
 
 
 def contact_fields(properties: set[str]) -> list[str]:

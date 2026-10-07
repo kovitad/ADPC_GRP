@@ -72,6 +72,22 @@
         ["usage_notes"],
       ],
     },
+    feed: {
+      label: "Live feed",
+      help: "A JSON feed Global Risk fetches itself and serves through feeds_query and its risk answers, such as GRP's Bangkok flood feed or an agency's live API. Global Risk keeps a copy for up to six hours.",
+      fields: [
+        ["dataset", { label: "Feed name", help: "snake_case; it becomes the feed's name on Global Risk, e.g. bangkok_flood_districts_live.", placeholder: "bangkok_flood_districts_live" }],
+        ["title"], ["description"], ["source"], ["validation"],
+        ["cadence", { label: "How often it changes", help: "In words, e.g. every 10 minutes.", placeholder: "every 10 minutes" }],
+        ["url", { label: "Feed address", help: "An http or https address anyone can open, that will stay up. Not a temporary tunnel.", placeholder: "https://grp.example.org/api/v1/public/flood/bangkok/feed.json" }],
+        ["records_path", { label: "Record list", help: "Where the list of records is, as a dot path, e.g. districts or data.rows.", placeholder: "districts" }],
+        ["fields", { label: "Fields to keep", type: "map", help: "Output name to the path inside each record. A list position is a number, e.g. values.0.", placeholder: "{\"district\": \"district_name_en\", \"active\": \"active_incidents\", \"as_of\": \"as_of\"}" }],
+        ["as_of_field", { label: "Date field", optional: true, help: "One of the output names above that holds each record's time, so Global Risk returns the newest records.", placeholder: "as_of" }],
+        ["pack"],
+        ["hazards", { label: "Hazards", type: "list", optional: true, help: "Comma separated. A risk answer cites the feed only for these hazards.", placeholder: "flood, flashflood" }],
+        ["countries"], ["license"], ["usage_notes"],
+      ],
+    },
     weights: {
       label: "Risk weights",
       help: "Changes how the flood risk level is computed from vulnerability layers. It affects the risk levels every Global Risk user sees, for every place.",
@@ -94,7 +110,8 @@
     failed: ["Not sent", "is-bad"],
   };
 
-  const state = { hubCode: null, kind: "vector", values: {}, checked: null, rows: [], timer: null, servir: false };
+  const startKind = window.location.hash === "#live-feed" ? "feed" : "vector";
+  const state = { hubCode: null, kind: startKind, values: {}, checked: null, rows: [], timer: null, servir: false, feedTab: "platform", platformFeeds: null, test: false };
 
   const kindButtons = () => {
     const box = $("[data-kinds]");
@@ -123,6 +140,11 @@
   const renderFields = (problems) => {
     const spec = KINDS[state.kind];
     $("[data-kind-help]").textContent = spec.help;
+    const isFeed = state.kind === "feed";
+    $("[data-feed]").hidden = !isFeed;
+    $("[data-feed-test]").hidden = !isFeed;
+    if (!isFeed) $("[data-feed-result]").hidden = true;
+    if (isFeed) renderFeedSource();
     const box = $("[data-fields]");
     box.replaceChildren();
     spec.fields.map(fieldSpec).forEach((field) => {
@@ -201,6 +223,227 @@
     return manifest;
   };
 
+  // ADR-0052: a live feed from this GRP (filled from its registry) or from another source.
+  const flattenFeed = (manifest) => {
+    const { fetch = {}, adapter: _adapter, ...rest } = manifest;
+    return { ...rest, url: fetch.url || "", records_path: fetch.records_path, fields: fetch.fields, as_of_field: fetch.as_of_field };
+  };
+
+  const renderFeedSource = () => {
+    document.querySelectorAll("[data-feed-tab]").forEach((tab) => {
+      tab.setAttribute("aria-selected", String(tab.dataset.feedTab === state.feedTab));
+    });
+    $("[data-feed-other]").hidden = state.feedTab !== "other";
+    const box = $("[data-feed-platform]");
+    box.hidden = state.feedTab !== "platform";
+    if (state.feedTab !== "platform") return;
+    box.replaceChildren();
+    if (!state.platformFeeds) {
+      box.textContent = "Loading this GRP's feeds…";
+      return;
+    }
+    if (!state.platformFeeds.length) {
+      box.textContent = "This GRP has no feeds to share.";
+      return;
+    }
+    state.platformFeeds.forEach((feed) => {
+      const card = document.createElement("div");
+      card.className = `cb-feed__card${feed.available ? "" : " is-unavailable"}`;
+      const title = document.createElement("strong");
+      title.textContent = feed.label;
+      const name = document.createElement("code");
+      name.textContent = feed.dataset;
+      const summary = document.createElement("p");
+      summary.textContent = feed.summary;
+      card.append(title, name, summary);
+      if (feed.sent) {
+        const sent = document.createElement("p");
+        sent.className = "cb-feed__sent";
+        sent.textContent = feed.sent.source === "this_hub"
+          ? `Already sent by this Hub${feed.sent.state ? ` (${(STATUS[feed.sent.state] || [feed.sent.state])[0]})` : ""}. Global Risk keeps names for good, so it cannot be sent again.`
+          : "This name was already sent to Global Risk by GRP. It cannot be sent again.";
+        card.append(sent);
+      }
+      const read = document.createElement("p");
+      read.className = "cb-feed__read";
+      read.textContent = feed.last_read
+        ? `Read from outside ${feed.last_read.count} time${feed.last_read.count === 1 ? "" : "s"}, last at ${GRP.formatTime(feed.last_read.last)}.`
+        : `Not read from outside since GRP started${state.readsSince ? ` (${GRP.formatTime(state.readsSince)})` : ""}.`;
+      card.append(read);
+      if (feed.reason) {
+        const why = document.createElement("p");
+        why.className = "cb-feed__reason";
+        why.textContent = `Not ready to send: ${feed.reason}`;
+        card.append(why);
+      }
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "button button--secondary";
+      use.textContent = feed.sent ? "Fill the form to compare" : feed.available ? "Use this feed" : "Fill the form anyway";
+      if (feed.available && !feed.sent) {
+        const send = document.createElement("button");
+        send.type = "button";
+        send.className = "button button--primary";
+        send.textContent = "Send to Global Risk";
+        send.addEventListener("click", () => {
+          state.test = false;
+          state.values = flattenFeed(feed.manifest);
+          state.feedTab = "other";
+          renderFields({});
+          check().catch((error) => showBanner(error.message, "bad"));
+        });
+        card.append(send);
+      }
+      if (feed.test_path) card.append(testPanel(feed));
+      use.addEventListener("click", () => {
+        state.test = false;
+        state.values = flattenFeed(feed.manifest);
+        state.feedTab = "other";
+        renderFields({});
+        showBanner(feed.available
+          ? "The form is filled from this GRP's feed. Test it, then check and send."
+          : "The form is filled, but this feed cannot be sent until the reason shown is fixed.", feed.available ? "info" : "bad");
+      });
+      card.append(use);
+      box.append(card);
+    });
+  };
+
+  // Owner's choice (5 Oct 2026): test a platform feed on Global Risk through a temporary tunnel,
+  // under a test name, before a permanent address exists. The test feed stays behind on Global
+  // Risk after the tunnel closes.
+  const testPanel = (feed) => {
+    const box = document.createElement("details");
+    box.className = "cb-feed__test";
+    const summary = document.createElement("summary");
+    summary.textContent = "Test it on Global Risk now";
+    const steps = document.createElement("ol");
+    [
+      "Start the test address on this computer: in a terminal, run .\\scripts\\feed-test-address.ps1 (it switches the feed on, starts the relay and a tunnel, and prints an address ending in trycloudflare.com).",
+      "Paste that address below, check the test name, and press Review.",
+      "Read the review, tick the box and send. Then ask Global Risk with feeds_query and the test name.",
+    ].forEach((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      steps.append(li);
+    });
+    const warn = document.createElement("p");
+    warn.className = "cb-feed__reason";
+    warn.textContent = "The test feed stays on Global Risk for everyone after the tunnel closes, pointing at a dead address, until a Global Risk maintainer removes it. Use a test name so the real name stays free.";
+    const addressLabel = document.createElement("label");
+    addressLabel.className = "cb-field";
+    const addressName = document.createElement("span");
+    addressName.className = "cb-field__name";
+    addressName.textContent = "Test address";
+    const address = document.createElement("input");
+    address.type = "url";
+    address.placeholder = "https://something.trycloudflare.com";
+    addressLabel.append(addressName, address);
+    const nameLabel = document.createElement("label");
+    nameLabel.className = "cb-field";
+    const nameName = document.createElement("span");
+    nameName.className = "cb-field__name";
+    nameName.textContent = "Test name";
+    const name = document.createElement("input");
+    name.type = "text";
+    name.value = `${feed.dataset}_test1`;
+    nameLabel.append(nameName, name);
+    const review = document.createElement("button");
+    review.type = "button";
+    review.className = "button button--primary";
+    review.textContent = "Review the test";
+    review.addEventListener("click", () => {
+      const base = address.value.trim().replace(/\/+$/, "");
+      if (!/^https?:\/\//.test(base)) {
+        showBanner("Paste the test address the script printed, starting with https://.", "bad");
+        return;
+      }
+      const manifest = JSON.parse(JSON.stringify(feed.manifest));
+      manifest.dataset = name.value.trim();
+      manifest.title = `TEST: ${manifest.title}`;
+      manifest.usage_notes = `TEST FEED on a temporary address; it will stop answering. ${manifest.usage_notes || ""}`.slice(0, 500);
+      manifest.fetch.url = `${base}${feed.test_path}`;
+      state.test = true;
+      state.values = flattenFeed(manifest);
+      state.feedTab = "other";
+      renderFields({});
+      showBanner("Test mode: a temporary address under a test name. Check the review below, then send.", "info");
+      check().catch((error) => showBanner(error.message, "bad"));
+    });
+    box.append(summary, steps, warn, addressLabel, nameLabel, review);
+    return box;
+  };
+
+  const loadPlatformFeeds = async () => {
+    if (!state.hubCode) return;
+    try {
+      const result = await GRP.request(`/api/v1/contributions/platform-feeds?hub_code=${encodeURIComponent(state.hubCode)}`);
+      state.platformFeeds = result.feeds || [];
+      state.readsSince = result.reads_since || null;
+    } catch (error) {
+      state.platformFeeds = [];
+      showBanner(error.message, "bad");
+    }
+    if (state.kind === "feed") renderFeedSource();
+  };
+
+  const showFeedResult = (result) => {
+    const box = $("[data-feed-result]");
+    box.replaceChildren();
+    box.hidden = false;
+    box.className = `cb-feed-result ${result.ok ? "is-ok" : "is-bad"}`;
+    const head = document.createElement("strong");
+    head.textContent = result.ok
+      ? `Global Risk would read ${result.count} records and return the last ${result.returned_by_default} by default.`
+      : `Global Risk could not use this feed: ${result.problem}`;
+    box.append(head);
+    if (!result.ok) return;
+    const facts = document.createElement("dl");
+    facts.append(detail("Order", result.order));
+    if (result.as_of) facts.append(detail("Newest record", result.as_of));
+    box.append(facts);
+    (result.notes || []).forEach((note) => {
+      const p = document.createElement("p");
+      p.textContent = note;
+      box.append(p);
+    });
+    const sample = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "The records a default query returns";
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(result.last, null, 2);
+    sample.append(summary, pre);
+    box.append(sample);
+  };
+
+  const testFeed = async () => {
+    const manifest = manifestFromForm();
+    let fields = manifest.fields;
+    if (typeof fields === "string") {
+      showFeedResult({ ok: false, problem: "Fields to keep must be a mapping, for example {\"name\": \"name\"}." });
+      return;
+    }
+    if (!manifest.url || !manifest.records_path || !fields) {
+      showFeedResult({ ok: false, problem: "Give the feed address, the record list and the fields to keep first." });
+      return;
+    }
+    const button = $("[data-feed-test]");
+    button.disabled = true;
+    button.textContent = "Testing…";
+    try {
+      fields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v)]));
+      showFeedResult(await GRP.request("/api/v1/contributions/feed-check", {
+        method: "POST",
+        body: { hub_code: state.hubCode, url: manifest.url, records_path: manifest.records_path, fields, as_of_field: manifest.as_of_field || null, test: state.test },
+      }));
+    } catch (error) {
+      showFeedResult({ ok: false, problem: error.message });
+    } finally {
+      button.disabled = false;
+      button.textContent = "Test the feed";
+    }
+  };
+
   const showBanner = (text, kind = "info") => {
     const banner = $("[data-banner]");
     banner.textContent = text;
@@ -225,43 +468,71 @@
     else dialog.setAttribute("open", "");
   };
 
+  const setCheckStatus = (text, kind = "") => {
+    const status = $("[data-check-status]");
+    status.textContent = text;
+    status.className = `cb-check-status${kind ? ` is-${kind}` : ""}`;
+  };
+
   const check = async () => {
     const manifest = manifestFromForm();
+    const button = $("[data-check]");
+    const form = $("[data-form]");
+    state.checked = null;
     $("[data-confirm]").hidden = true;
-    const result = await GRP.request("/api/v1/contributions", {
-      method: "POST",
-      body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true },
-    });
-    renderFields(result.problems || {});
-    if (result.duplicate) {
-      showBanner(result.duplicate.message, "bad");
-      showDuplicate(result.duplicate);
-      return;
+    button.disabled = true;
+    button.textContent = "Checking…";
+    form.setAttribute("aria-busy", "true");
+    setCheckStatus(`Checking this ${KINDS[state.kind].label.toLowerCase()}…`);
+    try {
+      const result = await GRP.request("/api/v1/contributions", {
+        method: "POST",
+        body: { hub_code: state.hubCode, kind: state.kind, manifest, preview: true, test: state.test },
+      });
+      renderFields(result.problems || {});
+      if (result.duplicate) {
+        setCheckStatus("This name is already on Global Risk. Nothing was sent.", "bad");
+        showBanner(result.duplicate.message, "bad");
+        showDuplicate(result.duplicate);
+        return;
+      }
+      if (Object.keys(result.problems || {}).length) {
+        setCheckStatus("Check finished. Fix the marked fields, then check again.", "bad");
+        showBanner("Fix the marked fields, then check again.", "bad");
+        return;
+      }
+      showBanner("");
+      state.checked = result;
+      const notes = $("[data-notes]");
+      notes.replaceChildren(...(result.notes || []).map((note) => {
+        const item = document.createElement("li");
+        item.textContent = note;
+        return item;
+      }));
+      $("[data-manifest]").textContent = JSON.stringify(result.manifest, null, 2);
+      // Worded to stay true whether Global Risk auto-approves (as on 30 Sep 2026) or reviews first.
+      $("[data-warning]").textContent = state.kind === "feed"
+        ? "Global Risk approves contributions at once on this server: the feed will be live for every Global Risk user, and only a Global Risk reviewer can remove it. It fetches the address again on later reads, so the address must stay up."
+        : state.kind === "weights"
+        ? "This changes the flood risk levels every Global Risk user sees, everywhere. Global Risk may apply it as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer."
+        : "Global Risk may publish this to every Global Risk user as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer.";
+      $("[data-agree-text]").textContent = state.kind === "weights"
+        ? "I understand Global Risk may change risk levels for every Global Risk user, and that I may not be able to take it back."
+        : "I understand Global Risk may make this available to every Global Risk user, and that I may not be able to take it back.";
+      $("[data-agree]").checked = false;
+      $("[data-send]").disabled = true;
+      $("[data-confirm]").hidden = false;
+      setCheckStatus("Check finished. Review the exact manifest below before sending.", "ok");
+      $("[data-confirm]").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (error) {
+      const message = error.message || "The contribution could not be checked.";
+      setCheckStatus(message, "bad");
+      showBanner(message, "bad");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Check";
+      form.removeAttribute("aria-busy");
     }
-    if (Object.keys(result.problems || {}).length) {
-      showBanner("Fix the marked fields, then check again.", "bad");
-      return;
-    }
-    showBanner("");
-    state.checked = result;
-    const notes = $("[data-notes]");
-    notes.replaceChildren(...(result.notes || []).map((note) => {
-      const item = document.createElement("li");
-      item.textContent = note;
-      return item;
-    }));
-    $("[data-manifest]").textContent = JSON.stringify(result.manifest, null, 2);
-    // Worded to stay true whether Global Risk auto-approves (as on 30 Sep 2026) or reviews first.
-    $("[data-warning]").textContent = state.kind === "weights"
-      ? "This changes the flood risk levels every Global Risk user sees, everywhere. Global Risk may apply it as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer."
-      : "Global Risk may publish this to every Global Risk user as soon as it arrives. The reply says whether it was approved or is waiting for a reviewer. An approved contribution may only be removable by a Global Risk reviewer.";
-    $("[data-agree-text]").textContent = state.kind === "weights"
-      ? "I understand Global Risk may change risk levels for every Global Risk user, and that I may not be able to take it back."
-      : "I understand Global Risk may make this available to every Global Risk user, and that I may not be able to take it back.";
-    $("[data-agree]").checked = false;
-    $("[data-send]").disabled = true;
-    $("[data-confirm]").hidden = false;
-    $("[data-confirm]").scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   const send = async () => {
@@ -271,7 +542,7 @@
     try {
       const result = await GRP.request("/api/v1/contributions", {
         method: "POST",
-        body: { hub_code: state.hubCode, kind: state.kind, manifest: state.checked.manifest, preview: false },
+        body: { hub_code: state.hubCode, kind: state.kind, manifest: state.checked.manifest, preview: false, test: state.test },
       });
       if (!result.sent) {
         renderFields(result.problems || {});
@@ -292,7 +563,9 @@
       });
       $("[data-confirm]").hidden = true;
       state.checked = null;
-      showBanner("Sent. Global Risk is downloading and checking the file; this can take a few minutes. You can leave this page: the top bar will tell you when it lands.", "info");
+      showBanner(state.kind === "feed"
+        ? "Sent. Global Risk is fetching the feed once to check it; this usually takes under a minute. You can leave this page: the top bar will tell you when it lands."
+        : "Sent. Global Risk is downloading and checking the file; this can take a few minutes. You can leave this page: the top bar will tell you when it lands.", "info");
       await loadList();
     } catch (error) {
       showBanner(error.message, "bad");
@@ -417,7 +690,8 @@
         fix.textContent = "Fix and send again";
         fix.addEventListener("click", () => {
           state.kind = row.kind;
-          state.values = { ...row.manifest };
+          state.values = row.kind === "feed" ? flattenFeed(row.manifest || {}) : { ...row.manifest };
+          if (row.kind === "feed") state.feedTab = "other";
           document.querySelectorAll("[data-kinds] input").forEach((input) => {
             input.checked = input.value === row.kind;
           });
@@ -427,7 +701,16 @@
         });
         actions.append(fix);
       }
-      if (row.status === "approved" && row.kind !== "weights") {
+      if (row.status === "approved" && row.kind === "feed") {
+        const how = document.createElement("p");
+        how.className = "cb-item__how";
+        how.append("Ask Global Risk through its MCP tools: ");
+        const code = document.createElement("code");
+        code.textContent = `feeds_query("${row.name}")`;
+        how.append(code, ", or any risk question whose hazard the feed declares.");
+        item.append(how);
+      }
+      if (row.status === "approved" && !["weights", "feed"].includes(row.kind)) {
         const use = document.createElement("a");
         use.className = "button button--primary button--compact";
         use.href = `/planning.html?ask=${encodeURIComponent(tryQuestion(row))}`;
@@ -542,13 +825,24 @@
   });
   $("[data-reset]").addEventListener("click", () => {
     state.values = {};
+    state.checked = null;
+    state.test = false;
     $("[data-confirm]").hidden = true;
+    setCheckStatus("");
     renderFields({});
   });
   $("[data-agree]").addEventListener("change", (event) => {
     $("[data-send]").disabled = !event.currentTarget.checked;
   });
   $("[data-send]").addEventListener("click", () => send());
+  $("[data-feed-test]").addEventListener("click", () => testFeed());
+  document.querySelectorAll("[data-feed-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      collect();
+      state.feedTab = tab.dataset.feedTab;
+      renderFeedSource();
+    });
+  });
   $("[data-edit]").addEventListener("click", () => {
     $("[data-confirm]").hidden = true;
   });
@@ -568,6 +862,7 @@
         return;
       }
       state.hubCode = membership.hub_code;
+      loadPlatformFeeds();
       $("[data-hub-name]").textContent = membership.hub_name;
       await Promise.all([checkServir(), loadList()]);
       if (state.servir) {

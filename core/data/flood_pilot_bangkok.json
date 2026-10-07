@@ -1,0 +1,123 @@
+{
+  "pilot_id": "bangkok",
+  "title": {
+    "en": "Bangkok flood pilot",
+    "th": "นำร่องน้ำท่วมกรุงเทพฯ"
+  },
+  "hubs": [
+    "adpc"
+  ],
+  "demo_corridor": {
+    "title": {
+      "en": "Bangkok and Nonthaburi (56 districts)",
+      "th": "กรุงเทพฯ และนนทบุรี (56 เขต/อำเภอ)"
+    },
+    "areas": [
+      "1001", "1002", "1003", "1004", "1005", "1006", "1007", "1008", "1009", "1010",
+      "1011", "1012", "1013", "1014", "1015", "1016", "1017", "1018", "1019", "1020",
+      "1021", "1022", "1023", "1024", "1025", "1026", "1027", "1028", "1029", "1030",
+      "1031", "1032", "1033", "1034", "1035", "1036", "1037", "1038", "1039", "1040",
+      "1041", "1042", "1043", "1044", "1045", "1046", "1047", "1048", "1049", "1050",
+      "1201", "1202", "1203", "1204", "1205", "1206"
+    ],
+    "chosen": "Product Owner, 3 October 2026 (Bang Sue and Chatuchak); Bang Kapi and Lat Krabang added the same day; whole Bangkok on 4 October 2026; Nonthaburi (1201-1206) added the same day (ADR-0057)"
+  },
+  "rain_areas": {
+    "areas": [
+      "1029",
+      "1030",
+      "1006",
+      "1011"
+    ],
+    "note": "District rain stays on the first four demo districts to keep Longdo Weather calls flat; the busiest active incidents anywhere in Bangkok still get their own rain."
+  },
+  "map": {
+    "center": [
+      13.75,
+      100.55
+    ],
+    "zoom": 11,
+    "bbox": [
+      100.32,
+      13.49,
+      100.94,
+      13.96
+    ]
+  },
+  "freshness_minutes": {
+    "current": 30,
+    "recent": 120,
+    "aging": 360,
+    "stale": 720
+  },
+  "report_window_hours": {
+    "default": 6,
+    "max": 24
+  },
+  "exposure": {
+    "near_m": 150,
+    "frontage_m": 60,
+    "note": "Display thresholds for the demo, not validated rules. near_m: a flooded road this close makes a facility potentially exposed. frontage_m: a closed or truck-risky road this close puts access under review."
+  },
+  "retention": {
+    "raw_days": 14,
+    "exposure_days": 7,
+    "note": "ADR-0045. Raw downloads and report IDs older than raw_days are removed (fetch rows and SHA-256 stay); per-snapshot facility states older than exposure_days are deleted. Observations, incidents and events are kept."
+  },
+  "sources": [
+    {
+      "source_id": "floodboard_roads",
+      "adapter": "floodboard_roads",
+      "url": "https://www.floodboard.org/api/export/roads.geojson",
+      "interval_minutes": 10,
+      "max_bytes": 20000000,
+      "owner": "Floodboard",
+      "dataset": "Flooded roads (roads.geojson)",
+      "purpose": "Road flood state and Floodboard's per-vehicle verdict",
+      "access": "Public HTTPS export, no key",
+      "license": "CC BY 4.0",
+      "attribution": "Floodboard (floodboard.org), CC BY 4.0",
+      "update_frequency": "Continuous; cached 30 seconds",
+      "coverage": "Bangkok and nearby provinces",
+      "pii": "None in road properties",
+      "redistribution": "Allowed with attribution",
+      "quality_notes": "A fusion of Traffy, crowd reports and BMA sensors. No feature IDs; GRP identifies a segment by a hash of its geometry. Features marked zone, estimated, inferred or cluster are Floodboard's own derivations. The verdict is Floodboard's estimate, not a BMA rule."
+    },
+    {
+      "source_id": "floodboard_reports",
+      "adapter": "floodboard_reports",
+      "url": "https://www.floodboard.org/api/export/reports.csv",
+      "interval_minutes": 15,
+      "max_bytes": 20000000,
+      "owner": "Floodboard",
+      "dataset": "Recent reports (reports.csv)",
+      "purpose": "Point reports behind the road states, about the last 24 hours",
+      "access": "Public HTTPS export, no key",
+      "license": "CC BY 4.0 for the export; quoted text may carry other terms",
+      "attribution": "Floodboard (floodboard.org), CC BY 4.0",
+      "update_frequency": "Continuous; cached 4 hours",
+      "coverage": "Bangkok and nearby provinces",
+      "pii": "Report text and links can identify people. GRP keeps only a hash of the text and never displays it.",
+      "redistribution": "Export allowed with attribution; quoted text not cleared",
+      "quality_notes": "Each row names its underlying source (traffy, crowd, bma_sensor, bma_dds, news). A sensor keeps one ID across readings."
+    },
+    {
+      "source_id": "longdo_events",
+      "adapter": "longdo_events",
+      "url": "https://event.longdo.com/feed/json",
+      "interval_minutes": 15,
+      "max_bytes": 10000000,
+      "owner": "Longdo Traffic (Metamedia Technology)",
+      "dataset": "Traffic events feed: flood events only",
+      "purpose": "Independent flood reports, mostly official Department of Highways (DOH) road status",
+      "access": "Public HTTPS feed, no key",
+      "license": "Not stated; credit Longdo Traffic, DOH and iTIC",
+      "attribution": "Longdo Traffic event feed (DOH, iTIC and Longdo users)",
+      "update_frequency": "Continuous",
+      "coverage": "Thailand; GRP keeps the Bangkok region",
+      "pii": "Contributor names can be usernames: only a source family is kept. Description text is kept as a hash.",
+      "redistribution": "Not stated; local demo only",
+      "quality_notes": "Flood events only (icon 'flood'). 'Passable' means flooded but passable, never dry. Times are Bangkok time; expired events are dropped."
+    }
+  ]
+}

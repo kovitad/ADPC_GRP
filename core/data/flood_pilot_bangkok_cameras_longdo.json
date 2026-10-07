@@ -1,0 +1,368 @@
+{
+ "_source": {
+  "provider": "iTIC Foundation / Longdo Traffic (Metamedia Technology)",
+  "url": "https://camera.longdo.com/feed/?command=json",
+  "retrieved_at": "2026-10-03T08:18:29+00:00",
+  "sha256": "c09a0b6c05a3fc2123d1160cae95f124eafe686bb59ae76e7b31ef344b4d1fd4",
+  "records_received": 186,
+  "records_kept": 21,
+  "terms": "Documented public feed; no licence stated beyond copyright. Used for the Gate A local demo with credit; confirm terms before wider use.",
+  "use": "Location and the published HLS live stream, played by the officer's browser."
+ },
+ "defaults": {
+  "provider": "ITIC_LONGDO",
+  "heading_deg": null,
+  "fov_deg": null,
+  "access_mode": "embed",
+  "viewer_url": "https://camera.longdo.com/",
+  "stream_url": null,
+  "snapshot_url": null,
+  "status": "unknown",
+  "status_checked_at": null,
+  "related_sensor_ids": [],
+  "rights": "iTIC Foundation / Longdo Traffic public feed; credit required",
+  "retention_policy": "No video is stored",
+  "ingestion_allowed": false,
+  "cv_allowed": false,
+  "placeholder": false,
+  "source_label": "iTIC Foundation · Longdo Traffic"
+ },
+ "cameras": [
+  {
+   "camera_id": "itic:ITICM_BMAMI0071",
+   "provider_camera_id": "ITICM_BMAMI0071",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ถ.พระราม4 แยกทางด่วนพระราม4",
+    "en": "(กรุงเทพมหานคร) ถ.พระราม4 แยกทางด่วนพระราม4"
+   },
+   "lat": 13.72309,
+   "lon": 100.552203,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.14_8002.m3u8"
+   },
+   "district_code": "1007",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0072",
+   "provider_camera_id": "ITICM_BMAMI0072",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ทางด่วน แยกทางด่วนพระราม4",
+    "en": "(กรุงเทพมหานคร) ทางด่วน แยกทางด่วนพระราม4"
+   },
+   "lat": 13.72257,
+   "lon": 100.553284,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.14_8003.m3u8"
+   },
+   "district_code": "1033",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0074",
+   "provider_camera_id": "ITICM_BMAMI0074",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ถ.พระราม4 แยกทางด่วนพระราม4",
+    "en": "(กรุงเทพมหานคร) ถ.พระราม4 แยกทางด่วนพระราม4"
+   },
+   "lat": 13.723356,
+   "lon": 100.551694,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.14_8001.m3u8"
+   },
+   "district_code": "1007",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0076",
+   "provider_camera_id": "ITICM_BMAMI0076",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ถนนสาทรหน้าสถานเอกอัครราชทูตเยอรมนี",
+    "en": "(กรุงเทพมหานคร) ถนนสาทรหน้าสถานเอกอัครราชทูตเยอรมนี"
+   },
+   "lat": 13.725388,
+   "lon": 100.542599,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.15_8552.m3u8"
+   },
+   "district_code": "1028",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0080",
+   "provider_camera_id": "ITICM_BMAMI0080",
+   "name": {
+    "th": "(กรุงเทพมหานคร) เชิงสะพานตากสิน ฝั่งสาทร บริเวณจุดกลับใต้สะพาน",
+    "en": "(กรุงเทพมหานคร) เชิงสะพานตากสิน ฝั่งสาทร บริเวณจุดกลับใต้สะพาน"
+   },
+   "lat": 13.718527,
+   "lon": 100.515279,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.18_8002.m3u8"
+   },
+   "district_code": "1004",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0081",
+   "provider_camera_id": "ITICM_BMAMI0081",
+   "name": {
+    "th": "(กรุงเทพมหานคร) เชิงสะพานตากสิน ฝั่งสาทร มุ่งหน้าถนนสาทร",
+    "en": "(กรุงเทพมหานคร) เชิงสะพานตากสิน ฝั่งสาทร มุ่งหน้าถนนสาทร"
+   },
+   "lat": 13.718309,
+   "lon": 100.516079,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.18_8001.m3u8"
+   },
+   "district_code": "1004",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0102",
+   "provider_camera_id": "ITICM_BMAMI0102",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ทางด่วน แยกทางด่วนพระราม4",
+    "en": "(กรุงเทพมหานคร) ทางด่วน แยกทางด่วนพระราม4"
+   },
+   "lat": 13.722297,
+   "lon": 100.552604,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.14_8554.m3u8"
+   },
+   "district_code": "1028",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0124",
+   "provider_camera_id": "ITICM_BMAMI0124",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ทางพิเศษศรีรัชด้านใต้ถนนกำแพงเพชร",
+    "en": "(กรุงเทพมหานคร) ทางพิเศษศรีรัชด้านใต้ถนนกำแพงเพชร"
+   },
+   "lat": 13.794136,
+   "lon": 100.539016,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.19_8801.m3u8"
+   },
+   "district_code": "1014",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0125",
+   "provider_camera_id": "ITICM_BMAMI0125",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ทางพิเศษศรีรัช ด้านเหนือถนนกำแพงเพชร",
+    "en": "(กรุงเทพมหานคร) ทางพิเศษศรีรัช ด้านเหนือถนนกำแพงเพชร"
+   },
+   "lat": 13.795449,
+   "lon": 100.539338,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.19_8802.m3u8"
+   },
+   "district_code": "1014",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0164",
+   "provider_camera_id": "ITICM_BMAMI0164",
+   "name": {
+    "th": "(กรุงเทพมหานคร) รัชดาภิเษก-วงศ์สว่าง",
+    "en": "(กรุงเทพมหานคร) รัชดาภิเษก-วงศ์สว่าง"
+   },
+   "lat": 13.828649,
+   "lon": 100.528819,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/charlie-new-tran-8.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0165",
+   "provider_camera_id": "ITICM_BMAMI0165",
+   "name": {
+    "th": "(กรุงเทพมหานคร) Big C วงศ์สว่าง",
+    "en": "(กรุงเทพมหานคร) Big C วงศ์สว่าง"
+   },
+   "lat": 13.827772,
+   "lon": 100.52788,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/charlie-new-tran-10.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0166",
+   "provider_camera_id": "ITICM_BMAMI0166",
+   "name": {
+    "th": "(กรุงเทพมหานคร) MRT วงศ์สว่าง",
+    "en": "(กรุงเทพมหานคร) MRT วงศ์สว่าง"
+   },
+   "lat": 13.828683,
+   "lon": 100.527849,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/charlie-new-tran-9.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0188",
+   "provider_camera_id": "ITICM_BMAMI0188",
+   "name": {
+    "th": "(กรุงเทพมหานคร) แยกประชานิเวศน์",
+    "en": "(กรุงเทพมหานคร) แยกประชานิเวศน์"
+   },
+   "lat": 13.839855,
+   "lon": 100.541248,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/charlie-new5.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0208",
+   "provider_camera_id": "ITICM_BMAMI0208",
+   "name": {
+    "th": "(กรุงเทพมหานคร) Bangna-Trat",
+    "en": "(กรุงเทพมหานคร) Bangna-Trat"
+   },
+   "lat": 13.666554,
+   "lon": 100.640951,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.21_8001.m3u8"
+   },
+   "district_code": "1047",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0209",
+   "provider_camera_id": "ITICM_BMAMI0209",
+   "name": {
+    "th": "(กรุงเทพมหานคร) Bangna-Trat",
+    "en": "(กรุงเทพมหานคร) Bangna-Trat"
+   },
+   "lat": 13.668852,
+   "lon": 100.629175,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.21_8002.m3u8"
+   },
+   "district_code": "1047",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0210",
+   "provider_camera_id": "ITICM_BMAMI0210",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ประชานุกูลไปแยกประชาชื่น",
+    "en": "(กรุงเทพมหานคร) ประชานุกูลไปแยกประชาชื่น"
+   },
+   "lat": 13.829911,
+   "lon": 100.538867,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/cl209-d.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0211",
+   "provider_camera_id": "ITICM_BMAMI0211",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ประชานุกูลไปต่างระดับรัชวิภา",
+    "en": "(กรุงเทพมหานคร) ประชานุกูลไปต่างระดับรัชวิภา"
+   },
+   "lat": 13.830396,
+   "lon": 100.539249,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/cl210-d.m3u8"
+   },
+   "district_code": "1030",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0212",
+   "provider_camera_id": "ITICM_BMAMI0212",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ประชานุกูลไปแยกประชานิเวศน์",
+    "en": "(กรุงเทพมหานคร) ประชานุกูลไปแยกประชานิเวศน์"
+   },
+   "lat": 13.831026,
+   "lon": 100.53918,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/cl211-d.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0213",
+   "provider_camera_id": "ITICM_BMAMI0213",
+   "name": {
+    "th": "(กรุงเทพมหานคร) ประชานุกูลไปวงศ์สว่าง",
+    "en": "(กรุงเทพมหานคร) ประชานุกูลไปวงศ์สว่าง"
+   },
+   "lat": 13.830535,
+   "lon": 100.538049,
+   "live": {
+    "kind": "hls",
+    "url": "https://camerai1.iticfoundation.org/hls/cl212-d.m3u8"
+   },
+   "district_code": "1029",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0292",
+   "provider_camera_id": "ITICM_BMAMI0292",
+   "name": {
+    "th": "(กรุงเทพมหานคร) รพ.บางปะกอก 9",
+    "en": "(กรุงเทพมหานคร) รพ.บางปะกอก 9"
+   },
+   "lat": 13.681438,
+   "lon": 100.474641,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.22_8554.m3u8"
+   },
+   "district_code": "1035",
+   "credit": "iTIC Motion"
+  },
+  {
+   "camera_id": "itic:ITICM_BMAMI0293",
+   "provider_camera_id": "ITICM_BMAMI0293",
+   "name": {
+    "th": "(กรุงเทพมหานคร) รพ.บางปะกอก 9",
+    "en": "(กรุงเทพมหานคร) รพ.บางปะกอก 9"
+   },
+   "lat": 13.681598,
+   "lon": 100.475303,
+   "live": {
+    "kind": "hls",
+    "url": "https://camera1.iticfoundation.org/hls/10.8.0.22_8555.m3u8"
+   },
+   "district_code": "1035",
+   "credit": "iTIC Motion"
+  }
+ ]
+}

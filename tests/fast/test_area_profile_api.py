@@ -111,6 +111,31 @@ def test_a_planner_sees_the_stored_counts_with_the_unconfirmed_source_named(worl
     assert "not yet confirmed" in payload["source"]["caveat"]
 
 
+def test_a_subdistrict_profile_names_its_parent_district(world) -> None:
+    session = world["session"]
+    parent = session.get(Boundary, world["boundary_id"])
+    subdistrict = Boundary(
+        admin_code="330301",
+        admin_level="subdistrict",
+        name="DUM YAI",
+        name_th="ดูนใหญ่",
+        province_name="SI SA KET",
+        country_name="Thailand",
+        geom={"type": "Polygon", "coordinates": []},
+        source=parent.source,
+        edition=parent.edition,
+        geometry_sha256="d" * 64,
+        is_supported=True,
+    )
+    session.add(subdistrict)
+    session.commit()
+
+    payload = routes.area_profile(subdistrict.id, _principal(), session, None)
+
+    assert payload["area"]["district_name"] == "KANTHARAROM"
+    assert payload["area"]["district_name_th"] == "กันทรารมย์"
+
+
 def test_an_area_with_no_summary_reports_none_rather_than_zero_people(world) -> None:
     session = world["session"]
     session.query(AreaPopulationSummary).delete()

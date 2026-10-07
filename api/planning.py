@@ -50,6 +50,19 @@ from api.sig_jobs import app_session, run_in_background, sig_lookups
 from core.access_models import PLANNING_MEMBER_ROLES, AuditEvent, AuditResult
 from core.ai_allowance import usage_view
 from core.assessment_models import Assessment, Boundary, Dataset, DatasetVersion, Method
+from core.flood_evidence.answer import PROMPT_VERSION as LIVE_PROMPT_VERSION
+from core.flood_evidence.answer import build_prompt as build_live_prompt
+from core.flood_evidence.answer import gate as live_gate
+from core.flood_evidence.answer import instructions_for as live_instructions
+from core.flood_evidence.planner_answer import (
+    NO_WARNINGS,
+    computed_planner_answer,
+    in_live_area,
+    live_facts,
+    unavailable_answer,
+)
+from core.flood_evidence.planner_answer import label_for as live_label
+from core.flood_evidence.planner_answer import language as live_language
 from core.hazard_import import PLATFORM_HAZARD_DATASET_ID
 from core.identity import MembershipView
 from core.local_evidence import RETRIEVAL as LOCAL_RETRIEVAL
@@ -116,8 +129,11 @@ ROUTER_INSTRUCTIONS = (
     '"sig_flood" when the user asks to show or explain flood, risk, population, schools, '
     "hospitals, buildings, roads or movement information for a named Thailand district, or asks "
     "for Global Risk evidence without naming a place while context.selected_area is set; "
+    '"live_flood" when the user asks about flooding happening now, today or currently, '
+    "reported flooding, flooded roads right now, or early warning, for a Bangkok district or "
+    "for context.selected_area; "
     '"chat" for greetings and general explanations that need no data; '
-    '"cannot" for anything else (other hazards, current conditions, access or role changes, '
+    '"cannot" for anything else (other hazards, access or role changes, '
     "safety certification, private data). Put the area the user mentioned in place, always "
     "written in English as the official romanized name, e.g. 'Chiang Yuen District, Maha "
     "Sarakham, Thailand' for เชียงยืน มหาสารคาม, or null. Put a flood return period "
@@ -275,7 +291,7 @@ def _decision(text: str) -> dict[str, Any]:
         value = json.loads(text.strip().removeprefix("```json").removesuffix("```").strip())
     except (json.JSONDecodeError, TypeError, ValueError):
         return fallback
-    modes = {"chat", "sig_flood", "cannot", "explain_result", "run_assessment"}
+    modes = {"chat", "sig_flood", "cannot", "explain_result", "run_assessment", "live_flood"}
     if not isinstance(value, dict) or value.get("mode") not in modes:
         return fallback
     reply = value.get("reply")
@@ -886,6 +902,73 @@ async def planning_chat(
     return response
 
 
+async def _answer_live_flood(
+    payload: PlanningChat,
+    principal: CurrentPrincipal,
+    session: Session,
+    settings: Settings,
+    hub: Any,
+    selected: Boundary | None,
+    boundaries: list[Boundary],
+    place: str | None,
+    export: Any,
+) -> dict[str, Any]:
+    """ADR-0056 step 3: live reported flooding for a Bangkok area, worded only from computed
+    facts. Never cached, never part of an assessment, and always ends with the fixed D8 text."""
+
+    lang = live_language(payload.message)
+    base = {"hub_code": hub.hub_code}
+    area = selected if selected is not None and in_live_area(selected.admin_code) else None
+    if area is None and place:
+        named = _match_boundary(boundaries, place)
+        if (named is not None and in_live_area(named.admin_code)
+                and _message_names_boundary(payload.message, named)):
+            area = named
+    if area is None:
+        if selected is not None or place:
+            answer = unavailable_answer("outside_coverage", lang)
+        else:
+            answer = {
+                "en": "Select a Bangkok district on the map, or name one, to see live reported "
+                      "flooding.",
+                "th": "เลือกเขตในกรุงเทพฯ บนแผนที่ หรือระบุชื่อเขต เพื่อดูรายงานน้ำท่วมแบบสด",
+            }[lang] + "\n\n" + NO_WARNINGS[lang]
+        return {**base, "mode": "live_flood_unavailable", "answer": answer,
+                "label": "Live reported flooding covers Bangkok only.",
+                "usage": _usage(session, settings, principal)}
+    live = live_facts(session, hub.hub_code, area.admin_code, area.admin_level)
+    if not live["available"]:
+        return {**base, "mode": "live_flood_unavailable",
+                "answer": unavailable_answer(live["reason"], lang),
+                "label": "Live reported flooding is not available here.",
+                "usage": _usage(session, settings, principal)}
+    text = computed_planner_answer(live, lang)
+    wording = "Computed answer."
+    try:
+        worded = await run_ai_call(
+            session, settings, user_id=principal.user_id, hub_id=hub.hub_id,
+            hub_code=hub.hub_code, instructions=live_instructions(lang),
+            prompt=build_live_prompt(payload.message, live["facts"]),
+            prompt_version=LIVE_PROMPT_VERSION, export=export,
+        )
+        if not live_gate(worded.text, live["facts"], payload.message):
+            text = worded.text + "\n\n" + NO_WARNINGS[lang]
+            wording = "AI wording of the computed facts; check the cited evidence."
+    except GrpError:
+        pass  # the computed answer stands
+    return {
+        **base,
+        "mode": "live_flood",
+        "answer": text,
+        "label": f"{live_label(live)} {wording}",
+        "live": {"boundary_id": str(area.id), "district_code": live["district_code"],
+                 "district_name": live["district_name"],
+                 "rolled_up_from": live["rolled_up_from"]},
+        "facts": live["facts"],
+        "usage": _usage(session, settings, principal),
+    }
+
+
 async def _answer_chat(
     payload: PlanningChat,
     principal: CurrentPrincipal,
@@ -995,6 +1078,10 @@ async def _answer_chat(
 
     example_area = (selected or (boundaries[0] if boundaries else None))
     example_area = example_area.name if example_area else "a district"
+
+    if mode == "live_flood":
+        return await _answer_live_flood(payload, principal, session, settings, hub, selected,
+                                        boundaries, decision["place"], export)
 
     if mode == "explain_result":
         if current is None or current.state != AssessmentState.SUCCEEDED:

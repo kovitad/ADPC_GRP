@@ -36,3 +36,6 @@ htmlcov/
 
 # Office decks are shared outside the repo
 *.pptx
+
+# Office lock files
+~$*

@@ -1,0 +1,48 @@
+{
+  "dataset": "sea_pm25_province_forecast",
+  "title": "Southeast Asia PM2.5 forecast by province (latest 3-hour step)",
+  "description": "One record per province in 11 Southeast Asian countries (351), from SERVIR Southeast Asia / ADPC AQ Tracker: PM2.5 average, minimum and maximum over the grid cells in the province at the 3-hourly forecast step closest to now, with an indicative US EPA category. A model forecast (NASA GEOS-CF, bias-corrected), not a station measurement. Republished by ADPC GRP with the step time on every record and the worst provinces last.",
+  "source": "SERVIR Southeast Asia / ADPC AQ Tracker, from NASA GEOS-CF (bias-corrected); republished by ADPC GRP",
+  "validation": "single-agency",
+  "residency": "external call-out",
+  "cadence": "a new 3-hourly forecast step every 3 hours; new runs daily",
+  "adapter": "generic_json",
+  "fetch": {
+    "url": "{public_base}/api/v1/public/aq/sea/feed.json",
+    "records_path": "records",
+    "as_of_field": "forecast_time",
+    "fields": {
+      "province": "province",
+      "country": "country",
+      "area_id": "area_id",
+      "pm25_avg": "pm25_avg",
+      "pm25_max": "pm25_max",
+      "category": "category",
+      "lat": "lat",
+      "lon": "lon",
+      "forecast_time": "forecast_time",
+      "init_date": "init_date",
+      "valid_until": "valid_until"
+    }
+  },
+  "pack": "risk",
+  "hazards": [
+    "air_quality",
+    "pm25"
+  ],
+  "countries": [
+    "Thailand",
+    "Laos",
+    "Cambodia",
+    "Vietnam",
+    "Myanmar",
+    "Malaysia",
+    "Singapore",
+    "Indonesia",
+    "Philippines",
+    "Brunei",
+    "Timor-Leste"
+  ],
+  "license": "unstated (SERVIR Southeast Asia / ADPC public feed; confirm with the AQ Tracker team)",
+  "usage_notes": "Southeast Asia only, µg/m³. The default returns the worst provinces; pass {limit: 351} for all. The category is indicative: US EPA categories are for 24-hour averages and this is one 3-hour step. A forecast, not a measurement: check forecast_time and valid_until. Credit: SERVIR Southeast Asia / ADPC AQ Tracker, NASA GEOS-CF."
+}
