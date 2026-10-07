@@ -11,8 +11,12 @@
   District-summary Word generation may include up to four credited BMA Traffic or allow-listed
   municipal snapshot pictures and stores no copy; video-only sources are not converted into stills.
   Deploy the next successful immutable image with the new flag, then browser-check one BMA Traffic
-  camera, one supported municipal snapshot camera and both kinds of Word summary. Validation:
-  **1,265 passed, 2 PostgreSQL-only tests skipped**; Ruff, Bash syntax and whitespace checks pass.
+  camera, one supported municipal snapshot camera and both kinds of Word summary. The first remote
+  test exposed why a fresh Lightsail camera session failed while localhost could still work:
+  BMA changed its canonical home path so `/index.aspx` now returns 404, while `/` returns 200 and
+  sets the required session cookie. The relay now initializes at `/`; a real bounded check fetched
+  camera 184 as a 14,998-byte JPEG. Validation before this follow-up: **1,265 passed, 2
+  PostgreSQL-only tests skipped**; Ruff, Bash syntax and whitespace checks pass.
 - **Public pilot feeds deployed:** the Product Owner confirmed provider publication was discussed
   and approved for the temporary pilot. ADR-0068 adds a fail-closed, rate-limited, database-only
   ThaiWater latest-observation feed at

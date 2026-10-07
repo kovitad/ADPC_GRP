@@ -111,7 +111,7 @@ class BmatrafficRelay:
         """Visit the home page and this camera's player page, as a person would."""
 
         visit.close()
-        for path in ("/index.aspx", f"/PlayVideo.aspx?ID={camera_id}"):
+        for path in ("/", f"/PlayVideo.aspx?ID={camera_id}"):
             status, _, _ = self._fetch(visit, camera_id, path)
             if status != 200:
                 raise RelayUnavailable(f"HTTP {status}")

@@ -32,7 +32,7 @@ class Site:
 
     def __call__(self, session: str, path: str) -> tuple[int, str, bytes]:
         self.calls.append(path.split("&")[0])
-        if path == "/index.aspx":
+        if path == "/":
             self.home.add(session)
             return 200, "text/html", b"<html>"
         if path.startswith("/PlayVideo.aspx?ID="):
@@ -62,13 +62,13 @@ def test_one_session_then_one_shared_picture_a_second() -> None:
     relay = BmatrafficRelay(fetch=site, clock=clock)
     first = relay.frame("1362")
     assert first.body == picture_of("1362")
-    assert site.calls == ["/index.aspx", "/PlayVideo.aspx?ID=1362", "/show.aspx?image=1362"]
+    assert site.calls == ["/", "/PlayVideo.aspx?ID=1362", "/show.aspx?image=1362"]
     clock.now += 0.5
     assert relay.frame("1362") is first  # every viewer shares it within the second
     clock.now += 0.6
     relay.frame("1362")
     assert site.calls.count("/show.aspx?image=1362") == 2
-    assert site.calls.count("/index.aspx") == 1
+    assert site.calls.count("/") == 1
 
 
 def test_a_blank_picture_opens_a_new_session_once_then_gives_up() -> None:
@@ -76,7 +76,7 @@ def test_a_blank_picture_opens_a_new_session_once_then_gives_up() -> None:
     site = Site(pictures=[blank, (200, "image/jpeg", PICTURE)])
     relay = BmatrafficRelay(fetch=site, clock=Clock())
     assert relay.frame("1108").body == PICTURE
-    assert site.calls.count("/index.aspx") == 2
+    assert site.calls.count("/") == 2
 
     site = Site(pictures=[blank, blank])
     with pytest.raises(RelayUnavailable):
@@ -101,7 +101,7 @@ def test_each_camera_has_its_own_session_and_shows_its_own_picture() -> None:
     assert relay.frame("1108").body == picture_of("1108")
     clock.now += 1.0
     assert relay.frame("1362").body == picture_of("1362")
-    assert site.calls.count("/index.aspx") == 2  # one session each, opened once
+    assert site.calls.count("/") == 2  # one session each, opened once
 
 
 def test_an_idle_camera_loses_its_session_and_picture() -> None:

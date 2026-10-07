@@ -86,6 +86,14 @@ stills.
 Repository and deployment defaults remain false. Removing the setting and recreating API/worker
 reverts the pilot to provider links without deleting data.
 
+## Amendment, 7 October 2026: provider home path
+
+The first Lightsail test exposed a provider-side path change: `www.bmatraffic.com/index.aspx` now
+returns HTTP 404, while the canonical home path `/` returns HTTP 200 and sets the required ASP.NET
+session cookie. A long-lived local relay session could continue to work, which explained the
+local-versus-Lightsail difference. Session initialization now opens `/` before the selected player.
+A real bounded check retrieved camera 184 as a 14,998-byte JPEG through the same relay code.
+
 ## Validation
 
 - `tests/fast/test_flood_camera_relay.py`:
