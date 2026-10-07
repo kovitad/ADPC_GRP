@@ -1,6 +1,18 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 7 October 2026.
+- **Camera pilot exception approved:** the Product Owner approved in-page camera pictures on the
+  temporary Lightsail pilot, including BMA Traffic and other already-supported municipal snapshot
+  cameras. Bootstrap 1.5.0 adds the explicit `--enable-camera-relay` switch while the repository
+  default remains false. The protected relay keeps the existing registry allowlist, per-person and
+  upstream limits, transient in-memory handling, attribution and `no-store`; it does not publish,
+  retain or analyse pictures. The API may retrieve BMA's picture over HTTP, but signed-in browsers
+  receive it through GRP's same-origin HTTPS route, so there is no mixed-content embed.
+  District-summary Word generation may include up to four credited BMA Traffic or allow-listed
+  municipal snapshot pictures and stores no copy; video-only sources are not converted into stills.
+  Deploy the next successful immutable image with the new flag, then browser-check one BMA Traffic
+  camera, one supported municipal snapshot camera and both kinds of Word summary. Validation:
+  **1,265 passed, 2 PostgreSQL-only tests skipped**; Ruff, Bash syntax and whitespace checks pass.
 - **Public pilot feeds deployed:** the Product Owner confirmed provider publication was discussed
   and approved for the temporary pilot. ADR-0068 adds a fail-closed, rate-limited, database-only
   ThaiWater latest-observation feed at

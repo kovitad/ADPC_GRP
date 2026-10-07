@@ -25,11 +25,18 @@ sudo mkdir -p /srv/grp/bootstrap
 sudo curl -fsSL https://raw.githubusercontent.com/kovitad/ADPC_GRP/main/deploy/bootstrap-ubuntu.sh -o /srv/grp/bootstrap/bootstrap-ubuntu.sh
 ```
 
-## 4. Deploy the approved pilot image and enable both public pilot feeds
+## 4. Deploy the approved pilot image, feeds and protected camera relay
 
 ```bash
-sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-<approved-short-sha> --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds --enable-public-flood-feed
+sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-<approved-short-sha> --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds --enable-public-flood-feed --enable-camera-relay
 ```
+
+The Product Owner approved the camera relay as a temporary pilot exception. It lets signed-in
+members see BMA Traffic and supported municipal snapshot cameras inside GRP. GRP retrieves the
+provider's HTTP picture server-side and returns it through the protected same-origin HTTPS route,
+so the browser does not embed mixed HTTP content. Requests remain rate-limited and pictures are
+not stored. District-summary Word downloads may include up to four credited BMA Traffic or
+allow-listed municipal snapshot pictures; video-only sources are not converted into report stills.
 
 The bootstrap preserves the existing database, `/srv/grp/secrets`, OAuth settings, ThaiWater
 capture configuration and Caddy certificate. Wait until it finishes before running verification.
@@ -65,8 +72,11 @@ curl -sI https://servir-risk.kovitad.com/flood.html | grep -i '^Referrer-Policy:
 ```
 
 The expected value is `strict-origin-when-cross-origin`. If it still says `no-referrer`, Caddy has
-not applied the map fix. Never paste API keys, OAuth tokens, cookies or secret-file contents into
-the terminal command, documentation or chat.
+not applied the map fix. After signing in, open a BMA Traffic camera and a Pak Kret municipal
+camera where available; each should show changing pictures inside GRP rather than only a new-tab
+link. Generate district-summary Word documents for areas with nearby BMA Traffic and municipal snapshot
+cameras and confirm that credited pictures appear. Never paste API keys, OAuth tokens, cookies or
+secret-file contents into the terminal command, documentation or chat.
 
 ## Troubleshooting sudo
 

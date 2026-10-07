@@ -23,6 +23,7 @@ from core.flood_evidence.config import pilot_config
 from core.flood_evidence.incident_store import list_incidents
 from core.flood_evidence.planner_answer import BANGKOK, NO_WARNINGS, live_facts
 from core.flood_evidence.situation import current_roads
+from core.flood_evidence.snapshot_relay import PROVIDERS as SNAPSHOT_PROVIDERS
 
 CAMERA_RADIUS_M = 400
 MAX_PICTURES = 4
@@ -30,14 +31,29 @@ STALE_MINUTES = 120
 CREDIT = "Floodboard (floodboard.org), CC BY 4.0; facilities © OpenStreetMap contributors and DDPM"
 CAMERA_CREDIT = "BMA traffic camera (bmatraffic.com)"
 
-# Fetches one camera picture: (provider camera ID) -> (JPEG bytes, retrieved_at). Tests replace it.
-FrameGetter = Callable[[str], tuple[bytes, datetime]]
+# Fetches one allow-listed camera picture: camera record -> (JPEG bytes, retrieved_at).
+# Tests replace it; production dispatches only to the two bounded relay implementations.
+FrameGetter = Callable[[dict[str, Any]], tuple[bytes, datetime]]
 
 
-def _relay_frame(provider_camera_id: str) -> tuple[bytes, datetime]:
-    from core.flood_evidence.camera_relay import shared_relay
+def _can_fetch(camera: dict[str, Any]) -> bool:
+    return (
+        camera.get("provider") == BMATRAFFIC
+        and str(camera.get("provider_camera_id") or "").isdigit()
+    ) or (
+        camera.get("provider") in SNAPSHOT_PROVIDERS and bool(camera.get("_snapshot_url"))
+    )
 
-    frame = shared_relay().frame(provider_camera_id)
+
+def _relay_frame(camera: dict[str, Any]) -> tuple[bytes, datetime]:
+    if camera.get("provider") in SNAPSHOT_PROVIDERS:
+        from core.flood_evidence.snapshot_relay import shared_snapshot_relay
+
+        frame = shared_snapshot_relay().frame(camera["camera_id"], camera["_snapshot_url"])
+    else:
+        from core.flood_evidence.camera_relay import shared_relay
+
+        frame = shared_relay().frame(str(camera["provider_camera_id"]))
     return frame.body, frame.retrieved_at
 
 
@@ -56,7 +72,7 @@ def _camera_name(camera: dict[str, Any]) -> Any:
 
 
 def _cameras(session: Session, live: dict[str, Any], now: datetime,
-             get_frame: FrameGetter) -> list[dict[str, Any]]:
+             get_frame: FrameGetter, include_pictures: bool) -> list[dict[str, Any]]:
     """The camera nearest each listed incident, with a picture for up to MAX_PICTURES of them."""
 
     config = pilot_config("bangkok")
@@ -65,6 +81,7 @@ def _cameras(session: Session, live: dict[str, Any], now: datetime,
     roads = {f["properties"]["id"]: f["geometry"]
              for f in current_roads(session, config, now, include_all=True)["features"]}
     registry = camera_registry(config.base_id)
+    snapshot_urls = {camera.camera_id: camera.snapshot_url for camera in registry}
     out, used, pictures = [], set(), 0
     for label, incident_id in zip(
         [f["id"] for f in live["facts"] if f["kind"] == "incident"], incident_ids, strict=True
@@ -78,23 +95,29 @@ def _cameras(session: Session, live: dict[str, Any], now: datetime,
         if not lines:
             continue
         footprint = {"type": "MultiLineString", "coordinates": lines}
-        near = [c for c in nearby_cameras(registry, footprint, now, CAMERA_RADIUS_M)
-                if not c.get("placeholder") and c["camera_id"] not in used]
+        near = [
+            {**camera, "_snapshot_url": snapshot_urls.get(
+                camera["camera_id"], camera.get("_snapshot_url")
+            )}
+            for camera in nearby_cameras(registry, footprint, now, CAMERA_RADIUS_M)
+            if not camera.get("placeholder") and camera["camera_id"] not in used
+        ]
         if not near:
             continue
         # Prefer a camera whose picture GRP can fetch; otherwise list the nearest one.
-        camera = next((c for c in near if c["provider"] == BMATRAFFIC
-                       and str(c.get("provider_camera_id") or "").isdigit()), near[0])
+        camera = next((c for c in near if _can_fetch(c)), near[0])
         used.add(camera["camera_id"])
         item = {"incident": label, "name": _camera_name(camera),
                 "distance_m": camera["distance_m"],
                 "source": camera.get("source_label") or camera["provider"],
                 "viewer_url": camera.get("viewer_url"), "picture": None, "picture_at": None,
                 "picture_note": None}
-        if camera["provider"] == BMATRAFFIC and pictures < MAX_PICTURES:
+        if include_pictures and _can_fetch(camera) and pictures < MAX_PICTURES:
             try:
-                body, at = get_frame(str(camera["provider_camera_id"]))
-                item.update(picture=body, picture_at=_clock(at), credit=CAMERA_CREDIT)
+                body, at = get_frame(camera)
+                credit = (CAMERA_CREDIT if camera["provider"] == BMATRAFFIC
+                          else camera.get("source_label") or camera["provider"])
+                item.update(picture=body, picture_at=_clock(at), credit=credit)
                 pictures += 1
             except Exception:  # a camera that does not answer is listed without a picture
                 item["picture_note"] = "camera did not answer"
@@ -104,7 +127,8 @@ def _cameras(session: Session, live: dict[str, Any], now: datetime,
 
 def live_section(session: Session, hub_code: str, admin_code: str, admin_level: str,
                  now: datetime | None = None,
-                 get_frame: FrameGetter | None = None) -> dict[str, Any]:
+                 get_frame: FrameGetter | None = None,
+                 include_camera_pictures: bool = True) -> dict[str, Any]:
     """Everything the summary's live section shows, or why it cannot be shown."""
 
     now = now or datetime.now(UTC)
@@ -132,7 +156,9 @@ def live_section(session: Session, hub_code: str, admin_code: str, admin_level: 
         "incidents_not_listed": limits.get("incidents_not_listed", 0),
         "facilities": [f for f in facts if f["kind"] == "facility"],
         "rain": by_id.get("W"),
-        "cameras": _cameras(session, live, now, get_frame or _relay_frame),
+        "cameras": _cameras(
+            session, live, now, get_frame or _relay_frame, include_camera_pictures
+        ),
         "credit": CREDIT,
         "no_warnings": NO_WARNINGS,
     }

@@ -52,16 +52,19 @@ def test_staging_sets_permanent_feed_address_but_keeps_public_routes_off() -> No
     assert '--enable-thaiwater-shadow) ENABLE_THAIWATER_SHADOW="true"' in script
     assert '--enable-public-pilot-feeds) ENABLE_PUBLIC_PILOT_FEEDS="true"' in script
     assert '--enable-public-flood-feed) ENABLE_PUBLIC_FLOOD_FEED="true"' in script
+    assert '--enable-camera-relay) ENABLE_CAMERA_RELAY="true"' in script
     assert 'set_env_value FLOOD_PILOT_PULLS_ENABLED "true"' in script
     assert 'set_env_value FLOOD_FEED_PUBLIC "true"' in script
     assert 'set_env_value THAIWATER_FEED_PUBLIC "true"' in script
     assert 'set_env_value AIR_QUALITY_FEED_PUBLIC "true"' in script
+    assert 'set_env_value BMATRAFFIC_RELAY_ENABLED "true"' in script
     assert 'set_env_value THAIWATER_API_KEY_FILE "/run/grp-secrets/thaiwater_api_key"' in script
     assert 'read -r -s -p "ThaiWater API key: " THAIWATER_KEY' in script
     assert "FLOOD_PILOT_PULLS_ENABLED=false" in environment
     assert "FLOOD_FEED_PUBLIC=false" in environment
     assert "THAIWATER_FEED_PUBLIC=false" in environment
     assert "AIR_QUALITY_FEED_PUBLIC=false" in environment
+    assert "BMATRAFFIC_RELAY_ENABLED=false" in environment
 
 
 def test_staging_content_policy_allows_pinned_map_dependencies_and_tiles() -> None:

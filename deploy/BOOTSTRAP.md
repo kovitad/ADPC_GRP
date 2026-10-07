@@ -86,7 +86,12 @@ because `.env.example` leaves every publication switch false. After provider app
 `--enable-public-pilot-feeds` option enables only the ThaiWater and PM2.5 anonymous pilot routes;
 it does not submit a Global Risk contribution. The separate `--enable-public-flood-feed` option
 enables regular Floodboard pulls and the anonymous district route. That route returns 503 until a
-successful timestamped roads snapshot exists, then 200. Verify the feeds at:
+successful timestamped roads snapshot exists, then 200. The Product Owner may explicitly add
+`--enable-camera-relay` for the temporary pilot: signed-in members then receive supported BMA
+Traffic and municipal snapshot pictures through the bounded protected GRP relay. The API may call
+the provider over HTTP, but the browser receives the picture from GRP over same-origin HTTPS.
+Pictures are rate-limited, held only briefly in memory and never stored. Omit the option outside
+the approved pilot. Verify the feeds at:
 
 - `/api/v1/public/flood/bangkok/government-observations/feed.json`
 - `/api/v1/public/aq/sea/feed.json`

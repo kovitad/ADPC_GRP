@@ -34,6 +34,7 @@ from api.planning import _canonical_sig_place
 from api.planning_access import planner_membership
 from api.river_outlook import outlook as river_outlook
 from api.sessions import CurrentPrincipal
+from api.settings import get_settings
 from core.assessment_models import AssessmentFeature, Boundary, Feature
 from core.contribution_models import APPROVED, SigContribution
 from core.flood_evidence.summary_live import live_section
@@ -357,7 +358,13 @@ def gather(session, principal: CurrentPrincipal, request: SummaryRequest) -> dic
     sources.append(["boundary", f"{boundary.name} ({boundary.admin_code})", boundary.source,
                     boundary.edition])
     # ADR-0056: live reported flooding for Bangkok, never part of the assessment above.
-    live = live_section(session, hub.hub_code, boundary.admin_code, boundary.admin_level)
+    live = live_section(
+        session,
+        hub.hub_code,
+        boundary.admin_code,
+        boundary.admin_level,
+        include_camera_pictures=get_settings().bmatraffic_relay_enabled,
+    )
     # ADR-0059: the GEOGLOWS river outlook, labelled exploratory.
     river = river_outlook(boundary.admin_code)
     if river.get("available"):

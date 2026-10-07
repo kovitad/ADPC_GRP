@@ -66,6 +66,26 @@ bounded by the limits above. Every other upstream call stays in the worker.
   other cameras for up to 8 seconds. That is acceptable for a demo; a deployment would need
   per-camera locks.
 
+## Amendment, 7 October 2026: temporary Lightsail pilot exception
+
+The Product Owner explicitly approved showing camera pictures inside the protected
+`servir-risk.kovitad.com` pilot. The Ubuntu bootstrap therefore offers
+`--enable-camera-relay`, which sets `BMATRAFFIC_RELAY_ENABLED=true` for that deployment.
+
+This approval covers the existing bounded relay for BMA Traffic and supported municipal snapshot
+cameras. It does not make a camera public, add computer vision, store images, turn an image into
+flood evidence or authorize reuse outside this pilot. Existing authentication, registry allowlist,
+rate limits, one-second shared fetch, short in-memory lifetime, attribution and no-store response
+remain unchanged. The upstream BMA request may use HTTP; GRP returns the picture to the signed-in
+browser through its protected same-origin HTTPS endpoint, avoiding mixed-content embedding.
+District-summary Word downloads may include up to four credited pictures from BMA Traffic or an
+allow-listed municipal snapshot source, retrieved while the document is generated; no copy is
+retained afterward. Video-only HLS/MP4 sources remain live views and are not converted into report
+stills.
+
+Repository and deployment defaults remain false. Removing the setting and recreating API/worker
+reverts the pilot to provider links without deleting data.
+
 ## Validation
 
 - `tests/fast/test_flood_camera_relay.py`:

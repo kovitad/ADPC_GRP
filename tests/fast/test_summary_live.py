@@ -60,8 +60,8 @@ def stored(monkeypatch):
 def test_the_live_section_gathers_incidents_facilities_and_one_camera_per_incident(stored) -> None:
     fetched = []
 
-    def frame(camera_id):
-        fetched.append(camera_id)
+    def frame(camera):
+        fetched.append(camera["provider_camera_id"])
         return PICTURE, NOW
 
     live = summary_live.live_section(None, "adpc", "1011", "district", NOW, get_frame=frame)
@@ -76,12 +76,43 @@ def test_the_live_section_gathers_incidents_facilities_and_one_camera_per_incide
 
 
 def test_a_camera_that_does_not_answer_is_listed_without_a_picture(stored) -> None:
-    def broken(_camera_id):
+    def broken(_camera):
         raise RuntimeError("no picture")
 
     live = summary_live.live_section(None, "adpc", "1011", "district", NOW, get_frame=broken)
     assert live["cameras"][0]["picture"] is None
     assert live["cameras"][0]["picture_note"] == "camera did not answer"
+
+
+def test_camera_pictures_follow_the_deployment_switch(stored) -> None:
+    called = False
+
+    def frame(_camera):
+        nonlocal called
+        called = True
+        return PICTURE, NOW
+
+    live = summary_live.live_section(
+        None, "adpc", "1011", "district", NOW, get_frame=frame,
+        include_camera_pictures=False,
+    )
+    assert live["cameras"][0]["picture"] is None
+    assert not called
+
+
+def test_municipal_snapshot_camera_can_appear_in_the_word_summary(stored, monkeypatch) -> None:
+    camera = _camera("pakkret:9", "PAKKRET_CCTV", 40)
+    camera["_snapshot_url"] = "https://example.test/camera.jpg"
+    camera["source_label"] = "Pak Kret Municipality CCTV"
+    monkeypatch.setattr(summary_live, "nearby_cameras", lambda *_a: [camera])
+
+    live = summary_live.live_section(
+        None, "adpc", "1206", "district", NOW,
+        get_frame=lambda _camera: (PICTURE, NOW),
+    )
+
+    assert live["cameras"][0]["picture"] == PICTURE
+    assert live["cameras"][0]["credit"] == "Pak Kret Municipality CCTV"
 
 
 def _text(docx_bytes: bytes) -> str:
