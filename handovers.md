@@ -14,6 +14,10 @@
   Caddy now sends only the public origin via `strict-origin-when-cross-origin`, never paths or query
   values. `deploy/LIGHTSAIL_REDEPLOY.md` provides copy-safe, single-line commands because line continuation
   and `sudo` handling in the Lightsail browser terminal caused repeated operator confusion.
+  `docs/pilot/2026-10-07_Claude_Desktop_Public_Feed_Test_Prompt.md` now provides copy-ready,
+  one-attempt-only Claude Desktop prompts for PM2.5 and ThaiWater, read-only preflight, status checks
+  and post-submit questions. It explicitly handles auto-approval, timeout ambiguity and failed
+  validation without automatic retries or public answer receipts.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
