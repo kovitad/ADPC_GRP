@@ -9,8 +9,10 @@
   return 200: ThaiWater has 143 latest pilot observations and PM2.5 has 351 province forecasts.
   The general flood feed and Global Risk submission remain off. ThaiWater remains separate from
   warnings, confidence and calculations. Caddy's CSP now permits the pinned Leaflet CDN and OSM
-  tiles; the previous policy blocked map startup and left the flood page layout empty.
-  `deploy/LIGHTSAIL_REDEPLOY.md` provides copy-safe, single-line commands because line continuation
+  tiles; the previous policy blocked map startup and left the flood page layout empty. A subsequent
+  OSM “Access blocked” tile exposed the global `no-referrer` mismatch with OSM's usage policy;
+  Caddy now sends only the public origin via `strict-origin-when-cross-origin`, never paths or query
+  values. `deploy/LIGHTSAIL_REDEPLOY.md` provides copy-safe, single-line commands because line continuation
   and `sudo` handling in the Lightsail browser terminal caused repeated operator confusion.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored

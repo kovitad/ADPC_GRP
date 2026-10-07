@@ -66,6 +66,9 @@ def test_staging_content_policy_allows_pinned_map_dependencies_and_tiles() -> No
     assert "script-src 'self' https://unpkg.com" in caddy
     assert "style-src 'self' https://unpkg.com" in caddy
     assert "https://*.tile.openstreetmap.org" in caddy
+    # OSM's tile policy requires an identifying Referer; send only the public origin, not paths.
+    assert 'Referrer-Policy "strict-origin-when-cross-origin"' in caddy
+    assert 'Referrer-Policy "no-referrer"' not in caddy
 
 
 def test_container_publish_waits_for_successful_main_ci_and_tags_the_exact_sha() -> None:
