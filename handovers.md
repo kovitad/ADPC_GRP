@@ -1,6 +1,6 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 6 October 2026.
+**Updated:** 7 October 2026.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
@@ -50,11 +50,12 @@
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
   everyone. It is now stored only in ignored local `.env`/Desktop secret files and was accepted by
   TWA. Never print, commit or return it.
-- **Branch:** `pilot/river-watch-and-bangkok-flood`. ThaiWater Stage 0 is implemented in `03aa63b`;
-  the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, the third
-  capture analysis is in `5a165c1`, and the metadata-only window analyzer is in `e687475`. The
-  local continuation has not been pushed.
-- **Next agent:** read Section 0, "6 October: Bangkok observation data briefing", first.
+- **Branch/deployment:** the AWS pilot is deployed from direct `main` releases at
+  `servir-risk.kovitad.com`; use the newest successful immutable GHCR SHA, never the moving `main`
+  tag. The local development checkout may still be on `pilot/river-watch-and-bangkok-flood` with
+  user-owned changes; do not discard or mix them into an operational hotfix.
+- **Next agent:** read Section 0, "7 October: first AWS Lightsail deployment and live ThaiWater
+  pull", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -167,7 +168,125 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-6 October 2026)
+## 0. Start here (sessions of 24 September-7 October 2026)
+
+### 7 October: first AWS Lightsail deployment and live ThaiWater pull
+
+#### Current external state
+
+- The owner created an AWS Lightsail Ubuntu **24.04.4 LTS AMD64** instance named `global-risk`
+  with **1 GB RAM, 2 vCPUs and 40 GB SSD**, attached a stable public IPv4 address, and created the
+  GoDaddy `A` record `servir-risk.kovitad.com`. Do not add an `AAAA` record until IPv6 is deliberately
+  configured. Lightsail allows inbound SSH, HTTP 80 and HTTPS 443; PostgreSQL 5432, FastAPI 8000 and
+  Docker ports remain private.
+- DNS now resolves publicly. Caddy obtained a valid certificate automatically. The static website
+  returns HTTP 200, `/api/v1/healthz` returns `{"status":"ok"}`, public `/readyz` returns 404,
+  anonymous protected PM2.5/ThaiWater requests return 401, and the anonymous PM2.5 route remains
+  deliberately off with 404.
+- The application/database/worker stack is running image
+  `ghcr.io/kovitad/adpc_grp:sha-3150954`. The database is healthy, API binds only to
+  `127.0.0.1:8000`, and all three containers reported zero restarts and `OOMKilled=false`.
+- Resource measurements after the complete stack started were 909 MiB total RAM, 578 MiB used,
+  331 MiB available and 58 MiB of 3 GiB swap used. After the first ThaiWater capture they were
+  586 MiB used, 322 MiB available and 69 MiB swap used. This passes the bounded trial gate but is
+  not production capacity. Stop and resize if normal use causes OOM, repeated restarts, health
+  failures or continuously increasing swap.
+- ThaiWater shadow capture is enabled at a 15-minute cadence. The root-owned key is only at
+  `/srv/grp/secrets/thaiwater_api_key`, mode `0600`; the entrypoint copies it to a container-only
+  tmpfs. The first AWS pull succeeded without logging values or credentials: water level returned
+  795 national records and 12 new pilot observations; 24-hour rainfall returned 2,071 national
+  records and 131 new pilot observations. This is shadow evidence only—no public measurements,
+  warning, confidence change or Global Risk contribution.
+- A callback-specific public PKCE client was successfully registered for
+  `https://servir-risk.kovitad.com/api/v1/auth/callback`. The ID is stored persistently at
+  `/srv/grp/data/servir_client_id` and configured in `.env`; it is non-secret but should not be
+  copied into prose unnecessarily. `/api/v1/auth/login` now redirects correctly to the SERVIR
+  staging issuer with the exact callback and MCP resource audience.
+- Platform Admin/ADPC Hub provisioning is the remaining deployment step. It stopped on the second
+  permission issue below. The email variable was unset by the caller's command block; prompt for it
+  again. No account or Hub was partially created by that failed CLI invocation.
+
+#### Release and CI behavior
+
+- The owner chose direct updates to `main` for these deployment hotfixes. Do not ask for another PR
+  during this live bootstrap unless the owner changes that decision.
+- `.github/workflows/container.yml` now runs only after the complete `CI` workflow succeeds on the
+  exact `main` commit. It checks out `workflow_run.head_sha`, then publishes `main` and an immutable
+  seven-character SHA tag. Never deploy `main`; copy the SHA tag shown by the successful container
+  run. The GHCR package is public at
+  <https://github.com/kovitad/ADPC_GRP/pkgs/container/adpc_grp>.
+- `6cfa1e0` was the first merged deployment release. Its image reached migration but failed on the
+  first secret-copy bug. `3150954` contains that fix and is the currently running image.
+  `074ca2a` fixes the second `docker compose exec` issue. At this handover update its CI/image may
+  still be running; check GitHub Actions and deploy the newest successful immutable tag, not an
+  assumed tag.
+- The browser-based Lightsail terminal did not execute the script directly reliably even after
+  mode `0755`; `sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh ...` works. The owner also prefers
+  no shell line-continuation backslashes. Use one-line commands or a Bash array pasted as one block.
+- The bootstrap is idempotent. Reruns preserve `/srv/grp/secrets`, `.env`, the PostGIS volume,
+  Caddy configuration/certificate and `/srv/grp/data`; they fast-forward a clean checkout, apply
+  migrations, and restart API/worker. Never delete `/srv/grp`, the Compose database volume or
+  secrets to recover from these errors.
+
+#### Two privilege-boundary defects found and fixed
+
+1. **Secret tmpfs ownership order (`fd6d43a`).** Dedicated Compose drops all capabilities except
+   `CHOWN`, `SETGID` and `SETUID`. The old entrypoint created `/run/grp-secrets` as UID 10001 mode
+   `0700` and then tried to copy into it as root. Because `CAP_DAC_OVERRIDE` is intentionally absent,
+   migration failed with `install: cannot stat '/run/grp-secrets/database_url': Permission denied`.
+   The fix keeps the directory/files root-owned while copying, transfers each file to 10001, then
+   transfers the directory last. Do not weaken host secret permissions or add broad capabilities.
+2. **Existing-container CLI user (`074ca2a`).** The entrypoint's `gosu` changes only the main
+   process; Docker's image user remains root. `docker compose exec api ...` therefore bypassed the
+   privilege drop. Root lacks access to UID-10001's mode-0400 tmpfs file, so Admin provisioning
+   failed reading `/run/grp-secrets/database_url`. Bootstrap and its runbook now add
+   `--user 10001:10001` to all Admin/bootstrap CLI commands executed in an existing API container.
+   Migration uses `docker compose run`, enters through the entrypoint and was already correct.
+
+Regression tests pin both boundaries in `tests/fast/test_staging_deployment.py`. Keep the least-
+privilege model; do not “fix” either issue with `chmod 644`, world-readable secrets,
+`privileged: true` or `CAP_DAC_OVERRIDE`.
+
+#### Exact continuation after the `074ca2a` image succeeds
+
+1. Download the updated bootstrap again because the host copy is the old, already-running shell
+   program; updating the checkout during a run cannot change that process:
+
+   ```bash
+   sudo curl -fsSL https://raw.githubusercontent.com/kovitad/ADPC_GRP/main/deploy/bootstrap-ubuntu.sh -o /srv/grp/bootstrap/bootstrap-ubuntu.sh
+   ```
+
+2. Read the existing client ID into a shell variable and prompt for the Admin email. Do not print
+   either or save the email in Git:
+
+   ```bash
+   SERVIR_CLIENT_ID=$(sudo cat /srv/grp/data/servir_client_id)
+   read -r -p "Platform Admin email: " GRP_ADMIN_EMAIL
+   ```
+
+3. Rerun the updated bootstrap with the newest successful immutable image, domain, small-host
+   option, client ID and email. A Bash array avoids line continuations:
+
+   ```bash
+   deploy_command=(sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-<new-sha> --domain servir-risk.kovitad.com --small-host --servir-client-id "$SERVIR_CLIENT_ID" --admin-email "$GRP_ADMIN_EMAIL")
+   "${deploy_command[@]}"
+   unset SERVIR_CLIENT_ID GRP_ADMIN_EMAIL
+   ```
+
+4. Require successful `bootstrap-platform-admin` and `ensure-hub`, then open
+   `https://servir-risk.kovitad.com`, complete SERVIR sign-in, and verify the exact person, Platform
+   Admin flag and ADPC Hub Admin role. Check Planning, Data Library, Live and the protected
+   government-observation status. Anonymous access must remain denied.
+5. Recheck `free -h`, container restart/OOM state, API health and worker logs. Let the planned
+   six-hour ThaiWater window run only with a named monitor, then disable capture and execute the
+   metadata-only analyzer with explicit UTC bounds. Do not display or publish measurements.
+6. Test the protected PM2.5 endpoint after sign-in. Keep `AIR_QUALITY_FEED_PUBLIC=false` until AQ
+   Tracker redistribution/licence and credit wording are confirmed. Keep both Global Risk public
+   feed submissions blocked until the approved-feed retirement/version issue is resolved.
+7. Defer the 2.1 GB Thailand baseline import. HTTPS, authentication, live-source behavior and
+   free-tier resource measurements must pass first. See
+   [`docs/pilot/2026-10-06_AWS_Free_Tier_Deployment_Plan.md`](docs/pilot/2026-10-06_AWS_Free_Tier_Deployment_Plan.md)
+   for all acceptance and resize gates.
 
 ### 6 October: Global Risk live-feed issue pack
 
