@@ -1,15 +1,17 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 7 October 2026.
-- **Public pilot feeds pending deployment:** the Product Owner confirmed provider publication was
-  discussed and approved for the temporary pilot. ADR-0068 adds a fail-closed, rate-limited,
-  database-only ThaiWater latest-observation feed at
+- **Public pilot feeds deployed:** the Product Owner confirmed provider publication was discussed
+  and approved for the temporary pilot. ADR-0068 adds a fail-closed, rate-limited, database-only
+  ThaiWater latest-observation feed at
   `/api/v1/public/flood/bangkok/government-observations/feed.json`; the existing PM2.5 feed remains
-  `/api/v1/public/aq/sea/feed.json`. `--enable-public-pilot-feeds` deliberately enables both while
-  leaving the general flood feed and Global Risk submission off. ThaiWater remains separate from
+  `/api/v1/public/aq/sea/feed.json`. Image `sha-3985efd` is deployed and both anonymous endpoints
+  return 200: ThaiWater has 143 latest pilot observations and PM2.5 has 351 province forecasts.
+  The general flood feed and Global Risk submission remain off. ThaiWater remains separate from
   warnings, confidence and calculations. Caddy's CSP now permits the pinned Leaflet CDN and OSM
-  tiles; the previous policy blocked map startup and left the flood page layout empty. Deploy the
-  next successful immutable main SHA before expecting either public route or the map fix on AWS.
+  tiles; the previous policy blocked map startup and left the flood page layout empty.
+  `deploy/LIGHTSAIL_REDEPLOY.md` provides copy-safe, single-line commands because line continuation
+  and `sudo` handling in the Lightsail browser terminal caused repeated operator confusion.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
@@ -192,6 +194,11 @@ RP20/RP50 rasters and methods exist.
 - The empty flood-page layout also exposed a Caddy CSP mismatch: production blocked Leaflet from
   `unpkg.com` before `flood.js` initialized. The policy now permits that pinned CDN and OSM tiles.
 - Validation: full suite **1,263 passed, 2 PostgreSQL-only tests skipped**; Ruff and `bash -n` pass.
+- Deployment completed with image `sha-3985efd`, checkout `3985efd`, bootstrap 1.3.0 and healthy
+  database/API/worker. External checks returned 200 for health and both public feeds. ThaiWater
+  returned 143 latest pilot observations (about 89 KB); PM2.5 returned 351 forecasts (about 122 KB).
+  Both advertise `Cache-Control: public, max-age=300`. The production CSP also contains the
+  approved Leaflet and OSM sources.
 
 ### 7 October: first AWS Lightsail deployment and live ThaiWater pull
 
