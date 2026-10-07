@@ -21,7 +21,10 @@
   generic reader's validation/order/staleness behavior for a team issue report. The guide now
   separates declared product cadence, HTTP cache duration and Global Risk's previously observed
   six-hour fetched-copy cache. It handles auto-approval, timeout ambiguity and failed validation
-  without retries or public answer receipts.
+  without retries or public answer receipts. It also includes a comprehensive Bang Sue risk-pack
+  report prompt that separates district flood exposure, incident reports, pilot-wide ThaiWater
+  observations and province-level PM2.5 context while requiring timestamps, units, lineage, cache
+  state and localization gaps.
 - **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual

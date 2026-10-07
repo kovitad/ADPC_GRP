@@ -261,6 +261,69 @@ Use feeds_query for bangkok_thaiwater_observations_pilot. Show five newest recor
 Use feeds_query separately for sea_pm25_province_forecast and bangkok_thaiwater_observations_pilot. Compare only operational properties: fetch success, record count returned, geographic coverage, newest timestamp, valid_until behavior, staleness and attribution. Do not compare PM2.5 concentration numerically with rainfall or water level, do not combine them into a score, and do not publish an answer or create a receipt.
 ```
 
+## Comprehensive Bang Sue (บางซื่อ) risk-pack report test
+
+Use this only after checking the contribution names and states. It deliberately separates the
+flood risk pack, ThaiWater observations and PM2.5 forecasts because they are different evidence
+products. It also tests whether Global Risk can actually localize contributed feed rows to Bang
+Sue rather than merely citing a Bangkok-wide or Southeast-Asia-wide feed.
+
+```text
+Use the SERVIR Global Risk MCP connector to prepare the most complete evidence report currently possible for Bang Sue District (บางซื่อ), Bangkok, Thailand. Do not publish the answer, call publish_answer, create a receipt, or submit any new contribution.
+
+Follow this sequence and show the result of each step:
+
+1. Call contribute_status and find the exact state, contribution_id, reviewer or auto-approval state for these datasets if they exist:
+   - bangkok_thaiwater_observations_pilot
+   - sea_pm25_province_forecast
+   - sea_pm25_upstream_direct_diagnostic_20261007
+   - bangkok_flood_districts_live
+   Do not assume that a submitted feed is approved, live or current.
+
+2. Call platform_capabilities and state which risk-pack, feed-query, place-resolution and hazard capabilities are actually available in this deployment.
+
+3. Call assemble_pack with pack="risk", place="Bang Sue District, Bangkok, Thailand", hazard="flood". Report the resolved administrative area and polygon source, all flood-hazard layers, return periods or severity classes, and every exposure count returned for schools, hospitals, buildings, roads, population or contributed layers. Name every source and layer exactly. Do not invent a count for a category that the pack does not return.
+
+4. If bangkok_flood_districts_live is visible, call feeds_query with limit 56. Find Bang Sue by the explicit district name/code in the returned records. Report active incidents, receding incidents, confidence wording, nearby facilities, as_of, valid_until, pulled-at/cache state and warnings. If the feed is unavailable, stale, still points to an expired temporary URL, or Bang Sue is absent, say so prominently and do not interpret zero as proof that Bang Sue is dry.
+
+5. If bangkok_thaiwater_observations_pilot is visible, call feeds_query with a limit large enough to retrieve all current records (use 200 unless the tool reports a lower maximum). Keep water_level in metres and rainfall_24h in millimetres separate. Report record count, newest and oldest observed_at, retrieved_at, valid_until, stale records, station names, delivery provider and attribution. Include a Bang Sue-specific station/value section only if the returned fields explicitly establish that the station belongs to Bang Sue through an administrative name/code or a platform-supported point-in-polygon result. Do not infer district membership from a station name or nearby coordinate. If the contributed field mapping does not expose district membership, state that the feed is pilot-wide and cannot yet support a defensible Bang Sue subset.
+
+6. If sea_pm25_province_forecast is visible, call feeds_query with limit 351 and find the explicit province record for Bangkok Metropolis. Report pm25_avg, pm25_max, indicative category, forecast_time, init_date, valid_until, pulled-at/cache state and warnings. Label it Bangkok-province context, not a Bang Sue district measurement and not a station observation. Do not infer a Bang Sue-specific concentration from the province average.
+
+7. If sea_pm25_upstream_direct_diagnostic_20261007 is visible, query it separately. Compare its timestamp, ordering, as_of and stale_data behavior with sea_pm25_province_forecast. Keep it in a diagnostic appendix and do not count it as independent corroboration because both PM2.5 feeds originate from the same AQ Tracker/GEOS-CF product.
+
+8. Produce one structured report with these headings:
+   A. Executive summary
+   B. Area resolution and administrative boundary
+   C. Flood hazard and exposed assets from the risk pack
+   D. Reported flood incidents and their freshness
+   E. ThaiWater water-level observations
+   F. ThaiWater 24-hour rainfall observations
+   G. PM2.5 Bangkok-province forecast context
+   H. Source lineage, validation and independence
+   I. Freshness, cache and stale-data table
+   J. Missing evidence and localization limitations
+   K. Contradictions or duplicated sources
+   L. Recommended verification actions for an operator tonight
+
+For every numerical statement, cite the exact layer/feed, timestamp and unit. Distinguish model forecasts, station observations, reported impacts and static return-period exposure. Never combine PM2.5, rainfall, water level and flood exposure into one score. Never call a place safe, issue a flood or health warning, invent thresholds, or treat two delivery paths for the same underlying source as independent confirmation. Separate facts observed from interpretation.
+```
+
+### What a defensible result should say
+
+- The flood risk pack may provide district-polygon hazard/exposure counts, but only for layers that
+  the platform actually returns.
+- `bangkok_flood_districts_live` can localize by district when reachable, but an old cached zero is
+  not evidence that Bang Sue is dry.
+- The current ThaiWater contribution mapping is pilot-wide. It does not map `district_codes` into
+  Global Risk, so it may be impossible to select Bang Sue defensibly even though GRP's source
+  endpoint stores pilot-area codes. The report must expose this gap rather than guess.
+- PM2.5 is province-level model context for Bangkok Metropolis, not a Bang Sue measurement.
+- The normalized and direct PM2.5 feeds are two representations of the same upstream product, not
+  independent evidence.
+- `assemble_pack(risk, hazard="air_quality")` may have no air-quality hazard raster or exposure
+  calculation; `feeds_query` can still return the PM2.5 forecast.
+
 ## What to record
 
 For each attempted feed, save:
