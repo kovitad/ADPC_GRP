@@ -50,10 +50,22 @@ def test_staging_sets_permanent_feed_address_but_keeps_public_routes_off() -> No
     assert 'set_env_value GRP_PUBLIC_FEED_BASE_URL "https://$DOMAIN"' in script
     assert '--small-host) SMALL_HOST="true"' in script
     assert '--enable-thaiwater-shadow) ENABLE_THAIWATER_SHADOW="true"' in script
+    assert '--enable-public-pilot-feeds) ENABLE_PUBLIC_PILOT_FEEDS="true"' in script
+    assert 'set_env_value THAIWATER_FEED_PUBLIC "true"' in script
+    assert 'set_env_value AIR_QUALITY_FEED_PUBLIC "true"' in script
     assert 'set_env_value THAIWATER_API_KEY_FILE "/run/grp-secrets/thaiwater_api_key"' in script
     assert 'read -r -s -p "ThaiWater API key: " THAIWATER_KEY' in script
     assert "FLOOD_FEED_PUBLIC=false" in environment
+    assert "THAIWATER_FEED_PUBLIC=false" in environment
     assert "AIR_QUALITY_FEED_PUBLIC=false" in environment
+
+
+def test_staging_content_policy_allows_pinned_map_dependencies_and_tiles() -> None:
+    caddy = (REPOSITORY_ROOT / "deploy" / "Caddyfile").read_text(encoding="utf-8")
+
+    assert "script-src 'self' https://unpkg.com" in caddy
+    assert "style-src 'self' https://unpkg.com" in caddy
+    assert "https://*.tile.openstreetmap.org" in caddy
 
 
 def test_container_publish_waits_for_successful_main_ci_and_tags_the_exact_sha() -> None:

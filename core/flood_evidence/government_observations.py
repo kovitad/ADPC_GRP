@@ -165,6 +165,7 @@ def government_observation_status(
     key_configured: bool,
     base_url: str,
     interval_minutes: int,
+    publication_approved: bool = False,
 ) -> dict[str, Any]:
     """Summarize stored shadow evidence without returning values or contacting the provider."""
 
@@ -174,7 +175,7 @@ def government_observation_status(
             "mode": "shadow",
             "state": "not_available_in_replay",
             "as_of": as_of.isoformat(),
-            "publication_approved": False,
+            "publication_approved": publication_approved,
             "products": [],
         }
 
@@ -228,7 +229,7 @@ def government_observation_status(
         "as_of": as_of.isoformat(),
         "capture_enabled": capture_enabled,
         "credential_configured": key_configured,
-        "publication_approved": False,
+        "publication_approved": publication_approved,
         "products": products,
     }
 

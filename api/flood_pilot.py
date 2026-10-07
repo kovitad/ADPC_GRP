@@ -48,6 +48,7 @@ from core.flood_evidence.cameras import camera_registry, nearby_cameras
 from core.flood_evidence.config import PILOT_IDS, PilotConfig, pilot_config
 from core.flood_evidence.exposure import latest_exposure
 from core.flood_evidence.feed import build_feed, serialise
+from core.flood_evidence.government_feed import public_government_observation_feed
 from core.flood_evidence.government_observations import government_observation_status
 from core.flood_evidence.incident_store import (
     REPORT_WINDOW_HOURS,
@@ -294,7 +295,34 @@ def read_government_observation_status(
         key_configured=key_configured,
         base_url=settings.thaiwater_api_base_url,
         interval_minutes=settings.thaiwater_poll_minutes,
+        publication_approved=settings.thaiwater_feed_public,
     )
+
+
+@public_router.get(
+    "/{pilot_id}/government-observations/feed.json",
+    summary="Latest ThaiWater observations in an approved public pilot feed (ADR-0068)",
+    openapi_extra={"x-grp-access": "public"},
+)
+def read_public_government_observations(
+    pilot_id: str, session: DatabaseSession, request: Request
+) -> Response:
+    settings = get_settings()
+    config = pilot_config(pilot_id) if settings.thaiwater_feed_public else None
+    if config is None:
+        raise not_found()
+    caller = request.client.host if request.client else "unknown"
+    limiter.check("public_thaiwater_per_caller_per_minute", caller, 30, 60)
+    public_reads.record(f"thaiwater:{config.pilot_id}")
+    now = datetime.now(UTC)
+    # Match the five-minute public cache so generated_at, freshness and the ETag remain stable.
+    as_of = now.replace(minute=(now.minute // 5) * 5, second=0, microsecond=0)
+    feed = public_government_observation_feed(session, config, as_of)
+    body, etag = serialise(feed)
+    headers = {"ETag": etag, "Cache-Control": "public, max-age=300"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=body, media_type="application/json", headers=headers)
 
 
 @router.get(

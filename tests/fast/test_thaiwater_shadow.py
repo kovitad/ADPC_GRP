@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from core.db import Base
 from core.flood_evidence.config import pilot_config
+from core.flood_evidence.government_feed import public_government_observation_feed
 from core.flood_evidence.government_observations import government_observation_status
 from core.flood_evidence.ingest import Pulled
 from core.flood_evidence.models import (
@@ -219,6 +220,47 @@ def test_shadow_storage_is_pilot_only_idempotent_and_correction_preserving(
     assert corrected.new_states == 1
     values = session.scalars(select(HydroObservation.value).order_by(HydroObservation.value)).all()
     assert values == [0.75, 0.91]
+
+
+def test_public_feed_returns_only_latest_valid_values_without_raw_lineage(
+    session: Session, storage: LocalStorage
+) -> None:
+    source = sources()[0]
+    ingest_product(
+        session, storage, CONFIG, source, PRODUCTS[0], Pulled(200, WATER, FETCH_OK), AT
+    )
+    ingest_product(
+        session,
+        storage,
+        CONFIG,
+        source,
+        PRODUCTS[0],
+        Pulled(200, _body(_feature(value=0.91)), FETCH_OK),
+        AT + timedelta(minutes=15),
+    )
+    future = _body(_feature(observed_at="2026-10-06T19:30:00+07:00", value=99.0))
+    ingest_product(
+        session,
+        storage,
+        CONFIG,
+        source,
+        PRODUCTS[0],
+        Pulled(200, future, FETCH_OK),
+        AT + timedelta(minutes=30),
+    )
+    session.commit()
+
+    feed = public_government_observation_feed(session, CONFIG, AT + timedelta(minutes=30))
+
+    assert feed["schema_version"] == "grp.thaiwater.pilot-observations.v1"
+    assert feed["pilot_id"] == "bangkok"
+    assert len(feed["records"]) == 1
+    record = feed["records"][0]
+    assert record["value"] == 0.91
+    assert record["unit"] == "m" and record["datum"] == "MSL"
+    assert record["originating_agency_name"] == "สำนักการระบายน้ำ กรุงเทพมหานคร"
+    encoded = json.dumps(feed, ensure_ascii=False)
+    assert "raw_fetch" not in encoded and "public-test-value" not in encoded
 
 
 def test_station_metadata_change_creates_a_new_version(

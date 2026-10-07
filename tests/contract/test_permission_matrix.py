@@ -850,3 +850,25 @@ def test_the_public_flood_feed_is_closed_unless_switched_on(world, monkeypatch) 
     assert len(body["districts"]) == 56 and body["records"] == []
     assert client.get("/api/v1/public/flood/no-such/feed.json").status_code == 404
     assert client.get("/api/v1/public/flood/r00000000000/feed.json").status_code == 404
+
+
+def test_the_public_thaiwater_feed_is_closed_unless_switched_on(world, monkeypatch) -> None:
+    import api.flood_pilot as flood_module
+
+    limiter.reset()
+    client, _headers = _client(world, "anonymous")
+    path = "/api/v1/public/flood/bangkok/government-observations/feed.json"
+    assert client.get(path).status_code == 404
+
+    enabled = world["settings"].model_copy(update={"thaiwater_feed_public": True})
+    monkeypatch.setattr(flood_module, "get_settings", lambda: enabled)
+    first = client.get(path)
+    assert first.status_code == 200
+    assert first.headers["cache-control"] == "public, max-age=300"
+    assert first.json()["records"] == []
+    assert first.json()["attribution"].startswith("ThaiWater")
+    again = client.get(path, headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304
+    assert client.get(
+        "/api/v1/public/flood/no-such/government-observations/feed.json"
+    ).status_code == 404
