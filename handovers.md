@@ -1,6 +1,13 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 7 October 2026.
+- **Clean local main deployed:** a separate clean `main` worktree at `15b1224` was rebuilt with
+  `scripts/docker-desktop.ps1` for `kovitad.janlakhon@adpc.net`, reusing the existing ignored local
+  configuration and data without touching the dirty pilot checkout. Database, API and worker are
+  healthy at `http://127.0.0.1:8000`; the Platform Admin and ADPC Hub already existed, SERVIR auth
+  is configured and the protected camera relay is enabled. A direct camera-250 check from the new
+  API container currently fails with BMA `RemoteProtocolError`, confirming the provider outage is
+  external rather than a stale local build. ThaiWater shadow remains disabled in this local run.
 - **Camera pilot exception approved:** the Product Owner approved in-page camera pictures on the
   temporary Lightsail pilot, including BMA Traffic and other already-supported municipal snapshot
   cameras. Bootstrap 1.5.0 adds the explicit `--enable-camera-relay` switch while the repository
