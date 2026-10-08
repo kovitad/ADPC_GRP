@@ -1,6 +1,11 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 7 October 2026.
+- **Developer call guide:** `docs/guides/call-global-risk-assemble-pack-from-grp.md` gives the
+  direct MCP `assemble_pack` arguments, authenticated background GRP API contract, polling flow,
+  stored-pack/`refresh=true` behavior and commit-pinned GitHub links to every relevant GRP source
+  location plus the upstream Global Risk repository. It distinguishes upstream AOI/exposure/risk
+  trace lines from GRP's own trace and warns that the quoted Phaya Thai result reused a stored pack.
 - **Clean local main deployed:** a separate clean `main` worktree at `15b1224` was rebuilt with
   `scripts/docker-desktop.ps1` for `kovitad.janlakhon@adpc.net`, reusing the existing ignored local
   configuration and data without touching the dirty pilot checkout. Database, API and worker are
