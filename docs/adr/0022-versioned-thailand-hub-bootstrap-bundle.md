@@ -40,6 +40,21 @@ The implementation plan is
 | Versioned external bundle plus idempotent import | Chosen: traceable, repeatable and compatible with later object storage |
 | Require SIG for every planning question | Rejected: unnecessary latency/dependency when approved local data exists |
 
+## Amendment, 8 October 2026: assessment-core deployment profile
+
+A resource-constrained pilot may install the independently valid assessment core without the
+optional heavy context: administrative hierarchy excluding village points, DDPM shelters, six
+RP100 tiles and the approved overlay method. The explicit `--assessment-core-only` CLI option and
+`--bootstrap-thailand-assessment-core` Ubuntu option select this profile. They do not silently
+weaken the complete release or relabel missing context as ready.
+
+The three vulnerability rasters remain display-only under the approved method and are not an
+assessment input. Volunteer centres, warning resources and village locations are also optional
+context. Their absence must stay visible in Data Library, while the release card may separately say
+**Assessment core ready** once boundaries, shelters and RP100 are active. The complete profile
+remains the route to a fully ready Thailand release, and later imports do not change versions
+pinned by existing assessments.
+
 ## Consequences
 
 - Deployment requires a controlled source-bundle transfer or direct object-storage URL.

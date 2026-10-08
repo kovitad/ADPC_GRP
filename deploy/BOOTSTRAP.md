@@ -55,6 +55,13 @@ sudo /srv/grp/bootstrap/bootstrap-ubuntu.sh \
 The worker uses `/srv/grp/tmp` for bounded temporary GIS products so large raster conversion does
 not consume a small in-memory `/tmp`. Both the data import and Admin provisioning are safe to rerun.
 
+For a resource-constrained pilot, `--bootstrap-thailand-assessment-core` accepts a reduced bundle
+containing the administrative hierarchy (village points may be absent), DDPM shelters and exactly
+six RP100 GeoTIFFs. It activates the approved assessment method without requiring the display-only
+vulnerability rasters or optional volunteer, warning-resource and village context. Do not combine
+it with `--bootstrap-thailand-data`. Data Library reports **Assessment core ready** and continues to
+show every omitted optional category as unavailable.
+
 Normal releases can pull the prebuilt GitHub Container Registry image and avoid compiling GIS dependencies on the VM:
 
 ```bash

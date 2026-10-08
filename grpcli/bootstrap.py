@@ -20,6 +20,7 @@ from core.thailand_bootstrap import (
     TERMINAL_STATES,
     ThailandBootstrapError,
     bootstrap_library_status,
+    discover_assessment_core_sources,
     discover_supported_sources,
     import_result,
     prepare_source,
@@ -58,10 +59,15 @@ def install_thailand(
     source_root: Path,
     timeout_seconds: int,
     poll_seconds: float,
+    assessment_core_only: bool = False,
 ) -> dict[str, object]:
     """Queue, wait for and activate the supported baseline in dependency order."""
 
-    sources = discover_supported_sources(source_root)
+    sources = (
+        discover_assessment_core_sources(source_root)
+        if assessment_core_only
+        else discover_supported_sources(source_root)
+    )
     print(f"Preflight found {len(sources)} supported Thailand source collections.")
     with Session(get_engine()) as session:
         actor = require_bootstrap_context(session, actor_email=actor_email, hub_code=hub_code)
@@ -104,11 +110,16 @@ def install_thailand(
             centers_version_id=version_ids["evacuation_centers"],
             hazard_version_id=version_ids["hazard"],
         )
-        payload["supporting_layers"] = activate_supporting_layers(
-            session,
-            actor_user_id=actor_id,
-            version_ids=version_ids,
-        )
+        if assessment_core_only:
+            payload["installation_profile"] = "assessment_core"
+            payload["supporting_layers"] = {}
+        else:
+            payload["installation_profile"] = "complete"
+            payload["supporting_layers"] = activate_supporting_layers(
+                session,
+                actor_user_id=actor_id,
+                version_ids=version_ids,
+            )
         session.commit()
         payload["hub_code"] = hub_code.strip().lower()
     return payload
@@ -123,6 +134,11 @@ def main() -> None:
     install.add_argument("--source-root", type=Path, default=None)
     install.add_argument("--timeout-seconds", type=int, default=1800)
     install.add_argument("--poll-seconds", type=float, default=1.5)
+    install.add_argument(
+        "--assessment-core-only",
+        action="store_true",
+        help="activate only boundaries, DDPM shelters, RP100 and the approved method",
+    )
     status = commands.add_parser("status")
     status.add_argument("--source-root", type=Path, default=None)
     arguments = parser.parse_args()
@@ -138,6 +154,7 @@ def main() -> None:
             source_root=source_root,
             timeout_seconds=arguments.timeout_seconds,
             poll_seconds=arguments.poll_seconds,
+            assessment_core_only=arguments.assessment_core_only,
         )
     except (OSError, ThailandBootstrapError, ValueError) as error:
         print(f"Thailand bootstrap stopped: {error}", file=sys.stderr)

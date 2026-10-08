@@ -103,7 +103,7 @@ def test_running_container_cli_uses_the_non_root_secret_owner() -> None:
     )
 
     command = "exec --no-TTY --user 10001:10001 api python -m grpcli."
-    assert script.count(command) == 4
+    assert script.count(command) == 6
     assert "exec --no-TTY api python" not in script
 
 
@@ -115,7 +115,10 @@ def test_staging_bootstrap_can_provision_and_install_thailand_data() -> None:
 
     assert 'SOURCE_DATA_DIR="${BASE_DIR}/bootstrap-data"' in script
     assert '--bootstrap-thailand-data requires --admin-email' in script
+    assert '--bootstrap-thailand-assessment-core requires --admin-email' in script
+    assert 'die "choose only one Thailand bootstrap profile"' in script
     assert "bootstrap-platform-admin" in script
     assert "python -m grpcli.bootstrap install-thailand" in script
+    assert "--assessment-core-only" in script
     assert "python -m grpcli.bootstrap status" in script
     assert "/srv/grp/bootstrap-data/administrative_boundary/district_boundary/" in runbook

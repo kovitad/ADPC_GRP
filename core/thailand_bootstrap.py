@@ -100,8 +100,8 @@ def _shapefile_paths(
     )
 
 
-def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
-    """Locate every collection in the approved Thailand Hub baseline."""
+def discover_assessment_core_sources(root: Path) -> tuple[BootstrapSource, ...]:
+    """Locate only the inputs required by the approved RP100 shelter assessment."""
 
     root = root.resolve()
     hierarchy_root = root / HIERARCHY_SOURCE_REF
@@ -130,6 +130,36 @@ def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
         raise ThailandBootstrapError(
             f"{HAZARD_SOURCE_REF} must contain exactly {EXPECTED_TILE_COUNT} GeoTIFF files"
         )
+    return (
+        BootstrapSource(
+            "boundary",
+            HIERARCHY_SOURCE_REF,
+            PLATFORM_BOUNDARY_DATASET_ID,
+            HIERARCHY_IMPORTER_VERSION,
+            boundary_files,
+        ),
+        BootstrapSource(
+            "evacuation_centers",
+            SHELTER_SOURCE_REF,
+            PLATFORM_SHELTER_DATASET_ID,
+            SHELTER_IMPORTER_VERSION,
+            shelter_files,
+        ),
+        BootstrapSource(
+            "hazard",
+            HAZARD_SOURCE_REF,
+            PLATFORM_HAZARD_DATASET_ID,
+            HAZARD_IMPORTER_VERSION,
+            hazard_files,
+        ),
+    )
+
+
+def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
+    """Locate every collection in the approved Thailand Hub baseline."""
+
+    root = root.resolve()
+    boundary, centers, hazard = discover_assessment_core_sources(root)
     supporting = tuple(
         BootstrapSource(
             category,
@@ -159,31 +189,7 @@ def discover_supported_sources(root: Path) -> tuple[BootstrapSource, ...]:
     missing_rasters = [str(item.files[0]) for item in vulnerability if not item.files[0].is_file()]
     if missing_rasters:
         raise ThailandBootstrapError("Vulnerability delivery is incomplete")
-    return (
-        BootstrapSource(
-            "boundary",
-            HIERARCHY_SOURCE_REF,
-            PLATFORM_BOUNDARY_DATASET_ID,
-            HIERARCHY_IMPORTER_VERSION,
-            boundary_files,
-        ),
-        BootstrapSource(
-            "evacuation_centers",
-            SHELTER_SOURCE_REF,
-            PLATFORM_SHELTER_DATASET_ID,
-            SHELTER_IMPORTER_VERSION,
-            shelter_files,
-        ),
-        *supporting,
-        BootstrapSource(
-            "hazard",
-            HAZARD_SOURCE_REF,
-            PLATFORM_HAZARD_DATASET_ID,
-            HAZARD_IMPORTER_VERSION,
-            hazard_files,
-        ),
-        *vulnerability,
-    )
+    return (boundary, centers, *supporting, hazard, *vulnerability)
 
 
 def prepare_source(root: Path, source: BootstrapSource) -> PreparedBootstrapSource:
@@ -300,9 +306,13 @@ def bootstrap_library_status(session: Session, root: Path) -> dict[str, object]:
             "active": bool(current),
             "version_id": str(current.id) if current else None,
         }
+    assessment_core_categories = {"boundary", "evacuation_centers", "hazard"}
     return {
         "release": BOOTSTRAP_RELEASE,
         "ready": all(bool(item["active"]) for item in categories.values()),
+        "assessment_core_ready": all(
+            bool(categories[category]["active"]) for category in assessment_core_categories
+        ),
         "categories": categories,
         "scope_note": (
             "This release activates the administrative hierarchy, DDPM shelters, volunteer and "

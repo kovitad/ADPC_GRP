@@ -1,6 +1,15 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 7 October 2026.
+**Updated:** 8 October 2026.
+- **Resource-bounded Thailand assessment core:** the Lightsail host has 909 MiB RAM, 3 GiB swap
+  and 26 GiB free. A verified 194 MiB archive (258 MiB extracted) containing the hierarchy without
+  villages, DDPM shelters and six RP100 tiles is staged at `/srv/grp/bootstrap-data`; SHA-256
+  `caf97d3212309a37b8750cdf0ff7d0e187f53437917cdf7fbf45fccff84c8bab`. Bootstrap 1.7.0 adds
+  `--bootstrap-thailand-assessment-core`, backed by CLI `--assessment-core-only`. It imports and
+  activates only boundaries, shelters, RP100 and the approved method. Vulnerability remains
+  display-only and optional; volunteer, warning and village context remain visibly unavailable.
+  Data Library distinguishes **Assessment core ready** from a complete release. The full installer
+  is unchanged, and the two deployment profiles are mutually exclusive.
 - **Production Share Data switch:** the `kovitad.com` contribution page loaded its static UI but
   every backend request returned the deliberate generic 404 because contribution availability was
   coupled to local-only Planning chat. Bootstrap 1.6.0 adds

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="1.6.0"
+readonly SCRIPT_VERSION="1.7.0"
 readonly DEFAULT_REPOSITORY="https://github.com/kovitad/ADPC_GRP.git"
 readonly DEFAULT_IMAGE="ghcr.io/kovitad/adpc_grp:main"
 readonly DEFAULT_DOMAIN="staging-risk-servir.adpc.net"
@@ -25,6 +25,7 @@ ENABLE_UFW="false"
 CHECK_ONLY="false"
 ADMIN_EMAIL=""
 BOOTSTRAP_THAILAND_DATA="false"
+BOOTSTRAP_THAILAND_ASSESSMENT_CORE="false"
 SMALL_HOST="false"
 ENABLE_THAIWATER_SHADOW="false"
 ENABLE_PUBLIC_PILOT_FEEDS="false"
@@ -62,7 +63,8 @@ Options:
   --deploy-user USER          Account that owns the checkout (default: SUDO_USER)
   --admin-email EMAIL         Idempotently provision this Platform Admin and ADPC Hub
   --servir-client-id ID       Configure the callback-specific public PKCE client ID
-  --bootstrap-thailand-data   Import and activate /srv/grp/bootstrap-data after deployment
+  --bootstrap-thailand-data   Import and activate the complete Thailand release
+  --bootstrap-thailand-assessment-core  Activate only boundaries, shelters and RP100
   --small-host                Add 3 GB swap and bounded Docker logs for a 1 GB trial VM
   --enable-thaiwater-shadow   Prompt for/store the key if needed and enable shadow capture
   --enable-public-pilot-feeds Publish approved ThaiWater and PM2.5 pilot feeds anonymously
@@ -91,6 +93,7 @@ while [ "$#" -gt 0 ]; do
         --admin-email) require_option_value "$@"; ADMIN_EMAIL="$2"; shift 2 ;;
         --servir-client-id) require_option_value "$@"; SERVIR_CLIENT_ID="$2"; shift 2 ;;
         --bootstrap-thailand-data) BOOTSTRAP_THAILAND_DATA="true"; shift ;;
+        --bootstrap-thailand-assessment-core) BOOTSTRAP_THAILAND_ASSESSMENT_CORE="true"; shift ;;
         --small-host) SMALL_HOST="true"; shift ;;
         --enable-thaiwater-shadow) ENABLE_THAIWATER_SHADOW="true"; shift ;;
         --enable-public-pilot-feeds) ENABLE_PUBLIC_PILOT_FEEDS="true"; shift ;;
@@ -124,6 +127,10 @@ if [ -n "$SERVIR_CLIENT_ID" ]; then
 fi
 [ "$BOOTSTRAP_THAILAND_DATA" = "false" ] || [ -n "$ADMIN_EMAIL" ] \
     || die "--bootstrap-thailand-data requires --admin-email"
+[ "$BOOTSTRAP_THAILAND_ASSESSMENT_CORE" = "false" ] || [ -n "$ADMIN_EMAIL" ] \
+    || die "--bootstrap-thailand-assessment-core requires --admin-email"
+[ "$BOOTSTRAP_THAILAND_DATA" = "false" ] || [ "$BOOTSTRAP_THAILAND_ASSESSMENT_CORE" = "false" ] \
+    || die "choose only one Thailand bootstrap profile"
 
 if [ -z "$DEPLOY_USER" ]; then
     if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
@@ -526,9 +533,14 @@ if [ -n "$ADMIN_EMAIL" ]; then
 fi
 
 if [ "$BOOTSTRAP_THAILAND_DATA" = "true" ]; then
-    log "Installing the supported Thailand baseline from $SOURCE_DATA_DIR"
+    log "Installing the complete Thailand baseline from $SOURCE_DATA_DIR"
     "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.bootstrap install-thailand \
         --actor-email "$ADMIN_EMAIL" --hub-code adpc
+    "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.bootstrap status
+elif [ "$BOOTSTRAP_THAILAND_ASSESSMENT_CORE" = "true" ]; then
+    log "Installing the Thailand assessment core from $SOURCE_DATA_DIR"
+    "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.bootstrap install-thailand \
+        --actor-email "$ADMIN_EMAIL" --hub-code adpc --assessment-core-only
     "${COMPOSE[@]}" exec --no-TTY --user 10001:10001 api python -m grpcli.bootstrap status
 fi
 

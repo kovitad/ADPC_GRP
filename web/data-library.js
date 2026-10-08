@@ -55,11 +55,14 @@
     const summary = document.querySelector("[data-bootstrap-summary]");
     const categories = document.querySelector("[data-bootstrap-categories]");
     const next = document.querySelector("[data-bootstrap-next]");
-    state.textContent = bootstrap.ready ? "Ready" : "Setup needed";
-    state.classList.toggle("status-pill--success", bootstrap.ready);
+    const coreReady = Boolean(bootstrap.assessment_core_ready);
+    state.textContent = bootstrap.ready ? "Ready" : coreReady ? "Assessment core ready" : "Setup needed";
+    state.classList.toggle("status-pill--success", bootstrap.ready || coreReady);
     summary.textContent = bootstrap.ready
       ? "The complete Thailand Hub baseline is active for district and sub-district planning."
-      : "One or more supported baseline inputs still need to be imported and activated.";
+      : coreReady
+        ? "Boundaries, DDPM shelters and RP100 are active for assessments. Optional context remains unavailable."
+        : "One or more required assessment inputs still need to be imported and activated.";
     categories.replaceChildren();
     const labels = {
       boundary: "Administrative hierarchy",

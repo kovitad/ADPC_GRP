@@ -10,6 +10,7 @@ from core.data_import_jobs import requeue_failed_import
 from core.data_library_models import DataImportJob
 from core.models import AssessmentState
 from core.thailand_bootstrap import (
+    discover_assessment_core_sources,
     discover_supported_sources,
     prepare_source,
     queue_prepared_source,
@@ -54,6 +55,30 @@ def _delivery(root: Path) -> None:
         "disability_total.tif",
     ):
         (vulnerability / filename).write_bytes(filename.encode())
+
+
+def test_assessment_core_discovery_does_not_require_optional_heavy_sources(
+    tmp_path: Path,
+) -> None:
+    _delivery(tmp_path)
+    for optional in (
+        tmp_path / "administrative_boundary/village",
+        tmp_path / "evacuation_centers/volunteer_center",
+        tmp_path / "evacuation_centers/earlywarning_resources",
+        tmp_path / "vulnerable_people",
+    ):
+        for item in optional.iterdir():
+            item.unlink()
+        optional.rmdir()
+
+    sources = discover_assessment_core_sources(tmp_path)
+
+    assert [item.category for item in sources] == [
+        "boundary",
+        "evacuation_centers",
+        "hazard",
+    ]
+    assert all("village" not in path.parts for path in sources[0].files)
 
 
 def test_discovery_and_fingerprint_are_stable(tmp_path: Path) -> None:
