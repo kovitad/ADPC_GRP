@@ -1,6 +1,14 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 7 October 2026.
+- **Production Share Data switch:** the `kovitad.com` contribution page loaded its static UI but
+  every backend request returned the deliberate generic 404 because contribution availability was
+  coupled to local-only Planning chat. Bootstrap 1.6.0 adds
+  `--enable-global-risk-contributions`; it enables only the protected contribution MCP routes and
+  in-memory session token retention, not AI, draft methods, data inspection or Planning chat.
+  Defaults remain false. Existing Hub-role, CSRF, validation, duplicate-name, rate-limit, audit and
+  no-blind-retry controls remain. Users must sign out/in after deployment. Deployment verification
+  may use **Check** but must not confirm/send: this Global Risk instance may auto-approve globally.
 - **Developer call guide:** `docs/guides/call-global-risk-assemble-pack-from-grp.md` gives the
   direct MCP `assemble_pack` arguments, authenticated background GRP API contract, polling flow,
   stored-pack/`refresh=true` behavior and commit-pinned GitHub links to every relevant GRP source

@@ -107,6 +107,24 @@ declined submission leaves no record. `weights` fields come from the runbook: `h
     - **Limits.** The call is read-only and rate limited like an evidence read. A colleague's
       contributions are not listed: `contribute_status` answers only for the caller.
 
+## Amendment, 7 October 2026: explicit protected-server switch
+
+The temporary `servir-risk.kovitad.com` pilot may enable Share Data independently of the
+local-only Planning assistant with `GLOBAL_RISK_CONTRIBUTIONS_ENABLED=true`. The Ubuntu bootstrap
+sets it only when the owner passes `--enable-global-risk-contributions`; repository and deployment
+defaults remain false.
+
+When either local Planning or this explicit switch is enabled, the SERVIR callback retains the
+person's short-lived MCP access and refresh tokens in process memory for no longer than the GRP
+session. The production switch does not enable AI, draft methods, the data inspector or Planning
+chat. Existing Hub-role checks, CSRF protection, contribution validation, duplicate-name gate,
+rate limits, audit records and no-blind-retry behavior remain unchanged. Users must sign out and
+sign in again after the switch is deployed because an existing session has no retained MCP token.
+
+The pilot deployment may auto-approve a valid submission globally. Enabling the interface is not
+permission to send: users must still inspect the exact preview and explicit publication warning
+before confirmation.
+
 ## Consequences
 
 - A planner can publish a layer, or change flood risk weights, that every Global Risk user sees at

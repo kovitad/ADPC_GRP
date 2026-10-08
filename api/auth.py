@@ -29,7 +29,7 @@ from api.sessions import (
     secure_cookie,
     set_session_cookie,
 )
-from api.settings import Settings, get_settings, planning_chat_available
+from api.settings import Settings, get_settings, sig_user_tools_available
 from api.sig_connection import forget as forget_sig_connection
 from api.token_store import session_token_store
 from core.access_models import AppUser, AuditEvent, AuditResult
@@ -160,9 +160,9 @@ async def complete_login(
         session_id = str(uuid4())
         planning_answer_cache.delete_user(str(result.user_id))
         set_session_cookie(response, settings, result, session_id=session_id)
-        if planning_chat_available(settings):
-            # Interim exception (ADR-0002, ADR-0004, ADR-0017): SIG MCP token and its refresh
-            # token kept in memory, dev only. Renewal never outlives the GRP session.
+        if sig_user_tools_available(settings):
+            # ADR-0002, ADR-0004, ADR-0017 and ADR-0032: the SIG MCP access and refresh tokens
+            # stay in process memory only and never outlive the GRP session.
             session_token_store.put(
                 session_id,
                 authenticated.access_token,

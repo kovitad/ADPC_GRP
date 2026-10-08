@@ -91,7 +91,11 @@ successful timestamped roads snapshot exists, then 200. The Product Owner may ex
 Traffic and municipal snapshot pictures through the bounded protected GRP relay. The API may call
 the provider over HTTP, but the browser receives the picture from GRP over same-origin HTTPS.
 Pictures are rate-limited, held only briefly in memory and never stored. Omit the option outside
-the approved pilot. Verify the feeds at:
+the approved pilot. The separate `--enable-global-risk-contributions` option enables the protected
+Share Data MCP routes for Hub planning roles without enabling AI or Planning chat. Because MCP
+tokens are held only in memory, every user must sign out and sign in again after that switch is
+deployed. A valid submission may be auto-approved globally; enabling the route is not permission
+to skip its preview and confirmation gate. Verify the feeds at:
 
 - `/api/v1/public/flood/bangkok/government-observations/feed.json`
 - `/api/v1/public/aq/sea/feed.json`

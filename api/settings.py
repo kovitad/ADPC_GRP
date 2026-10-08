@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     ai_feature_enabled: bool = False
     # Planner chat box and map using SIG generic evidence (ADR-0004). Docker Desktop only.
     planning_chat_enabled: bool = False
+    # Share Data calls the signed-in person's governed Global Risk MCP tools. Independently
+    # switchable on an approved server; false keeps the routes hidden by default.
+    global_risk_contributions_enabled: bool = False
     # Admin data inspector over a read-only source folder (ADR-0006). Docker Desktop only.
     data_inspector_enabled: bool = False
     data_in_root: Path = Path(".local/data-in")
@@ -107,6 +110,18 @@ def planning_chat_available(settings: Settings) -> bool:
     """ADR-0004: the interim planning chat runs only in local development."""
 
     return settings.planning_chat_enabled and settings.grp_env == "dev"
+
+
+def global_risk_contributions_available(settings: Settings) -> bool:
+    """Share Data is local by default or explicitly enabled on an approved deployment."""
+
+    return planning_chat_available(settings) or settings.global_risk_contributions_enabled
+
+
+def sig_user_tools_available(settings: Settings) -> bool:
+    """Whether this deployment needs the person's short-lived MCP token after sign-in."""
+
+    return planning_chat_available(settings) or global_risk_contributions_available(settings)
 
 
 def data_inspector_available(settings: Settings) -> bool:

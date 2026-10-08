@@ -31,7 +31,7 @@ from api.permissions import SignedInMember
 from api.planning_access import planner_membership
 from api.rate_limits import limiter
 from api.sessions import CurrentPrincipal
-from api.settings import get_settings, planning_chat_available
+from api.settings import get_settings, global_risk_contributions_available
 from api.sig_connection import sig_access_token
 from api.sig_evidence import tool_payload
 from api.sig_jobs import app_session
@@ -106,8 +106,8 @@ class ContributionRequest(BaseModel):
 
 
 def _available() -> None:
-    # The SERVIR token lives only where the planning chat runs (ADR-0004).
-    if not planning_chat_available(get_settings()):
+    # Hide the surface unless local Planning or the explicit server switch retains the token.
+    if not global_risk_contributions_available(get_settings()):
         raise not_found()
 
 

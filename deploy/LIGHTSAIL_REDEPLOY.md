@@ -28,7 +28,7 @@ sudo curl -fsSL https://raw.githubusercontent.com/kovitad/ADPC_GRP/main/deploy/b
 ## 4. Deploy the approved pilot image, feeds and protected camera relay
 
 ```bash
-sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-<approved-short-sha> --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds --enable-public-flood-feed --enable-camera-relay
+sudo bash /srv/grp/bootstrap/bootstrap-ubuntu.sh --deploy-mode image --image ghcr.io/kovitad/adpc_grp:sha-<approved-short-sha> --domain servir-risk.kovitad.com --small-host --enable-public-pilot-feeds --enable-public-flood-feed --enable-camera-relay --enable-global-risk-contributions
 ```
 
 The Product Owner approved the camera relay as a temporary pilot exception. It lets signed-in
@@ -37,6 +37,11 @@ provider's HTTP picture server-side and returns it through the protected same-or
 so the browser does not embed mixed HTTP content. Requests remain rate-limited and pictures are
 not stored. District-summary Word downloads may include up to four credited BMA Traffic or
 allow-listed municipal snapshot pictures; video-only sources are not converted into report stills.
+
+The protected Share Data routes are deliberately enabled for the pilot without enabling production
+AI or Planning chat. After deployment, sign out and sign in again so the new session retains the
+short-lived SERVIR MCP token. A valid contribution may be auto-approved globally; previewing the
+interface does not authorize a submission.
 
 The bootstrap preserves the existing database, `/srv/grp/secrets`, OAuth settings, ThaiWater
 capture configuration and Caddy certificate. Wait until it finishes before running verification.
@@ -75,8 +80,11 @@ The expected value is `strict-origin-when-cross-origin`. If it still says `no-re
 not applied the map fix. After signing in, open a BMA Traffic camera and a Pak Kret municipal
 camera where available; each should show changing pictures inside GRP rather than only a new-tab
 link. Generate district-summary Word documents for areas with nearby BMA Traffic and municipal snapshot
-cameras and confirm that credited pictures appear. Never paste API keys, OAuth tokens, cookies or
-secret-file contents into the terminal command, documentation or chat.
+cameras and confirm that credited pictures appear. After a fresh SERVIR sign-in, open
+`/contribute.html`, require the Hub contribution list and platform-feed cards to load without 404,
+and use **Check** only; do not confirm or send a contribution as part of deployment verification.
+Never paste API keys, OAuth tokens, cookies or secret-file contents into the terminal command,
+documentation or chat.
 
 ## Troubleshooting sudo
 

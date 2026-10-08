@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="1.5.0"
+readonly SCRIPT_VERSION="1.6.0"
 readonly DEFAULT_REPOSITORY="https://github.com/kovitad/ADPC_GRP.git"
 readonly DEFAULT_IMAGE="ghcr.io/kovitad/adpc_grp:main"
 readonly DEFAULT_DOMAIN="staging-risk-servir.adpc.net"
@@ -30,6 +30,7 @@ ENABLE_THAIWATER_SHADOW="false"
 ENABLE_PUBLIC_PILOT_FEEDS="false"
 ENABLE_PUBLIC_FLOOD_FEED="false"
 ENABLE_CAMERA_RELAY="false"
+ENABLE_GLOBAL_RISK_CONTRIBUTIONS="false"
 SERVIR_CLIENT_ID=""
 SSH_ALLOW_CIDRS=()
 APT_UPDATED="false"
@@ -67,6 +68,7 @@ Options:
   --enable-public-pilot-feeds Publish approved ThaiWater and PM2.5 pilot feeds anonymously
   --enable-public-flood-feed  Pull Floodboard and publish the district feed after first success
   --enable-camera-relay       Show approved pilot camera pictures inside protected GRP pages
+  --enable-global-risk-contributions  Enable protected Share Data MCP tools for Hub planners
   --enable-ufw                Enable UFW after safe allow rules are installed
   --ssh-allow-cidr CIDR       SSH source network; repeat for multiple networks
   --check-only                Report state without changing the machine
@@ -94,6 +96,7 @@ while [ "$#" -gt 0 ]; do
         --enable-public-pilot-feeds) ENABLE_PUBLIC_PILOT_FEEDS="true"; shift ;;
         --enable-public-flood-feed) ENABLE_PUBLIC_FLOOD_FEED="true"; shift ;;
         --enable-camera-relay) ENABLE_CAMERA_RELAY="true"; shift ;;
+        --enable-global-risk-contributions) ENABLE_GLOBAL_RISK_CONTRIBUTIONS="true"; shift ;;
         --enable-ufw) ENABLE_UFW="true"; shift ;;
         --ssh-allow-cidr)
             require_option_value "$@"
@@ -381,6 +384,9 @@ if [ "$ENABLE_PUBLIC_FLOOD_FEED" = "true" ]; then
 fi
 if [ "$ENABLE_CAMERA_RELAY" = "true" ]; then
     set_env_value BMATRAFFIC_RELAY_ENABLED "true"
+fi
+if [ "$ENABLE_GLOBAL_RISK_CONTRIBUTIONS" = "true" ]; then
+    set_env_value GLOBAL_RISK_CONTRIBUTIONS_ENABLED "true"
 fi
 if [ "$DEPLOY_MODE" = "image" ]; then
     set_env_value GRP_IMAGE "$IMAGE"
