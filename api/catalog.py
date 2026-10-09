@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -27,7 +28,8 @@ def boundaries(
     level: str = Query(default="district", pattern="^(district|subdistrict)$"),
     parent_admin_code: str | None = Query(default=None, max_length=64),
     province_code: str | None = Query(default=None, max_length=8),
-    include_geometry: bool = Query(default=True),
+    include_geometry: bool = Query(default=False),
+    geometry_detail: str = Query(default="full", pattern="^(full|overview)$"),
 ) -> dict[str, object]:
     """List the supported areas at one level.
 
@@ -38,12 +40,37 @@ def boundaries(
     """
 
     planner_membership(principal, hub_code)
-    statement = select(Boundary).where(Boundary.is_supported, Boundary.admin_level == level)
+    columns = (
+        Boundary.id,
+        Boundary.name,
+        Boundary.name_th,
+        Boundary.admin_code,
+        Boundary.admin_level,
+        Boundary.province_name,
+        Boundary.province_name_th,
+        Boundary.country_name,
+        Boundary.source,
+        Boundary.edition,
+    )
+    overview_geometry = include_geometry and geometry_detail == "overview"
+    if overview_geometry and session.get_bind().dialect.name == "postgresql":
+        # A nationwide picker needs only an orientation outline. Selecting/clicking an area uses
+        # the full indexed geometry through the narrowed or point endpoint. Never deserialize all
+        # 928 detailed source polygons in the API process on the 1 GB pilot host.
+        geometry_column = func.ST_AsGeoJSON(
+            func.ST_SimplifyPreserveTopology(literal_column("boundary.geom_postgis"), 0.01)
+        ).label("geometry")
+    else:
+        geometry_column = Boundary.geom.label("geometry")
+    selected_columns = (*columns, geometry_column) if include_geometry else columns
+    statement = select(*selected_columns).where(
+        Boundary.is_supported, Boundary.admin_level == level
+    )
     if level == "subdistrict" and parent_admin_code:
         statement = statement.where(Boundary.admin_code.like(f"{parent_admin_code[:4]}%"))
     if province_code:
         statement = statement.where(Boundary.admin_code.like(f"{province_code[:2]}%"))
-    rows = session.scalars(statement.order_by(Boundary.name)).all()
+    rows = session.execute(statement.order_by(Boundary.name)).all()
     return {
         "boundaries": [
             {
@@ -58,7 +85,17 @@ def boundaries(
                 "source": row.source,
                 "edition": row.edition,
                 "synthetic": "synthetic" in row.source.casefold(),
-                **({"geometry": row.geom} if include_geometry else {}),
+                **(
+                    {
+                        "geometry": (
+                            json.loads(row.geometry)
+                            if overview_geometry and isinstance(row.geometry, str)
+                            else row.geometry
+                        )
+                    }
+                    if include_geometry
+                    else {}
+                ),
             }
             for row in rows
         ]

@@ -1,7 +1,7 @@
 """A picker can be built without shipping every district outline to the browser (backlog U2)."""
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -89,11 +89,26 @@ def test_districts_can_be_narrowed_to_one_province(world) -> None:
 
 
 def test_geometry_can_be_left_out_so_a_dropdown_is_cheap(world) -> None:
-    light = routes.boundaries(_principal(), world, None, "district", None, None, False)
+    statements = []
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _many) -> None:
+        statements.append(statement)
+
+    event.listen(world.get_bind(), "before_cursor_execute", capture)
+    try:
+        light = routes.boundaries(_principal(), world, None, "district", None, None, False)
+    finally:
+        event.remove(world.get_bind(), "before_cursor_execute", capture)
     full = routes.boundaries(_principal(), world, None, "district", None, None, True)
+    overview = routes.boundaries(
+        _principal(), world, None, "district", None, None, True, "overview"
+    )
 
     assert all("geometry" not in item for item in light["boundaries"])
     assert all("geometry" in item for item in full["boundaries"])
+    assert all("geometry" in item for item in overview["boundaries"])
+    boundary_select = next(statement for statement in statements if "FROM boundary" in statement)
+    assert "boundary.geom" not in boundary_select
     # Everything a picker needs to label and group an option is still present.
     for item in light["boundaries"]:
         assert item["name"] and item["admin_code"] and item["id"]

@@ -893,6 +893,7 @@
   const drawDistricts = () => {
     districtLayer.clearLayers();
     state.boundaries.forEach((boundary) => {
+      if (!boundary.geometry) return;
       const layer = window.L.geoJSON(boundary.geometry, { style: boundaryStyle(false) });
       layer.boundaryId = boundary.id;
       layer.bindTooltip(`${boundary.name}${boundary.synthetic ? " · synthetic" : ""}`, { sticky: true });
@@ -1096,7 +1097,11 @@
   const loadSubdistricts = async (district) => {
     if (!district || district.admin_level !== "district") return [];
     if (!subdistrictLists.has(district.admin_code)) {
-      const params = new URLSearchParams({ hub_code: state.hubCode, level: "subdistrict" });
+      const params = new URLSearchParams({
+        hub_code: state.hubCode,
+        level: "subdistrict",
+        include_geometry: "true",
+      });
       params.set("parent_admin_code", district.admin_code);
       subdistrictLists.set(district.admin_code, GRP.request(`/api/v1/catalog/boundaries?${params}`)
         .then((payload) => payload.boundaries || [])
@@ -1158,8 +1163,13 @@
     }
   };
   // The loaded district object (it carries the outline the map draws), for an area from the API.
-  const knownDistrict = (area) => (area ? state.boundaries.find((item) => item.id === area.id
-    || (item.admin_level === "district" && item.admin_code === area.admin_code)) || area : null);
+  const knownDistrict = (area) => {
+    if (!area) return null;
+    const known = state.boundaries.find((item) => item.id === area.id
+      || (item.admin_level === "district" && item.admin_code === area.admin_code));
+    if (known && area.geometry && !known.geometry) known.geometry = area.geometry;
+    return known || area;
+  };
 
   // One click: the sub-district under the pointer and its district.
   const selectAtPoint = async (latlng, fallbackDistrict = null) => {
@@ -1438,7 +1448,11 @@
       return list.find((item) => item.id === detail.id) || null;
     }
     try {
-      const params = new URLSearchParams({ hub_code: state.hubCode, level: "district" });
+      const params = new URLSearchParams({
+        hub_code: state.hubCode,
+        level: "district",
+        include_geometry: "true",
+      });
       const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
       return payload.boundaries.find((item) => item.id === detail.id) || null;
     } catch (error) {
@@ -5852,7 +5866,7 @@
       const query = `?hub_code=${encodeURIComponent(state.hubCode)}`;
       const [planning, areas, layers, methods] = await Promise.all([
         GRP.request("/api/v1/planning/status").catch(() => ({ available: false })),
-        GRP.request(`/api/v1/catalog/boundaries${query}`),
+        GRP.request(`/api/v1/catalog/boundaries${query}&include_geometry=true&geometry_detail=overview`),
         GRP.request(`/api/v1/maps/layers${query}`),
         GRP.request(`/api/v1/catalog/methods${query}`),
       ]);

@@ -1,6 +1,15 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 8 October 2026.
+**Updated:** 9 October 2026.
+- **Nationwide-boundary memory incident and fix:** after core activation, several Planning and
+  Assessment tabs loaded all detailed district geometry concurrently. On the 909 MiB host the API
+  grew to about 359 MiB, swap reached 2.7/3 GiB, synchronous request threads stalled and sign-in
+  appeared frozen. There was no OOM kill or evidence of unauthorized SSH access. Restarting only
+  the API restored health. The catalogue now omits geometry by default and, critically, does not
+  even select it from PostgreSQL for label-only indexes. Narrow province/parent requests explicitly
+  fetch full outlines; Planning's nationwide map requests a topology-preserving 0.01-degree
+  PostGIS overview. Asset versions are bumped and missing geometry is handled defensively. This
+  changes display transfer only; assessment geometry and pinned results remain exact.
 - **Resource-bounded Thailand assessment core:** the Lightsail host has 909 MiB RAM, 3 GiB swap
   and 26 GiB free. A verified 194 MiB archive (258 MiB extracted) containing the hierarchy without
   villages, DDPM shelters and six RP100 tiles is staged at `/srv/grp/bootstrap-data`; SHA-256

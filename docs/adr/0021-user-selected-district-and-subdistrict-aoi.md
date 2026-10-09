@@ -40,6 +40,16 @@ by SIG and refuses evidence for a different or approximate area.
 | Use sub-district polygons and parent-district SIG context | Chosen: exact local analysis with honest external context |
 | Estimate sub-district SIG values from district totals | Rejected: unsupported disaggregation |
 
+## Amendment, 9 October 2026: bounded catalogue geometry
+
+Nationwide area indexes return labels and identifiers without source geometry by default. A
+province- or parent-narrowed picker may explicitly request full geometry. Planning's nationwide
+orientation layer requests a PostGIS `ST_SimplifyPreserveTopology` overview at approximately
+0.01 degrees, while point selection continues to use the indexed full geometry and a selected
+province/district fetches only its bounded full outlines. This prevents concurrent pages from
+deserializing hundreds of detailed polygons into the API process on the 1 GB pilot host without
+changing any assessment geometry or pinned result.
+
 ## Consequences
 
 - Planners gain a meaningful level choice without losing reproducibility.

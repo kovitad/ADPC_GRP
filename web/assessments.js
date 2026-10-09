@@ -88,6 +88,7 @@
     } else {
       params.set("province_code", String(detail.admin_code).slice(0, 2));
     }
+    params.set("include_geometry", "true");
     let found = null;
     try {
       const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
@@ -107,6 +108,7 @@
     if (known) return known;
     const params = new URLSearchParams({
       hub_code: hubCode, level: "district", province_code: code.slice(0, 2),
+      include_geometry: "true",
     });
     try {
       const payload = await GRP.request(`/api/v1/catalog/boundaries?${params}`);
@@ -187,7 +189,8 @@
     if (!district || district.synthetic) return;
     const payload = await GRP.request(
       `/api/v1/catalog/boundaries?hub_code=${encodeURIComponent(hubCode)}`
-      + `&level=subdistrict&parent_admin_code=${encodeURIComponent(district.admin_code)}`,
+      + `&level=subdistrict&parent_admin_code=${encodeURIComponent(district.admin_code)}`
+      + "&include_geometry=true",
     );
     if (!payload.boundaries.length) return;
     // Merge so selectedArea() can find a sub-district, and keep its outline for the map.
@@ -206,7 +209,8 @@
     if (!provinceCode) return;
     const payload = await GRP.request(
       `/api/v1/catalog/boundaries?hub_code=${encodeURIComponent(hubCode)}`
-      + `&level=district&province_code=${encodeURIComponent(provinceCode)}`,
+      + `&level=district&province_code=${encodeURIComponent(provinceCode)}`
+      + "&include_geometry=true",
     );
     boundaries = payload.boundaries.slice();
     payload.boundaries.forEach((item) => option(boundarySelect, item.id, areaLabel(item)));
