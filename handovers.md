@@ -9,7 +9,12 @@
   even select it from PostgreSQL for label-only indexes. Narrow province/parent requests explicitly
   fetch full outlines; Planning's nationwide map requests a topology-preserving 0.01-degree
   PostGIS overview. Asset versions are bumped and missing geometry is handled defensively. This
-  changes display transfer only; assessment geometry and pinned results remain exact.
+  changes display transfer only; assessment geometry and pinned results remain exact. Commit
+  `2f046e7` passed 1,267 tests (2 PostgreSQL-only skips), Ruff and JavaScript syntax checks, and is
+  deployed. Live PostGIS verification returns all 928 district labels in 384,381 bytes/1.36 s and
+  the simplified nationwide overview in 1,191,752 bytes/2.96 s. After deployment the API used
+  about 105 MiB, swap fell to 206 MiB, external health answered in 0.33 s, sign-in initiation
+  returned 303 in 2.0 s, current assets were served, and no new API errors appeared.
 - **Resource-bounded Thailand assessment core:** the Lightsail host has 909 MiB RAM, 3 GiB swap
   and 26 GiB free. A verified 194 MiB archive (258 MiB extracted) containing the hierarchy without
   villages, DDPM shelters and six RP100 tiles is staged at `/srv/grp/bootstrap-data`; SHA-256
