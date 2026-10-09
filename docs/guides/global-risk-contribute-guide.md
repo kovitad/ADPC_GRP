@@ -78,11 +78,16 @@ sent from Claude Desktop only once a Planning lookup has counted it.
 | 04_OPTIONAL_population_grid | `population_th_village_register` | Only if the GRP team says so (experimental) |
 | 05_OPTIONAL_subdistrict_population_table | `th_subdistrict_population` | Only if the GRP team says so |
 | 06_OPTIONAL_flood_thailand_rp100 | `hazard_flood_thailand_rp100` | Only if the GRP team says so |
-| HOLD_evacuation_centres_until_test_layer_withdrawn | `evacuation_centres_ddpm` | **No, not yet** |
+| 07_evacuation_centres | `evacuation_centres_ddpm` | Foundation now; contribute after duplicate removal |
+| 08_child_sensitivity | `vulnerability_child_sensitivity_th` | Foundation now; contribute after metadata approval |
+| 09_older_person_sensitivity | `vulnerability_elderly_sensitivity_th` | Foundation now; contribute after metadata approval |
+| 10_disability_support_indicator | `vulnerability_disability_class_th` | Foundation now; contribute after class metadata approval |
 
-The evacuation centres wait because an older test copy of the same 10,303 centres is still in
-Global Risk. Submitting again now would make every answer count them twice. The GRP team will
-tell you when the old copy has been withdrawn.
+Loading these files into an isolated development foundation is not a public contribution. Before a
+later contribution, evacuation centres still require removal of the older 10,303-centre test copy
+or answers may count them twice. The three indicator rasters remain separate display/foundation
+layers: they are not vulnerable-person counts and must not be combined into an unapproved score.
+Their manifests can be reused after source meaning, licence and vintage are confirmed.
 
 ## Step 1: Find the link
 

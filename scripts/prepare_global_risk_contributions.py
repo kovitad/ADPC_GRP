@@ -22,6 +22,7 @@ import csv
 import io
 import json
 import math
+import shutil
 import sys
 from collections import Counter
 from pathlib import Path
@@ -497,12 +498,52 @@ def vulnerability() -> None:
         }, f"Relative sensitivity of {title}. Only takes part in risk levels through a weights\n"
            f"contribution. File: {mb} MB.")
         target.replace(folder / layer / target.name)
-        print(f"{layer} written: {mb} MB, breaks {breaks.round(3).tolist()}")
-    write_text(DATA_OUT / "vulnerable_people/disability_total/README.md", """
-# disability_total: withheld
+        write_text(folder / layer / "TEST.md", f"""
+# Foundation check: sensitivity of {title}
 
-The file holds only the values 1, 2 and 255 and nobody has said what 1 and 2 mean. GRP
-withholds it from the map for the same reason. Ask the data owner before contributing it.
+Load `{target.name}` as a separate EPSG:4326 display/foundation raster. It contains uint8
+quintile classes 1–5 and NoData 0, aligned to the flood grid. The non-zero source-index breaks are
+{", ".join(f"{value:.3f}" for value in breaks)}.
+
+This is a relative index, not a headcount, exposure result or risk score. Before a later public
+contribution, confirm source meaning, licence and vintage, put the direct file URL in
+`manifest.yaml`, and run GRP **Check**. Do not add weights without a separate approved scoring
+decision.
+""")
+        print(f"{layer} written: {mb} MB, breaks {breaks.round(3).tolist()}")
+    disability_source = DATA_IN / "vulnerable_people/disability_total.tif"
+    disability_folder = DATA_OUT / "vulnerable_people/vulnerability_disability_class_th"
+    write_manifest(disability_folder, "raster", {
+        "layer": "vulnerability_disability_class_th", "url": URL,
+        "title": "Disability support indicator class, Thailand",
+        "description": (
+            "Source ordinal disability-support indicator at 12.5 m resolution. Values 1-4 are "
+            "source classes, not numbers of people, percentages, exposure or flood risk. The "
+            "source did not provide meanings or direction for the classes."
+        ),
+        "source": "ADPC Data Science Thailand delivery", "license": "unstated",
+        "vintage": "2026-09",
+        "legend": {str(value): f"Source class {value}; meaning and direction not supplied"
+                   for value in range(1, 5)},
+        "declared": {"dtype": "uint8", "valid_min": 1, "valid_max": 4, "nodata": 255},
+        "usage_notes": (
+            "Foundation/display context only. Never sum classes or describe them as people with "
+            "disabilities, exposure, vulnerability counts or risk. Class meaning, licence and "
+            "vintage require owner confirmation before publication."
+        ),
+    }, "Foundation/display class raster. Despite the source filename, values are ordinal classes, "
+       "not totals.")
+    shutil.copy2(disability_source, disability_folder / "disability_support_class_th.tif")
+    write_text(disability_folder / "TEST.md", """
+# Foundation check: disability support indicator
+
+Load `disability_support_class_th.tif` as a separate source-native EPSG:32647 display/foundation
+raster. Only classes 1–4 may render; NoData 255 is transparent. The source did not provide approved
+meanings or direction for the classes, and despite its original filename the values are not totals.
+
+Before a later public contribution, confirm class meaning, licence and vintage, put the direct file
+URL in `manifest.yaml`, and run GRP **Check**. Never sum the classes or call them people, exposure,
+vulnerability counts or risk.
 """)
     write_manifest(DATA_OUT / "vulnerable_people/weights_flood_thailand", "weights", {
         "hazard": "flood_thailand",
@@ -691,9 +732,8 @@ def check() -> None:
 
 # ---------- the folder to upload to Google Drive ----------
 
-# (folder, source folder, file, what it is). Order is the order to submit in. Evacuation centres
-# wait in HOLD_ until a Global Risk reviewer withdraws the 24 September test layer; weights,
-# sensitivity, disability and boundaries are left out entirely.
+# (folder, source folder, file, what it is). Order is the stable foundation order. Loading a
+# foundation is not publication approval; each manifest preserves its later contribution gates.
 DRIVE = [
     ("01_early_warning_towers", "evacuation_centers/earlywarning_resources",
      "early_warning_towers_ddpm.geojson", "Early-warning towers (DDPM)"),
@@ -708,8 +748,14 @@ DRIVE = [
      "th_subdistrict_population.csv", "Sub-district population table"),
     ("06_OPTIONAL_flood_thailand_rp100", "floods/flood_depth_rp100",
      "hazard_flood_thailand_rp100.tif", "GRP's flood tiles, classed 1-5"),
-    ("HOLD_evacuation_centres_until_test_layer_withdrawn", "evacuation_centers/shelters",
-     "evacuation_centres_ddpm.geojson", "Evacuation centres (DDPM): do not submit yet"),
+    ("07_evacuation_centres", "evacuation_centers/shelters",
+     "evacuation_centres_ddpm.geojson", "Evacuation centres (DDPM)"),
+    ("08_child_sensitivity", "vulnerable_people/vulnerability_child_sensitivity_th",
+     "vulnerability_child_sensitivity_th.tif", "Child sensitivity index"),
+    ("09_older_person_sensitivity", "vulnerable_people/vulnerability_elderly_sensitivity_th",
+     "vulnerability_elderly_sensitivity_th.tif", "Older-person sensitivity index"),
+    ("10_disability_support_indicator", "vulnerable_people/vulnerability_disability_class_th",
+     "disability_support_class_th.tif", "Disability support indicator class"),
 ]
 
 
@@ -742,9 +788,13 @@ def drive() -> None:
     else:
         with (target / "LINKS.csv").open("w", encoding="utf-8-sig", newline="") as handle:
             csv.writer(handle).writerows(rows)
-    write_text(target / "00_START_HERE.md", """# Upload kit: GRP data for Global Risk
+    write_text(
+        target / "00_START_HERE.md",
+        """# Foundation and future-contribution kit: GRP data for Global Risk
 
-Global Risk auto-approves every contribution: anything sent is public to every user at once
+Folders 01–10 give developers stable foundation files and reusable manifests. Loading a file into
+an isolated development foundation is not permission to publish it. Global Risk may auto-approve
+every contribution: anything sent is public to every user at once
 (confirmed 30 Sep 2026), and removing an approved one may need a Global Risk reviewer. Only the
 GRP team sends. Testers practise with Check and a dry run, which send nothing (see the guide's
 "Try it yourself"). Already live from ADPC: the test copies evacuation_centres_th_test and
@@ -762,15 +812,17 @@ early_warning_towers_test_kovitad.
   - GRP's Share data page: follow `share-data-with-global-risk-guide.docx` (Appendix A has
     every field value to type);
   - Claude Desktop: follow `global-risk-contribute-guide.docx` (paste `manifest.yaml`).
-- Submit in folder order: 01, 02, 03. 04 to 06 are optional; ask the GRP team first.
-- Each folder has `manifest.yaml` and `TEST.md` (what to ask afterwards, and GRP's own numbers
-  to compare with).
-- **HOLD_ folder: do not submit** until the GRP team confirms the old test layer
-  `evacuation_centres_th_test` (c66ade79bc2605ac) is withdrawn. Otherwise every answer counts
-  the centres twice.
+- Load foundations in folder order 01–10. Folders 04–06 are optional/experimental.
+- Each folder has `manifest.yaml` and `TEST.md` (what to check and the limits to preserve).
+- Before contributing folder 07 publicly, remove the older duplicate test layer
+  `evacuation_centres_th_test` (c66ade79bc2605ac), or answers may count centres twice.
+- Folders 08–10 are separate relative/class indicators, never vulnerable-person counts. Confirm
+  source meaning, licence and vintage before public contribution; do not add weights merely to
+  make them affect a risk score.
 - One person submits each dataset, once. Record the time, `contribution_id` and status in
   `LINKS.csv`.
-""")
+""",
+    )
     print(f"wrote {target.relative_to(ROOT)}")
 
 

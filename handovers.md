@@ -1,6 +1,17 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 9 October 2026.
+- **Foundation/contribution kit extended through 10:** owner clarified that numbered folders are
+  first for a developer's isolated Global Risk foundation and should remain reusable for a later
+  governed `contribute_submit`. The local ignored kit now uses `07_evacuation_centres`,
+  `08_child_sensitivity`, `09_older_person_sensitivity` and
+  `10_disability_support_indicator`; every folder has data, a validated manifest and a test sheet.
+  08/09 use the existing compact EPSG:4326 flood-grid quintile rasters (1.2/1.3 MiB), not the
+  575–580 MiB source-native indexes. 10 retains the 65 MiB source ordinal raster and the compliant
+  layer name `vulnerability_disability_class_th`. The indicators remain separate display layers,
+  never person counts or an unapproved composite. Foundation loading is allowed; later public
+  contribution still requires metadata confirmation, and 07 requires removal of the duplicate
+  test layer first. The reproducible preparation script, Markdown and generated Word guides match.
 - **Nationwide-boundary memory incident and fix:** after core activation, several Planning and
   Assessment tabs loaded all detailed district geometry concurrently. On the 909 MiB host the API
   grew to about 359 MiB, swap reached 2.7/3 GiB, synchronous request threads stalled and sign-in

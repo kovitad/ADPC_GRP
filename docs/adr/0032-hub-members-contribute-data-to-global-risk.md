@@ -125,6 +125,21 @@ The pilot deployment may auto-approve a valid submission globally. Enabling the 
 permission to send: users must still inspect the exact preview and explicit publication warning
 before confirmation.
 
+## Amendment, 9 October 2026: numbered development-foundation kit
+
+The owner approved extending the external developer kit after folder 07. Folders 01–10 may be
+loaded into an isolated development foundation, while retaining manifests for a later governed
+`contribute_submit`. Foundation loading is not public-publication approval and does not bypass the
+GRP preview/confirmation gate.
+
+Folder 07 is DDPM evacuation centres. Before public contribution, the older duplicate test layer
+must be removed. Folders 08 and 09 are compact, flood-grid-aligned quintile display rasters derived
+from the source child and older-person sensitivity indexes. Folder 10 is the source disability
+support ordinal-class raster. These three remain separate source indicators: never person counts,
+never summed, and never combined into weights without a distinct approved scoring decision. Their
+manifests preserve metadata limitations and can be submitted only after source meaning, licence
+and vintage are confirmed.
+
 ## Consequences
 
 - A planner can publish a layer, or change flood risk weights, that every Global Risk user sees at

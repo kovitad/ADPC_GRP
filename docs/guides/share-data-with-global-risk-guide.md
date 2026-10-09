@@ -156,8 +156,8 @@ file at 27.5 MB.
 
 | Kind on the page | Use it for | Kit folders |
 |---|---|---|
-| Point layer | GeoJSON points, counted against the flood layer | 01, 02, 03, HOLD |
-| Raster | GeoTIFF: a hazard, risk or vulnerability class grid (0-5), or a population count grid | 04, 06 |
+| Point layer | GeoJSON points, counted against the flood layer | 01, 02, 03, 07 |
+| Raster | GeoTIFF: a hazard, risk or vulnerability class grid (0-5), or a population count grid | 04, 06, 08, 09, 10 |
 | Table | CSV. It becomes a feed Global Risk can query and cite, never an exposure count | 05 |
 | Document | A report or guideline PDF that Global Risk archives and cites | none in the kit |
 | Risk weights | Changes how every user's flood risk level is computed | **Do not use** without the data owner's written agreement |
@@ -401,13 +401,17 @@ district where it was counted, so GRP sees it is gone. Then send the corrected f
 
 **Never send a corrected file under a new name.** Global Risk would keep both and count both.
 
-## The HOLD folder
+## Folder 07 duplicate gate
 
-`HOLD_evacuation_centres_until_test_layer_withdrawn` contains the same 10,303 evacuation centres
-as an older test layer, `evacuation_centres_th_test` (contribution `c66ade79bc2605ac`). **The GRP
-page will not stop you**: the names differ, so its name guard lets it through. Sending it now
-would make every Global Risk answer count every centre twice. Wait until the GRP team confirms
-that the old layer is withdrawn.
+`07_evacuation_centres` is ready for an isolated development foundation, but it contains the same
+10,303 evacuation centres as the older Global Risk test layer `evacuation_centres_th_test`
+(contribution `c66ade79bc2605ac`). **The GRP page will not stop you**: the names differ, so its name
+guard lets it through. Before a public contribution, confirm that the old layer is withdrawn or
+Global Risk answers may count every centre twice.
+
+Folders 08–10 are separate source indicators, not vulnerable-person counts. Their manifests are
+reusable after source meaning, licence and vintage are confirmed. Do not create a weights
+contribution merely to make them affect risk levels.
 
 ## If something goes wrong
 
