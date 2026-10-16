@@ -4,8 +4,10 @@
 - **Langfuse session grouping:** new AI calls now carry a one-way reference derived from the
   signed-in GRP login session, allowing Langfuse's Sessions view to group related router, drafting,
   explanation and test-call traces. The real session identifier and cookie are never exported.
-  Existing observations remain ungrouped; rebuild/recreate the local API before testing this
-  addition. Focused AI, Planning and flood tests pass (141), Ruff and whitespace checks are clean.
+  Existing observations remain ungrouped. The supported Desktop launcher rebuilt and recreated the
+  local image; API/database are healthy, the worker is running, and the container contains the
+  session-grouping code. Focused AI, Planning and flood tests pass (141); the full suite passes
+  1,267 with 2 PostgreSQL-only skips; Ruff and whitespace checks are clean.
 - **AWS/Langfuse migration preparation:** the existing AWS deployment remains unchanged, with AI
   deliberately disabled. Fresh server configuration keeps both AI and Langfuse export off; the
   bootstrap preserves the server's existing `.env` and root-owned secret directory, so the local
