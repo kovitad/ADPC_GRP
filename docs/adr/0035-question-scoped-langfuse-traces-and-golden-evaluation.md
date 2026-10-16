@@ -1,7 +1,7 @@
 # ADR-0035: Question-scoped Langfuse traces and golden evaluation
 
-**Status:** Proposed (owner decisions recorded 1 October 2026; the reviewer assignment is
-unconfirmed)
+**Status:** Partially accepted (question tracing and gated stakeholder content approved
+16 October 2026; evaluation and reviewer assignment remain unconfirmed)
 
 **Date:** 2026-10-01
 
@@ -48,14 +48,16 @@ ADR-0004. The full task text and design are in
    environment. Evaluation runs use `environment=evaluation`.
 6. **Privacy.**
    - Traces are metadata-only by default.
-   - Masked question and answer text is exported only when an **approved evaluation case** is
-     run under a **named test account** on `LANGFUSE_EVAL_TEXT_ACCOUNTS`. A test account alone
-     never enables it.
-   - The privacy documentation, starting with the `api/langfuse.py` statement that prompts and
-     answers are never sent, is updated before the allow-list is populated.
-7. **Integration.** GRP uses Langfuse's public ingestion API (`POST /api/public/ingestion`) with
-   batched `trace-create`, `span-create` and `generation-create` events. An SDK version is
-   recorded only if an SDK is introduced.
+   - Non-production stakeholder demonstrations may export Planning question, AI instruction,
+     prompt and answer content only when both `LANGFUSE_CAPTURE_CONTENT=true` and the signed-in
+     account is named in `LANGFUSE_EVAL_TEXT_ACCOUNTS`.
+   - Production rejects content capture regardless of configuration. Email addresses, credentials,
+     real session identifiers and raw MCP arguments/results are never exported.
+   - Demonstrators must use reviewed test questions and must not enter personal, secret or
+     restricted operational information.
+7. **Integration.** ADR-0069 supersedes the original legacy-ingestion choice. GRP uses the
+   Langfuse 4.x SDK and OTel ingestion because the dedicated 4.59.0 server rejects legacy
+   `trace-create`, `span-create` and `generation-create` events.
 8. **Failure handling.** Telemetry failures never block an answer. Rejected or unreachable
    exports are logged and counted. Quota behaviour comes from Langfuse support or a controlled
    test, and is otherwise documented as unconfirmed.
@@ -73,8 +75,9 @@ ADR-0004. The full task text and design are in
 
 ## Options considered
 
-- **Adopt the Langfuse Python SDK (OTel based).** The SDK has a richer API. Rejected for now: it
-  adds a dependency and global OTel state to a codebase that exports with plain httpx.
+- **Adopt the Langfuse Python SDK (OTel based).** Originally rejected because it adds a dependency
+  and global OTel state. Subsequently accepted by ADR-0069 because Langfuse 4.59.0 rejects the
+  legacy ingestion events.
 - **Export all content, masked.** Simpler for reviewers. Rejected: it would send planners'
   questions to a hosted service, against the current promise.
 - **Enable text export for any test account.** Rejected: interactive test use can contain real
@@ -82,6 +85,22 @@ ADR-0004. The full task text and design are in
 - **Count missing usage as 0, or let Langfuse estimate it with a tokenizer.** Rejected: both
   hide gaps in the cost figure.
 - **Add read-only retries now.** Deferred to follow-up scope.
+
+## 16 October 2026 implementation amendment
+
+The Product Owner approved the question-level support/monitoring slice. Planning now exports one
+metadata-only question trace with child router/draft generations and MCP tool spans. Tool spans
+contain tool name, safe outcome/error category, duration and allow-listed pack/receipt/report IDs;
+they never contain arguments, results, access tokens, place text or question text. The existing
+one-way user and login-session references remain in place. Export runs independently and cannot
+change the Planning response. Accurate operation durations are retained in `metadata.duration_ms`;
+opening live OTel spans at operation start remains follow-up work for native Langfuse latency.
+
+The Product Owner subsequently approved visible input/output for stakeholder demonstrations.
+Content capture is implemented as a two-lock, account-specific, non-production exception and stays
+false by default. It applies to Planning question roots and AI generation children only; MCP tools
+remain metadata-only. The wider usage-schema, evaluation dataset, dashboard/report and release
+metadata work remains proposed.
 
 ## Consequences
 

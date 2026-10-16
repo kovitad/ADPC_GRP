@@ -75,13 +75,16 @@ class Settings(BaseSettings):
     ai_timezone: str = "Asia/Bangkok"
     ai_timeout_seconds: float = 60.0
 
-    # Langfuse (hosted) receives safe AI call metadata only; it never enforces the allowance.
+    # Langfuse receives metadata by default and never enforces the allowance. Explicitly
+    # allow-listed non-production stakeholder sessions may also export AI text (ADR-0035).
     langfuse_host: str | None = Field(
         default=None, validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL")
     )
     langfuse_public_key: str | None = None
     langfuse_secret_key_file: Path = Path(".local/secrets/langfuse_secret_key")
     langfuse_environment: str | None = None
+    langfuse_capture_content: bool = False
+    langfuse_eval_text_accounts: str = ""
 
     # SIG machine login, staging fallback (Section 9.6): hash of a long random token.
     sig_service_token_hash_file: Path = Path(".local/secrets/sig_service_token_hash")

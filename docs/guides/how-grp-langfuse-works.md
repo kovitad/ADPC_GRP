@@ -22,7 +22,7 @@ sequenceDiagram
     Provider-->>GRP: Answer, model name and token usage
     GRP->>DB: Record authoritative usage and outcome
     GRP-->>User: Return the AI response
-    GRP-->>LF: Export privacy-safe metadata through OTel
+    GRP-->>LF: Export metadata (and explicitly gated test content) through OTel
 ```
 
 Every provider call goes through the GRP AI gateway. The provider response supplies the actual
@@ -31,10 +31,11 @@ best-effort Langfuse export.
 
 ## What Langfuse receives
 
-Each new AI call creates a `grp-ai-call` trace with one generation observation. Calls made during
-one signed-in GRP login share a pseudonymous Langfuse session, so the Sessions view can group a
-router call, answer call and later AI actions without receiving the real GRP session value. GRP
-exports:
+Each Planning question creates one `grp-planning-question` trace. Its child observations show the
+AI router, Global Risk MCP tools such as `assemble_pack`, and the AI draft.
+Calls made during one signed-in GRP login also share a pseudonymous Langfuse session, so the
+Sessions view can group multiple question traces without receiving the real GRP session value.
+Other single-call workflows continue to use a `grp-ai-call` trace. GRP exports:
 
 - the model identifier returned by the provider;
 - input, output and total token counts;
@@ -46,13 +47,16 @@ exports:
 - a one-way pseudonymous person reference; and
 - a separate one-way session reference that groups AI calls made during one GRP login.
 
-GRP does **not** export:
+By default, GRP does **not** export prompts, instructions or AI answers. A stakeholder demonstration
+may show real Planning and AI input/output only when the local deployment has both content capture
+switched on and the signed-in email in its allow-list. Production refuses this mode.
 
-- prompts or instructions;
-- AI answers;
+GRP never exports:
+
 - names or email addresses;
-- passwords, API keys, cookies or the real GRP login-session identifier; or
-- assessment source records.
+- passwords, API keys, cookies or the real GRP login-session identifier;
+- raw MCP arguments or results; or
+- raw assessment source records.
 
 ## Tokens and cost
 
@@ -65,7 +69,8 @@ current pricing. If a dated or organization-specific model is unknown, an admini
 custom pricing or GRP must export explicit costs. A missing Langfuse cost must not be interpreted
 as a free AI call.
 
-The current integration exports standard input and output totals. Separate cached-input and
+The current integration exports standard input and output totals. A question trace sums cost from
+its generation children; MCP tool spans have no model cost. Separate cached-input and
 reasoning-token categories remain future work.
 
 ## Source of truth and failure behavior
@@ -88,6 +93,28 @@ project receives an observation. Development testing currently uses **GRP Evalua
 `development` environment. Production telemetry remains disabled until its operational gates are
 approved.
 
+## Enable stakeholder trace content locally
+
+Use this only with reviewed demonstration questions. Content persists in the Evaluation project
+according to its retention policy, so do not enter personal information, credentials or restricted
+operational material.
+
+In the ignored repository `.env`, set:
+
+```dotenv
+LANGFUSE_CAPTURE_CONTENT=true
+LANGFUSE_EVAL_TEXT_ACCOUNTS=your.approved.account@example.org
+```
+
+Multiple approved accounts are comma-separated. Both settings are required, matching is
+case-insensitive, and `GRP_ENV=production` always refuses content capture. Rebuild from PowerShell
+with `.\scripts\docker-desktop.ps1` after changing the settings. Set
+`LANGFUSE_CAPTURE_CONTENT=false` and rebuild when the demonstration is finished.
+
+This mode populates input/output on the Planning root and AI generation children. MCP tool children
+remain metadata-only to prevent arguments, upstream responses and credentials from entering
+Langfuse.
+
 ## Plain-language dashboard
 
 The **GRP AI at a glance** dashboard provides a simpler team view:
@@ -107,14 +134,22 @@ checking a new call. The dashboard is reproducibly managed by
 
 ## How to verify a trace
 
-1. Sign in to GRP as a Platform Admin.
-2. Open **Admin → Platform → Test AI call**.
-3. Submit a short test message.
+1. Sign in to GRP with access to Planning.
+2. Open **Planning**, select a supported area and leave at least one **Global Risk layer**
+   selected.
+3. Ask a short planning question and wait for the answer. This exercises the router, the
+   `assemble_pack` MCP tool and, when needed, the drafting model.
 4. Open **GRP Evaluation → Tracing** in Langfuse.
 5. Select environment **development** or **All** and a recent time range.
-6. Refresh and open the `grp-ai-call` trace.
-7. Confirm the model, input/output tokens, duration and outcome are present.
-8. Confirm no prompt, answer, email address or credential appears.
+6. Refresh and open the latest `grp-planning-question` trace.
+7. Confirm the question trace contains router and draft generation children and, when Global Risk
+   was requested, an `mcp.assemble_pack` tool child.
+8. Confirm model, token usage, metadata `duration_ms` and outcome are present. With stakeholder
+   content enabled for your account, confirm the Planning root and AI generations show their real
+   input/output. Standard Langfuse latency remains near zero until GRP opens spans at operation
+   start rather than exporting completed records afterward.
+9. Confirm MCP children still have no input/output and no email address, credential, cookie or real
+   session identifier appears anywhere.
 
 If the AI response succeeds but no trace appears, check the GRP API logs for `Langfuse export
 failed`, verify that the API key belongs to the selected project, and confirm that no environment

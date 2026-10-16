@@ -12,9 +12,15 @@ from api.ai_gateway import ProviderError, run_ai_call
 from api.errors import GrpError
 from api.langfuse import (
     AiCallRecord,
+    QuestionTrace,
+    TraceObservation,
     build_observation,
+    build_question_trace,
+    collect_question_trace,
+    langfuse_content_enabled,
     person_reference,
     send_ai_call,
+    send_question_trace,
     session_reference,
 )
 from api.settings import Settings
@@ -379,6 +385,203 @@ def test_langfuse_is_skipped_when_server_has_only_partial_configuration(tmp_path
     record = AiCallRecord("req-1", "u", None, "web", "gpt", "v1", 1, 1, "completed", now, now)
 
     assert asyncio.run(send_ai_call(settings, record, client=ClientThatMustNotRun())) is False
+
+
+def test_langfuse_content_requires_nonproduction_switch_and_allowlisted_account() -> None:
+    base = {
+        "_env_file": None,
+        "LANGFUSE_CAPTURE_CONTENT": True,
+        "LANGFUSE_EVAL_TEXT_ACCOUNTS": "owner@example.test, reviewer@example.test",
+    }
+    assert langfuse_content_enabled(Settings(**base), "OWNER@example.test") is True
+    assert langfuse_content_enabled(Settings(**base), "other@example.test") is False
+    assert (
+        langfuse_content_enabled(
+            Settings(**base, GRP_ENV="production"), "owner@example.test"
+        )
+        is False
+    )
+    assert (
+        langfuse_content_enabled(
+            Settings(
+                _env_file=None,
+                LANGFUSE_CAPTURE_CONTENT=False,
+                LANGFUSE_EVAL_TEXT_ACCOUNTS="owner@example.test",
+            ),
+            "owner@example.test",
+        )
+        is False
+    )
+
+
+def test_allowlisted_question_trace_exports_ai_content_but_not_tool_payloads() -> None:
+    now = datetime.now(UTC)
+    trace = QuestionTrace(
+        user_id="real-user-id",
+        login_session_id="real-login-session",
+        hub_code="adpc",
+        capture_content=True,
+        input="What should the district prepare?",
+        output={"answer": "Prepare evacuation centres first."},
+    )
+    record = AiCallRecord(
+        "req-1", "real-user-id", "adpc", "web", "test-model", "planning-draft-v1",
+        20, 5, "completed", now, now, "real-login-session",
+    )
+    trace.add_generation(
+        record,
+        instructions="Use only cited evidence.",
+        prompt="Summarize the district evidence.",
+        answer="Prepare evacuation centres first.",
+    )
+    trace.add_tool(
+        name="assemble_pack",
+        started_at=now,
+        ended_at=now,
+        outcome="completed",
+        identifiers={"pack_id": "pack-1"},
+    )
+    trace.finish("completed")
+
+    document = build_question_trace(trace)
+    assert document["root"]["input"] == "What should the district prepare?"
+    assert document["root"]["output"] == {"answer": "Prepare evacuation centres first."}
+    generation, tool = document["observations"]
+    assert generation["input"] == {
+        "instructions": "Use only cited evidence.",
+        "prompt": "Summarize the district evidence.",
+    }
+    assert generation["output"] == "Prepare evacuation centres first."
+    assert "input" not in tool and "output" not in tool
+
+
+def test_question_trace_groups_metadata_only_ai_and_tool_children(tmp_path) -> None:
+    started = datetime.now(UTC)
+    ended = started + timedelta(seconds=12)
+    trace = QuestionTrace(
+        user_id="real-user-id",
+        login_session_id="real-login-session",
+        hub_code="adpc",
+        started_at=started,
+    )
+    trace.observations.extend(
+        [
+            TraceObservation(
+                name="planning-router-v3",
+                as_type="generation",
+                started_at=started,
+                ended_at=started + timedelta(seconds=2),
+                outcome="completed",
+                model="test-model",
+                usage_details={"input": 10, "output": 2, "total": 12},
+            ),
+            TraceObservation(
+                name="mcp.assemble_pack",
+                as_type="tool",
+                started_at=started + timedelta(seconds=2),
+                ended_at=ended,
+                outcome="completed",
+                metadata={"tool": "assemble_pack", "pack_id": "pack-1"},
+            ),
+        ]
+    )
+    trace.update(area_admin_code="7503", hazard="flood", evidence_reused=False)
+    trace.ended_at = ended
+    trace.outcome = "completed"
+
+    document = build_question_trace(trace)
+    serialized = json.dumps(document)
+    assert "real-user-id" not in serialized
+    assert "real-login-session" not in serialized
+    assert "question text" not in serialized and '"input"' not in document["root"]
+    assert document["metadata"]["duration_ms"] == 12_000
+    assert [item["as_type"] for item in document["observations"]] == ["generation", "tool"]
+    assert document["observations"][1]["metadata"]["pack_id"] == "pack-1"
+
+    class Observation:
+        def __init__(self, arguments):
+            self.arguments = arguments
+            self.children = []
+            self.ended = False
+
+        def start_observation(self, **arguments):
+            child = Observation(arguments)
+            self.children.append(child)
+            return child
+
+        def end(self) -> None:
+            self.ended = True
+
+    class Client:
+        def __init__(self) -> None:
+            self.root = None
+            self.flushed = False
+
+        def create_trace_id(self, *, seed):
+            assert seed == trace.trace_id
+            return "0" * 32
+
+        def start_observation(self, **arguments):
+            self.root = Observation(arguments)
+            return self.root
+
+        def flush(self) -> None:
+            self.flushed = True
+
+    secret = tmp_path / "langfuse-secret"
+    secret.write_text("sk-lf-test", encoding="utf-8")
+    settings = Settings(
+        _env_file=None,
+        LANGFUSE_HOST="https://langfuse.test",
+        langfuse_public_key="pk-lf-test",
+        langfuse_secret_key_file=secret,
+    )
+    client = Client()
+
+    assert asyncio.run(send_question_trace(settings, trace, client=client)) is True
+    assert client.root.arguments["name"] == "planning-question"
+    assert [child.arguments["name"] for child in client.root.children] == [
+        "planning-router-v3",
+        "mcp.assemble_pack",
+    ]
+    assert all(child.ended for child in client.root.children)
+    assert client.root.ended is True and client.flushed is True
+
+
+def test_question_collector_replaces_separate_ai_exports(session) -> None:
+    admin = _person(session, "owner@example.test", admin=True)
+    _enable(session, admin)
+    session.commit()
+    separately_exported: list[AiCallRecord] = []
+    trace = QuestionTrace(
+        user_id=str(admin.id), login_session_id="login-session", hub_code="adpc"
+    )
+
+    async def provider(settings, *, instructions, prompt, hub_code):
+        return "It works.", "test-model", 20, 5
+
+    with collect_question_trace(trace):
+        asyncio.run(
+            run_ai_call(
+                session,
+                _settings(),
+                user_id=admin.id,
+                hub_id=None,
+                hub_code="adpc",
+                instructions="check",
+                prompt="private question",
+                prompt_version="planning-router-v3",
+                provider_call=provider,
+                export=separately_exported.append,
+            )
+        )
+
+    assert separately_exported == []
+    assert len(trace.observations) == 1
+    assert trace.observations[0].name == "planning-router-v3"
+    assert trace.observations[0].usage_details == {"input": 20, "output": 5, "total": 25}
+    assert trace.observations[0].input is None
+    assert trace.observations[0].output is None
 
 
 def test_langfuse_export_failure_does_not_break_the_operational_call(tmp_path) -> None:

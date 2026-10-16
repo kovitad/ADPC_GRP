@@ -77,6 +77,9 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY_FILE: /run/grp-secrets/langfuse_secret_key
       LANGFUSE_ENVIRONMENT: ${LANGFUSE_ENVIRONMENT:-development}
+      # Two-lock, local-only stakeholder trace content. Accounts are comma-separated emails.
+      LANGFUSE_CAPTURE_CONTENT: "${LANGFUSE_CAPTURE_CONTENT:-false}"
+      LANGFUSE_EVAL_TEXT_ACCOUNTS: "${LANGFUSE_EVAL_TEXT_ACCOUNTS:-}"
       SIG_SERVICE_TOKEN_HASH_FILE: /run/grp-secrets/sig_service_token_hash
     volumes: &grp-secrets
       - ../.local/docker/secrets:/run/source-secrets:ro

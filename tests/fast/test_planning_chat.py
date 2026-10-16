@@ -22,8 +22,9 @@ import api.permissions
 import api.planning
 import api.planning_memory
 from api.dependencies import database_session
+from api.langfuse import QuestionTrace, collect_question_trace
 from api.main import app
-from api.mcp_client import McpToolResult, SigMcpClient
+from api.mcp_client import McpToolResult, SigMcpClient, SigMcpError
 from api.planning_cache import PlanningAnswerCache, planning_answer_cache
 from api.rate_limits import limiter
 from api.sessions import CSRF_COOKIE, set_session_cookie
@@ -330,6 +331,7 @@ def test_deterministic_summary_reports_findings_hidden_by_display_limit() -> Non
 
 def test_sig_mcp_client_initializes_then_calls_tool() -> None:
     methods: list[str] = []
+    trace = QuestionTrace(user_id="user-1", login_session_id="session-1", hub_code="adpc")
 
     def respond(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer short-lived-token"
@@ -345,13 +347,55 @@ def test_sig_mcp_client_initializes_then_calls_tool() -> None:
         return httpx.Response(200, json={"jsonrpc": "2.0", "id": document["id"], "result": result})
 
     async def exercise():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            async with SigMcpClient("https://sig.example/mcp", "short-lived-token",
-                                    client=client) as mcp:
-                return await mcp.call_tool("assemble_pack", {"pack": "risk"})
+        with collect_question_trace(trace):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+                async with SigMcpClient("https://sig.example/mcp", "short-lived-token",
+                                        client=client) as mcp:
+                    return await mcp.call_tool("assemble_pack", {"pack": "risk"})
 
     assert asyncio.run(exercise()).structured_content["pack_id"] == "pack-1"
     assert methods == ["initialize", "notifications/initialized", "tools/call"]
+    assert len(trace.observations) == 1
+    assert trace.observations[0].name == "mcp.assemble_pack"
+    assert trace.observations[0].metadata == {"tool": "assemble_pack", "pack_id": "pack-1"}
+
+
+def test_sig_mcp_client_records_timeout_without_arguments_or_token() -> None:
+    trace = QuestionTrace(user_id="user-1", login_session_id="session-1", hub_code="adpc")
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        document = json.loads(request.content)
+        if document["method"] == "initialize":
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": document["id"],
+                    "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
+                },
+            )
+        if document["method"] == "notifications/initialized":
+            return httpx.Response(202)
+        raise httpx.ReadTimeout("upstream stalled", request=request)
+
+    async def exercise() -> None:
+        with collect_question_trace(trace):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+                async with SigMcpClient(
+                    "https://sig.example/mcp", "secret-token", client=client
+                ) as mcp:
+                    await mcp.call_tool(
+                        "assemble_pack", {"place": "private place", "focus": "private question"}
+                    )
+
+    with pytest.raises(SigMcpError, match="SIG MCP is unavailable"):
+        asyncio.run(exercise())
+    assert len(trace.observations) == 1
+    observation = trace.observations[0]
+    assert observation.outcome == "failed"
+    assert observation.metadata == {"tool": "assemble_pack", "error_category": "timeout"}
+    serialized = json.dumps(observation.metadata)
+    assert "private" not in serialized and "secret-token" not in serialized
 
 
 # --- route -----------------------------------------------------------------------------

@@ -26,7 +26,14 @@ from api.dependencies import DatabaseSession
 from api.errors import GrpError, not_found
 from api.global_risk_layers import MAX_CHOSEN
 from api.global_risk_layers import catalog as layer_catalog
-from api.langfuse import send_ai_call
+from api.langfuse import (
+    QuestionTrace,
+    collect_question_trace,
+    current_question_trace,
+    langfuse_content_enabled,
+    schedule_question_trace,
+    send_ai_call,
+)
 from api.mcp_client import SigMcpClient, SigMcpError
 from api.permissions import SignedInMember
 from api.planning_access import planner_membership
@@ -888,18 +895,57 @@ async def planning_chat(
     session: DatabaseSession,
     background: BackgroundTasks,
 ) -> dict[str, Any]:
-    response = await _answer_chat(payload, principal, session, background)
-    # Only an answer is remembered. A refusal raised above (no access, SIG down) was never shown
-    # as part of the conversation.
-    hub = planner_membership(principal, payload.hub_code)
-    record_exchange(
-        session,
-        user_id=principal.user_id,
-        hub_id=hub.hub_id,
-        question=payload.message if payload.echo and not payload.publish_receipt else None,
-        response=response,
+    async def answer_and_record() -> dict[str, Any]:
+        response = await _answer_chat(payload, principal, session, background)
+        # Only an answer is remembered. A refusal raised above (no access, SIG down) was never
+        # shown as part of the conversation.
+        hub = planner_membership(principal, payload.hub_code)
+        record_exchange(
+            session,
+            user_id=principal.user_id,
+            hub_id=hub.hub_id,
+            question=payload.message if payload.echo and not payload.publish_receipt else None,
+            response=response,
+        )
+        return response
+
+    if current_question_trace() is not None:
+        return await answer_and_record()
+
+    settings = get_settings()
+    capture_content = langfuse_content_enabled(settings, principal.email)
+    trace = QuestionTrace(
+        user_id=str(principal.user_id),
+        login_session_id=principal.session_id,
+        hub_code=(
+            payload.hub_code
+            or (principal.memberships[0].hub_code if principal.memberships else None)
+        ),
+        question_kind="publish" if payload.publish_receipt else "new",
+        capture_content=capture_content,
+        input=payload.message if capture_content else None,
     )
-    return response
+    try:
+        with collect_question_trace(trace):
+            try:
+                response = await answer_and_record()
+            except Exception as error:
+                trace.finish(
+                    "failed",
+                    error_code=str(getattr(error, "code", None) or type(error).__name__),
+                )
+                raise
+            else:
+                trace.update(mode=response.get("mode"))
+                if capture_content:
+                    trace.output = response
+                trace.finish("completed")
+                return response
+            finally:
+                if trace.ended_at is None:
+                    trace.finish("cancelled", error_code="cancelled")
+    finally:
+        schedule_question_trace(settings, trace)
 
 
 async def _answer_live_flood(
@@ -1030,6 +1076,12 @@ async def _answer_chat(
     selected = session.get(Boundary, payload.boundary_id) if payload.boundary_id else None
     if selected is not None and not selected.is_supported:
         selected = None
+    question_trace = current_question_trace()
+    if question_trace is not None and selected is not None:
+        question_trace.update(
+            area_admin_code=selected.admin_code,
+            area_level=selected.admin_level,
+        )
     current = None
     if payload.assessment_id:
         current = session.get(Assessment, payload.assessment_id)
@@ -1242,6 +1294,12 @@ async def _answer_chat(
         if payload.refresh
         else stored_pack(session, user_id=principal.user_id, hub_id=hub.hub_id, place=place)
     )
+    if question_trace is not None:
+        question_trace.update(
+            hazard="flood",
+            evidence_reused=reused_pack is not None,
+            selected_layer_count=len(layers),
+        )
     access_token = None
     if reused_pack is None:
         access_token = await sig_access_token(settings, principal.session_id)
@@ -1297,6 +1355,8 @@ async def _answer_chat(
             )
             trace.append({"step": "assemble_pack", "detail": str(pack.get("pack_id", "")),
                           "duration_ms": elapsed_ms(step_started)})
+        if question_trace is not None:
+            question_trace.update(pack_id=pack.get("pack_id"))
         step_started = perf_counter()
 
         area = check_area(place, pack)
