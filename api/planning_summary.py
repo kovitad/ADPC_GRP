@@ -283,6 +283,10 @@ def _global_risk(session, principal: CurrentPrincipal, hub_id: UUID,
         else:
             status = "unverified draft, not published"
         summary = evidence.get("summary") or {}
+        # The map is meaningful evidence only when it remains bound to the published receipt.
+        map_link = (payload.get("map_url") or payload.get("map_link")) if receipt.get(
+            "receipt_id"
+        ) else None
         return {
             "place": area.get("sig_place") or evidence.get("place") or "",
             "pack_id": evidence.get("pack_id") or "-",
@@ -308,8 +312,7 @@ def _global_risk(session, principal: CurrentPrincipal, hub_id: UUID,
             "gaps": [str(gap) for gap in evidence.get("gaps") or []],
             "receipt_id": receipt.get("receipt_id"),
             "receipt_url": receipt.get("public_url"),
-            "map_link": payload.get("map_link") if not payload.get("map_link_verified") else
-            payload.get("map_url"),
+            "map_link": map_link,
         }
     return None
 

@@ -22,6 +22,8 @@ from typing import Any
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
@@ -401,6 +403,33 @@ def _para(document: Any, text: str, *, bold: bool = False, color: RGBColor | Non
         run.font.color.rgb = color
     if size:
         run.font.size = Pt(size)
+    return paragraph
+
+
+def _link_paragraph(document: Any, label: str, url: str, *, size: float = 9.5) -> Any:
+    """Add a visible, clickable external link rather than relying on Word auto-detection."""
+
+    paragraph = document.add_paragraph()
+    paragraph.add_run(label)
+    relationship_id = document.part.relate_to(url, RT.HYPERLINK, is_external=True)
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), relationship_id)
+    run = OxmlElement("w:r")
+    properties = OxmlElement("w:rPr")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "0563C1")
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "single")
+    font_size = OxmlElement("w:sz")
+    font_size.set(qn("w:val"), str(round(size * 2)))
+    properties.extend((color, underline, font_size))
+    text = OxmlElement("w:t")
+    text.text = url
+    run.extend((properties, text))
+    hyperlink.append(run)
+    paragraph._p.append(hyperlink)  # noqa: SLF001 - python-docx has no public hyperlink API
+    for item in paragraph.runs:
+        item.font.size = Pt(size)
     return paragraph
 
 
@@ -787,7 +816,8 @@ def render_summary(facts: dict[str, Any], lang: str = "en") -> bytes:
             _para(document, t("receipt", lang, id=evidence["receipt_id"],
                               url=evidence.get("receipt_url") or ""), size=9.5)
         if evidence.get("map_link"):
-            _para(document, t("gr_map", lang, url=evidence["map_link"]), size=9.5)
+            map_label = t("gr_map", lang, url="")
+            _link_paragraph(document, map_label, evidence["map_link"])
             _note(document, t("gr_map_note", lang))
         if evidence.get("citations"):
             document.add_heading(t("gr_sources", lang), level=2)

@@ -149,21 +149,26 @@ def test_the_word_summary_names_global_risks_flood_layer_and_polygon() -> None:
         "centres": {"total": 0, "rows": [], "gap_note": "No centres.", "source_line": "Shelters"},
         "global_risk": {
             "place": "Samko District", "pack_id": "p1", "assembled_at": "29 Sep 2026 09:00",
-            "status": "unverified draft, not published", "hazard": "hazard_flood",
-            "area_km2": 1784,
+            "status": "passed Global Risk's source check, receipt receipt-1",
+            "receipt_id": "receipt-1",
+            "map_link": "https://servirplatform.sig-gis.com/?embed=hazard_map&receipt_id=receipt-1",
+            "hazard": "hazard_flood", "area_km2": 1784,
             "stats": global_risk_stats({"stats": {"counts": {
                 "villages_th_register": {"total": 33, "exposed": 25, "by_severity": {"1": 9}},
             }}}),
         },
     }
+    document = Document(io.BytesIO(render_summary(facts)))
     text = "\n".join(
-        [p.text for p in Document(io.BytesIO(render_summary(facts))).paragraphs]
-        + [cell.text for table in Document(io.BytesIO(render_summary(facts))).tables
-           for row in table.rows for cell in row.cells]
+        [p.text for p in document.paragraphs]
+        + [cell.text for table in document.tables for row in table.rows for cell in row.cells]
     )
 
     assert "flood layer hazard_flood and district polygon 1,784 km²" in text
     assert "Villages (villages_th_register)" in text and "GRP's own data" in text
+    map_url = "https://servirplatform.sig-gis.com/?embed=hazard_map&receipt_id=receipt-1"
+    assert f"Global Risk map: {map_url}" in text
+    assert map_url in {relationship.target_ref for relationship in document.part.rels.values()}
 
 
 def test_a_subdistrict_word_summary_names_its_parent_and_global_risk_scope() -> None:
