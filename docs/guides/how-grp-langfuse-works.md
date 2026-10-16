@@ -1,0 +1,131 @@
+# How Langfuse works with GRP
+
+## Purpose
+
+GRP uses Langfuse to monitor AI calls, token usage, model selection, latency and outcomes. Langfuse
+is an observability service; it does not enforce a person's GRP token allowance and it is not the
+official usage record.
+
+## Data flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant GRP as GRP API
+    participant Provider as AI provider
+    participant DB as GRP database
+    participant LF as Langfuse
+
+    User->>GRP: Request an AI response
+    GRP->>GRP: Check and reserve GRP allowance
+    GRP->>Provider: Send instructions and prompt
+    Provider-->>GRP: Answer, model name and token usage
+    GRP->>DB: Record authoritative usage and outcome
+    GRP-->>User: Return the AI response
+    GRP-->>LF: Export privacy-safe metadata through OTel
+```
+
+Every provider call goes through the GRP AI gateway. The provider response supplies the actual
+model identifier and token counts. GRP records them in its database before scheduling a
+best-effort Langfuse export.
+
+## What Langfuse receives
+
+Each new AI call creates a `grp-ai-call` trace with one generation observation. GRP exports:
+
+- the model identifier returned by the provider;
+- input, output and total token counts;
+- start time, end time and duration;
+- completed or failed outcome;
+- prompt-version identifier;
+- GRP channel and Hub code;
+- deployment environment; and
+- a one-way pseudonymous person reference.
+
+GRP does **not** export:
+
+- prompts or instructions;
+- AI answers;
+- names or email addresses;
+- passwords, API keys or cookies; or
+- assessment source records.
+
+## Tokens and cost
+
+Token counts are not estimated by Langfuse. The AI provider reports the counts and GRP forwards
+them. For example, a provider may report 49 input tokens and 17 output tokens, giving 66 total
+tokens.
+
+Langfuse can estimate cost when its model catalogue recognizes the exact model identifier and has
+current pricing. If a dated or organization-specific model is unknown, an administrator must add
+custom pricing or GRP must export explicit costs. A missing Langfuse cost must not be interpreted
+as a free AI call.
+
+The current integration exports standard input and output totals. Separate cached-input and
+reasoning-token categories remain future work.
+
+## Source of truth and failure behavior
+
+The GRP database is authoritative for monthly allowances and recorded usage. Langfuse is a
+monitoring and evaluation copy. Export runs after the operational usage record is committed, and
+a Langfuse outage must not block or change the GRP response.
+
+Historical calls rejected by the former legacy integration are not recreated automatically.
+Only calls made after the Langfuse v4 OTel integration produce new observations.
+
+## Projects and environments
+
+The self-hosted service is at:
+
+- <https://langfuse-risk-servir.adpc.net>
+
+GRP has separate Staging, Evaluation and Production projects. Project API keys determine which
+project receives an observation. Development testing currently uses **GRP Evaluation** with the
+`development` environment. Production telemetry remains disabled until its operational gates are
+approved.
+
+## Plain-language dashboard
+
+The **GRP AI at a glance** dashboard provides a simpler team view:
+
+- [Open GRP AI at a glance](https://langfuse-risk-servir.adpc.net/project/cmv90jcpl0008mu28iv24dmf2/dashboards/cmv99wqu5000ynv27qbd7miqv)
+- **AI requests:** number of recorded AI operations.
+- **Estimated cost:** provider-cost estimate; blank means pricing is unavailable, not free usage.
+- **Average response time:** typical duration across the selected period.
+- **Requests by model:** models that handled requests.
+- **Estimated cost by model:** cost distribution where model pricing is recognized.
+- **Requests by workflow:** which GRP functions used AI.
+- **Slow-call indicator:** the 95th-percentile duration; lower is better.
+
+The widgets are filtered to the `development` environment. Use a recent dashboard time range when
+checking a new call. The dashboard is reproducibly managed by
+`scripts/langfuse_layman_dashboard.py`; the script does not print credentials.
+
+## How to verify a trace
+
+1. Sign in to GRP as a Platform Admin.
+2. Open **Admin → Platform → Test AI call**.
+3. Submit a short test message.
+4. Open **GRP Evaluation → Tracing** in Langfuse.
+5. Select environment **development** or **All** and a recent time range.
+6. Refresh and open the `grp-ai-call` trace.
+7. Confirm the model, input/output tokens, duration and outcome are present.
+8. Confirm no prompt, answer, email address or credential appears.
+
+If the AI response succeeds but no trace appears, check the GRP API logs for `Langfuse export
+failed`, verify that the API key belongs to the selected project, and confirm that no environment
+or time filter is hiding the observation.
+
+## Claude MCP access
+
+Approved users can follow
+[Connect Claude to the GRP Langfuse MCP server](connect-claude-to-grp-langfuse-mcp.md).
+The project key provides both read and write MCP tools, so centrally managed configuration and a
+read-only tool allowlist are preferred over distributing credentials to normal users.
+
+## Technical implementation
+
+GRP uses the Langfuse 4.x Python SDK and its OpenTelemetry ingestion path. The dedicated Langfuse
+4.59.0 server runs in `events_only` mode, so legacy `trace-create` and `generation-create` batches
+are not supported. The integration decision and migration rationale are recorded in
+[ADR-0069](../adr/0069-langfuse-v4-uses-otel-ingestion.md).

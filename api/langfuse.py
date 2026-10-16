@@ -1,4 +1,4 @@
-"""Best-effort Langfuse (hosted) export of AI call metadata (Section 14.1).
+"""Best-effort Langfuse v4 export of privacy-safe AI call metadata.
 
 Only safe fields leave ADPC: model, prompt version, token counts, timing, outcome,
 a hashed person reference and the Hub code. Prompts, answers, emails and secrets are
@@ -7,13 +7,14 @@ never sent. Failures are swallowed: the GRP database stays the official record.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import uuid4
+from typing import Any
 
-import httpx
+from langfuse import Langfuse, propagate_attributes
 
 from api.settings import Settings
 from core.db import read_secret
@@ -50,13 +51,18 @@ def person_reference(user_id: str) -> str:
     return "grp-" + hashlib.sha256(f"grp-langfuse-v1:{user_id}".encode()).hexdigest()[:24]
 
 
-def build_batch(settings: Settings, record: AiCallRecord) -> dict[str, object]:
-    trace_id = record.request_id
+def build_observation(record: AiCallRecord) -> dict[str, Any]:
+    """Build the metadata-only Langfuse v4 observation without prompts or answers."""
+
+    duration_ms = max(0, round((record.ended_at - record.started_at).total_seconds() * 1000))
     metadata = {
         "hub_code": record.hub_code,
         "channel": record.channel,
         "prompt_version": record.prompt_version,
         "outcome": record.outcome,
+        "started_at": record.started_at.isoformat(),
+        "ended_at": record.ended_at.isoformat(),
+        "duration_ms": duration_ms,
     }
     usage = {
         "input": record.input_tokens,
@@ -64,61 +70,59 @@ def build_batch(settings: Settings, record: AiCallRecord) -> dict[str, object]:
         "total": record.input_tokens + record.output_tokens,
     }
     return {
-        "batch": [
-            {
-                "id": str(uuid4()),
-                "timestamp": record.started_at.isoformat(),
-                "type": "trace-create",
-                "body": {
-                    "id": trace_id,
-                    "name": "grp-ai-call",
-                    "userId": person_reference(record.user_id),
-                    "metadata": metadata,
-                    "environment": settings.langfuse_environment or settings.grp_env,
-                },
-            },
-            {
-                "id": str(uuid4()),
-                "timestamp": record.ended_at.isoformat(),
-                "type": "generation-create",
-                "body": {
-                    "id": f"{trace_id}-generation",
-                    "traceId": trace_id,
-                    "name": record.prompt_version,
-                    "model": record.model,
-                    "startTime": record.started_at.isoformat(),
-                    "endTime": record.ended_at.isoformat(),
-                    "usage": {**usage, "unit": "TOKENS"},
-                    "usageDetails": {"input": usage["input"], "output": usage["output"]},
-                    "level": "DEFAULT" if record.outcome == "completed" else "ERROR",
-                    "metadata": metadata,
-                },
-            },
-        ]
+        "trace_name": "grp-ai-call",
+        "user_id": person_reference(record.user_id),
+        "metadata": metadata,
+        "observation": {
+            "name": record.prompt_version,
+            "as_type": "generation",
+            "model": record.model,
+            "usage_details": usage,
+            "level": "DEFAULT" if record.outcome == "completed" else "ERROR",
+            "status_message": None if record.outcome == "completed" else record.outcome,
+            "metadata": metadata,
+        },
     }
 
 
-async def send_ai_call(
-    settings: Settings, record: AiCallRecord, client: httpx.AsyncClient | None = None
-) -> bool:
-    if not langfuse_configured(settings):
-        return False
+def _export_ai_call(settings: Settings, record: AiCallRecord, client: Any | None = None) -> bool:
     owns_client = client is None
-    http_client = client or httpx.AsyncClient(timeout=10.0)
+    langfuse = client or Langfuse(
+        public_key=str(settings.langfuse_public_key),
+        secret_key=read_secret(settings.langfuse_secret_key_file),
+        base_url=str(settings.langfuse_host).rstrip("/"),
+        environment=settings.langfuse_environment or settings.grp_env,
+    )
+    document = build_observation(record)
     try:
-        response = await http_client.post(
-            f"{str(settings.langfuse_host).rstrip('/')}/api/public/ingestion",
-            auth=(
-                str(settings.langfuse_public_key),
-                read_secret(settings.langfuse_secret_key_file),
-            ),
-            json=build_batch(settings, record),
-        )
-        response.raise_for_status()
+        trace_id = langfuse.create_trace_id(seed=record.request_id)
+        with propagate_attributes(
+            trace_name=document["trace_name"],
+            user_id=document["user_id"],
+            metadata=document["metadata"],
+            environment=settings.langfuse_environment or settings.grp_env,
+        ):
+            observation = langfuse.start_observation(
+                trace_context={"trace_id": trace_id},
+                **document["observation"],
+            )
+            observation.end()
+        langfuse.flush()
         return True
-    except (httpx.HTTPError, OSError, RuntimeError):
-        logger.warning("Langfuse export failed; the GRP usage record is unaffected")
-        return False
     finally:
         if owns_client:
-            await http_client.aclose()
+            langfuse.shutdown()
+
+
+async def send_ai_call(
+    settings: Settings, record: AiCallRecord, client: Any | None = None
+) -> bool:
+    """Export through the Langfuse v4 OTel SDK without delaying the request event loop."""
+
+    if not langfuse_configured(settings):
+        return False
+    try:
+        return await asyncio.to_thread(_export_ai_call, settings, record, client)
+    except Exception:  # telemetry must never fail an operational GRP response
+        logger.warning("Langfuse export failed; the GRP usage record is unaffected")
+        return False
