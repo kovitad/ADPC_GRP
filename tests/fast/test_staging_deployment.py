@@ -41,6 +41,22 @@ def test_staging_secret_file_settings_use_the_container_tmpfs_copy() -> None:
     assert "/run/source-secrets/" not in environment
 
 
+def test_staging_keeps_ai_and_langfuse_off_until_separately_configured() -> None:
+    environment = (REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
+    bootstrap = (REPOSITORY_ROOT / "deploy" / "bootstrap-ubuntu.sh").read_text(
+        encoding="utf-8"
+    )
+    compose = (REPOSITORY_ROOT / "deploy" / "compose.yml").read_text(encoding="utf-8")
+
+    assert "AI_FEATURE_ENABLED=false" in environment
+    assert "LANGFUSE_HOST=\n" in environment
+    assert "LANGFUSE_PUBLIC_KEY=\n" in environment
+    assert "LANGFUSE_SECRET_KEY_FILE=/run/grp-secrets/langfuse_secret_key" in environment
+    assert "LANGFUSE_ENVIRONMENT=staging" in environment
+    assert 'log "Preserving existing .env"' in bootstrap
+    assert compose.count("/srv/grp/secrets:/run/source-secrets:ro") == 2
+
+
 def test_staging_sets_permanent_feed_address_but_keeps_public_routes_off() -> None:
     environment = (REPOSITORY_ROOT / ".env.example").read_text(encoding="utf-8")
     script = (REPOSITORY_ROOT / "deploy" / "bootstrap-ubuntu.sh").read_text(

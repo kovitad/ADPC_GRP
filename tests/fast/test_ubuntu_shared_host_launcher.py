@@ -27,6 +27,8 @@ def test_ubuntu_launcher_uses_ignored_secret_files() -> None:
     assert 'SECRET_ROOT="$LOCAL_ROOT/docker/secrets"' in launcher
     assert 'chmod 600 "$SECRET_ROOT/ai_key_adpc"' in launcher
     assert 'chmod 600 "$SECRET_ROOT/langfuse_secret_key"' in launcher
+    assert "https://langfuse-risk-servir.adpc.net" in launcher
+    assert "https://cloud.langfuse.com" not in launcher
     assert "OPENAI_API_KEY=" not in launcher
     assert "LANGFUSE_SECRET_KEY=" not in launcher
     assert 'REPOSITORY_ROOT/.env"' in launcher

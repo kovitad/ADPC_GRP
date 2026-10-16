@@ -25,7 +25,7 @@ This command builds the images, registers a localhost SERVIR/SIG OAuth client, s
   --hub-admin-email you@adpc.net
 ```
 
-The script prompts without echo for the OpenAI key, OpenAI model, Langfuse Cloud URL, public key, secret key and environment. Press Enter to accept the displayed defaults for the model (`gpt-5.2`), Langfuse URL (`https://cloud.langfuse.com`) and environment (`development`). The script is safe to rerun. Existing generated secrets and Docker volumes are kept. For later rebuilds, use the same command without the three setup flags.
+The script prompts without echo for the OpenAI key, OpenAI model, approved Langfuse URL, public key, secret key and environment. Press Enter to accept the displayed defaults for the model (`gpt-5.2`), dedicated Langfuse URL (`https://langfuse-risk-servir.adpc.net`) and environment (`development`). The public and secret keys must belong to the same project on that host. The script is safe to rerun. Existing generated secrets and Docker volumes are kept. For later rebuilds, use the same command without the three setup flags.
 
 ## Install the Thailand baseline
 

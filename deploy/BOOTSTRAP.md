@@ -88,6 +88,39 @@ The platform health endpoint works before identity-provider setup, but login rem
 
 Prepare future LLM configuration without enabling it. Keep `AI_FEATURE_ENABLED=false`, set provider/model/base URL as non-secret values when approved, and place the token only in `/srv/grp/secrets/ai_key_adpc` with root ownership and mode `0600`.
 
+### Migrating before Langfuse is enabled
+
+Langfuse is not a migration prerequisite. For the first AWS upgrade, keep `AI_FEATURE_ENABLED=false`,
+`LANGFUSE_HOST` blank and `LANGFUSE_PUBLIC_KEY` blank. Do not create
+`/srv/grp/secrets/langfuse_secret_key` yet. The bootstrap preserves the existing server `.env` and
+`/srv/grp/secrets`, and neither a local developer key nor the dedicated Langfuse deployment's
+root-owned `.env` is included in the GRP image. Run the normal database migration and assessment
+acceptance checks with AI and telemetry still off.
+
+Enable telemetry only as a separate approved change after the GRP upgrade is healthy. The host,
+public key and secret key must come from one project in the target Langfuse deployment; keys from
+the earlier Cloud project and the self-hosted Staging, Evaluation and Production projects are not
+interchangeable. Put only the non-secret host and public key in `/srv/grp/app/.env`. Enter the secret
+without echo and install it as a root-owned file:
+
+```bash
+read -rsp "Langfuse secret key: " LANGFUSE_SECRET_KEY; echo
+printf '%s\n' "$LANGFUSE_SECRET_KEY" | sudo tee \
+  /srv/grp/secrets/langfuse_secret_key >/dev/null
+unset LANGFUSE_SECRET_KEY
+sudo chown root:root /srv/grp/secrets/langfuse_secret_key
+sudo chmod 0600 /srv/grp/secrets/langfuse_secret_key
+sudoedit /srv/grp/app/.env
+```
+
+In `sudoedit`, set `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`,
+`LANGFUSE_SECRET_KEY_FILE=/run/grp-secrets/langfuse_secret_key` and the intended
+`LANGFUSE_ENVIRONMENT`. Keep `AI_FEATURE_ENABLED=false` during this configuration step. Recreate
+API and worker only after checking that all three values select the same project. A missing or
+partial configuration leaves export off; an unavailable or rejected telemetry request is
+best-effort and does not replace the official GRP usage record or fail an operational response.
+Enabling production AI remains a later, separately approved action.
+
 The `main` image is published by `.github/workflows/container.yml`. Make the package public in its GitHub package settings, or authenticate once if it remains private. Enter a token with `read:packages` without placing it in shell history:
 
 ```bash

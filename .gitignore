@@ -8,6 +8,7 @@ secrets/
 *.pem
 *.p12
 *.pfx
+/client_secret_*.apps.googleusercontent.com.json
 
 # Raw correspondence may contain personal or infrastructure metadata
 *.eml

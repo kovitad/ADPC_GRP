@@ -35,7 +35,7 @@ Options:
                             one --admin-email. May be supplied more than once.
   --configure-ai            Prompt for the OpenAI API key and model. The key is
                             hidden and saved in a mode-0600 local secret file.
-  --configure-langfuse      Prompt for the Langfuse Cloud URL, public key,
+  --configure-langfuse      Prompt for the approved Langfuse URL, public key,
                             secret key and environment. Both keys are hidden.
   --register-sig-client     Register a localhost public PKCE client with SIG.
   --servir-client-id ID     Use an already registered non-secret SIG client ID.
@@ -246,7 +246,7 @@ if $CONFIGURE_LANGFUSE; then
     [ -t 0 ] || die "--configure-langfuse needs an interactive terminal so keys can be entered securely"
 
     CURRENT_LANGFUSE_HOST="$(get_config_value LANGFUSE_HOST)"
-    CURRENT_LANGFUSE_HOST="${CURRENT_LANGFUSE_HOST:-https://cloud.langfuse.com}"
+    CURRENT_LANGFUSE_HOST="${CURRENT_LANGFUSE_HOST:-https://langfuse-risk-servir.adpc.net}"
     read -r -p "Langfuse base URL [$CURRENT_LANGFUSE_HOST]: " LANGFUSE_HOST_INPUT
     LANGFUSE_HOST_INPUT="${LANGFUSE_HOST_INPUT:-$CURRENT_LANGFUSE_HOST}"
     [[ "$LANGFUSE_HOST_INPUT" =~ ^https?://[^[:space:]]+$ ]] \
