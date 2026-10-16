@@ -949,7 +949,8 @@ async def _answer_live_flood(
             session, settings, user_id=principal.user_id, hub_id=hub.hub_id,
             hub_code=hub.hub_code, instructions=live_instructions(lang),
             prompt=build_live_prompt(payload.message, live["facts"]),
-            prompt_version=LIVE_PROMPT_VERSION, export=export,
+            prompt_version=LIVE_PROMPT_VERSION, login_session_id=principal.session_id,
+            export=export,
         )
         if not live_gate(worded.text, live["facts"], payload.message):
             text = worded.text + "\n\n" + NO_WARNINGS[lang]
@@ -1057,6 +1058,7 @@ async def _answer_chat(
             ensure_ascii=False,
         ),
         prompt_version=ROUTER_VERSION,
+        login_session_id=principal.session_id,
         export=export,
     )
     decision = _decision(routed.text)
@@ -1383,6 +1385,7 @@ async def _answer_chat(
                 ensure_ascii=False,
             ),
             prompt_version=DRAFT_VERSION,
+            login_session_id=principal.session_id,
             export=export,
         )
         trace.append({"step": "draft", "detail": f"{draft.model}",

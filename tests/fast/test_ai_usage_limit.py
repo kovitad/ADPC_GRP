@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 
 from api.ai_gateway import ProviderError, run_ai_call
 from api.errors import GrpError
-from api.langfuse import AiCallRecord, build_observation, person_reference, send_ai_call
+from api.langfuse import (
+    AiCallRecord,
+    build_observation,
+    person_reference,
+    send_ai_call,
+    session_reference,
+)
 from api.settings import Settings
 from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import (
@@ -203,6 +209,7 @@ def test_gateway_success_records_usage_and_exports_safe_record(session) -> None:
     answer = asyncio.run(
         run_ai_call(session, _settings(), user_id=admin.id, hub_id=None, hub_code=None,
                     instructions="check", prompt="hello", prompt_version="v1",
+                    login_session_id="login-session-secret",
                     provider_call=provider, export=exported.append)
     )
 
@@ -210,6 +217,7 @@ def test_gateway_success_records_usage_and_exports_safe_record(session) -> None:
     view = usage_view(session, admin.id, feature_enabled=True)
     assert view.tokens_used == 25 and view.tokens_reserved == 0
     assert exported[0].outcome == "completed" and exported[0].input_tokens == 20
+    assert exported[0].login_session_id == "login-session-secret"
 
 
 def test_gateway_provider_failure_releases_reservation_and_counts_billed_tokens(session) -> None:
@@ -288,13 +296,15 @@ def test_langfuse_observation_contains_no_private_text() -> None:
     now = datetime.now(UTC)
     record = AiCallRecord(
         "req-1", "user-uuid", "adpc", "web", "gpt", "v1", 10, 3,
-        "completed", now, now,
+        "completed", now, now, "login-session-secret",
     )
     document = build_observation(record)
     body = json.dumps(document)
 
     assert "user-uuid" not in body
     assert person_reference("user-uuid") in body
+    assert "login-session-secret" not in body
+    assert document["session_id"] == session_reference("login-session-secret")
     generation = document["observation"]
     assert generation["usage_details"]["total"] == 13
     assert generation["model"] == "gpt"

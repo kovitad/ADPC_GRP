@@ -134,6 +134,7 @@ async def run_ai_call(
     instructions: str,
     prompt: str,
     prompt_version: str,
+    login_session_id: str | None = None,
     channel: str = "web",
     provider_call=None,
     export: Callable[[AiCallRecord], None] | None = None,
@@ -206,6 +207,7 @@ async def run_ai_call(
         outcome=outcome,
         started_at=started,
         ended_at=datetime.now(UTC),
+        login_session_id=login_session_id,
     )
     if export is not None:
         export(record)

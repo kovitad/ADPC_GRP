@@ -35,6 +35,7 @@ class AiCallRecord:
     outcome: str
     started_at: datetime
     ended_at: datetime
+    login_session_id: str | None = None
 
 
 def langfuse_configured(settings: Settings) -> bool:
@@ -49,6 +50,13 @@ def person_reference(user_id: str) -> str:
     """Stable pseudonymous reference so Langfuse can group calls without GRP identities."""
 
     return "grp-" + hashlib.sha256(f"grp-langfuse-v1:{user_id}".encode()).hexdigest()[:24]
+
+
+def session_reference(login_session_id: str) -> str:
+    """Group calls from one login without exporting the real GRP session identifier."""
+
+    digest = hashlib.sha256(f"grp-langfuse-session-v1:{login_session_id}".encode()).hexdigest()
+    return "grp-session-" + digest[:24]
 
 
 def build_observation(record: AiCallRecord) -> dict[str, Any]:
@@ -72,6 +80,9 @@ def build_observation(record: AiCallRecord) -> dict[str, Any]:
     return {
         "trace_name": "grp-ai-call",
         "user_id": person_reference(record.user_id),
+        "session_id": (
+            session_reference(record.login_session_id) if record.login_session_id else None
+        ),
         "metadata": metadata,
         "observation": {
             "name": record.prompt_version,
@@ -99,6 +110,7 @@ def _export_ai_call(settings: Settings, record: AiCallRecord, client: Any | None
         with propagate_attributes(
             trace_name=document["trace_name"],
             user_id=document["user_id"],
+            session_id=document["session_id"],
             metadata=document["metadata"],
             environment=settings.langfuse_environment or settings.grp_env,
         ):

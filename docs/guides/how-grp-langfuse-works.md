@@ -31,7 +31,10 @@ best-effort Langfuse export.
 
 ## What Langfuse receives
 
-Each new AI call creates a `grp-ai-call` trace with one generation observation. GRP exports:
+Each new AI call creates a `grp-ai-call` trace with one generation observation. Calls made during
+one signed-in GRP login share a pseudonymous Langfuse session, so the Sessions view can group a
+router call, answer call and later AI actions without receiving the real GRP session value. GRP
+exports:
 
 - the model identifier returned by the provider;
 - input, output and total token counts;
@@ -39,15 +42,16 @@ Each new AI call creates a `grp-ai-call` trace with one generation observation. 
 - completed or failed outcome;
 - prompt-version identifier;
 - GRP channel and Hub code;
-- deployment environment; and
-- a one-way pseudonymous person reference.
+- deployment environment;
+- a one-way pseudonymous person reference; and
+- a separate one-way session reference that groups AI calls made during one GRP login.
 
 GRP does **not** export:
 
 - prompts or instructions;
 - AI answers;
 - names or email addresses;
-- passwords, API keys or cookies; or
+- passwords, API keys, cookies or the real GRP login-session identifier; or
 - assessment source records.
 
 ## Tokens and cost

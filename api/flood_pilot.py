@@ -663,7 +663,8 @@ async def ask(
         answer = await run_ai_call(
             session, settings, user_id=principal.user_id, hub_id=hub_id, hub_code=hub_code,
             instructions=instructions_for(body.lang), prompt=build_prompt(body.question, facts),
-            prompt_version=PROMPT_VERSION, channel="web", provider_call=PROVIDER_CALL,
+            prompt_version=PROMPT_VERSION, login_session_id=principal.session_id,
+            channel="web", provider_call=PROVIDER_CALL,
             export=lambda record: background.add_task(send_ai_call, settings, record),
         )
     except GrpError as error:

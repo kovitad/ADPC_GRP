@@ -22,6 +22,8 @@ would retain a deprecated integration and add an avoidable server migration depe
 - Use Langfuse Python SDK 4.x as a runtime dependency for AI telemetry.
 - Export each completed AI-call record as one OTel generation under a `grp-ai-call` trace.
 - Derive the OTel trace ID deterministically from GRP's request ID.
+- Group calls made during one signed-in GRP login under a one-way hashed Langfuse session
+  reference. Never export the real login-session identifier or cookie.
 - Preserve the existing privacy boundary: export only model, prompt-version identifier, token
   counts, timestamps, duration, outcome, channel, Hub code and a pseudonymous person reference.
   Never export prompts, answers, email addresses or credentials.

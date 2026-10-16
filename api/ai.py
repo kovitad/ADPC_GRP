@@ -75,6 +75,7 @@ async def ai_test_call(
         instructions=TEST_INSTRUCTIONS,
         prompt=payload.message,
         prompt_version=TEST_PROMPT_VERSION,
+        login_session_id=principal.session_id,
         export=lambda record: background.add_task(send_ai_call, settings, record),
     )
     view = usage_view(session, principal.user_id, feature_enabled=settings.ai_feature_enabled)

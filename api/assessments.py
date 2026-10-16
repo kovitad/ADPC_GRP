@@ -605,6 +605,7 @@ async def explain_stored_result(
             {"result": facts, "question": question, "history": history}, ensure_ascii=False
         ),
         prompt_version=EXPLAIN_VERSION,
+        login_session_id=principal.session_id,
         export=export,
     )
     resolved = resolve_references(answer.text, tokens)
