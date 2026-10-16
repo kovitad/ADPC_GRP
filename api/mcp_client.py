@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
+
+from api.langfuse import current_question_trace
 
 MCP_PROTOCOL_VERSION = "2025-06-18"
 
@@ -40,6 +43,24 @@ def _decode_response(response: httpx.Response) -> dict[str, Any]:
     if payload.get("error"):
         raise SigMcpError("SIG MCP declined the request")
     return payload
+
+
+def _error_category(error: Exception) -> str:
+    current: BaseException | None = error
+    while current is not None:
+        if isinstance(current, httpx.TimeoutException):
+            return "timeout"
+        if isinstance(current, httpx.HTTPStatusError):
+            status = current.response.status_code
+            if status in {401, 403}:
+                return "auth"
+            return "http_5xx" if status >= 500 else "http_4xx"
+        current = current.__cause__
+    if "sign-in" in str(error).lower() or "renewed" in str(error).lower():
+        return "auth"
+    if "invalid" in str(error).lower() or "unreadable" in str(error).lower():
+        return "invalid_response"
+    return "mcp_error"
 
 
 class SigMcpClient:
@@ -113,16 +134,44 @@ class SigMcpClient:
             raise SigMcpError("SIG MCP session could not be initialized") from error
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> McpToolResult:
-        result = await self._request("tools/call", {"name": name, "arguments": arguments})
-        content = result.get("content", [])
-        structured = result.get("structuredContent", {})
-        if not isinstance(content, list) or not isinstance(structured, dict):
-            raise SigMcpError("SIG MCP tool returned an invalid result")
-        return McpToolResult(
-            content=[item for item in content if isinstance(item, dict)],
-            structured_content=structured,
-            is_error=bool(result.get("isError", False)),
-        )
+        started_at = datetime.now(UTC)
+        question = current_question_trace()
+        try:
+            result = await self._request("tools/call", {"name": name, "arguments": arguments})
+            content = result.get("content", [])
+            structured = result.get("structuredContent", {})
+            if not isinstance(content, list) or not isinstance(structured, dict):
+                raise SigMcpError("SIG MCP tool returned an invalid result")
+            tool_result = McpToolResult(
+                content=[item for item in content if isinstance(item, dict)],
+                structured_content=structured,
+                is_error=bool(result.get("isError", False)),
+            )
+        except Exception as error:
+            if question is not None:
+                question.add_tool(
+                    name=name,
+                    started_at=started_at,
+                    ended_at=datetime.now(UTC),
+                    outcome="failed",
+                    error_category=_error_category(error),
+                )
+            raise
+        if question is not None:
+            identifiers = {
+                key: value
+                for key in ("pack_id", "receipt_id", "report_id")
+                if isinstance((value := structured.get(key)), str)
+            }
+            question.add_tool(
+                name=name,
+                started_at=started_at,
+                ended_at=datetime.now(UTC),
+                outcome="failed" if tool_result.is_error else "completed",
+                error_category="tool_error" if tool_result.is_error else None,
+                identifiers=identifiers,
+            )
+        return tool_result
 
     async def close(self) -> None:
         if self._owns_client:

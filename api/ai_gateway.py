@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from api.errors import GrpError
-from api.langfuse import AiCallRecord
+from api.langfuse import AiCallRecord, current_question_trace
 from api.settings import Settings
 from core.ai_allowance import AiBlocked, next_reset, reserve, settle
 from core.db import read_secret
@@ -207,7 +207,10 @@ async def run_ai_call(
         started_at=started,
         ended_at=datetime.now(UTC),
     )
-    if export is not None:
+    question = current_question_trace()
+    if question is not None:
+        question.add_generation(record, instructions=instructions, prompt=prompt, answer=text)
+    elif export is not None:
         export(record)
     if outcome != "completed":
         raise blocked("AI_USAGE_UNAVAILABLE")
