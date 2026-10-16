@@ -4,14 +4,13 @@ import asyncio
 import json
 from datetime import UTC, date, datetime, timedelta
 
-import httpx
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from api.ai_gateway import ProviderError, run_ai_call
 from api.errors import GrpError
-from api.langfuse import AiCallRecord, build_batch, person_reference, send_ai_call
+from api.langfuse import AiCallRecord, build_observation, person_reference, send_ai_call
 from api.settings import Settings
 from core.access_models import AppUser, AuditEvent, Base
 from core.ai_allowance import (
@@ -285,45 +284,107 @@ def test_gateway_does_not_call_provider_when_estimate_exceeds_balance(session) -
     assert usage_view(session, admin.id, feature_enabled=True).tokens_used == 950
 
 
-def test_langfuse_batch_contains_no_private_text() -> None:
+def test_langfuse_observation_contains_no_private_text() -> None:
     now = datetime.now(UTC)
-    record = AiCallRecord("req-1", "user-uuid", "adpc", "web", "gpt", "v1", 10, 3,
-                          "completed", now, now)
-    batch = build_batch(Settings(_env_file=None), record)
-    body = json.dumps(batch)
+    record = AiCallRecord(
+        "req-1", "user-uuid", "adpc", "web", "gpt", "v1", 10, 3,
+        "completed", now, now,
+    )
+    document = build_observation(record)
+    body = json.dumps(document)
 
     assert "user-uuid" not in body
     assert person_reference("user-uuid") in body
-    generation = batch["batch"][1]["body"]
-    assert generation["usage"]["total"] == 13 and generation["model"] == "gpt"
+    generation = document["observation"]
+    assert generation["usage_details"]["total"] == 13
+    assert generation["model"] == "gpt"
+    assert "input" not in generation and "output" not in generation
 
 
-def test_langfuse_sends_with_basic_auth_when_configured(tmp_path) -> None:
+def test_langfuse_sends_with_v4_sdk_when_configured(tmp_path) -> None:
     secret = tmp_path / "langfuse_secret"
     secret.write_text("sk-lf-test", encoding="utf-8")
     settings = Settings(
-        _env_file=None, LANGFUSE_HOST="https://cloud.langfuse.test",
-        langfuse_public_key="pk-lf-test", langfuse_secret_key_file=secret,
+        _env_file=None,
+        LANGFUSE_HOST="https://langfuse.test",
+        langfuse_public_key="pk-lf-test",
+        langfuse_secret_key_file=secret,
     )
-    seen: list[httpx.Request] = []
 
-    def respond(request: httpx.Request) -> httpx.Response:
-        seen.append(request)
-        return httpx.Response(207, json={"successes": [], "errors": []})
+    class Observation:
+        ended = False
 
+        def end(self) -> None:
+            self.ended = True
+
+    class Client:
+        def __init__(self) -> None:
+            self.observation = Observation()
+            self.trace_seed = None
+            self.arguments = None
+            self.flushed = False
+
+        def create_trace_id(self, *, seed):
+            self.trace_seed = seed
+            return "0" * 32
+
+        def start_observation(self, **arguments):
+            self.arguments = arguments
+            return self.observation
+
+        def flush(self) -> None:
+            self.flushed = True
+
+    client = Client()
     now = datetime.now(UTC)
     record = AiCallRecord("req-1", "u", None, "web", "gpt", "v1", 1, 1, "completed", now, now)
 
-    async def run() -> bool:
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            return await send_ai_call(settings, record, client=client)
-
-    assert asyncio.run(run()) is True
-    assert seen[0].url.path == "/api/public/ingestion"
-    assert seen[0].headers["authorization"].startswith("Basic ")
+    assert asyncio.run(send_ai_call(settings, record, client=client)) is True
+    assert client.trace_seed == "req-1"
+    assert client.arguments["trace_context"] == {"trace_id": "0" * 32}
+    assert client.arguments["as_type"] == "generation"
+    assert client.arguments["usage_details"]["total"] == 2
+    assert client.observation.ended is True
+    assert client.flushed is True
 
 
 def test_langfuse_is_skipped_without_configuration() -> None:
     now = datetime.now(UTC)
     record = AiCallRecord("req-1", "u", None, "web", "gpt", "v1", 1, 1, "completed", now, now)
     assert asyncio.run(send_ai_call(Settings(_env_file=None), record)) is False
+
+
+def test_langfuse_is_skipped_when_server_has_only_partial_configuration(tmp_path) -> None:
+    class ClientThatMustNotRun:
+        def create_trace_id(self, **_arguments):
+            raise AssertionError("a partial Langfuse configuration must not create a client call")
+
+    settings = Settings(
+        _env_file=None,
+        LANGFUSE_HOST="https://langfuse.test",
+        langfuse_public_key="pk-lf-test",
+        langfuse_secret_key_file=tmp_path / "missing-secret",
+    )
+    now = datetime.now(UTC)
+    record = AiCallRecord("req-1", "u", None, "web", "gpt", "v1", 1, 1, "completed", now, now)
+
+    assert asyncio.run(send_ai_call(settings, record, client=ClientThatMustNotRun())) is False
+
+
+def test_langfuse_export_failure_does_not_break_the_operational_call(tmp_path) -> None:
+    class UnavailableClient:
+        def create_trace_id(self, **_arguments):
+            raise OSError("telemetry endpoint unavailable")
+
+    secret = tmp_path / "langfuse-secret"
+    secret.write_text("sk-lf-test", encoding="utf-8")
+    settings = Settings(
+        _env_file=None,
+        LANGFUSE_HOST="https://langfuse.test",
+        langfuse_public_key="pk-lf-test",
+        langfuse_secret_key_file=secret,
+    )
+    now = datetime.now(UTC)
+    record = AiCallRecord("req-1", "u", None, "web", "gpt", "v1", 1, 1, "completed", now, now)
+
+    assert asyncio.run(send_ai_call(settings, record, client=UnavailableClient())) is False
