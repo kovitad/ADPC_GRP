@@ -32,6 +32,10 @@ gis = [
   "pyogrio>=0.10,<1",
   "shapely>=2.0,<3",
 ]
+evaluation = [
+  "openai>=3.29,<4",
+  "PyYAML>=6.0,<7",
+]
 
 [tool.setuptools.packages.find]
 include = ["api*", "core*", "grpcli*", "worker*"]

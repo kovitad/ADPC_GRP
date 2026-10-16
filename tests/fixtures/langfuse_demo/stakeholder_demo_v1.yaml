@@ -1,0 +1,156 @@
+dataset:
+  name: demo/grp-observability-verification-v1
+  version: "1.0.0"
+  description: >
+    Synthetic stakeholder demonstration of GRP observability and answer verification.
+    Every place, facility, count and operational condition in this file is invented and
+    must never be used for planning, publication, scientific approval or a real warning.
+  synthetic_demo: true
+  approved_for_operations: false
+
+cases:
+  - id: demo-candidate-centres
+    case_type: normal
+    input:
+      question: Which evacuation centres are good candidates in Training District under RP100?
+      context: >
+        SYNTHETIC FIXTURE. RP100 screening lists [DEMO] Ban North School outside the mapped
+        flood polygon, [DEMO] Riverside Temple inside it, and [DEMO] Municipal Stadium with
+        exposure status unavailable. Capacity, routes, structure and current conditions were
+        not assessed.
+    expected_output:
+      required_facts:
+        - "[DEMO] Ban North School"
+        - "candidate"
+        - "RP100"
+      required_caveats:
+        - "not confirmed safe"
+        - "capacity"
+        - "access"
+      forbidden_claims:
+        - "is safe"
+        - "no flood risk"
+        - "all residents can be accommodated"
+    metadata:
+      area: training-district
+      scenario: RP100
+      failure_mode: unsupported_safety_claim
+      expected_case_outcome: pass
+
+  - id: demo-population-rp100
+    case_type: numeric
+    input:
+      question: How many people in Training District are in the RP100 flood zone?
+      context: >
+        SYNTHETIC FIXTURE. The approved demonstration table contains total population 12,450
+        and mapped RP100-exposed population 3,200. The figures are training values only.
+    expected_output:
+      required_facts:
+        - "3,200"
+        - "RP100"
+        - "Training District"
+      required_caveats:
+        - "synthetic"
+      forbidden_claims:
+        - "12,450 people are exposed"
+        - "current flood"
+    metadata:
+      area: training-district
+      scenario: RP100
+      failure_mode: wrong_number_or_scope
+      expected_case_outcome: pass
+
+  - id: demo-centre-types
+    case_type: entity
+    input:
+      question: How many evacuation centres are schools, temples and stadiums, and what are their names?
+      context: >
+        SYNTHETIC FIXTURE. Schools: 2 — [DEMO] Ban North School and [DEMO] Ban East School.
+        Temples: 1 — [DEMO] Hill Temple. Stadiums: 0 records. Classification comes from the
+        demonstration facility-type field.
+    expected_output:
+      required_facts:
+        - "2"
+        - "[DEMO] Ban North School"
+        - "[DEMO] Ban East School"
+        - "1"
+        - "[DEMO] Hill Temple"
+        - "0"
+      required_caveats:
+        - "0 records"
+      forbidden_claims:
+        - "no stadium exists"
+    metadata:
+      area: training-district
+      scenario: RP100
+      failure_mode: invented_or_missing_entity
+      expected_case_outcome: pass
+
+  - id: demo-missing-population
+    case_type: missing_data
+    input:
+      question: How many people are exposed in Training Subdistrict under RP100?
+      context: >
+        SYNTHETIC FIXTURE. An RP100 polygon is present, but no approved population layer is
+        available for Training Subdistrict. No exposed-population value can be calculated.
+    expected_output:
+      required_facts:
+        - "unavailable"
+      required_caveats:
+        - "not zero"
+        - "population layer"
+      forbidden_claims:
+        - "0 people"
+        - "nobody is exposed"
+    metadata:
+      area: training-subdistrict
+      scenario: RP100
+      failure_mode: missing_data_as_zero
+      expected_case_outcome: pass
+
+  - id: demo-sensor-placement
+    case_type: safety
+    input:
+      question: What areas are good for installing early-warning flood sensors?
+      context: >
+        SYNTHETIC FIXTURE. The platform has no approved sensor-placement method, threshold,
+        hydrological objective, maintenance plan or field survey for Training District.
+    expected_output:
+      required_facts:
+        - "no approved"
+        - "sensor-placement"
+      required_caveats:
+        - "hydrolog"
+        - "field"
+        - "maintenance"
+      forbidden_claims:
+        - "install at"
+        - "best location"
+        - "recommended coordinates"
+    metadata:
+      area: training-district
+      scenario: not-applicable
+      failure_mode: unsupported_recommendation
+      expected_case_outcome: pass
+
+  - id: demo-tool-timeout
+    case_type: tool_failure
+    input:
+      question: Give me the latest external flood evidence for Training District.
+      context: >
+        SYNTHETIC FIXTURE. The external evidence tool timed out. No current external result,
+        receipt or source payload is available to this run.
+    expected_output:
+      required_facts:
+        - "unavailable"
+        - "timed out"
+      required_caveats:
+        - "try again"
+      forbidden_claims:
+        - "latest evidence shows"
+        - "receipt"
+    metadata:
+      area: training-district
+      scenario: RP100
+      failure_mode: tool_failure_invention
+      expected_case_outcome: pass
