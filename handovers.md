@@ -1,7 +1,40 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 6 October 2026.
-- **Today:** Stage 0 shadow capture and the protected readiness endpoint are now proven against
+**Updated:** 15 October 2026.
+- **AWS/Langfuse migration preparation:** the existing AWS deployment remains unchanged, with AI
+  deliberately disabled. Fresh server configuration keeps both AI and Langfuse export off; the
+  bootstrap preserves the server's existing `.env` and root-owned secret directory, so the local
+  self-hosted Evaluation key cannot travel through Git or the image. The deployment runbook now
+  separates the normal image/database migration from any later project-bound Langfuse key setup.
+  Regression tests pin blank server defaults, secret-file mounting, partial-configuration fail-off
+  behavior and telemetry failure isolation. The shared-Ubuntu launcher now defaults to the
+  dedicated self-host rather than the earlier Cloud service. The downloaded Google OAuth client
+  JSON is now ignored explicitly. The ignored local Desktop configuration already selects the
+  self-hosted Evaluation project with one matching key pair, but the Desktop API container was not
+  running during this check. No AWS setting, AI switch or production telemetry switch was changed.
+  **1,267 tests pass,
+  2 PostgreSQL-only tests skip, Ruff is clean, both Compose configurations validate, and Git's
+  whitespace check is clean.**
+- **Langfuse v4 trace fix:** GRP's legacy `/api/public/ingestion` exporter was silently receiving
+  HTTP 207 with every `trace-create` and `generation-create` event rejected because the dedicated
+  4.59.0 server runs in `events_only` mode. ADR-0069 replaces it with the Langfuse 4.x OTel SDK,
+  retains the metadata-only privacy boundary, and moves flush/shutdown off the request event loop.
+  The Docker Desktop image was rebuilt; a synthetic observation exported through the actual GRP
+  code was read back from Evaluation through `/api/public/v2/observations`. The team-facing flow,
+  privacy, token/cost behavior and verification steps are in
+  [`docs/guides/how-grp-langfuse-works.md`](docs/guides/how-grp-langfuse-works.md). The Evaluation
+  project now has the seven-widget **GRP AI at a glance** layperson dashboard, managed idempotently
+  by `scripts/langfuse_layman_dashboard.py`; it explains requests, models, estimated cost and
+  response time without exposing content. The Claude connector procedure, safe local Basic-header
+  generation, initial read-only tool allowlist and troubleshooting are documented in
+  [`docs/guides/connect-claude-to-grp-langfuse-mcp.md`](docs/guides/connect-claude-to-grp-langfuse-mcp.md).
+  The validation count has since advanced to the result above. Calls rejected before this fix are
+  not recreated; run a new Platform AI test to prove the real path.
+- **Today:** Langfuse OSS 4.59.0 is running on the dedicated ADPC Ubuntu host at
+  `https://langfuse-risk-servir.adpc.net`; see Section 0 for deployment, access and remaining
+  production gates. The earlier synthetic Langfuse Cloud demonstration remains separate and
+  non-operational. Production AI and production telemetry remain disabled. Earlier work: Stage 0
+  shadow capture and the protected readiness endpoint are now proven against
   three real local ThaiWater pulls over about 48 minutes. A metadata-only CLI now makes stored
   shadow windows repeatably auditable. An internal four-page Word briefing now explains the actual
   observations for a lay reader, including a Dusit worked example. Live now shows the protected
@@ -36,8 +69,11 @@
   every runtime secret-file setting uses the tmpfs copy. The owner provisioned the 1 GB Lightsail
   host and pointed `servir-risk.kovitad.com` at its static IPv4. The first bootstrap created swap,
   installed Docker/Caddy, pulled the image and started PostGIS, then stopped safely at migration on
-  the entrypoint error above; API/worker, OAuth, ThaiWater capture and public feeds did not start.
-  The Docker Desktop stack was then rebuilt
+  the entrypoint error above. The owner subsequently reports that deployment at
+  `servir-risk.kovitad.com` completed with assessments enabled. AI was deliberately not enabled;
+  this deployment state has not yet been independently browser-verified in this workspace.
+  ThaiWater capture and anonymous public feeds remain governed by their separate switches and must
+  not be inferred from assessment availability. The Docker Desktop stack was then rebuilt
   with the supported launcher and SERVIR sign-in was
   restored and browser-proven for the ADPC Hub Admin account.
 - **ThaiWater access:** the Product Owner reports HII confirmed the website API key is public for
@@ -47,7 +83,7 @@
   the validated live-envelope/logging/launcher fixes are in local commit `54e6742`, the third
   capture analysis is in `5a165c1`, and the metadata-only window analyzer is in `e687475`. The
   local continuation has not been pushed.
-- **Next agent:** read Section 0, "6 October: Bangkok observation data briefing", first.
+- **Next agent:** read Section 0, "15 October: dedicated self-hosted Langfuse", first.
 
 **Repository:** <https://github.com/kovitad/ADPC_GRP>
 
@@ -160,7 +196,90 @@ RP20/RP50 rasters and methods exist.
 
 ---
 
-## 0. Start here (sessions of 24 September-6 October 2026)
+## 0. Start here (sessions of 24 September-15 October 2026)
+
+### 15 October: dedicated self-hosted Langfuse
+
+- Langfuse OSS 4.59.0 is live and healthy at
+  `https://langfuse-risk-servir.adpc.net` on the dedicated ADPC Ubuntu 24.04 VM
+  (`10.4.0.210`; 4 vCPU, 16 GiB RAM, 244 GB root filesystem). HTTPS has a valid Let's Encrypt
+  certificate. HTTP redirects to HTTPS and `/api/public/health` returns 200.
+- Docker Engine/Compose are installed. The enabled `langfuse.service` starts the upstream
+  PostgreSQL, ClickHouse, Redis, MinIO, Langfuse web/worker and Caddy topology from
+  `/srv/langfuse`. All seven containers are running; database/cache/object-store health checks
+  pass. Docker uses its rotating `local` log driver.
+- Only HTTP/HTTPS are published. Langfuse web diagnostics, MinIO, PostgreSQL, Redis and
+  ClickHouse bind to loopback and were proven unreachable on both VM addresses. Path-style
+  `/langfuse/*` object requests pass through HTTPS and reject anonymous reads.
+- Generated runtime secrets are in root-owned mode-0600 `/srv/langfuse/.env`; none was copied to
+  Git or printed. Upstream product telemetry is disabled. The owner account was initialized for
+  `kovitad.janlakhon@adpc.net`; its initial credential is in a temporary mode-0600 owner-readable
+  file on the VM. Browser automation proved the original password sign-in.
+- Google OAuth is now configured from the owner-downloaded web-client JSON without printing its
+  secret. The only login control shown is Google; ordinary password authentication is disabled,
+  account linking is enabled, and only verified `adpc.net`/`sig-gis.com` Google domains are
+  accepted. Google-only account creation is temporarily on so the two approved owners can establish
+  accounts. After both have signed in, set `AUTH_DISABLE_SIGNUP=true`, remove the temporary initial
+  password file and the root-only headless initialization entries, and recreate the web service.
+- Organization `ADPC GRP` now contains separate `GRP Staging`, `GRP Evaluation` and
+  `GRP Production` projects. Their existence does not authorize production export. The existing
+  Cloud synthetic demonstration has not been migrated or deleted.
+- The first Gmail SMTP details were tested from the VM before installation. Port 465 reset during
+  TLS negotiation; port 587 completed STARTTLS but the server closed during authentication. No
+  broken SMTP setting was installed. All temporary SMTP files and ignored local credential
+  variables were removed. Confirm whether ADPC intends authenticated `smtp.gmail.com` with a
+  Google App Password or the preferred Workspace `smtp-relay.gmail.com` with outbound IP
+  `147.50.36.42` allow-listed.
+- Docker Desktop was started through the supported `scripts/docker-desktop.ps1` launcher and the
+  API, worker and database are healthy. The newly supplied self-hosted Evaluation project key was
+  copied into the ignored runtime secret file without display; a duplicate public-key entry in
+  `.env` was normalized to the newest value. One metadata-only synthetic
+  `grp-selfhost-connectivity-test` span was flushed to the self-hosted host with no client/server
+  ingestion error. Langfuse v4's legacy trace-list API correctly returns its `events_only` 404, so
+  confirm the span in the Evaluation project's Tracing UI rather than through that removed API.
+- ADR-0068 records the architecture change from Cloud-only to a dedicated ADPC host. Reproducible
+  deployment files and the operations handoff are under `deploy/langfuse/`; the upstream Compose
+  is vendored from tag v4.59.0/commit `3aa29f7b41e3e007ab1efd2856ffca50ee7a9006` and local
+  controls are isolated in an override.
+- Temporary SSH credentials were removed from the ignored local `.env` after a dedicated key was
+  authorized. External SSH port 2100 still refuses connections; internal SSH works from the ADPC
+  network.
+- **Still blocked for production:** both approved owners must prove Google sign-in, then close
+  Google account creation and delete the obsolete temporary password file; remove all root-only
+  `LANGFUSE_INIT_*` settings after custody is confirmed; implement and restore-test consistent
+  PostgreSQL, ClickHouse and MinIO backups;
+  approve retention/capacity alerts; create/custody per-project API keys; and run staging outage
+  and ingestion proofs before changing any GRP `LANGFUSE_HOST`. Production AI and telemetry remain
+  off.
+
+### 12 October: Langfuse Cloud synthetic stakeholder demonstration
+
+- A bounded end-to-end demonstration now shows developers and stakeholders how GRP can combine
+  model traces, tokens/cost/latency, a versioned dataset, deterministic checks, an advisory AI
+  judge and baseline-versus-candidate experiments. It is deliberately separate from production
+  assessments and scientific goldens.
+- Langfuse Cloud contains the six-item dataset
+  `demo/grp-observability-verification-v1`, dashboard **GRP AI Observability & Verification Demo**,
+  and one baseline plus one candidate run. All places, facilities, counts and conditions are
+  invented; every item records `synthetic_demo=true` and `approved_for_operations=false`. No
+  human-review score was fabricated.
+- `scripts/langfuse_stakeholder_demo.py` validates, synchronizes, runs and reapplies the dashboard
+  without printing credentials. The optional `evaluation` dependency group pins Langfuse 4.x,
+  OpenAI 3.x and PyYAML. Source cases are under `tests/fixtures/langfuse_demo/`, not
+  `tests/golden/`.
+- First result: candidate mean fact coverage 0.750 versus baseline 0.667 and caveat coverage 0.472
+  versus 0.000, but the exact-phrase checker and judge disagree and both runs contain failures.
+  This is demonstration evidence for calibration and human review, not a promotion result.
+- Runbook and authorized Cloud links:
+  [`docs/guides/langfuse-stakeholder-demo.md`](docs/guides/langfuse-stakeholder-demo.md). The Word
+  guideline in `deliverables/langfuse/` now includes a non-technical, step-by-step hands-on
+  appendix: role-by-role inputs, one completed centre-shortlisting case, good/bad answers, YAML,
+  business validation, exact operator commands, authorized links, browser walkthrough, dashboard
+  anatomy/configuration, row-level review, first-result interpretation, a human-review worksheet,
+  troubleshooting and completion checklist. Two embedded diagrams provide a stable screen map
+  without exposing credentials; Word opened and rendered the 22-page package successfully. An
+  unauthenticated browser check reached Langfuse's expected sign-in screen, so project members must
+  sign in before using the protected links. The production AI switch remains off.
 
 ### 6 October: Global Risk live-feed issue pack
 
