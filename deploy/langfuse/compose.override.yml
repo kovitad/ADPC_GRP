@@ -1,0 +1,45 @@
+# Production overlay for the pinned upstream Langfuse v4.59.0 Compose file.
+services:
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:4.59.0
+
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:4.59.0
+    ports: !override
+      - 127.0.0.1:3000:3000
+    environment:
+      AUTH_DISABLE_SIGNUP: ${AUTH_DISABLE_SIGNUP:-true}
+      AUTH_DISABLE_USERNAME_PASSWORD: ${AUTH_DISABLE_USERNAME_PASSWORD:-false}
+      AUTH_GOOGLE_CLIENT_ID: ${AUTH_GOOGLE_CLIENT_ID:-}
+      AUTH_GOOGLE_CLIENT_SECRET: ${AUTH_GOOGLE_CLIENT_SECRET:-}
+      AUTH_GOOGLE_ALLOWED_DOMAINS: ${AUTH_GOOGLE_ALLOWED_DOMAINS:-}
+      AUTH_GOOGLE_ALLOW_ACCOUNT_LINKING: ${AUTH_GOOGLE_ALLOW_ACCOUNT_LINKING:-false}
+      LANGFUSE_CSP_ENFORCE_HTTPS: "true"
+      LANGFUSE_TRUSTED_PROXY_COUNT: "1"
+
+  minio:
+    ports: !override
+      - 127.0.0.1:9090:9000
+      - 127.0.0.1:9091:9001
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: always
+    depends_on:
+      langfuse-web:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - langfuse_caddy_data:/data
+      - langfuse_caddy_config:/config
+
+volumes:
+  langfuse_caddy_data:
+    driver: local
+  langfuse_caddy_config:
+    driver: local

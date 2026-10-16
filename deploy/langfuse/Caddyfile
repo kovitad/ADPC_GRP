@@ -1,0 +1,21 @@
+{
+	admin off
+	email kovitad.janlakhon@adpc.net
+}
+
+langfuse-risk-servir.adpc.net {
+	encode zstd gzip
+
+	# Browser uploads use path-style MinIO URLs under the private Langfuse bucket.
+	@object_storage path /langfuse/*
+	reverse_proxy @object_storage minio:9000
+
+	reverse_proxy langfuse-web:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
