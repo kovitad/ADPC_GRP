@@ -23,6 +23,13 @@ class McpToolResult:
     is_error: bool
 
 
+@dataclass(frozen=True)
+class McpToolDefinition:
+    name: str
+    description: str | None
+    input_schema: dict[str, Any]
+
+
 def _decode_response(response: httpx.Response) -> dict[str, Any]:
     content_type = response.headers.get("content-type", "").lower()
     try:
@@ -132,6 +139,41 @@ class SigMcpClient:
             response.raise_for_status()
         except httpx.HTTPError as error:
             raise SigMcpError("SIG MCP session could not be initialized") from error
+
+    async def list_tools(self, *, max_pages: int = 10) -> list[McpToolDefinition]:
+        """List advertised tools, following bounded MCP cursor pagination."""
+
+        cursor: str | None = None
+        definitions: list[McpToolDefinition] = []
+        seen_cursors: set[str] = set()
+        for _page in range(max_pages):
+            params = {"cursor": cursor} if cursor else {}
+            result = await self._request("tools/list", params)
+            tools = result.get("tools")
+            if not isinstance(tools, list):
+                raise SigMcpError("SIG MCP returned an invalid tool list")
+            for item in tools:
+                if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                    raise SigMcpError("SIG MCP returned an invalid tool definition")
+                schema = item.get("inputSchema", {})
+                if not isinstance(schema, dict):
+                    raise SigMcpError("SIG MCP returned an invalid tool schema")
+                description = item.get("description")
+                definitions.append(
+                    McpToolDefinition(
+                        name=item["name"],
+                        description=description if isinstance(description, str) else None,
+                        input_schema=schema,
+                    )
+                )
+            next_cursor = result.get("nextCursor")
+            if next_cursor is None:
+                return definitions
+            if not isinstance(next_cursor, str) or not next_cursor or next_cursor in seen_cursors:
+                raise SigMcpError("SIG MCP returned an invalid tool cursor")
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+        raise SigMcpError("SIG MCP tool list exceeded the page limit")
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> McpToolResult:
         started_at = datetime.now(UTC)

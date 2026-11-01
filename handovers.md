@@ -1,6 +1,44 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 16 October 2026.
+**Updated:** 23 October 2026.
+- **Temporary external coastal UX test:** an ephemeral Cloudflare HTTP-origin tunnel and temporary
+  public-PKCE SERVIR callback were browser-verified for colleague testing. The ignored tunnel URL,
+  client ID and Compose override are not committed. Automatic cleanup stops the tunnel and restores
+  localhost settings after the agreed two-hour window. The tester still needs an approved SERVIR
+  identity and GRP membership; no token, cookie, or secret was shared.
+- **Coastal zoning implementation branch:** active on
+  `adhoc/grp-coastal-zoning-integration-spec-2026-10-23`. The primary workflow now works end to
+  end: a signed-in member draws an AOI in the branded map, checks bounded topology/area/tile limits,
+  obtains a live delegated-user `assemble_pack`, queues the immutable evidence pack, watches the
+  worker execute P1-P10, and opens a real four-view map-grid report. No MCP token is persisted or
+  sent to the worker. Explicit live profiles currently cover Lamu, Kenya and South Sumatra,
+  Indonesia; all required layers must be returned or coverage fails closed. Docker browser/API
+  smokes completed real 22.24 km² assessments for both profiles. Lamu produced a 39×39 zoning grid
+  and four unranked planting/reconnection candidates; South Sumatra produced a 36×36 hazard-aware
+  grid and correctly reported no candidates for the tested polygon. Both smoke records were then
+  auditably retired so they are not presented as user assessments. Reports expose governed pack
+  gaps, a map key, result JSON download, P1-P10 trace, and the warning that map-grid candidates are
+  not building permission. Candidates without receipts remain unranked; P7-P9 are explicitly
+  skipped rather than fabricating grounded briefs or verdicts. Completed Hub work can be reopened.
+  Hub admins/platform admins can auditably review names/notes or retire reports. The supplied
+  Mangrove 360 assets remain byte-identical to their manifest, and Leaflet is vendored locally.
+  Foundation details remain: five persistent tables/migration `20261023_0029`, pinned starter-kit
+  rules, South Sumatra/Lamu goldens, idempotency, Hub-scoped 404s, and retry/cancel semantics.
+  Validation now passes **1,306 tests with 2 PostgreSQL-only skips**, focused Ruff checks and JS
+  syntax. Remaining production work is governed zone-level `publish_answer`/receipt resolution,
+  full-resolution raster/tile processing and the five shapefile/ZIP package groups; the current
+  report truthfully labels itself a map-grid MVP. A browser follow-up fixed an inert Run button:
+  failed/expired coverage no longer leaves it permanently disabled, clicking it before readiness
+  now explains the prerequisite, and 401s present a SERVIR reauthentication link. Report tabs now
+  change the map as well as the text: non-selected zoning cells dim, matching candidate polygons
+  receive bright kind-specific fills and short IDs, the map zooms to those locations, clicking a
+  candidate opens its details, and an explicit notice appears when a view has no candidates. A
+  fresh live browser run completed after the fix and its smoke record was retired. Fixture bytes remain local
+  because the starter kit has no explicit licence and its DEM licence/vintage is unstated.
+- **End of session push:** uncommitted tracked changes (12 files, +757/−75) committed as `95a3811`
+  and pushed to `origin/pilot/river-watch-and-bangkok-flood`. Includes Langfuse v4 OTel
+  ingestion, session grouping, MCP/planning updates, AI usage limit tests and ADR/guide
+  revisions. Untracked deliverables and local docs remain ignored.
 - **Langfuse session grouping:** new AI calls now carry a one-way reference derived from the
   signed-in GRP login session, allowing Langfuse's Sessions view to group related router, drafting,
   explanation and test-call traces. The real session identifier and cookie are never exported.

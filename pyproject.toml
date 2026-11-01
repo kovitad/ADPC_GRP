@@ -29,6 +29,8 @@ dev = [
   "ruff>=0.9,<1",
 ]
 gis = [
+  "numpy>=2.1,<3",
+  "scipy>=1.14,<2",
   "rasterio>=1.4,<2",
   "pyogrio>=0.10,<1",
   "shapely>=2.0,<3",
@@ -58,6 +60,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["docs/adhoc/mangrove360-zoning-starter-kit"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

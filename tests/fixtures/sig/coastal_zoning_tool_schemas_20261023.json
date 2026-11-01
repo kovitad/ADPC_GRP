@@ -1,0 +1,64 @@
+{
+  "captured_at": "2026-10-23",
+  "source": "live SIG MCP tools/list through delegated SERVIR session",
+  "sanitization": "Descriptions and credentials omitted; JSON input schemas retained.",
+  "tools": {
+    "platform_capabilities": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "resolve_place_time": {
+      "type": "object",
+      "properties": {
+        "country": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "crop": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "region": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "when": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "place": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "list": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null}
+      },
+      "additionalProperties": false
+    },
+    "assemble_pack": {
+      "type": "object",
+      "properties": {
+        "country": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "crop": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "focus": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "pack": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "place": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "hazard": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "min_severity": {"anyOf": [{"type": "integer"}, {"type": "null"}], "default": null},
+        "override": {"anyOf": [{"type": "array", "items": {"type": "object", "additionalProperties": true}}, {"type": "null"}], "default": null},
+        "override_country": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "override_crop": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "geometry": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "array", "items": {}}, {"type": "null"}], "default": null},
+        "map_layer": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "year": {"anyOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}], "default": null},
+        "year_to": {"anyOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}], "default": null},
+        "classes": {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}], "default": null},
+        "stack": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null},
+        "layers": {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}], "default": null},
+        "vectors": {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}], "default": null},
+        "within": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null}
+      },
+      "additionalProperties": false
+    },
+    "publish_answer": {
+      "type": "object",
+      "properties": {
+        "pack_id": {"type": "string"},
+        "draft": {"type": "string"},
+        "question": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null}
+      },
+      "required": ["pack_id", "draft"],
+      "additionalProperties": false
+    }
+  },
+  "receipt_resolution": {
+    "transport": "HTTPS GET",
+    "path_template": "/api/resolve/receipt/{receipt_id}",
+    "persist_verdict": false
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "product": "Mangrove 360",
+  "version": "1.0",
+  "createdDate": "2026-10-23",
+  "assets": [
+    {
+      "file": "assets/logo-primary.png",
+      "role": "Primary horizontal logo",
+      "width": 2172,
+      "height": 724,
+      "format": "png",
+      "bytes": 477778,
+      "hasAlpha": true,
+      "alphaRange": {
+        "min": 0,
+        "max": 255
+      },
+      "sha256": "405551f16e6478810eba59e72a08fd88dc8ba56c9efe20c46aed8f1cbacca35d",
+      "provenance": {
+        "tool": "Built-in image_gen",
+        "originalGeneratedFile": "exec-84b8549f-d683-43a1-bcf1-ed3befce8a35.png"
+      }
+    },
+    {
+      "file": "assets/logo-symbol.png",
+      "role": "Standalone logo symbol, edited from primary logo",
+      "width": 1254,
+      "height": 1254,
+      "format": "png",
+      "bytes": 670479,
+      "hasAlpha": true,
+      "alphaRange": {
+        "min": 0,
+        "max": 255
+      },
+      "sha256": "5f7f220ccec4879332eb4828432f005e49c0bbeff5f7bfba340a28114f5335a2",
+      "provenance": {
+        "tool": "Built-in image_gen",
+        "originalGeneratedFile": "exec-20e7131b-6254-4348-963e-99c30adcdd1c.png"
+      }
+    },
+    {
+      "file": "assets/login-hero.png",
+      "role": "Login hero, AI-generated fictional coastline",
+      "width": 1586,
+      "height": 992,
+      "format": "png",
+      "bytes": 2751097,
+      "hasAlpha": false,
+      "alphaRange": null,
+      "sha256": "c7f5cd2c758cfe272e6fa7824dfd3fa69ea3702102e2dc15093a485b1c27ba53",
+      "provenance": {
+        "tool": "Built-in image_gen",
+        "originalGeneratedFile": "exec-e6ab0465-1019-405a-b12f-29369b0682d2.png"
+      }
+    },
+    {
+      "file": "assets/dashboard-banner.png",
+      "role": "Decorative dashboard welcome illustration",
+      "width": 2163,
+      "height": 727,
+      "format": "png",
+      "bytes": 2129040,
+      "hasAlpha": false,
+      "alphaRange": null,
+      "sha256": "aab90796e8e5450601d7e55110e4d5ec3b842b97a58e64e608efbea20e500a65",
+      "provenance": {
+        "tool": "Built-in image_gen",
+        "originalGeneratedFile": "exec-815226a9-6905-4daf-97ee-583e8933582b.png"
+      }
+    },
+    {
+      "file": "assets/empty-state.png",
+      "role": "Decorative empty-state illustration",
+      "width": 1254,
+      "height": 1254,
+      "format": "png",
+      "bytes": 1021160,
+      "hasAlpha": true,
+      "alphaRange": {
+        "min": 0,
+        "max": 255
+      },
+      "sha256": "e4043355e91756f66634781e33425061625b86dfef457ca7a12cab7272b21039",
+      "provenance": {
+        "tool": "Built-in image_gen",
+        "originalGeneratedFile": "exec-97c1db57-e6ea-4ac0-ab4d-8fba2fe6fb06.png"
+      }
+    }
+  ],
+  "notes": [
+    "All generated coastlines are fictional and illustrative, not geographic evidence.",
+    "PNG logo assets are raster files, not editable vectors.",
+    "Login and dashboard pages are local design previews; no authentication or live analysis is connected."
+  ]
+}

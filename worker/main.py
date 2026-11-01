@@ -16,6 +16,8 @@ from core.boundary_import import (
     BoundaryImportError,
     process_boundary_import,
 )
+from core.coastal_zoning.jobs import claim_next_run as claim_next_coastal_run
+from core.coastal_zoning.pipeline import process_coastal_zoning_run
 from core.data_import_jobs import ImportClaim, claim_next_import, fail_import, version_id_for_import
 from core.data_library_models import DataImportJob
 from core.db import get_engine, read_secret, session_scope
@@ -86,6 +88,10 @@ def run() -> None:
             last_housekeeping = time.monotonic()
             logger.info("Worker heartbeat")
         worked = run_one_job(storage, settings.job_lease_minutes)
+        # Coastal zoning uses the same persistent lease discipline, but only immutable MCP results
+        # enter this worker; delegated SERVIR credentials remain in the API process.
+        if not worked and settings.coastal_zoning_enabled:
+            worked = run_one_coastal_zoning(storage, settings.job_lease_minutes)
         # A Planner waiting on an assessment wins. Imports run before optional source previews.
         if not worked:
             worked = run_one_import(
@@ -169,8 +175,10 @@ def run_flood_retention(storage: LocalStorage) -> None:
                 result = prune_flood(session, config, datetime.now(UTC))
                 session.commit()
             delete_raw(storage, result)
-            if any(result[k] for k in ("raw_fetches_cleared", "report_ids_pruned",
-                                        "exposure_rows_removed")):
+            if any(
+                result[k]
+                for k in ("raw_fetches_cleared", "report_ids_pruned", "exposure_rows_removed")
+            ):
                 logger.info("Flood retention %s: %s", pilot_id, result)
         except Exception:
             logger.exception("Flood retention %s failed; will retry", pilot_id)
@@ -242,8 +250,11 @@ def run_flood_weather(key_file: Path) -> None:
             if stored:
                 logger.info("Longdo Weather %s: %d scopes recorded", pilot_id, stored)
         except Exception as error:
-            logger.error("Longdo Weather %s failed: %s", pilot_id,
-                         client.redact(f"{type(error).__name__}: {error}"))
+            logger.error(
+                "Longdo Weather %s failed: %s",
+                pilot_id,
+                client.redact(f"{type(error).__name__}: {error}"),
+            )
 
 
 def run_one_replay_step(storage: LocalStorage) -> bool:
@@ -269,6 +280,23 @@ def run_one_job(storage: LocalStorage, lease_minutes: int) -> bool:
             return True
     except SQLAlchemyError:
         logger.exception("Job loop database error; will retry")
+        return False
+
+
+def run_one_coastal_zoning(storage: LocalStorage, lease_minutes: int) -> bool:
+    """Claim and execute one deterministic coastal-zoning run."""
+
+    try:
+        with Session(get_engine()) as session:
+            run_id = claim_next_coastal_run(session, lease_minutes=lease_minutes)
+            if run_id is None:
+                return False
+            logger.info("Claimed coastal-zoning run %s", run_id)
+            state = process_coastal_zoning_run(session, storage, run_id)
+            logger.info("Coastal-zoning run %s finished: %s", run_id, state)
+            return True
+    except Exception:
+        logger.exception("Coastal-zoning loop failed; run remains retryable")
         return False
 
 

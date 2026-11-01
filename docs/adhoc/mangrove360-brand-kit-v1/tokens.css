@@ -1,0 +1,13 @@
+:root {
+  --m360-forest: #123f3a;
+  --m360-teal: #297c78;
+  --m360-sage: #a8bda1;
+  --m360-sand: #f5f3eb;
+  --m360-gold: #c6a465;
+  --m360-ink: #173c38;
+  --m360-muted: #526863;
+  --m360-line: #dce5df;
+  --m360-white: #ffffff;
+  --m360-radius: 16px;
+  --m360-font: Inter, "Segoe UI", "Leelawadee UI", system-ui, sans-serif;
+}

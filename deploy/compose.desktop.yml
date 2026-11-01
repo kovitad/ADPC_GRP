@@ -40,6 +40,8 @@ services:
       AI_FEATURE_ENABLED: "true"
       # ADR-0004: planner chat box and map on SIG generic evidence, Docker Desktop only.
       PLANNING_CHAT_ENABLED: "true"
+      # ADR-0070: local integration build for the checkpointed coastal-zoning pipeline.
+      COASTAL_ZONING_ENABLED: "true"
       # ADR-0006: Admin data inspector over the read-only source folder below.
       DATA_INSPECTOR_ENABLED: "true"
       DATA_IN_ROOT: /srv/grp/data-in

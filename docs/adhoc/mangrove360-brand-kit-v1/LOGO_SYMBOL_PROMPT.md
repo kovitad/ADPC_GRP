@@ -1,0 +1,9 @@
+# Logo symbol derivative
+
+Tool: built-in `image_gen`.
+
+Input: `assets/logo-primary.png`, reviewed before editing.
+
+Prompt:
+
+Use case: background-extraction. Edit target: the provided horizontal Mangrove 360 logo. Create the standalone logo symbol only by removing all wordmark lettering. Preserve the original emblem geometry, colors, tree canopy, branching trunk, prop roots and open circular wave sweep EXACTLY; do not redesign, re-interpret, add anything, or change style. Center this same emblem on a square canvas, enlarge to occupy about 78 percent of width with balanced transparent clear space all around. Crisp flat edges. No text, no border, no shadow, no watermark. Output genuine alpha transparency.

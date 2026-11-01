@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     ai_feature_enabled: bool = False
     # Planner chat box and map using SIG generic evidence (ADR-0004). Docker Desktop only.
     planning_chat_enabled: bool = False
+    # Checkpointed mangrove coastal-zoning assessment (ADR-0070). Disabled by default.
+    coastal_zoning_enabled: bool = False
     # Admin data inspector over a read-only source folder (ADR-0006). Docker Desktop only.
     data_inspector_enabled: bool = False
     data_in_root: Path = Path(".local/data-in")

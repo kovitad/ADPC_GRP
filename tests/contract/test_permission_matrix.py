@@ -21,6 +21,7 @@ import api.access
 import api.admin
 import api.ai
 import api.auth
+import api.coastal_zoning
 import api.data_inspector
 import api.data_library
 import api.integrations.sig
@@ -119,6 +120,8 @@ MATRIX = {
     # ADR-0034: the Planning layer picker follows the planning conversation: every planning role
     # reads its own Hub's list, a Platform Admin with no planning membership has none.
     "global_risk_layers": (401, 200, 200, 200, 403),
+    # Capability discovery requires both Hub access and this session's delegated MCP token.
+    "coastal_zoning_capabilities": (401, 401, 401, 401, 403),
     # Sub-district plan: area search and lookup by point follow the planning catalogue rules.
     "areas_search": (401, 200, 200, 200, 403),
     "areas_at": (401, 200, 200, 200, 403),
@@ -248,6 +251,9 @@ MATRIX_OPERATION_IDS = {
         "refresh_contribution_api_v1_contributions__contribution_id__refresh_post"
     ),
     "global_risk_layers": "global_risk_layers_api_v1_planning_global_risk_layers_get",
+    "coastal_zoning_capabilities": (
+        "coastal_zoning_capabilities_api_v1_coastal_zoning_capabilities_get"
+    ),
     "river_watch_reaches": "list_reaches_api_v1_pilot_river_watch_reaches_get",
     "river_watch_forecast": "river_forecast_api_v1_pilot_river_watch__reach_id__get",
     "river_watch_feed_preview": (
@@ -349,6 +355,17 @@ KNOWN_UNCOVERED = {
     "planning_chat_api_v1_planning_chat_post",
     # Planning tests cover status access.
     "planning_status_api_v1_planning_status_get",
+    # Coastal-zoning API tests cover Hub privacy, idempotency, trace reads and owner changes.
+    "coastal_zoning_coverage_api_v1_coastal_zoning_coverage_post",
+    "create_coastal_zoning_run_api_v1_coastal_zoning_runs_post",
+    "list_coastal_zoning_runs_api_v1_coastal_zoning_runs_get",
+    "read_coastal_zoning_run_api_v1_coastal_zoning_runs__run_id__get",
+    "read_coastal_zoning_result_api_v1_coastal_zoning_runs__run_id__result_get",
+    "read_coastal_zoning_trace_api_v1_coastal_zoning_runs__run_id__trace_get",
+    "review_coastal_zoning_run_api_v1_coastal_zoning_runs__run_id__review_post",
+    "retire_coastal_zoning_run_api_v1_coastal_zoning_runs__run_id__retire_post",
+    "cancel_coastal_zoning_run_api_v1_coastal_zoning_runs__run_id__cancel_post",
+    "retry_coastal_zoning_run_api_v1_coastal_zoning_runs__run_id__retry_post",
     # Planning tests cover starting a lookup and reading only your own.
     "start_lookup_api_v1_planning_lookups_post",
     "read_lookup_api_v1_planning_lookups__job_id__get",
@@ -383,10 +400,11 @@ def world(tmp_path_factory) -> Iterator[dict]:
         storage_root=tmp_path_factory.mktemp("managed-data"),
         shelter_browser_upload_enabled=True,
         planning_chat_enabled=True,
+        coastal_zoning_enabled=True,
     )
     patch = pytest.MonkeyPatch()
     for module in (
-        api.access, api.admin, api.ai, api.auth, api.integrations.sig,
+        api.access, api.admin, api.ai, api.auth, api.coastal_zoning, api.integrations.sig,
         api.permissions, api.planning, api.platform, api.data_inspector, api.data_library,
         api.maps, api.uploads,
     ):
@@ -621,6 +639,7 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
                         "records_path": "a", "fields": {"b": "c"}}),
         "refresh_contribution": ("POST", f"/api/v1/contributions/{user_id}/refresh", None),
         "global_risk_layers": ("GET", "/api/v1/planning/global-risk-layers", None),
+        "coastal_zoning_capabilities": ("GET", "/api/v1/coastal-zoning/capabilities", None),
         "river_watch_reaches": ("GET", "/api/v1/pilot/river-watch/reaches", None),
         "river_watch_forecast": ("GET", "/api/v1/pilot/river-watch/1", None),
         "river_watch_feed_preview": ("GET", "/api/v1/pilot/river-watch/1/feed-preview", None),

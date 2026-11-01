@@ -12,6 +12,7 @@ from core import (  # noqa: F401
     inspection_models,
     planning_memory_models,
 )
+from core.coastal_zoning import models as coastal_zoning_models  # noqa: F401
 from core.db import Base, get_database_url
 from core.flood_evidence import models as flood_evidence_models  # noqa: F401
 

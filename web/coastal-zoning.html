@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#123f3a" />
+    <title>Mangrove 360 | Coastal zoning</title>
+    <link rel="icon" type="image/png" href="/assets/mangrove360/logo-symbol.png" />
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css?v=1.9.4" />
+    <link rel="stylesheet" href="/coastal-zoning.css?v=20261023f" />
+    <script src="/vendor/leaflet/leaflet.js?v=1.9.4"></script>
+    <script src="/grp-common.js?v=20261023f" defer></script>
+    <script src="/coastal-zoning.js?v=20261023f" defer></script>
+  </head>
+  <body>
+    <a class="m360-skip" href="#main-content">Skip to content</a>
+    <div class="m360-shell">
+      <aside class="m360-sidebar">
+        <a class="m360-brand" href="/coastal-zoning.html" aria-label="Mangrove 360 home">
+          <img src="/assets/mangrove360/logo-primary.png" alt="Mangrove 360" />
+        </a>
+        <nav aria-label="Mangrove 360 workspace">
+          <a class="is-active" href="/coastal-zoning.html" aria-current="page">Overview</a>
+          <a href="#runs">Assessments</a>
+          <a href="/planning.html">GRP Planning</a>
+          <a href="/workspace.html">My access</a>
+        </nav>
+        <div class="m360-sidebar__foot">
+          <p>Coastal decision support within the SERVIR Global Risk Platform.</p>
+          <button type="button" data-sign-out>Sign out</button>
+        </div>
+      </aside>
+
+      <main class="m360-main" id="main-content">
+        <header class="m360-header">
+          <p>Workspace <span aria-hidden="true">/</span> <strong>Overview</strong></p>
+          <div class="m360-account">
+            <span data-account-name>Loading account…</span>
+            <span class="m360-pill" data-hub-name>Hub</span>
+          </div>
+        </header>
+
+        <section class="m360-welcome" aria-labelledby="welcome-title">
+          <img
+            src="/assets/mangrove360/dashboard-banner.png"
+            alt=""
+            aria-hidden="true"
+          />
+          <div class="m360-welcome__copy">
+            <p class="m360-eyebrow">Your coastal workspace</p>
+            <h1 id="welcome-title">A better perspective<br />starts here.</h1>
+            <p>
+              Explore the relationship between development, healthy mangroves, and resilient
+              communities using governed evidence.
+            </p>
+          </div>
+        </section>
+
+        <section aria-labelledby="perspectives-title">
+          <h2 class="m360-section-title" id="perspectives-title">Three perspectives. One decision.</h2>
+          <div class="m360-info-grid">
+            <article class="m360-info-card">
+              <span>01 / DEVELOPMENT</span>
+              <h3>Understand the opportunity</h3>
+              <p>Compare site options, access, constraints, and documented planning inputs.</p>
+            </article>
+            <article class="m360-info-card">
+              <span>02 / MANGROVES</span>
+              <h3>Plan for restoration</h3>
+              <p>Review habitat evidence and restoration feasibility without treating gaps as zero.</p>
+            </article>
+            <article class="m360-info-card">
+              <span>03 / RESILIENCE</span>
+              <h3>See the wider picture</h3>
+              <p>Bring hazards, infrastructure, and community priorities into one traceable view.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="m360-assessment" aria-labelledby="new-assessment-title">
+          <div class="m360-section-heading">
+            <div>
+              <p class="m360-eyebrow">New assessment</p>
+              <h2 id="new-assessment-title">Select the coast on the map</h2>
+            </div>
+            <span class="m360-pill">Live governed evidence</span>
+          </div>
+          <p class="m360-help">
+            Choose a supported coast, then click at least three points on the map. Finish the
+            polygon, check its evidence coverage, and run the deterministic zoning rules.
+          </p>
+          <div class="m360-builder">
+            <form class="m360-controls" data-assessment-form novalidate>
+              <label>
+                Evidence area
+                <select data-profile>
+                  <option value="KE">Lamu coast, Kenya</option>
+                  <option value="ID">South Sumatra, Indonesia</option>
+                </select>
+              </label>
+              <label>
+                Assessment name
+                <input data-site-name maxlength="200" value="My mangrove assessment" required />
+              </label>
+              <div class="m360-control-actions">
+                <button class="m360-button" type="button" data-reset-area>Reset polygon</button>
+                <button class="m360-button" type="button" data-finish-area disabled>Finish selection</button>
+              </div>
+              <button class="m360-button m360-button--primary" type="button" data-check-coverage disabled>
+                Check live evidence
+              </button>
+              <p class="m360-status" data-builder-status role="status" aria-live="polite">
+                Click the map to start drawing your area.
+              </p>
+              <button class="m360-button m360-button--primary" type="button" data-run>
+                Run mangrove assessment
+              </button>
+              <div class="m360-coverage" data-coverage hidden></div>
+            </form>
+            <div class="m360-map" id="mangrove-map" aria-label="Map for drawing the coastal assessment area"></div>
+          </div>
+          <div class="m360-progress" data-progress hidden>
+            <h3>Assessment progress</h3>
+            <div data-steps></div>
+          </div>
+          <section class="m360-result" data-result hidden aria-labelledby="result-title">
+            <div class="m360-section-heading">
+              <div>
+                <p class="m360-eyebrow">Map-grid result</p>
+                <h2 id="result-title" data-result-title>Mangrove zoning result</h2>
+              </div>
+              <div class="m360-result-actions">
+                <span class="m360-pill" data-result-state>Unverified</span>
+                <a class="m360-button" data-result-download download>Download result JSON</a>
+              </div>
+            </div>
+            <div class="m360-result-tabs" role="tablist" aria-label="Choose what the map highlights">
+              <button type="button" role="tab" aria-selected="true" data-result-view="zones">All zoning classes</button>
+              <button type="button" role="tab" aria-selected="false" data-result-view="winwin">All opportunities</button>
+              <button type="button" role="tab" aria-selected="false" data-result-view="resort">Resort candidates</button>
+              <button type="button" role="tab" aria-selected="false" data-result-view="restoration">Restoration candidates</button>
+            </div>
+            <p class="m360-view-explanation" data-view-explanation>
+              Showing every mapped zoning class. Select another view to highlight its locations.
+            </p>
+            <div class="m360-result-map-wrap">
+              <div class="m360-result-map" id="mangrove-result-map" aria-label="Mangrove zoning result map"></div>
+              <p class="m360-map-notice" data-map-notice hidden></p>
+            </div>
+            <div class="m360-result-summary" data-result-summary></div>
+          </section>
+        </section>
+
+        <section class="m360-runs" id="runs" aria-labelledby="runs-title">
+          <div class="m360-section-heading">
+            <div>
+              <p class="m360-eyebrow">Coastal zoning assessments</p>
+              <h2 id="runs-title">Your Hub's recent work</h2>
+            </div>
+            <button class="m360-button" type="button" data-refresh>Refresh</button>
+          </div>
+          <p class="m360-status" data-status role="status">Loading assessments…</p>
+          <div class="m360-run-list" data-run-list hidden></div>
+          <div class="m360-empty" data-empty hidden>
+            <img
+              src="/assets/mangrove360/empty-state.png"
+              alt="Illustration of a folded coastline sheet with mangrove trees"
+            />
+            <div>
+              <h3>Choose your first study area</h3>
+              <p>
+                The area-selection and coverage workflow is being connected to governed Global
+                Risk evidence. No site recommendation is inferred from this illustration.
+              </p>
+              <a class="m360-button m360-button--primary" href="/planning.html">Open GRP Planning</a>
+            </div>
+          </div>
+        </section>
+
+        <footer class="m360-disclaimer">
+          Decorative coastal illustrations are fictional and are not geographic evidence, a land
+          boundary, hazard assessment, financial forecast, or carbon-credit estimate.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

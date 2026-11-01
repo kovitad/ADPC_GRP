@@ -4,112 +4,81 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <meta name="theme-color" content="#0b453d" />
-    <title>Sign in | SERVIR Global Risk Platform</title>
-    <link rel="stylesheet" href="/styles.css?v=20261005a" />
+    <meta name="theme-color" content="#123f3a" />
+    <meta name="description" content="Sign in to Mangrove 360 through SERVIR Global Risk." />
+    <title>Sign in | Mangrove 360</title>
+    <link rel="icon" type="image/png" href="/assets/mangrove360/logo-symbol.png" />
+    <link rel="stylesheet" href="/mangrove-auth.css?v=20261023a" />
     <script src="/app.js" defer></script>
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to sign in</a>
-    <div class="auth-layout">
-      <aside class="brand-panel" aria-label="Platform introduction">
-        <img
-          class="brand-panel__cover"
-          src="/assets/thailand-flood-planning-cover.webp"
-          alt=""
-          aria-hidden="true"
-        />
-        <div class="brand-lockup">
-          <img
-            class="servir-logo"
-            src="/assets/servir-global-collaborative.png"
-            alt="SERVIR Global Collaborative"
-          />
-          <span class="brand-platform">Global Risk Platform</span>
-        </div>
+    <a class="m360-auth-skip" href="#main-content">Skip to sign in</a>
+    <main class="m360-auth-layout">
+      <section class="m360-auth-main" id="main-content" aria-labelledby="sign-in-title">
+        <header class="m360-auth-header">
+          <img src="/assets/mangrove360/logo-primary.png" alt="Mangrove 360" />
+          <span>Coastal intelligence</span>
+        </header>
 
-        <div class="brand-story">
-          <p class="eyebrow eyebrow--light">ADPC Hub experience</p>
-          <h1>Flood preparedness planning</h1>
-          <p class="brand-summary">
-            Build traceable risk evidence, review preparedness, and support clearer decisions from
-            one secure workspace.
+        <div class="m360-auth-card">
+          <p class="m360-auth-eyebrow">A clearer view of the coast</p>
+          <h1 id="sign-in-title">Welcome back.</h1>
+          <p class="m360-auth-intro">
+            Explore coastal opportunities, understand risk, and plan with nature in mind.
           </p>
-        </div>
 
-        <p class="environment-label">SERVIR Global Risk Platform · ADPC staging</p>
-      </aside>
-
-      <main class="auth-main" id="main-content">
-        <section class="auth-card" aria-labelledby="sign-in-title">
-          <div class="mobile-brand" aria-label="ADPC Hub">
-            <img class="servir-logo servir-logo--color" src="/assets/servir-global-collaborative.png" alt="SERVIR Global Collaborative" />
-          </div>
-
-          <div class="context-row">
-            <span class="context-badge">Secure access</span>
-            <span class="context-code">GRP / ADPC</span>
-          </div>
-
-          <div class="auth-heading">
-            <p class="eyebrow">Welcome back</p>
-            <h2 id="sign-in-title">Sign in to your Hub</h2>
-            <p>
-              Continue with the SERVIR account you use for Global Risk. GRP does not create or store a
-              separate password.
+          <div class="m360-auth-alert" id="auth-alert" role="alert" hidden>
+            <strong data-auth-alert-title>Sign-in is temporarily unavailable</strong>
+            <p data-auth-alert-message>
+              Please try again later. If the problem continues, contact your Hub administrator.
             </p>
           </div>
 
-          <div class="auth-alert" id="auth-alert" role="alert" hidden>
-            <span class="auth-alert__icon" aria-hidden="true">!</span>
-            <div>
-              <strong data-auth-alert-title>Sign-in is temporarily unavailable</strong>
-              <p data-auth-alert-message>
-                Please try again later. If the problem continues, contact your Hub administrator.
-              </p>
-            </div>
-          </div>
-
-          <a class="button button--primary" href="/api/v1/auth/login">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 2 4.5 5v5.8c0 4.8 3.1 9.2 7.5 11.2 4.4-2 7.5-6.4 7.5-11.2V5L12 2Zm0 3.1 4.5 1.8v3.9c0 3.3-1.8 6.4-4.5 8-2.7-1.6-4.5-4.7-4.5-8V6.9L12 5.1Z" />
-            </svg>
-            Continue with SERVIR
-            <span class="button__arrow" aria-hidden="true">→</span>
+          <a class="m360-auth-button" href="/api/v1/auth/login">
+            Continue with SERVIR <span aria-hidden="true">→</span>
           </a>
+          <p class="m360-auth-provider">
+            Continue with the SERVIR account you use for Global Risk. GRP does not create or store a
+            separate password for Mangrove 360.
+          </p>
 
-          <div class="provider-note">
-            <span class="provider-note__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V18a2 2 0 0 0 2 2h1v2h2v-2h1a2 2 0 0 0 2-2v-3.3A7 7 0 0 0 12 2Zm2.5 11.3-.5.3V18h-4v-4.4l-.5-.3A5 5 0 1 1 14.5 13.3Z" /></svg>
-            </span>
-            <p>
-              On the SERVIR sign-in page, use Google, Microsoft, or a secure code sent to your
-              work email.
-            </p>
-          </div>
-
-          <div class="card-divider"><span>Need GRP access?</span></div>
-
-          <a class="button button--secondary" href="/register.html">
+          <div class="m360-auth-divider"><span>Need GRP access?</span></div>
+          <a class="m360-auth-button m360-auth-button--secondary" href="/register.html">
             Register with an existing Global Risk account
           </a>
-
-          <p class="support-copy support-copy--admin">
+          <p class="m360-auth-support">
             Platform administrator? <a href="/admin-login.html">Open the approval console</a>.
           </p>
-
-          <p class="support-copy">
+          <p class="m360-auth-support">
             First sign-in without a GRP membership is denied and securely flagged for an
             administrator. After your Hub and role are assigned, return here and try again.
           </p>
-        </section>
+        </div>
 
-        <footer class="auth-footer">
-          <span>© 2026 Asian Disaster Preparedness Center</span>
-          <span class="auth-footer__separator" aria-hidden="true">•</span>
-          <span>Authorized use only</span>
+        <footer class="m360-auth-footer">
+          <span>Mangrove 360 · Coastal decision support</span>
+          <span>Powered by SERVIR Global Risk Platform</span>
         </footer>
-      </main>
-    </div>
+      </section>
+
+      <aside class="m360-auth-visual" aria-label="Illustrative mangrove landscape">
+        <img
+          src="/assets/mangrove360/login-hero.png"
+          alt="AI-generated aerial illustration of mangrove forest and a winding tidal creek"
+        />
+        <div class="m360-auth-visual-copy">
+          <p>MANGROVE 360 / LAND · WATER · PEOPLE</p>
+          <h2>See the coast.<br />Shape what comes next.</h2>
+          <span>
+            Bring development, mangrove restoration, and coastal resilience into one view.
+          </span>
+          <div>
+            <small>Development planning</small>
+            <small>Mangrove restoration</small>
+            <small>Coastal resilience</small>
+          </div>
+        </div>
+      </aside>
+    </main>
   </body>
 </html>

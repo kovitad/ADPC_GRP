@@ -145,6 +145,7 @@ window.GRP = (() => {
   // person's own menu. Every item keeps its data attribute, so pages can still show or hide it.
   const NAV_ITEMS = [
     { key: "planning", label: "Planning", href: "/planning.html" },
+    { key: "coastal-zoning", label: "Mangrove 360", href: "/coastal-zoning.html", attr: "data-coastal-menu", hidden: true },
     { key: "assessments", label: "Assessments", href: "/assessments.html" },
     {
       key: "live", label: "Live", items: [
@@ -172,6 +173,7 @@ window.GRP = (() => {
   ];
   const PAGE_KEYS = {
     "/planning.html": "planning",
+    "/coastal-zoning.html": "coastal-zoning",
     "/assessments.html": "assessments",
     "/contribute.html": "share",
     "/workspace.html": "access",
@@ -395,6 +397,13 @@ window.GRP = (() => {
           const spec = NAV_ITEMS.flatMap((group) => group.items || []).find((i) => i.key === link.dataset.nav);
           if (spec && spec.access === "admin") link.hidden = !isAdmin;
         });
+        const coastalLink = nav.querySelector('[data-nav="coastal-zoning"]');
+        request("/api/v1/coastal-zoning/runs")
+          .then(() => {
+            coastalLink.hidden = false;
+            syncGroups(nav);
+          })
+          .catch(() => {});
         const floodLink = nav.querySelector('[data-nav="pilot"]');
         if (isAdmin) {
           floodLink.hidden = false;

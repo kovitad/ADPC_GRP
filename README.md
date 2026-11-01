@@ -78,6 +78,146 @@ The local stack runs PostGIS, Alembic migrations, the API (with the web screens)
 
 Open `http://127.0.0.1:8000` (sign-in) or `http://127.0.0.1:8000/admin`. The script creates ignored secrets under `.local/docker/secrets`, reuses the localhost SIG client from `.\scripts\run-local.ps1 -RegisterSigClient`, runs migrations, and makes each `-AdminEmail` a Platform Admin with the `adpc` Hub. Stop it with `.\scripts\docker-desktop.ps1 -Down`; data stays in Docker volumes. This file is for local demos only; servers use `deploy/compose.yml`.
 
+## Mangrove 360 coastal zoning branch guide
+
+This branch, `adhoc/grp-coastal-zoning-integration-spec-2026-10-23`, adds the first working
+Mangrove 360 coastal-zoning workflow. It is intended for a colleague to run, inspect, and extend
+without treating an attractive map as stronger evidence than it is.
+
+### What a user can do
+
+1. Sign in with the existing SERVIR/Global Risk identity.
+2. Open `http://127.0.0.1:8000/coastal-zoning.html`.
+3. Choose the Lamu, Kenya or South Sumatra, Indonesia evidence profile.
+4. Click at least three map points, finish the polygon, and check live evidence coverage.
+5. Review the governed layers and declared gaps, then run the assessment.
+6. Watch persistent P1–P10 progress and reopen completed work from the recent-runs list.
+7. Inspect four map views:
+   - **All zoning classes** shows the complete zoning grid and color key.
+   - **All opportunities** dims the base grid and highlights every candidate polygon.
+   - **Resort candidates** zooms to coastal and inland screening locations.
+   - **Restoration candidates** zooms to restoration and planting/reconnection locations.
+8. Click a short candidate ID such as `C1`, `R1`, or `P1` for its area and status, or download the
+   result JSON.
+
+A tab changes both the explanation and the map. Matching polygons receive bright category colors,
+non-selected cells dim, and the map zooms to the matching locations. A view with no candidates
+says so explicitly instead of showing an unchanged map.
+
+### How it works
+
+```mermaid
+sequenceDiagram
+    participant Person as Signed-in person
+    participant Browser
+    participant API
+    participant MCP as SERVIR/SIG MCP
+    participant Store as Immutable storage
+    participant Worker
+    participant DB as PostgreSQL
+
+    Person->>Browser: Draw AOI and check coverage
+    Browser->>API: POST /api/v1/coastal-zoning/coverage
+    API->>API: Validate topology, area, extent and tile estimate
+    API->>MCP: assemble_pack with delegated in-memory token
+    MCP-->>API: Governed layers, grids, pack ID and declared gaps
+    API->>Store: Save checksum-pinned coverage record
+    Note over API,Worker: The MCP token is never persisted or sent to the worker
+    Browser->>API: POST /api/v1/coastal-zoning/runs with coverage_id
+    API->>DB: Queue run and ten checkpoints
+    Worker->>DB: Claim run using a lease
+    Worker->>Store: Read and verify immutable evidence
+    Worker->>Worker: Decode, align and apply pinned deterministic rules
+    Worker->>DB: Save checkpoints and unranked candidate geometry
+    Worker->>Store: Save result JSON
+    Browser->>API: Poll run and read authorized result
+```
+
+The API performs only bounded coordination and validation. GIS calculations stay in
+`worker/`. `core/coastal_zoning/pipeline.py` has no MCP client and receives no user credential.
+Coverage records are bound to the signed-in user, Hub, AOI hash, profile, and expiry. Unknown,
+cross-Hub, incomplete, expired, or altered inputs fail closed.
+
+The current profiles require all of these governed inputs:
+
+- **Lamu:** 1996/2020 mangroves, Copernicus DEM, wetlands, WorldCover and WorldPop.
+- **South Sumatra:** 2017/2024 mangroves, landforms, DEM, WorldPop, flood and fire layers.
+
+Missing evidence remains unknown; it is never converted to zero or low risk. The deterministic
+rules are pinned to source SHA-256
+`a3ec7fbc65190a9b76e4ef1c8a6231f4a9de26108603d6e7ffbdaf770059700d` and checked against the
+approved local South Sumatra and Lamu goldens when those restricted fixtures are available.
+
+### Trust labels and current limits
+
+This branch produces a **map-grid estimate**, not a permit, legal determination, engineering
+survey, financial estimate, or carbon-credit estimate. A candidate is a place to investigate, not
+a place the user may build. Zone-level `publish_answer` receipts are not minted yet, so candidates
+remain unranked and P7–P9 are visibly skipped. Full-resolution raster processing and the five
+shapefile/ZIP packages remain follow-up work. Do not remove these labels merely to make a demo
+look complete.
+
+The supplied starter-kit fixture bytes and DEM remain uncommitted until their licence and vintage
+are approved. The deployed Mangrove 360 brand assets are committed and pinned to their supplied
+manifest hashes; decorative illustrations are labelled as non-geographic evidence.
+
+### Important implementation files
+
+```text
+api/coastal_zoning.py                 Protected coverage, run, result, review and retire routes
+core/coastal_zoning/aoi.py            GeoJSON topology, area, extent, scale and tile validation
+core/coastal_zoning/jobs.py           P1-P10 state machine, claims, retries and cancellation
+core/coastal_zoning/pipeline.py       Credential-free deterministic worker execution
+core/coastal_zoning/rules.py          Pinned Mangrove 360 zoning rules
+core/coastal_zoning/models.py         Runs, steps, zones, artifacts and review logs
+worker/main.py                         Coastal run claim loop
+web/coastal-zoning.*                  Map drawing, progress and four-view report UX
+migrations/versions/20261023_0029_*   PostgreSQL schema
+```
+
+Architecture rationale and the implementation plan are in
+[`ADR-0070`](docs/adr/0070-coastal-zoning-is-a-checkpointed-worker-pipeline.md) and
+[`docs/adhoc/grp-coastal-zoning-implementation-plan-2026-10-23.md`](docs/adhoc/grp-coastal-zoning-implementation-plan-2026-10-23.md).
+
+### Run focused checks
+
+```powershell
+python -m pytest `
+  tests/fast/test_coastal_zoning_aoi.py `
+  tests/fast/test_coastal_zoning_api.py `
+  tests/fast/test_coastal_zoning_jobs.py `
+  tests/fast/test_coastal_zoning_mcp.py `
+  tests/fast/test_coastal_zoning_pipeline.py `
+  tests/fast/test_coastal_zoning_rules.py `
+  tests/contract/test_coastal_zoning_sig_contract.py `
+  tests/golden/test_coastal_zoning_rules.py
+python -m ruff check api/coastal_zoning.py core/coastal_zoning worker/main.py
+node --check web/coastal-zoning.js
+```
+
+The golden tests skip when the restricted local fixture paths are unavailable. Run the complete
+offline suite with `python -m pytest -q` before merging.
+
+### Let a remote colleague test temporarily
+
+Use a temporary HTTPS tunnel, not a raw public database/API port. SERVIR OAuth requires the exact
+public callback URL, so a random tunnel address needs a separately registered public PKCE client
+and temporary `GRP_PUBLIC_BASE_URL`, `SERVIR_AUTH_CLIENT_ID`, and
+`SERVIR_AUTH_REDIRECT_URI` values. For example, the origin can remain local HTTP:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:8000 --no-autoupdate
+python -m grpcli.oauth register-client `
+  --redirect-uri https://YOUR-TUNNEL.trycloudflare.com/api/v1/auth/callback `
+  --client-name "ADPC GRP temporary coastal test" `
+  --output-file .local/tunnel/servir_client_id
+```
+
+Do not commit the generated client file, tunnel override, cookies, tokens, or `.env`. The tester
+still needs an approved SERVIR identity and active GRP Hub membership. Stop the tunnel after the
+agreed window and restore the normal localhost OAuth settings. A quick tunnel has no uptime
+commitment and is for short testing only.
+
 ### Test the shelter upload and district workflow
 
 In the local development build, a Platform Admin can open **Data library**, upload one ZIP with
