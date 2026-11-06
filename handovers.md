@@ -1,6 +1,17 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 9 October 2026.
+- **Local Langfuse MCP connector helper:** `web/langfuse-mcp-connector.html` now generates and
+  copies the Basic Authorization value for the GRP Evaluation Langfuse MCP endpoint without
+  displaying, transmitting or storing either project key. The controls start disabled and are
+  enabled only on localhost, loopback or a local file; a page CSP denies network connections.
+  Successful generation clears both fields. The page then explicitly tells the user to choose
+  **No sign-in**, add an `Authorization` request header, paste the generated `Basic …` value, save,
+  and overwrite the clipboard. The local procedure and Claude connector settings are in
+  `docs/guides/generate-langfuse-mcp-connector-locally.md`. Browser acceptance used fake keys,
+  confirmed clipboard success and cleared fields; focused tests, Ruff, JavaScript syntax and
+  whitespace checks pass. Do not enter real keys on a deployed host or commit/share generated
+  headers.
 - **Foundation/contribution kit extended through 10:** owner clarified that numbered folders are
   first for a developer's isolated Global Risk foundation and should remain reusable for a later
   governed `contribute_submit`. The local ignored kit now uses `07_evacuation_centres`,

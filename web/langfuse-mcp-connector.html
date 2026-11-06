@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="theme-color" content="#0d2534" />
+    <title>Langfuse MCP connector helper | GRP</title>
+    <link rel="stylesheet" href="styles.css?v=20261009a" />
+    <link rel="stylesheet" href="langfuse-mcp-connector.css?v=20261009a" />
+    <script src="langfuse-mcp-connector.js?v=20261009a" defer></script>
+  </head>
+  <body class="connector-page">
+    <a class="skip-link" href="#main-content">Skip to connector form</a>
+    <main class="connector-shell" id="main-content">
+      <header class="connector-header">
+        <img
+          class="connector-logo"
+          src="assets/servir-global-collaborative.png"
+          alt="SERVIR Global Collaborative"
+        />
+        <p class="connector-product">Global Risk Platform</p>
+        <p class="eyebrow">Local administrator utility</p>
+        <h1>Prepare a Langfuse MCP connector</h1>
+        <p>
+          Generate the Basic Authorization value required by Claude without sending or storing the
+          Langfuse project keys.
+        </p>
+      </header>
+
+      <section class="connector-card" aria-labelledby="connection-title">
+        <div class="connector-local-state" data-local-state role="status">
+          Checking that this utility is running locally…
+        </div>
+
+        <h2 id="connection-title">Connection details</h2>
+        <dl class="connector-details">
+          <div>
+            <dt>Connector name</dt>
+            <dd><code>grp-langfuse</code></dd>
+          </div>
+          <div>
+            <dt>MCP URL</dt>
+            <dd>
+              <code data-mcp-url>https://langfuse-risk-servir.adpc.net/api/public/mcp</code>
+              <button class="text-button" type="button" data-copy-url disabled>Copy URL</button>
+            </dd>
+          </div>
+          <div>
+            <dt>Authentication</dt>
+            <dd><strong>No sign-in</strong>, with an <code>Authorization</code> request header</dd>
+          </div>
+        </dl>
+
+        <form class="connector-form" data-connector-form autocomplete="off" novalidate>
+          <div class="field-group">
+            <label for="langfuse-public-key">Evaluation public key</label>
+            <input
+              id="langfuse-public-key"
+              name="public-key"
+              type="text"
+              inputmode="text"
+              placeholder="pk-lf-…"
+              aria-describedby="key-help"
+              autocapitalize="none"
+              autocomplete="off"
+              spellcheck="false"
+              disabled
+              required
+            />
+          </div>
+
+          <div class="field-group">
+            <label for="langfuse-secret-key">Evaluation secret key</label>
+            <input
+              id="langfuse-secret-key"
+              name="secret-key"
+              type="password"
+              placeholder="sk-lf-…"
+              aria-describedby="key-help"
+              autocapitalize="none"
+              autocomplete="new-password"
+              spellcheck="false"
+              disabled
+              required
+            />
+          </div>
+
+          <p class="field-help" id="key-help">
+            Use keys from the same GRP Evaluation project. They remain only in this page's memory
+            and are cleared immediately after copying.
+          </p>
+
+          <div class="connector-actions">
+            <button class="button button--primary" type="submit" data-generate disabled>
+              Generate and copy Authorization value
+            </button>
+            <button class="button button--secondary" type="reset" data-clear disabled>Clear</button>
+          </div>
+        </form>
+
+        <div class="connector-status" data-status role="status" aria-live="polite"></div>
+
+        <section class="connector-next-steps" aria-labelledby="claude-setup-title">
+          <h2 id="claude-setup-title">Add the copied value to Claude</h2>
+          <ol>
+            <li>Open Claude's custom connector settings and select <strong>No sign-in</strong>.</li>
+            <li>Under <strong>Request headers</strong>, select <strong>Add header</strong>.</li>
+            <li>
+              Set the header name to <code>Authorization</code> and paste the generated clipboard
+              value into the header-value field.
+            </li>
+            <li>Leave transport set to automatic, save the connector, then overwrite the clipboard.</li>
+          </ol>
+          <p class="connector-header-example">
+            Header name: <code>Authorization</code><br />
+            Header value: <code>Basic &lt;generated value&gt;</code>
+          </p>
+        </section>
+
+        <aside class="connector-warning" aria-labelledby="security-title">
+          <h2 id="security-title">Treat the copied value as a secret</h2>
+          <ul>
+            <li>Paste it only into Claude's <code>Authorization</code> request-header field.</li>
+            <li>Do not paste it into chat, email, screenshots, documents, logs, or Git.</li>
+            <li>Overwrite the clipboard after saving the connector.</li>
+            <li>Revoke the project key immediately if either key or the generated value is exposed.</li>
+          </ul>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
