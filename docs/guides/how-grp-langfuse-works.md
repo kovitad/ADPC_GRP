@@ -54,7 +54,8 @@ GRP never exports:
 
 - names or email addresses;
 - passwords, API keys, cookies or the real GRP login-session identifier;
-- raw MCP arguments or results; or
+- unredacted MCP arguments or results;
+- authorization, token, secret, cookie, contact or session fields inside debug summaries; or
 - raw assessment source records.
 
 ## Tokens and cost

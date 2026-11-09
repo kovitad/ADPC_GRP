@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from api.errors import GrpError
-from api.langfuse import AiCallRecord, current_question_trace
+from api.langfuse import AiCallRecord, current_question_trace, http_error_type
 from api.settings import Settings
 from core.ai_allowance import AiBlocked, next_reset, reserve, settle
 from core.db import read_secret
@@ -93,9 +93,13 @@ async def call_openai(
         raise ProviderError()
     owns_client = client is None
     http_client = client or httpx.AsyncClient(timeout=settings.ai_timeout_seconds)
+    url = settings.ai_base_url or "https://api.openai.com/v1/responses"
+    started_at = datetime.now(UTC)
+    question = current_question_trace()
+    http_recorded = False
     try:
         response = await http_client.post(
-            settings.ai_base_url or "https://api.openai.com/v1/responses",
+            url,
             headers={"Authorization": f"Bearer {_provider_key(settings, hub_code)}"},
             json={
                 "model": model,
@@ -105,6 +109,21 @@ async def call_openai(
                 "store": False,
             },
         )
+        if question is not None:
+            failed = response.status_code >= 400
+            question.add_http(
+                service="ai-provider",
+                operation="responses",
+                method="POST",
+                url=url,
+                started_at=started_at,
+                ended_at=datetime.now(UTC),
+                outcome="failed" if failed else "completed",
+                status_code=response.status_code,
+                error_type=str(response.status_code) if failed else None,
+                response_bytes=len(response.content),
+            )
+            http_recorded = True
         document = response.json() if response.content else {}
         usage = document.get("usage", {}) if isinstance(document, dict) else {}
         input_tokens = int(usage.get("input_tokens", 0) or 0)
@@ -116,6 +135,21 @@ async def call_openai(
             raise ProviderError(input_tokens, output_tokens)
         return text, str(document.get("model", model)), input_tokens, output_tokens
     except (httpx.HTTPError, ValueError, TypeError, OSError, RuntimeError) as error:
+        if question is not None and isinstance(error, httpx.HTTPError) and not http_recorded:
+            status_code = (
+                error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+            )
+            question.add_http(
+                service="ai-provider",
+                operation="responses",
+                method="POST",
+                url=url,
+                started_at=started_at,
+                ended_at=datetime.now(UTC),
+                outcome="failed",
+                status_code=status_code,
+                error_type=http_error_type(error),
+            )
         if isinstance(error, ProviderError):
             raise
         raise ProviderError() from error

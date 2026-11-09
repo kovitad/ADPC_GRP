@@ -1,15 +1,20 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 9 November 2026.
-- **OpenTelemetry debug tracing plan:** `docs/proposals/langfuse-opentelemetry-debug-tracing-plan.md`
-  reviews the official Langfuse OTLP, OpenTelemetry HTTP/error/context, HTTPX and FastAPI guidance
-  and maps it to GRP. The proposed staged design gives each approved development question one root
-  trace with live AI, MCP and sanitized HTTP children; classifies retries and timeout phases; and
-  supports W3C context only across GRP-owned boundaries. Full question/answer capture remains
-  fail-closed behind non-production mode, an explicit switch and an account allow-list. Secrets,
-  auth/cookie/MCP-session headers, raw uploads and unrestricted upstream bodies remain prohibited.
-  Implementation decisions still needed are listed at the end of the plan; no capture setting or
-  runtime behavior changed in this documentation slice.
+- **Development OpenTelemetry debug tracing implemented:** `main` now groups each Planning
+  question into one `grp-planning-question` trace with hashed user/session references, generation,
+  MCP tool and sanitized AI/MCP HTTP observations. The allow-listed local tester receives bounded
+  question, answer, instruction, prompt and recursively redacted tool summaries; every other user
+  remains metadata-only and production fails closed. HTTP observations retain host/path without
+  query values, status/size/duration and connect/read/write/pool timeout classes; headers, cookies,
+  tokens, MCP session IDs, binary values and raw uploads are never exported. Context continuity is
+  tested across async tasks and threads. FastAPI-wide tracing and W3C worker/service propagation
+  remain deliberately deferred because no current AI request crosses those boundaries. The rebuilt
+  `grp-main` stack has content capture on for one local allow-listed account. A synthetic
+  four-observation trace was read back from GRP Evaluation in `development`; a secret canary was absent. Validation:
+  1,279 tests pass with 2 PostgreSQL-only skips; tracked Ruff and whitespace checks are clean. See
+  `docs/proposals/langfuse-opentelemetry-debug-tracing-plan.md` and the 9 November amendment to
+  ADR-0035.
 - **Main Langfuse v4 repair:** active work is now on `main`. Commit `862adca` ports the
   reviewed OTel exporter from `4d80a5a`, replacing the legacy `/api/public/ingestion` events that
   Langfuse 4.59 rejected in `events_only` mode. The Docker Desktop `grp-main` stack was rebuilt

@@ -4,11 +4,12 @@ import asyncio
 import json
 from datetime import UTC, date, datetime, timedelta
 
+import httpx
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from api.ai_gateway import ProviderError, run_ai_call
+from api.ai_gateway import ProviderError, call_openai, run_ai_call
 from api.errors import GrpError
 from api.langfuse import (
     AiCallRecord,
@@ -17,11 +18,11 @@ from api.langfuse import (
     build_observation,
     build_question_trace,
     collect_question_trace,
+    current_question_trace,
     langfuse_content_enabled,
     person_reference,
     send_ai_call,
     send_question_trace,
-    session_reference,
 )
 from api.settings import Settings
 from core.access_models import AppUser, AuditEvent, Base
@@ -410,7 +411,7 @@ def test_langfuse_content_requires_nonproduction_switch_and_allowlisted_account(
     )
 
 
-def test_allowlisted_question_trace_exports_ai_content_but_not_tool_payloads() -> None:
+def test_allowlisted_question_trace_exports_redacted_bounded_debug_content() -> None:
     now = datetime.now(UTC)
     trace = QuestionTrace(
         user_id="real-user-id",
@@ -418,7 +419,10 @@ def test_allowlisted_question_trace_exports_ai_content_but_not_tool_payloads() -
         hub_code="adpc",
         capture_content=True,
         input="What should the district prepare?",
-        output={"answer": "Prepare evacuation centres first."},
+        output={
+            "answer": "Prepare evacuation centres first.",
+            "publish_token": "must-not-leave-grp",
+        },
     )
     record = AiCallRecord(
         "req-1", "real-user-id", "adpc", "web", "test-model", "planning-draft-v1",
@@ -436,19 +440,116 @@ def test_allowlisted_question_trace_exports_ai_content_but_not_tool_payloads() -
         ended_at=now,
         outcome="completed",
         identifiers={"pack_id": "pack-1"},
+        arguments={"place": "Dusit", "authorization": "Bearer secret"},
+        result={"pack_id": "pack-1", "contact_email": "person@example.test"},
     )
     trace.finish("completed")
 
     document = build_question_trace(trace)
     assert document["root"]["input"] == "What should the district prepare?"
-    assert document["root"]["output"] == {"answer": "Prepare evacuation centres first."}
+    assert document["root"]["output"] == {
+        "answer": "Prepare evacuation centres first.",
+        "publish_token": "[REDACTED]",
+    }
     generation, tool = document["observations"]
     assert generation["input"] == {
         "instructions": "Use only cited evidence.",
         "prompt": "Summarize the district evidence.",
     }
     assert generation["output"] == "Prepare evacuation centres first."
-    assert "input" not in tool and "output" not in tool
+    assert tool["input"] == {"place": "Dusit", "authorization": "[REDACTED]"}
+    assert tool["output"] == {"pack_id": "pack-1", "contact_email": "[REDACTED]"}
+
+
+def test_ai_provider_http_span_records_status_without_secret_headers(tmp_path) -> None:
+    key = tmp_path / "ai-key"
+    key.write_text("secret-provider-key", encoding="utf-8")
+    settings = Settings(
+        _env_file=None,
+        AI_MODEL="test-model",
+        AI_KEY_FILE_ADPC=key,
+        AI_BASE_URL="https://provider.example/v1/responses?token=secret",
+    )
+    trace = QuestionTrace(user_id="user", login_session_id="session", hub_code="adpc")
+
+    def respond(request):
+        assert request.headers["authorization"] == "Bearer secret-provider-key"
+        return httpx.Response(
+            200,
+            json={
+                "model": "test-model-1",
+                "usage": {"input_tokens": 2, "output_tokens": 1},
+                "output": [
+                    {"type": "message", "content": [{"type": "output_text", "text": "ok"}]}
+                ],
+            },
+        )
+
+    async def exercise():
+        with collect_question_trace(trace):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+                return await call_openai(
+                    settings,
+                    instructions="test",
+                    prompt="question",
+                    hub_code="adpc",
+                    client=client,
+                )
+
+    assert asyncio.run(exercise())[0] == "ok"
+    observation = trace.observations[0]
+    assert observation.name == "http.ai-provider.responses"
+    assert observation.metadata["http.response.status_code"] == 200
+    assert observation.metadata["url.full"] == "https://provider.example/v1/responses"
+    assert "secret-provider-key" not in json.dumps(observation.metadata)
+
+
+def test_ai_provider_http_span_classifies_read_timeout(tmp_path) -> None:
+    key = tmp_path / "ai-key"
+    key.write_text("secret-provider-key", encoding="utf-8")
+    settings = Settings(
+        _env_file=None,
+        AI_MODEL="test-model",
+        AI_KEY_FILE_ADPC=key,
+        AI_BASE_URL="https://provider.example/v1/responses",
+    )
+    trace = QuestionTrace(user_id="user", login_session_id="session", hub_code="adpc")
+
+    def respond(request):
+        raise httpx.ReadTimeout("upstream stalled", request=request)
+
+    async def exercise():
+        with collect_question_trace(trace):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+                await call_openai(
+                    settings,
+                    instructions="test",
+                    prompt="question",
+                    hub_code="adpc",
+                    client=client,
+                )
+
+    with pytest.raises(ProviderError):
+        asyncio.run(exercise())
+    observation = trace.observations[0]
+    assert observation.outcome == "failed"
+    assert observation.metadata["error.type"] == "timeout.read"
+    assert observation.metadata["timeout_phase"] == "read"
+
+
+def test_question_trace_context_crosses_task_and_thread_boundaries() -> None:
+    trace = QuestionTrace(user_id="user", login_session_id="session", hub_code="adpc")
+
+    async def exercise():
+        with collect_question_trace(trace):
+            task_value = await asyncio.create_task(asyncio.sleep(0, current_question_trace()))
+            thread_value = await asyncio.to_thread(current_question_trace)
+            return task_value, thread_value
+
+    task_value, thread_value = asyncio.run(exercise())
+    assert task_value is trace
+    assert thread_value is trace
+    assert current_question_trace() is None
 
 
 def test_question_trace_groups_metadata_only_ai_and_tool_children(tmp_path) -> None:

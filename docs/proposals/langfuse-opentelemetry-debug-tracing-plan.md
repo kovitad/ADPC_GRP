@@ -1,8 +1,33 @@
 # Langfuse OpenTelemetry debug tracing plan
 
-**Status:** Proposed  
-**Date:** 9 November 2026  
+**Status:** Core development tracing implemented
+
+**Date:** 9 November 2026
+
 **Scope:** Local development and explicitly approved evaluation deployments only
+
+## Implementation status
+
+Implemented on `main`:
+
+- one `grp-planning-question` trace with hashed user and login-session references;
+- allow-listed, non-production question, answer and generation input/output capture;
+- recursive sensitive-key redaction, binary refusal, depth/item/document limits;
+- MCP tool timing, outcomes, safe IDs and bounded/redacted debug summaries;
+- sanitized AI-provider and MCP HTTP attempt observations with method, host/path, status, response
+  size and connect/read/write/pool timeout classification;
+- context continuity across awaited calls, detached asyncio tasks and `asyncio.to_thread()`;
+- metadata-only behavior for users outside the allow-list and production fail-closed behavior.
+
+Deferred because no current AI request crosses these boundaries:
+
+- FastAPI-wide auto-instrumentation (it would add noisy/billable health and unrelated spans);
+- W3C propagation to a GRP-owned downstream HTTP service;
+- database queue propagation to GIS workers;
+- automatic retries and per-resend spans, because current AI/MCP clients do not retry.
+
+These deferred items require a concrete GRP-owned service or worker debugging case and should not be
+implemented speculatively.
 
 ## Purpose
 

@@ -355,9 +355,17 @@ def test_sig_mcp_client_initializes_then_calls_tool() -> None:
 
     assert asyncio.run(exercise()).structured_content["pack_id"] == "pack-1"
     assert methods == ["initialize", "notifications/initialized", "tools/call"]
-    assert len(trace.observations) == 1
-    assert trace.observations[0].name == "mcp.assemble_pack"
-    assert trace.observations[0].metadata == {"tool": "assemble_pack", "pack_id": "pack-1"}
+    assert [item.name for item in trace.observations] == [
+        "http.sig-mcp.initialize",
+        "http.sig-mcp.notifications.initialized",
+        "http.sig-mcp.tools.call",
+        "mcp.assemble_pack",
+    ]
+    http_call = trace.observations[2]
+    assert http_call.metadata["http.response.status_code"] == 200
+    assert http_call.metadata["url.full"] == "https://sig.example/mcp"
+    tool = trace.observations[3]
+    assert tool.metadata == {"tool": "assemble_pack", "pack_id": "pack-1"}
 
 
 def test_sig_mcp_client_records_timeout_without_arguments_or_token() -> None:
@@ -390,11 +398,20 @@ def test_sig_mcp_client_records_timeout_without_arguments_or_token() -> None:
 
     with pytest.raises(SigMcpError, match="SIG MCP is unavailable"):
         asyncio.run(exercise())
-    assert len(trace.observations) == 1
-    observation = trace.observations[0]
-    assert observation.outcome == "failed"
-    assert observation.metadata == {"tool": "assemble_pack", "error_category": "timeout"}
-    serialized = json.dumps(observation.metadata)
+    assert [item.name for item in trace.observations] == [
+        "http.sig-mcp.initialize",
+        "http.sig-mcp.notifications.initialized",
+        "http.sig-mcp.tools.call",
+        "mcp.assemble_pack",
+    ]
+    http_call = trace.observations[2]
+    assert http_call.outcome == "failed"
+    assert http_call.metadata["error.type"] == "timeout.read"
+    assert http_call.metadata["timeout_phase"] == "read"
+    tool = trace.observations[3]
+    assert tool.outcome == "failed"
+    assert tool.metadata == {"tool": "assemble_pack", "error_category": "timeout"}
+    serialized = json.dumps([item.metadata for item in trace.observations])
     assert "private" not in serialized and "secret-token" not in serialized
 
 

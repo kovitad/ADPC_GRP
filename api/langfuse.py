@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,6 +17,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from langfuse import Langfuse, propagate_attributes
@@ -24,6 +26,26 @@ from api.settings import Settings
 from core.db import read_secret
 
 logger = logging.getLogger("grp.langfuse")
+
+_REDACTED = "[REDACTED]"
+_SENSITIVE_PARTS = (
+    "authorization",
+    "token",
+    "secret",
+    "password",
+    "cookie",
+    "api_key",
+    "apikey",
+    "email",
+    "tel",
+    "fax",
+    "address",
+    "session_id",
+)
+_MAX_DEBUG_TEXT = 2_000
+_MAX_DEBUG_DOCUMENT = 16_000
+_MAX_DEBUG_ITEMS = 20
+_MAX_DEBUG_DEPTH = 5
 
 
 @dataclass(frozen=True)
@@ -39,6 +61,7 @@ class AiCallRecord:
     outcome: str
     started_at: datetime
     ended_at: datetime
+    login_session_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -87,7 +110,9 @@ class QuestionTrace:
     ) -> None:
         generation_input = None
         if self.capture_content:
-            generation_input = {"instructions": instructions, "prompt": prompt}
+            generation_input = safe_debug_value(
+                {"instructions": instructions, "prompt": prompt}
+            )
         self.observations.append(
             TraceObservation(
                 name=record.prompt_version,
@@ -103,7 +128,7 @@ class QuestionTrace:
                 },
                 metadata={"prompt_version": record.prompt_version},
                 input=generation_input,
-                output=answer if self.capture_content else None,
+                output=safe_debug_value(answer) if self.capture_content else None,
             )
         )
 
@@ -116,6 +141,8 @@ class QuestionTrace:
         outcome: str,
         error_category: str | None = None,
         identifiers: dict[str, str] | None = None,
+        arguments: Any | None = None,
+        result: Any | None = None,
     ) -> None:
         metadata: dict[str, Any] = {"tool": name}
         if error_category:
@@ -130,6 +157,53 @@ class QuestionTrace:
                 ended_at=ended_at,
                 outcome=outcome,
                 metadata=metadata,
+                input=safe_debug_value(arguments) if self.capture_content else None,
+                output=safe_debug_value(result) if self.capture_content else None,
+            )
+        )
+
+    def add_http(
+        self,
+        *,
+        service: str,
+        operation: str,
+        method: str,
+        url: str,
+        started_at: datetime,
+        ended_at: datetime,
+        outcome: str,
+        status_code: int | None = None,
+        error_type: str | None = None,
+        resend_count: int = 0,
+        response_bytes: int | None = None,
+    ) -> None:
+        parts = urlsplit(url)
+        metadata: dict[str, Any] = {
+            "service": service,
+            "operation": operation,
+            "http.request.method": method.upper(),
+            "server.address": parts.hostname or "unknown",
+            "url.full": sanitized_url(url),
+            "http.request.resend_count": resend_count,
+        }
+        if parts.port is not None:
+            metadata["server.port"] = parts.port
+        if status_code is not None:
+            metadata["http.response.status_code"] = status_code
+        if error_type:
+            metadata["error.type"] = error_type
+            if error_type.startswith("timeout."):
+                metadata["timeout_phase"] = error_type.removeprefix("timeout.")
+        if response_bytes is not None:
+            metadata["response_bytes"] = response_bytes
+        self.observations.append(
+            TraceObservation(
+                name=f"http.{service}.{operation}",
+                as_type="span",
+                started_at=started_at,
+                ended_at=ended_at,
+                outcome=outcome,
+                metadata=metadata,
             )
         )
 
@@ -140,6 +214,82 @@ class QuestionTrace:
         self.outcome = outcome
         self.error_code = error_code
         self.ended_at = datetime.now(UTC)
+
+
+def _sensitive_key(key: object) -> bool:
+    normalized = str(key).lower().replace("-", "_")
+    return any(part in normalized for part in _SENSITIVE_PARTS)
+
+
+def safe_debug_value(value: Any, *, _depth: int = 0) -> Any:
+    """Bound and recursively redact optional non-production trace content."""
+
+    if _depth >= _MAX_DEBUG_DEPTH:
+        return "[TRUNCATED_DEPTH]"
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= _MAX_DEBUG_ITEMS:
+                result["_truncated_items"] = len(value) - _MAX_DEBUG_ITEMS
+                break
+            result[str(key)] = (
+                _REDACTED
+                if _sensitive_key(key)
+                else safe_debug_value(item, _depth=_depth + 1)
+            )
+        document = json.dumps(result, ensure_ascii=False, default=str)
+        if len(document) > _MAX_DEBUG_DOCUMENT:
+            return {"_truncated": True, "preview": document[:_MAX_DEBUG_DOCUMENT]}
+        return result
+    if isinstance(value, (list, tuple)):
+        result = [
+            safe_debug_value(item, _depth=_depth + 1)
+            for item in value[:_MAX_DEBUG_ITEMS]
+        ]
+        if len(value) > _MAX_DEBUG_ITEMS:
+            result.append(f"[TRUNCATED_{len(value) - _MAX_DEBUG_ITEMS}_ITEMS]")
+        return result
+    if isinstance(value, bytes):
+        return f"[BINARY_{len(value)}_BYTES]"
+    if isinstance(value, str):
+        return value if len(value) <= _MAX_DEBUG_TEXT else value[:_MAX_DEBUG_TEXT] + "[TRUNCATED]"
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:_MAX_DEBUG_TEXT]
+
+
+def sanitized_url(url: str) -> str:
+    """Retain only scheme, host, optional port and path; never credentials/query/fragment."""
+
+    parts = urlsplit(url)
+    hostname = parts.hostname or "unknown"
+    port = f":{parts.port}" if parts.port is not None else ""
+    return f"{parts.scheme}://{hostname}{port}{parts.path or '/'}"
+
+
+def http_error_type(error: BaseException) -> str:
+    """Return a stable, low-cardinality HTTP error category through wrapped causes."""
+
+    import httpx
+
+    current: BaseException | None = error
+    while current is not None:
+        if isinstance(current, httpx.ConnectTimeout):
+            return "timeout.connect"
+        if isinstance(current, httpx.ReadTimeout):
+            return "timeout.read"
+        if isinstance(current, httpx.WriteTimeout):
+            return "timeout.write"
+        if isinstance(current, httpx.PoolTimeout):
+            return "timeout.pool"
+        if isinstance(current, httpx.HTTPStatusError):
+            return str(current.response.status_code)
+        if isinstance(current, httpx.ConnectError):
+            return "network.connect"
+        if isinstance(current, httpx.RequestError):
+            return "network.request"
+        current = current.__cause__
+    return "upstream.error"
 
 
 _question_trace: ContextVar[QuestionTrace | None] = ContextVar("grp_question_trace", default=None)
@@ -186,6 +336,13 @@ def person_reference(user_id: str) -> str:
     return "grp-" + hashlib.sha256(f"grp-langfuse-v1:{user_id}".encode()).hexdigest()[:24]
 
 
+def session_reference(login_session_id: str) -> str:
+    """Group calls from one login without exporting the real GRP session identifier."""
+
+    digest = hashlib.sha256(f"grp-langfuse-session-v1:{login_session_id}".encode()).hexdigest()
+    return "grp-session-" + digest[:24]
+
+
 def build_observation(record: AiCallRecord) -> dict[str, Any]:
     """Build the metadata-only Langfuse v4 observation without prompts or answers."""
 
@@ -207,6 +364,9 @@ def build_observation(record: AiCallRecord) -> dict[str, Any]:
     return {
         "trace_name": "grp-ai-call",
         "user_id": person_reference(record.user_id),
+        "session_id": (
+            session_reference(record.login_session_id) if record.login_session_id else None
+        ),
         "metadata": metadata,
         "observation": {
             "name": record.prompt_version,
@@ -276,8 +436,8 @@ def build_question_trace(trace: QuestionTrace) -> dict[str, Any]:
             "level": "DEFAULT" if trace.outcome == "completed" else "ERROR",
             "status_message": None if trace.outcome == "completed" else trace.error_code,
             "metadata": metadata,
-            **({"input": trace.input} if trace.input is not None else {}),
-            **({"output": trace.output} if trace.output is not None else {}),
+            **({"input": safe_debug_value(trace.input)} if trace.input is not None else {}),
+            **({"output": safe_debug_value(trace.output)} if trace.output is not None else {}),
         },
         "observations": observations,
     }

@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from api.langfuse import current_question_trace
+from api.langfuse import current_question_trace, http_error_type
 
 MCP_PROTOCOL_VERSION = "2025-06-18"
 
@@ -92,6 +92,8 @@ class SigMcpClient:
     async def _request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         request_id = self._next_id
         self._next_id += 1
+        started_at = datetime.now(UTC)
+        question = current_question_trace()
         try:
             response = await self.client.post(
                 self.base_url,
@@ -100,11 +102,47 @@ class SigMcpClient:
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as error:
+            if question is not None:
+                question.add_http(
+                    service="sig-mcp",
+                    operation=method.replace("/", "."),
+                    method="POST",
+                    url=self.base_url,
+                    started_at=started_at,
+                    ended_at=datetime.now(UTC),
+                    outcome="failed",
+                    status_code=error.response.status_code,
+                    error_type=http_error_type(error),
+                    response_bytes=len(error.response.content),
+                )
             if error.response.status_code in {401, 403}:
                 raise SigMcpError("SERVIR sign-in must be renewed") from error
             raise SigMcpError("SIG MCP is unavailable") from error
         except httpx.HTTPError as error:
+            if question is not None:
+                question.add_http(
+                    service="sig-mcp",
+                    operation=method.replace("/", "."),
+                    method="POST",
+                    url=self.base_url,
+                    started_at=started_at,
+                    ended_at=datetime.now(UTC),
+                    outcome="failed",
+                    error_type=http_error_type(error),
+                )
             raise SigMcpError("SIG MCP is unavailable") from error
+        if question is not None:
+            question.add_http(
+                service="sig-mcp",
+                operation=method.replace("/", "."),
+                method="POST",
+                url=self.base_url,
+                started_at=started_at,
+                ended_at=datetime.now(UTC),
+                outcome="completed",
+                status_code=response.status_code,
+                response_bytes=len(response.content),
+            )
         self.session_id = response.headers.get("mcp-session-id") or self.session_id
         payload = _decode_response(response)
         if payload.get("id") not in {request_id, str(request_id)}:
@@ -123,6 +161,8 @@ class SigMcpClient:
                 "clientInfo": {"name": "adpc-grp", "version": "0.1.0"},
             },
         )
+        started_at = datetime.now(UTC)
+        question = current_question_trace()
         try:
             response = await self.client.post(
                 self.base_url,
@@ -131,7 +171,36 @@ class SigMcpClient:
             )
             response.raise_for_status()
         except httpx.HTTPError as error:
+            if question is not None:
+                status_code = (
+                    error.response.status_code
+                    if isinstance(error, httpx.HTTPStatusError)
+                    else None
+                )
+                question.add_http(
+                    service="sig-mcp",
+                    operation="notifications.initialized",
+                    method="POST",
+                    url=self.base_url,
+                    started_at=started_at,
+                    ended_at=datetime.now(UTC),
+                    outcome="failed",
+                    status_code=status_code,
+                    error_type=http_error_type(error),
+                )
             raise SigMcpError("SIG MCP session could not be initialized") from error
+        if question is not None:
+            question.add_http(
+                service="sig-mcp",
+                operation="notifications.initialized",
+                method="POST",
+                url=self.base_url,
+                started_at=started_at,
+                ended_at=datetime.now(UTC),
+                outcome="completed",
+                status_code=response.status_code,
+                response_bytes=len(response.content),
+            )
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> McpToolResult:
         started_at = datetime.now(UTC)
@@ -155,6 +224,7 @@ class SigMcpClient:
                     ended_at=datetime.now(UTC),
                     outcome="failed",
                     error_category=_error_category(error),
+                    arguments=arguments,
                 )
             raise
         if question is not None:
@@ -170,6 +240,12 @@ class SigMcpClient:
                 outcome="failed" if tool_result.is_error else "completed",
                 error_category="tool_error" if tool_result.is_error else None,
                 identifiers=identifiers,
+                arguments=arguments,
+                result={
+                    "content": tool_result.content,
+                    "structuredContent": tool_result.structured_content,
+                    "isError": tool_result.is_error,
+                },
             )
         return tool_result
 

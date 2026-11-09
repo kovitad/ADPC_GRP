@@ -98,8 +98,24 @@ opening live OTel spans at operation start remains follow-up work for native Lan
 
 The Product Owner subsequently approved visible input/output for stakeholder demonstrations.
 Content capture is implemented as a two-lock, account-specific, non-production exception and stays
-false by default. It applies to Planning question roots and AI generation children only; MCP tools
-remain metadata-only. The wider usage-schema, evaluation dataset, dashboard/report and release
+false by default. It applies to Planning question roots and AI generation children only.
+
+## 9 November 2026 debug-tracing amendment
+
+The Product Owner approved detailed development debugging under the controls in
+[`docs/proposals/langfuse-opentelemetry-debug-tracing-plan.md`](../proposals/langfuse-opentelemetry-debug-tracing-plan.md).
+For an explicitly allow-listed non-production account, MCP tools may now include recursively
+redacted and size-bounded argument/result summaries. Authorization, token, secret, password,
+cookie, API-key, email, telephone, fax, address and session fields are replaced before export;
+binary values are never exported. Other users remain metadata-only and production still fails
+closed.
+
+AI-provider and MCP HTTP attempts may export sanitized OpenTelemetry semantic metadata: method,
+host/path without query values, status, response size, duration and stable timeout/error category.
+Headers and generic HTTP bodies remain prohibited. Context stays local across asyncio/thread
+boundaries; GRP does not send baggage or trace context to external providers. FastAPI-wide tracing,
+GRP-owned cross-service propagation and worker-queue context remain deferred until a concrete
+boundary requires them. The wider usage-schema, evaluation dataset, dashboard/report and release
 metadata work remains proposed.
 
 ## Consequences
