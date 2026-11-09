@@ -1,6 +1,17 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 9 October 2026.
+**Updated:** 9 November 2026.
+- **Main Langfuse v4 repair:** active work is now on `main`. Commit `862adca` ports the
+  reviewed OTel exporter from `4d80a5a`, replacing the legacy `/api/public/ingestion` events that
+  Langfuse 4.59 rejected in `events_only` mode. The Docker Desktop `grp-main` stack was rebuilt
+  against the project-bound GRP Evaluation credentials. A metadata-only
+  `grp-main-otel-proof` generation exported through the actual `api.langfuse.send_ai_call` path
+  and was read back from `/api/public/v2/observations` with environment `development` and a trace
+  ID. No model call or prompt/answer content was used. Validation: 1,271 tests pass with 2
+  PostgreSQL-only skips; tracked Python Ruff and whitespace checks are clean. The broad Ruff scan
+  sees pre-existing style errors only in the untracked supplied coastal starter kit. The app is at
+  `http://127.0.0.1:8000` on separate `grp-main` volumes because the preserved earlier Desktop
+  database is already at coastal migration `20261023_0029`.
 - **Local Langfuse MCP connector helper:** `web/langfuse-mcp-connector.html` now generates and
   copies the Basic Authorization value for the GRP Evaluation Langfuse MCP endpoint without
   displaying, transmitting or storing either project key. The controls start disabled and are
