@@ -1,6 +1,15 @@
 # GRP MVP 1 Project Handover
 
 **Updated:** 9 November 2026.
+- **OpenTelemetry debug tracing plan:** `docs/proposals/langfuse-opentelemetry-debug-tracing-plan.md`
+  reviews the official Langfuse OTLP, OpenTelemetry HTTP/error/context, HTTPX and FastAPI guidance
+  and maps it to GRP. The proposed staged design gives each approved development question one root
+  trace with live AI, MCP and sanitized HTTP children; classifies retries and timeout phases; and
+  supports W3C context only across GRP-owned boundaries. Full question/answer capture remains
+  fail-closed behind non-production mode, an explicit switch and an account allow-list. Secrets,
+  auth/cookie/MCP-session headers, raw uploads and unrestricted upstream bodies remain prohibited.
+  Implementation decisions still needed are listed at the end of the plan; no capture setting or
+  runtime behavior changed in this documentation slice.
 - **Main Langfuse v4 repair:** active work is now on `main`. Commit `862adca` ports the
   reviewed OTel exporter from `4d80a5a`, replacing the legacy `/api/public/ingestion` events that
   Langfuse 4.59 rejected in `events_only` mode. The Docker Desktop `grp-main` stack was rebuilt
