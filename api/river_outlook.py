@@ -83,7 +83,7 @@ def _png(pixels: np.ndarray) -> bytes:
 
 
 def chart(series: list[dict[str, Any]]) -> bytes | None:
-    """A small 7-day flow chart. The y axis starts at zero; the x axis is real time."""
+    """A small 72-hour flow chart. The y axis starts at zero; the x axis is real time."""
 
     points = [(datetime.fromisoformat(s["valid_at_utc"].replace("Z", "+00:00")).timestamp(),
                s["median_m3s"], s.get("p25_m3s"), s.get("p75_m3s")) for s in series

@@ -257,7 +257,7 @@ def read_district(admin_code: str, principal: AdminUser) -> dict[str, Any]:
 
 @router.get(
     "/{reach_id}",
-    summary="The latest GEOGLOWS seven-day river forecast for one reach",
+    summary="The latest GEOGLOWS 72-hour river forecast for one reach",
     openapi_extra={"x-grp-access": "protected"},
 )
 async def river_forecast(reach_id: int, principal: AdminUser) -> dict[str, Any]:

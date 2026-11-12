@@ -270,8 +270,8 @@ T: dict[str, dict[str, str]] = {
     "r_likely": {"en": "Probably the {name} (not confirmed).", "th": "น่าจะเป็น{name} (ยังไม่ยืนยัน)"},
     "r_small": {"en": "This is a small waterway: its modelled flow says little about the district.",
                 "th": "ลำน้ำนี้มีขนาดเล็ก ปริมาณน้ำที่จำลองบอกอะไรเกี่ยวกับพื้นที่ได้น้อย"},
-    "r_headline": {"en": "Over the next 7 days the river flow is forecast to be {trend}.",
-                   "th": "ในอีก 7 วันข้างหน้า คาดว่าปริมาณน้ำในแม่น้ำจะ{trend}"},
+    "r_headline": {"en": "Over the next 3 days the river flow is forecast to be {trend}.",
+                   "th": "ในอีก 3 วันข้างหน้า คาดว่าปริมาณน้ำในแม่น้ำจะ{trend}"},
     "r_trend_rise": {"en": "rising", "th": "เพิ่มขึ้น"},
     "r_trend_steady": {"en": "steady", "th": "ทรงตัว"},
     "r_trend_fall": {"en": "falling", "th": "ลดลง"},
@@ -294,9 +294,9 @@ T: dict[str, dict[str, str]] = {
     "r_now": {"en": "Flow at the start of the window", "th": "ปริมาณน้ำต้นช่วง"},
     "r_run": {"en": "Forecast run", "th": "รอบการพยากรณ์"},
     "r_quality": {"en": "Forecast freshness", "th": "ความใหม่ของการพยากรณ์"},
-    "r_chart": {"en": "7-day river flow (cubic metres per second): the line is the median, the "
+    "r_chart": {"en": "3-day river flow (cubic metres per second): the line is the median, the "
                       "band is where most forecasts fall. The axis starts at zero.",
-                "th": "ปริมาณน้ำ 7 วัน (ลูกบาศก์เมตรต่อวินาที) เส้นคือค่ามัธยฐาน แถบคือช่วงที่การ"
+                "th": "ปริมาณน้ำ 3 วัน (ลูกบาศก์เมตรต่อวินาที) เส้นคือค่ามัธยฐาน แถบคือช่วงที่การ"
                       "พยากรณ์ส่วนใหญ่อยู่ แกนเริ่มที่ศูนย์"},
     "r_caveat": {"en": "River flow only: not water level, flood depth, street flooding or a "
                        "warning. GEOGLOWS has no 'high' threshold here, so the outlook says only "

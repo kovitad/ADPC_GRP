@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -126,6 +127,23 @@ def test_the_practice_grid_has_every_kind_of_cell_and_is_labelled_made_up() -> N
     assert result["label"] == LABEL
     assert all(result["counts"][key] > 0 for key in (WET, DRY, UNKNOWN, OUTSIDE))
     assert sum(result["counts"].values()) == result["rows"] * result["cols"]
+
+
+@pytest.mark.fast
+def test_the_riverside_village_ui_keeps_the_practice_and_forecast_separate() -> None:
+    web = Path(__file__).resolve().parents[2] / "web"
+    page = (web / "pilot.html").read_text(encoding="utf-8")
+    text = (web / "pilot-i18n.js").read_text(encoding="utf-8")
+    script = (web / "pilot-practice.js").read_text(encoding="utf-8")
+
+    assert "แบบฝึก • พื้นดินและบ้านสมมติ" in page
+    assert "ดูตัวเลขแต่ละช่อง" in text
+    assert "แนวโน้มปริมาณน้ำในแม่น้ำ 3 วันข้างหน้า" in text
+    assert "ไม่ได้มาจากพยากรณ์ GEOGLOWS" in text
+    assert 'const PROFILE_ROW = 4' in script
+    assert '"4:7"' in script and '"4:18"' in script
+    assert "asked !== state.asked" in script
+    assert "data-hd-confirmed" in page
 
 
 @pytest.mark.fast

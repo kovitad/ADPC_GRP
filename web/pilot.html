@@ -8,14 +8,14 @@
     <title>River Watch pilot | SERVIR Global Risk Platform</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="/styles.css?v=20261005a" />
-    <link rel="stylesheet" href="/pilot.css?v=20261003a" />
+    <link rel="stylesheet" href="/pilot.css?v=20261112b" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <link rel="stylesheet" href="/map-symbols.css?v=20261005d" />
     <script src="/map-symbols.js?v=20261005d"></script>
     <script src="/grp-common.js?v=20261005a" defer></script>
-    <script src="/pilot-i18n.js?v=20261003a" defer></script>
-    <script src="/pilot.js?v=20261005a" defer></script>
-    <script src="/pilot-practice.js?v=20261002b" defer></script>
+    <script src="/pilot-i18n.js?v=20261112b" defer></script>
+    <script src="/pilot.js?v=20261112b" defer></script>
+    <script src="/pilot-practice.js?v=20261112b" defer></script>
   </head>
   <body class="workspace-body">
     <header data-grp-topbar></header>
@@ -106,7 +106,23 @@
       <p class="rw-loading" data-loading data-t="rw.loading">Loading the latest forecast…</p>
 
       <section class="rw-chart-card" data-chart-card hidden aria-labelledby="rw-chart-heading">
-        <h2 id="rw-chart-heading" data-t="rw.chart.title">The next 7 days</h2>
+        <div class="rw-chart-card__heading">
+          <h2 id="rw-chart-heading" data-t="rw.chart.title">Three-day river-flow outlook</h2>
+          <span class="rw-role" data-t="rw.role">Model forecast</span>
+        </div>
+        <div class="rw-info" data-outlook hidden>
+          <div class="rw-info__trend">
+            <span class="rw-info__icon" data-outlook-icon aria-hidden="true"></span>
+            <div>
+              <p class="rw-info__label" data-t="info.net">Net change over the 72 hours</p>
+              <p class="rw-info__word" data-outlook-word></p>
+              <p class="rw-info__span" data-outlook-span></p>
+              <p class="rw-info__unit" data-t="info.unit"></p>
+            </div>
+          </div>
+          <ol class="rw-info__checks" data-outlook-checks></ol>
+          <p class="rw-info__note" data-t="info.glassNote"></p>
+        </div>
         <ul class="rw-legend">
           <li><span class="rw-key rw-key--line" aria-hidden="true"></span><span data-t="rw.legend.line">The middle forecast</span></li>
           <li><span class="rw-key rw-key--band" aria-hidden="true"></span><span data-t="rw.legend.band">Where most forecasts fall</span></li>
@@ -162,32 +178,53 @@
       </details>
 
       <section class="hd" data-hd hidden aria-labelledby="hd-heading">
-        <p class="hd__stripe" data-t="hd.stripe">Practice example · made-up ground · not Bang Bua Thong</p>
-        <h2 id="hd-heading" data-t="hd.title">Practice: how a flood-depth map would work</h2>
+        <p class="hd__stripe" data-t="hd.stripe">แบบฝึก • พื้นดินและบ้านสมมติ</p>
+        <h2 id="hd-heading" data-t="hd.title">ลองดู น้ำขึ้นถึงบ้านไหนก่อน</h2>
         <p class="hd__intro" data-t="hd.intro"></p>
 
+        <div class="hd__profile-card">
+          <div class="hd__profile-heading">
+            <div>
+              <h3 data-t="hd.side">ภาพด้านข้างของหมู่บ้านริมแม่น้ำสมมติ</h3>
+              <p data-t="hd.sideNote"></p>
+            </div>
+            <p class="hd__confirmed"><span data-t="hd.confirmed">ระดับน้ำในภาพ</span> <strong data-hd-confirmed>3.0 m</strong></p>
+          </div>
+          <div class="hd__profile" data-hd-profile></div>
+        </div>
+
         <div class="hd__control">
-          <label for="hd-stage"><span data-t="hd.if1">If the river rose</span> <output data-hd-value for="hd-stage">3.0</output> <span data-t="hd.if2">metres above its channel</span></label>
-          <input id="hd-stage" type="range" min="0" max="5" step="0.1" value="3" data-hd-stage />
+          <label for="hd-stage" data-t="hd.slider">เลือกความสูงของน้ำในแบบฝึก</label>
+          <div class="hd__control-row">
+            <input id="hd-stage" type="range" min="0" max="5" step="0.1" value="3" data-hd-stage />
+            <output data-hd-value for="hd-stage">3.0 m</output>
+          </div>
           <div class="hd__ticks" aria-hidden="true"><span>0 m</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5 m</span></div>
+          <p class="hd__reference" data-t="hd.reference">เทียบกับระดับอ้างอิงร่องน้ำสมมติเดียวกัน</p>
+          <p class="hd__request" data-hd-request aria-live="polite"></p>
         </div>
 
         <p class="hd__answer" data-hd-answer aria-live="polite"></p>
 
-        <div class="hd__layout">
+        <div class="hd__village-layout">
           <div>
-            <div class="hd__map" data-hd-map></div>
-            <label class="hd__toggle"><input type="checkbox" data-hd-numbers /> <span data-t="hd.numbers">Show each square's height</span></label>
+            <h3 class="hd__sub" data-t="hd.mapTitle">แผนที่หมู่บ้านสมมติ</h3>
+            <p class="hd__subnote" data-t="hd.mapNote"></p>
+            <div class="hd__map-scroll" tabindex="0" aria-label="แผนที่หมู่บ้านสมมติ เลื่อนดูได้">
+              <div class="hd__map" data-hd-map role="grid"></div>
+            </div>
+            <button class="hd__numbers" type="button" aria-expanded="false" data-hd-numbers data-t="hd.numbers">ดูตัวเลขแต่ละช่อง</button>
           </div>
-          <div>
+          <aside class="hd__explain" aria-labelledby="hd-selected-heading">
+            <h3 id="hd-selected-heading" data-hd-selected-title>บ้านตัวอย่าง A</h3>
+            <p class="hd__cell" data-hd-cell></p>
+            <details class="hd__why">
+              <summary data-t="hd.why">ทำไมจุดนี้มีน้ำ</summary>
+              <p data-hd-arithmetic></p>
+            </details>
             <ul class="hd__legend" data-hd-legend></ul>
-            <p class="hd__cell" data-hd-cell data-t="hd.cellPrompt">Tap or point at a square to see its numbers.</p>
-          </div>
+          </aside>
         </div>
-
-        <h3 class="hd__sub" data-t="hd.side">Side view across the valley</h3>
-        <p class="hd__subnote" data-t="hd.sideNote"></p>
-        <div class="hd__profile" data-hd-profile></div>
 
         <details class="rw-more hd__example">
           <summary data-t="hd.example">The rule, worked through for water 3 metres up</summary>

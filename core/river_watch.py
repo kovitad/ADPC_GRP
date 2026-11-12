@@ -25,7 +25,7 @@ from typing import Any
 
 GEOGLOWS_API = "https://geoglows.ecmwf.int/api/v2"
 SOURCE_PAGE = "https://geoglows.ecmwf.int/documentation"
-WINDOW = timedelta(days=7)
+WINDOW = timedelta(hours=72)
 # GEOGLOWS publishes each day's run by about 12:00 UTC; allow two hours before calling the newest
 # run we hold "older".
 PUBLISH_BY = timedelta(hours=14)
@@ -387,8 +387,10 @@ def _iso(moment: datetime) -> str:
     return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _trend(first: float, last: float, peak: float) -> str:
-    if peak > first * (1 + STEADY_RATIO):
+def _trend(first: float, last: float) -> str:
+    """Describe net change across the window, not an intermediate peak."""
+
+    if last > first * (1 + STEADY_RATIO):
         return "rise"
     if last < first * (1 - STEADY_RATIO):
         return "fall"
@@ -402,7 +404,7 @@ def summarise(
     retrieved_at: datetime,
     source_url: str,
 ) -> dict[str, Any]:
-    """The card and feed summary for ``[decision_time, decision_time + 7 days)``.
+    """The card and feed summary for ``[decision_time, decision_time + 72 hours)``.
 
     The peak is the highest value of the median series in the window; on a tie, the earliest.
     P25 and P75 are read at that same time. This is not a probability of flooding.
@@ -413,7 +415,7 @@ def summarise(
     in_window = [step for step in forecast.steps if start <= step.valid_at < end]
     series = [step for step in in_window if step.median is not None]
     if not series:
-        raise ForecastError("no_window", "The forecast has no values for the next seven days.")
+        raise ForecastError("no_window", "The forecast has no values for the next 72 hours.")
 
     peak = series[0]
     for step in series[1:]:
@@ -432,7 +434,7 @@ def summarise(
         "window_start_utc": _iso(start),
         "window_end_utc": _iso(end),
         "units": UNITS,
-        "trend": _trend(first, last, peak.median),
+        "trend": _trend(first, last),
         "first_median_m3s": first,
         "last_median_m3s": last,
         "median_peak_m3s": peak.median,

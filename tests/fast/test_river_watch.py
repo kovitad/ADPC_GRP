@@ -158,7 +158,7 @@ def test_the_summary_matches_an_independent_recalculation(payload: dict) -> None
         forecast, decision_time=DECISION, retrieved_at=DECISION, source_url="u"
     )
 
-    end = DECISION + timedelta(days=7)
+    end = DECISION + timedelta(hours=72)
     best = None
     for when, med, p25, p75 in zip(
         payload["datetime"], payload["flow_med"], payload["flow_25p"], payload["flow_75p"],
@@ -174,7 +174,7 @@ def test_the_summary_matches_an_independent_recalculation(payload: dict) -> None
     assert summary["median_peak_m3s"] == best[1]
     assert summary["median_peak_valid_at_utc"] == best[0].isoformat().replace("+00:00", "Z")
     assert (summary["p25_at_peak_m3s"], summary["p75_at_peak_m3s"]) == (best[2], best[3])
-    assert summary["window_end_utc"] == "2026-10-09T04:00:00Z"
+    assert summary["window_end_utc"] == "2026-10-05T04:00:00Z"
     assert summary["issued_at_utc"] == "2026-10-01T00:00:00Z"
 
 
@@ -228,6 +228,27 @@ def test_the_trend_reads_as_a_plain_word(medians: list, trend: str) -> None:
         source_url="u",
     )
     assert summary["trend"] == trend
+
+
+@pytest.mark.fast
+def test_an_intermediate_peak_does_not_override_the_net_three_day_trend() -> None:
+    forecast = parse_forecast(
+        _small(
+            flow_med=[100.0, "", 140.0, 120.0, 90.0],
+            flow_25p=["", "", "", "", ""],
+            flow_75p=["", "", "", "", ""],
+        ),
+        REACH,
+        RUN,
+    )
+    summary = summarise(
+        forecast,
+        decision_time=datetime(2026, 10, 2, tzinfo=UTC),
+        retrieved_at=DECISION,
+        source_url="u",
+    )
+    assert summary["median_peak_m3s"] == 140.0
+    assert summary["trend"] == "fall"
 
 
 @pytest.mark.fast

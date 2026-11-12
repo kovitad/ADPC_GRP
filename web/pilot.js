@@ -344,12 +344,63 @@
     return node;
   };
 
+  // The chart's own top, shared by the water glasses so both use one scale.
+  const chartTop = (rows) =>
+    Math.max(...rows.map((r) => (r.p75_m3s != null ? r.p75_m3s : r.median_m3s))) * 1.1 || 1;
+
+  const ARROW = { rise: "M12 20V5M5 11l7-7 7 7", steady: "M4 12h15M13 5l7 7-7 7", fall: "M12 4v15M5 13l7 7 7-7" };
+
+  // The infographic reads values straight from the stored series: no new statistic is made.
+  // The checkpoints are the medians at the window start, +24 h, +48 h and the last value.
+  const renderOutlook = (view) => {
+    const s = view.summary;
+    const rows = view.series;
+    const trend = TREND[s.trend] ? s.trend : "steady";
+    const icon = el("svg", { viewBox: "0 0 24 24", width: 44, height: 44, "aria-hidden": "true" });
+    icon.append(el("path", { d: ARROW[trend], class: "rw-info__arrow" }));
+    $("[data-outlook-icon]").replaceChildren(icon);
+    $("[data-outlook-icon]").className = `rw-info__icon ${TREND[trend]}`;
+    $("[data-outlook-word]").textContent = say(`trend.${trend}`);
+    $("[data-outlook-span]").textContent = say("info.span", {
+      first: number(s.first_median_m3s), last: number(s.last_median_m3s),
+    });
+    const start = Date.parse(s.window_start_utc);
+    // The first stored step at or after each checkpoint; steps need not align with the window start.
+    const at = (hours) => rows.find((r) => Date.parse(r.valid_at_utc) >= start + hours * 3600e3);
+    const checks = [
+      ["info.start", at(0)], ["info.day2", at(24)], ["info.day3", at(48)], ["info.last", rows[rows.length - 1]],
+    ];
+    const top = chartTop(rows);
+    const list = $("[data-outlook-checks]");
+    list.replaceChildren(...checks.map(([key, r]) => {
+      const li = document.createElement("li");
+      const glass = el("svg", { viewBox: "0 0 40 96", width: 34, height: 82, "aria-hidden": "true" });
+      glass.append(el("rect", { x: 2, y: 2, width: 36, height: 92, rx: 9, class: "rw-info__glass" }));
+      if (r) {
+        const h = Math.round(86 * Math.min(1, r.median_m3s / top));
+        glass.append(el("rect", { x: 5, y: 91 - h, width: 30, height: h, rx: 6, class: "rw-info__fill" }));
+      }
+      const text = document.createElement("div");
+      const label = Object.assign(document.createElement("span"), { className: "rw-info__when", textContent: say(key) });
+      const time = Object.assign(document.createElement("span"), {
+        className: "rw-info__time", textContent: r ? `${day(r.valid_at_utc)} ${clock(r.valid_at_utc)}` : say("info.none"),
+      });
+      const value = Object.assign(document.createElement("strong"), { textContent: r ? number(r.median_m3s) : "—" });
+      const unit = Object.assign(document.createElement("span"), { className: "rw-info__time", textContent: "m³/s" });
+      text.append(label, time, value, unit);
+      li.append(glass, text);
+      return li;
+    }));
+    $("[data-outlook]").hidden = false;
+  };
+
   // Time on the x-axis (the steps are not evenly spaced); the y-axis starts at zero so a small
   // change is not made to look dramatic.
   const renderChart = (view) => {
     // Drawn at the box's own width so the text stays readable on a phone.
     const box = $("[data-chart]");
     $("[data-chart-card]").hidden = false;
+    renderOutlook(view);
     const W = Math.max(320, Math.round(box.clientWidth || 720));
     const narrow = W < 560;
     const H = narrow ? 240 : 300, L = narrow ? 48 : 64, R = 12, T = 28, B = 44;
@@ -358,7 +409,7 @@
     const rows = view.series;
     const start = Date.parse(s.window_start_utc);
     const end = Date.parse(s.window_end_utc);
-    const top = Math.max(...rows.map((r) => (r.p75_m3s != null ? r.p75_m3s : r.median_m3s))) * 1.1 || 1;
+    const top = chartTop(rows);
     const x = (iso) => L + ((Date.parse(iso) - start) / (end - start)) * (W - L - R);
     const y = (v) => T + (1 - v / top) * (H - T - B);
 
