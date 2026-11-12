@@ -10,8 +10,8 @@
   and Ruff is clean on the touched files. Left uncommitted on purpose because it is other work:
   the planning-chat changes (`api/planning.py`, `web/planning.*`,
   `tests/fast/test_planning_chat.py`) and the untracked docs and deliverables. Never commit
-  `client_secret_*.json`. **Gaps:** the bank-outlook route docstring cites ADR-0070, which does
-  not exist in `docs/adr/` yet, so write it before merging. The route has no behaviour tests yet,
+  `client_secret_*.json`. **Gaps:** ADR-0070 (`docs/adr/0070-bank-outlook-keeps-observed-level-and-forecast-flow-separate.md`)
+  now records the bank-outlook decision, and the branch is pushed. The route has no behaviour tests yet,
   only the permission-matrix contract. The signed-in Admin browser check of `pilot.html` is
   still the owner's acceptance step.
 - **12 November 2026 (afternoon): GEOGLOWS infographic and illustrated village, approved by the
