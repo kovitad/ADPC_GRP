@@ -1,6 +1,186 @@
 # GRP MVP 1 Project Handover
 
-**Updated:** 9 November 2026.
+**Updated:** 12 November 2026.
+- **12 November 2026 (evening): committed on branch `feat/geoglows-3day-infographic`** (not
+  pushed; the owner pushes). Commit 1 holds the GEOGLOWS 72-hour window, the outlook
+  infographic, the illustrated village and the geoglow plan and concept art. Commit 2 holds the
+  protected `GET /api/v1/pilot/flood/{pilot_id}/bank-outlook` route
+  (`core/flood_evidence/bank_outlook.py`), now in the permission matrix as `flood_bank_outlook`
+  (401 anonymous, 200 Bangkok admin/Hub, 403 cross-Hub). Full suite: **1,292 passed, 2 skipped**,
+  and Ruff is clean on the touched files. Left uncommitted on purpose because it is other work:
+  the planning-chat changes (`api/planning.py`, `web/planning.*`,
+  `tests/fast/test_planning_chat.py`) and the untracked docs and deliverables. Never commit
+  `client_secret_*.json`. **Gaps:** the bank-outlook route docstring cites ADR-0070, which does
+  not exist in `docs/adr/` yet, so write it before merging. The route has no behaviour tests yet,
+  only the permission-matrix contract. The signed-in Admin browser check of `pilot.html` is
+  still the owner's acceptance step.
+- **12 November 2026 (afternoon): GEOGLOWS infographic and illustrated village, approved by the
+  owner and built in.** The look was first prototyped and approved on a Claude design canvas
+  (private artifact `https://claude.ai/artifact/9dfNmGKvRT5fp7YsDMzcAn`, two boards: the 3-day
+  outlook from the Mekong CSV example, and the interactive village). Ported into the Pilot page:
+  `web/pilot.js` adds `renderOutlook`, a trend hero with an arrow and the server's
+  `rise`/`steady`/`fall` word, first → last median, and four "water glass" checkpoints. The
+  glasses show the first stored median at or after window start, +24 h, +48 h, plus the last
+  value, all scaled to the chart's own top. This is read from the series only, and no new
+  statistic is computed. The peak dot and "rise" chip are no longer red, because red is
+  reserved for errors and warnings. `web/pilot-practice.js` `renderProfile` is now an
+  illustrated SVG scene in the concept-art style. It has a monotone-cubic bank through the row-4
+  cell values (so it cannot overshoot), soil and grass, Thai stilt houses and trees. Water is
+  filled only over cells the server marked `wet`, so `edge` cells stay dry. Unknown columns stay
+  hatched. House labels and the selection ring are drawn above the water, and the fictional-data
+  badge is drawn inside the SVG. New `info.*` strings are in `pilot-i18n.js` (th/en), and asset
+  versions were bumped to `20261112b`. Also fixed: a pre-existing phone overflow, where the
+  village grid's `1fr` let the tile map widen the page to 739 px (now `minmax(0, 1fr)`, so the map
+  pans in its own box and the page is 375 px wide at a 390 px viewport); a selected cell from
+  another map row now marks only its column in the side view; trend chips and the peak label are
+  neutral. Validation: full suite 1,286 passed, 2 skipped, 1 failed. The failure is
+  `test_permission_matrix`: the uncommitted `GET /pilot/flood/{id}/bank-outlook` route from the
+  earlier bank-outlook work (`api/flood_pilot.py`, untracked `core/flood_evidence/bank_outlook.py`)
+  is not in the permission matrix, which is unrelated to this UI work. `node --check` passes. The
+  browser check used `.local/adhoc/river_village_preview.py` at desktop width and a real 390 px
+  viewport through CDP. Screenshots are
+  `.local/screenshots/geoglows-infographic-{desktop,mobile}.png`. `web/` is bind-mounted into
+  `grp-main-api-1`, so the signed-in page already serves this version. Still open: the signed-in
+  Admin check, matrix entry for bank-outlook, and commit (nothing committed; keep the untracked
+  `client_secret_*.json` out of any commit).
+- **Local ThaiWater shadow capture enabled and bounded feasibility window completed:** the ignored
+  `.env` now keeps `THAIWATER_SHADOW_ENABLED=true`; the existing secret file was used without
+  printing or copying its value. The `grp-main` stack was rebuilt and three read-only source pulls
+  ran at a temporary five-minute cadence before restoring the configured cadence to 15 minutes.
+  Both products succeeded 3/3 with immutable raw parsing: water level returned 826 national
+  features and normalized 12 pilot stations across 10 districts; 24-hour rainfall returned 2,366
+  national features but currently normalized only 2 pilot stations across 2 districts. The window
+  stored 35 valid water-level states and 2 valid rainfall states, with zero missing configured
+  measurements, corrections or future clocks. All quality flags were unreported. Rainfall bytes
+  were unchanged across the three pulls, correctly creating no duplicate states after the first
+  pull. Protected readiness reports `state=ok`; publication remains false and `flood.html` still
+  shows health/coverage only. Khlong San has no placed water-level station. The nearest captured
+  station is provider station `G23069-CPY015` (Chao Phraya 15), about 2.7 km from the district
+  centroid; at the latest checked state it reported 1.25 m MSL and provider metadata said 0.91 m
+  below the bank at that station, but supplied no quality flag. This is feasible as nearby observed
+  station context, not enough to convert GEOGLOWS discharge to level or predict Khlong San flooding:
+  the system still lacks a reviewed station-to-reach mapping, same-point rating curve, verified
+  bank/datum interpretation and tide/gate/pump treatment. No public route, warning or measurement
+  UI was enabled.
+- **Riverside-village Pilot implementation completed locally:** the protected River Watch page now
+  leads its synthetic HAND practice with a code-rendered side-view river village: fixed terrain,
+  low/high banks, two fictional houses, a fixed metre scale and a horizontal water surface driven
+  only by the existing 0–5 m practice control. The existing server-calculated 12 × 20 fixture still
+  supplies every state, depth and count. A matching scrollable tile village supports touch/click
+  and roving-arrow-key selection, keeps the chosen source cell highlighted in both views, explains
+  ground/water/depth in plain Thai, hatches missing/outside cells and hides cell elevations behind
+  “ดูตัวเลขแต่ละช่อง”. Rapid requests discard stale responses; a failed request retains and labels
+  the last confirmed scene instead of pairing new controls with old results. The persistent badge
+  reads “แบบฝึก • พื้นดินและบ้านสมมติ”. GEOGLOWS remains independent discharge evidence, but its
+  existing path, Pilot chart, flood coverage copy and district-summary wording now consistently use
+  a deterministic 72-hour window and net first-to-last trend. No rating curve, flood threshold,
+  warning or Q-to-H link was introduced. The supplied generated artwork was inspected as concept
+  reference only; it was not treated as a calibrated scene or production sprite atlas. Validation:
+  full suite **1,287 passed, 2 PostgreSQL-only tests skipped**; focused Ruff, JavaScript syntax and
+  whitespace checks pass. Browser QA used a secret-free ignored localhost fixture server because
+  the real `http://127.0.0.1:8000/pilot.html?mode=bbt` correctly redirected the isolated browser to
+  sign-in. It covered equal H/ground wording and zero wet-depth behavior, unknown hatching,
+  map/cross-section selection, arrow keys, rapid changes, failed-request consistency, 390 px layout
+  and reduced motion. Screenshots are in `.local/screenshots/river-village-desktop-final.png`,
+  `river-village-map-final.png`, `river-village-mobile-final.png` and
+  `geoglows-72-hour-outlook.png`. Remaining acceptance item:
+  repeat the same browser checks against the protected Docker page in a signed-in Admin session.
+- **12 November 2026 — GEOGLOWS community visual design handoff updated:** the existing
+  three-day developer plan now includes a riverside-village theme, Thai lay-reader copy,
+  a side-view low/high-bank and house concept, a transparent 4-by-4 tile concept sheet,
+  interaction/rendering rules, accessibility and comprehension checks, and generation prompts.
+  Assets are under `docs/enhancement/geoglow/assets/`. Keep the synthetic HAND practice
+  separate from the 72-hour discharge outlook. Generated art is a visual reference and must be
+  normalized before quantitative/atlas use. The localhost pilot redirected to sign-in, so visual
+  review used the supplied screenshots and existing ADR-0037. This session delivered design and
+  documentation assets. Running application/browser acceptance remains outstanding.
+- **MVP 2 GEOGLOWS three-day developer plan completed:**
+  `docs/enhancement/geoglow/2026-11-09_GEOGLOWS_3_Day_River_Flow_Outlook_Developer_Plan.md`
+  reviews all 12 slides and notes in the latest MVP 2 story deck, the 17-page downloaded
+  GEOGLOWS report, the 51-member CSV, the current prototype River Watch/HAND implementation and
+  the private developer monorepo at `496c3cc`. Read-only live checks on 9 November confirmed
+  `/dates`, `forecaststats` and `forecastensembles`; the REST `returnperiods` route still returns
+  500. The plan defines the honest GEOGLOWS-only outcome as a reviewed-reach, deterministic
+  72-hour **river-discharge outlook** (run/valid/retrieval times, median, P25–P75, peak, net trend,
+  freshness and provenance), not observed live water, flood occurrence, water level, depth,
+  extent, impacts or warning. It includes the Q→rating curve→H→HAND concept boundary, a worked
+  three-day calculation from the downloaded Mekong/Vietnam fixture, target-monorepo modules,
+  persistence/API/UI/AI contracts, staged work, tests, acceptance criteria and unresolved owner/
+  hydrology decisions. No implementation or publication was authorised. Existing River Watch and
+  HAND focused validation remains clean: 59 tests pass; whitespace checks pass.
+- **Developer monorepo AI interaction inspected:** the private `SERVIRSEA/risk-servir-adpc`
+  repository has no `main` branch; its default `master` at `496c3cc` was cloned read-only into
+  ignored `.local/adhoc/risk-servir-adpc`. No source was changed and no credential was copied or
+  printed. The initial report is `.local/adhoc/risk-servir-adpc-ai-interaction-review.md`. It
+  confirms the reported failure is architectural, not just prompt wording: the React client
+  intercepts every Thai-script message for district-only geocoding (even greetings and questions
+  about an existing selection), proposed places create only a free map marker, general AI text
+  cannot update structured `area_code`, backend matching strips Thai characters and cannot name
+  sub-districts except by explicit UI selection, and direct shelter list/count has no deterministic
+  lane. The ignored clone's dependencies were not installed and its tests were not run.
+- **Planning location continuity improved:** natural-language requests such as `change the location
+  to ตำบลพระลับ อำเภอเมือง จังหวัดขอนแก่น` now resolve the unique supported bilingual boundary,
+  return its ID and make the browser select it explicitly instead of merely claiming that it can
+  switch. Follow-ups including “how many evacuation center here” and the shorthand
+  “evacuation-centre” now use that selected area's managed shelter catalogue directly, with no AI
+  or Global Risk call. Ambiguous and unsupported names fail closed and ask for an exact map
+  selection/full name and province. Validation: 1,285 tests pass with 2 PostgreSQL-only skips;
+  focused Ruff, JavaScript syntax and whitespace checks pass. The Docker Desktop engine was not
+  running, so rebuilding the stack and signed-in browser acceptance for Phra Lap remain to do.
+- **Global Risk evidence stop diagnosed:** the live Chiang Yuen question trace
+  `c1fd824734910fcc92d1f6be379d04d4` proves the router and MCP `assemble_pack` completed, but no
+  draft ran. Stored pack `c9d3e982c985c3bc` names Chiang Yuen in target/stats, while Global Risk
+  now spills its 2,533-character trace to
+  `servirplatform://pack/c9d3e982c985c3bc/trace` instead of returning the inline trace list
+  `check_area()` requires. GRP therefore fails closed and truthfully reports that it could not
+  verify the AOI; the lookup itself did not fail. Repair requires a bounded, exact-URI MCP
+  `resources/read` in the same session followed by the unchanged admin-boundary gate. Do not trust
+  target/stats alone, weaken the gate or re-gather with `detail=full`. This contract repair is
+  diagnosed and added to the conversation proposal but not yet implemented.
+- **Exact local population/flood chat route fixed:** the reported KU THONG sub-district question
+  no longer depends on the probabilistic AI router or a Global Risk AOI. When a selected or
+  uniquely named supported area is asked for managed population and/or people inside the modelled
+  flood extent, Planning reads that exact area's precomputed `AreaPopulationSummary` and
+  `AreaFloodExposure`, preserves their source/missing-data/safety caveats, and returns explicit
+  unavailable text rather than inventing zero. It bypasses stale answer cache, model allowance and
+  SIG; it never promotes a sub-district to parent-district values. The local-first route now also
+  recognizes impact wording such as “How badly could people there be affected if a big flood
+  comes?”, resolves a confirmed full district/sub-district name back to the exact managed boundary,
+  and reports the available RP100 exposure with its extent, missing-data and safety caveats.
+  Global Risk is used only when explicitly requested for this class of question. A synthetic KU
+  THONG regression proves its
+  fixture's local totals can be returned with no model or MCP call; it is not a claim about the
+  real area's values. Validation:
+  1,284 tests pass with 2 PostgreSQL-only skips; Ruff, JavaScript syntax and whitespace checks pass.
+  The supported Desktop launcher rebuilt the `grp-main` API/worker image; database, API and worker
+  are healthy at `http://127.0.0.1:8000`, and the running API recognizes the flood-extent intent.
+  Signed-in browser acceptance against the real KU THONG rows remains to do.
+- **LLM-led Planning conversation proposal drafted:**
+  `docs/proposals/planning-assistant-llm-tool-conversation-plan.md` records the gap between the
+  current JSON router and the requested natural LLM conversation with governed internal tools.
+  It proposes a bounded native Responses API tool loop rather than LangChain, keeps menus as
+  optional discovery aids, separates GRP internal tools from Global Risk MCP, preserves
+  deterministic fallback, and stages greeting/help, centre-list, structured follow-up, evidence
+  and assessment integration. No implementation is authorized. The primary formal blocker is
+  ADR-0028's unresolved AI-09 accounting decision for multiple provider calls; the plan also
+  requires decisions on slow background MCP work, action confirmation, structured memory,
+  provider compatibility, prompt injection and fallback behavior. It now also records the failed
+  “How badly could people there be affected if a big flood comes?” follow-up and defines a human
+  conversation policy: reuse validated area IDs, distinguish scenario/current/severity meanings,
+  ask one focused clarification before tools, prefer exact local facts, preserve partial answers,
+  and offer server-approved next steps. Product Owner and Technical Lead review questions are at
+  the end of the proposal.
+- **Direct evacuation-centre chat answers completed:** Planning now recognizes direct English
+  requests to list evacuation centres/shelters and reads the current managed catalogue for the
+  explicitly named or selected supported area instead of asking the model to rediscover local
+  records. It reports source-row and distinct facility/community-label counts, collapses the
+  importer's final numeric disambiguators for repeated source labels, preserves the data-gap
+  distinction, and states that capacity, condition and route safety were not assessed. Cached
+  model answers cannot shadow this path, ambiguous/missing areas fail closed with a selection
+  prompt, and assessment/result-explanation questions still follow their existing governed paths.
+  The direct path consumes no model tokens, AI-request allowance or SIG call. Validation: 1,283
+  tests pass with 2 PostgreSQL-only skips; focused Ruff, JavaScript syntax and whitespace checks
+  pass. Browser acceptance against the running stack remains to do.
 - **Development OpenTelemetry debug tracing implemented:** `main` now groups each Planning
   question into one `grp-planning-question` trace with hashed user/session references, generation,
   MCP tool and sanitized AI/MCP HTTP observations. The allow-listed local tester receives bounded

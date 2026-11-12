@@ -168,6 +168,7 @@ MATRIX = {
     "flood_replay_inject_report": (401, 404, 404, 403, 403),
     "flood_replay_inject_outage": (401, 404, 404, 403, 403),
     "flood_weather": (401, 200, 200, 403, 200),
+    "flood_bank_outlook": (401, 200, 200, 403, 200),
     # No road is stored in the fixture, so allowed callers are told it is not found.
     "flood_road_cameras": (401, 404, 404, 403, 404),
     # ADR-0051: the relay is off unless switched on, so members get 404 here.
@@ -304,6 +305,7 @@ MATRIX_OPERATION_IDS = {
         "post_inject_outage_api_v1_pilot_flood__pilot_id__replays__replay_id__inject_outage_post"
     ),
     "flood_weather": "read_weather_api_v1_pilot_flood__pilot_id__weather_get",
+    "flood_bank_outlook": "read_bank_outlook_api_v1_pilot_flood__pilot_id__bank_outlook_get",
     "flood_road_cameras": (
         "read_road_cameras_api_v1_pilot_flood__pilot_id__roads__road_id__cameras_get"
     ),
@@ -677,6 +679,9 @@ def _call(client: TestClient, headers: dict[str, str], route: str, world: dict, 
             {"at": "2026-10-03T04:00:00Z", "lat": 13.8, "lon": 100.5},
         ),
         "flood_weather": ("GET", "/api/v1/pilot/flood/bangkok/weather", None),
+        "flood_bank_outlook": (
+            "GET", "/api/v1/pilot/flood/bangkok/bank-outlook?area_code=1001", None
+        ),
         "flood_replay_inject_outage": (
             "POST", "/api/v1/pilot/flood/bangkok/replays/r00000000000/inject-outage",
             {"source_id": "floodboard_roads", "start": "2026-10-03T04:00:00Z",

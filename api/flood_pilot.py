@@ -24,6 +24,9 @@ from api.errors import GrpError, access_not_authorized, not_found, validation_fa
 from api.langfuse import send_ai_call
 from api.permissions import SignedInMember
 from api.rate_limits import limiter, rate_limited
+from api.river_outlook import reach_for
+from api.river_watch import _current as current_river_forecast
+from api.river_watch import _view as river_forecast_view
 from api.sessions import CurrentPrincipal
 from api.settings import get_settings
 from core import public_reads
@@ -36,6 +39,7 @@ from core.flood_evidence.answer import (
     instructions_for,
 )
 from core.flood_evidence.areas import pilot_areas, pilot_subdistricts
+from core.flood_evidence.bank_outlook import observed_bank_context, three_day_flow_slots
 from core.flood_evidence.briefing import build_facts, get_situation_changes
 from core.flood_evidence.camera_relay import PROVIDER as RELAY_PROVIDER
 from core.flood_evidence.camera_relay import (
@@ -315,6 +319,68 @@ def read_government_observation_status(
         interval_minutes=settings.thaiwater_poll_minutes,
         publication_approved=settings.thaiwater_feed_public,
     )
+
+
+@router.get(
+    "/{pilot_id}/bank-outlook",
+    summary="Observed ThaiWater bank context and an honest 1–3 day GEOGLOWS outlook",
+    openapi_extra={"x-grp-access": "protected"},
+)
+async def read_bank_outlook(
+    config: FloodPilot,
+    session: DatabaseSession,
+    area_code: Annotated[str, Query(min_length=4, max_length=12)],
+    as_of: AsOf = None,
+) -> dict[str, Any]:
+    """Keep observed station level and forecast discharge separate (ADR-0070)."""
+
+    if config.is_replay:
+        return {
+            "status": "unavailable",
+            "reason": "not_available_in_replay",
+            "days": three_day_flow_slots(None),
+        }
+    valid_codes = {
+        area["admin_code"] for area in pilot_areas(config) + pilot_subdistricts(config)
+    }
+    if area_code not in valid_codes:
+        raise not_found()
+    moment = _as_of(as_of, config)
+    observation = observed_bank_context(session, config, area_code, moment)
+    reach = reach_for(area_code[:4])
+    view = None
+    problem = None
+    if reach is not None:
+        fetched, problem = await current_river_forecast(reach["reach_id"])
+        view = river_forecast_view(reach["reach_id"], fetched, problem)
+    return {
+        "status": "available",
+        "area_code": area_code,
+        "as_of": moment.isoformat(),
+        "observation_role": "observed_station_context",
+        "forecast_role": "modelled_discharge",
+        "observation": observation,
+        "forecast": {
+            "reach": reach,
+            "available": bool(view and view.get("available")),
+            "run": (view or {}).get("summary", {}).get("run") if view else None,
+            "issued_at_utc": (view or {}).get("summary", {}).get("issued_at_utc")
+            if view
+            else None,
+            "quality_state": (view or {}).get("summary", {}).get("quality_state")
+            if view
+            else None,
+            "problem": problem or ((view or {}).get("problem") if view else "no_reach"),
+        },
+        "days": three_day_flow_slots(view),
+        "overtopping_method": "not_available",
+        "limitations": [
+            "No reviewed discharge-to-stage rating curve is configured.",
+            "The selected GEOGLOWS reach and ThaiWater station are not a reviewed pair.",
+            "Tides, gates and pumps are not represented in the discharge outlook.",
+            "Undetermined is not evidence that flooding is unlikely.",
+        ],
+    }
 
 
 @public_router.get(
